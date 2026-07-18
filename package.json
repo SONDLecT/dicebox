@@ -5,7 +5,8 @@
   "description": "An offline dice roller for tabletop RPGs.",
   "type": "module",
   "scripts": {
-    "test": "node tools/test.mjs && node tools/test-render.mjs && node tools/test-pool.mjs && node tools/test-markup.mjs && node tools/test-load.mjs",
+    "bundle": "node tools/bundle.mjs",
+    "test": "node tools/test.mjs && node tools/test-render.mjs && node tools/test-pool.mjs && node tools/test-markup.mjs && node tools/test-load.mjs && node tools/bundle.mjs && node tools/test-bundle.mjs",
     "icons": "node tools/make-icons.cjs",
     "preview": "node tools/preview.cjs",
     "serve": "python3 -m http.server 8080",

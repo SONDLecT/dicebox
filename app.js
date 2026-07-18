@@ -232,12 +232,12 @@ function doRoll(notation) {
       d.throwWith((d.homeX - d.x) * 2.4, (d.homeY - d.y) * 2.4);
     }
     $('total').dataset.rolling = '1';
-    setTimeout(() => finish(result), 620);
+    setTimeout(() => finish(result), 620 + rerollDelay(flat));
   } else if (mode === 'spin') {
     // Stagger the starts so the grid resolves in a wave instead of snapping.
     state.dice.forEach((d, i) => d.spinInPlace(i / state.dice.length));
     $('total').dataset.rolling = '1';
-    setTimeout(() => finish(result), 700);
+    setTimeout(() => finish(result), 700 + rerollDelay(flat));
   } else {
     for (const d of state.dice) { d.settled = true; d.settling = true; d.settleT = 1; }
     finish(result);
@@ -245,6 +245,13 @@ function doRoll(notation) {
 
   if (navigator.vibrate) navigator.vibrate(mode === 'none' ? 10 : [8, 40, 12]);
   hideHint();
+}
+
+// A rerolled die lands, pauses, hops and tumbles again, so the total has to wait
+// for the second landing or it would appear while dice are still moving. Only
+// paid when something actually rerolled.
+function rerollDelay(flat) {
+  return flat.some(f => f.rerolled) ? 700 : 0;
 }
 
 function finish(result) {
@@ -382,6 +389,20 @@ function addToPool(sides, count = 1) {
   }
   const cur = pool.get(sides) || { count: 0, mods: {} };
   pool.set(sides, { count: cur.count + count, mods: cur.mods });
+  syncPool();
+}
+
+// Set how many of one die are staged, keeping whatever modifiers it carries.
+// Zero removes it entirely.
+function setDieCount(sides, count) {
+  if (!poolMatchesField()) pool = parsePool($('notation').value);
+
+  const cur = pool.get(sides);
+  const next = Math.max(0, Math.min(999, Math.round(count)));
+  if (next === (cur ? cur.count : 0)) return;
+
+  if (next === 0) pool.delete(sides);
+  else pool.set(sides, { count: next, mods: cur ? cur.mods : {} });
   syncPool();
 }
 
@@ -755,6 +776,56 @@ function openSheet(sides) {
 
   const current = pool.get(sides);
 
+  // How many of this die are staged, adjustable exactly. Dragging the button
+  // sideways is quicker, but a number you can type is the only way to land on a
+  // specific count without counting taps.
+  const row = document.createElement('div');
+  row.className = 'sheet-count';
+
+  const label = document.createElement('span');
+  label.className = 'sheet-count-label';
+  label.textContent = 'How many';
+
+  const minus = document.createElement('button');
+  minus.type = 'button';
+  minus.className = 'step';
+  minus.textContent = '−';
+  minus.setAttribute('aria-label', `One fewer d${sides}`);
+
+  const field = document.createElement('input');
+  field.type = 'text';
+  field.inputMode = 'numeric';
+  field.className = 'count sheet-count-field';
+  field.value = String(current ? current.count : 0);
+  field.setAttribute('aria-label', `Number of d${sides}`);
+
+  const plus = document.createElement('button');
+  plus.type = 'button';
+  plus.className = 'step';
+  plus.textContent = '+';
+  plus.setAttribute('aria-label', `One more d${sides}`);
+
+  const readField = () => {
+    const n = parseInt(field.value, 10);
+    return Number.isFinite(n) && n >= 0 ? Math.min(n, 999) : 0;
+  };
+  const applyCount = n => {
+    setDieCount(sides, n);
+    field.value = String(Math.max(0, Math.min(999, Math.round(n))));
+    refreshSheetPreviews(sides);
+  };
+
+  minus.addEventListener('click', () => applyCount(readField() - 1));
+  plus.addEventListener('click', () => applyCount(readField() + 1));
+  field.addEventListener('change', () => applyCount(readField()));
+  field.addEventListener('focus', () => field.select());
+
+  const counter = document.createElement('div');
+  counter.className = 'counter';
+  counter.append(minus, field, plus);
+  row.append(label, counter);
+  sheetOptions.append(row);
+
   for (const mod of modifiersFor(sides)) {
     const active = current ? current.mods || {} : {};
     const slot = mod.suffix ? slotFor(mod.suffix) : null;
@@ -767,6 +838,8 @@ function openSheet(sides) {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'sheet-option';
+    b.dataset.suffix = mod.suffix;
+    b.dataset.min = String(mod.min);
     if (isOn) b.setAttribute('aria-pressed', 'true');
     if (blocked) {
       b.disabled = true;
@@ -822,6 +895,25 @@ function openSheet(sides) {
   sheetOptions.firstElementChild?.focus();
 }
 
+// The modifier rows preview what they would stage, so changing the count has to
+// update them or they advertise a number that is no longer true.
+function refreshSheetPreviews(sides) {
+  for (const option of sheetOptions.querySelectorAll('.sheet-option')) {
+    const suffix = option.dataset.suffix || '';
+    const min = Number(option.dataset.min || 1);
+    const notation = option.querySelector('.sheet-option-notation');
+    if (!notation || option.dataset.blocked) continue;
+
+    const cur = pool.get(sides);
+    const mods = { ...(cur ? cur.mods : {}) };
+    if (suffix) mods[slotFor(suffix)] = suffix;
+    else for (const s of SLOTS) delete mods[s];
+
+    const base = cur ? cur.count : perTap();
+    notation.textContent = entryNotation(sides, { count: Math.max(min, base), mods });
+  }
+}
+
 function closeSheet() {
   sheet.hidden = true;
 }
@@ -839,9 +931,18 @@ document.addEventListener('keydown', e => {
 function attachModifierSheet(button, sides) {
   let timer = null;
   let longPressed = false;
+  let scrub = null;
 
-  const start = () => {
+  const start = e => {
     longPressed = false;
+    // Sliding sideways from here adjusts how many of this die are staged, so a
+    // count can be dialled from 37 to 3 in one gesture instead of 34 taps.
+    scrub = {
+      x: e.clientX,
+      startCount: (pool.get(sides) || { count: 0 }).count,
+      moved: false,
+      pointerId: e.pointerId,
+    };
     // The fill is the affordance: it shows a hold is doing something, and how
     // much longer to hold. Duration matches the CSS transition.
     button.dataset.holding = '1';
@@ -852,18 +953,52 @@ function attachModifierSheet(button, sides) {
       openSheet(sides);
     }, 450);
   };
+
   const cancel = () => {
     clearTimeout(timer);
     timer = null;
     delete button.dataset.holding;
+    delete button.dataset.scrubbing;
+    scrub = null;
   };
 
-  button.addEventListener('pointerdown', start);
-  button.addEventListener('pointerup', cancel);
-  button.addEventListener('pointerleave', cancel);
-  button.addEventListener('pointercancel', cancel);
+  button.addEventListener('pointerdown', e => {
+    start(e);
+    button.setPointerCapture?.(e.pointerId);
+  });
 
-  // Swallow the click that follows a long press, so it does not also stage dice.
+  button.addEventListener('pointermove', e => {
+    if (!scrub) return;
+    const dx = e.clientX - scrub.x;
+    if (!scrub.moved) {
+      if (Math.abs(dx) < 8) return;
+      // It is a drag, not a tap or a hold.
+      scrub.moved = true;
+      clearTimeout(timer);
+      timer = null;
+      delete button.dataset.holding;
+      button.dataset.scrubbing = '1';
+    }
+    // Accelerates with distance: small nudges are precise, long drags cover the
+    // range without a marathon swipe.
+    const steps = Math.sign(dx) * Math.round(Math.pow(Math.abs(dx) / 14, 1.55));
+    setDieCount(sides, Math.max(0, scrub.startCount + steps));
+  });
+
+  const finish = () => {
+    if (scrub && scrub.moved) {
+      // The drag already set the count; suppress the click that follows.
+      longPressed = true;
+    }
+    cancel();
+  };
+
+  button.addEventListener('pointerup', finish);
+  button.addEventListener('pointercancel', cancel);
+  button.addEventListener('pointerleave', () => { if (!scrub || !scrub.moved) cancel(); });
+
+  // Swallow the click that follows a long press or a drag, so neither also
+  // stages another die.
   button.addEventListener('click', e => {
     if (longPressed) { e.preventDefault(); e.stopImmediatePropagation(); longPressed = false; }
   }, true);
@@ -971,7 +1106,21 @@ function drawFrame(dt) {
   for (const d of state.dice) {
     const wasSettled = d.settled;
     d.step(dt, state.bounds);
-    if (!wasSettled && d.settled) state.surface.impact(d.x, d.y, d.size);
+    if (!wasSettled && d.settled) {
+      state.surface.impact(d.x, d.y, d.size);
+      // A rerolled die lands once, then throws itself again. Doing it here
+      // rather than at roll time means the pause starts when the die actually
+      // stops, however long its first tumble took.
+      if (d.rerolled && !d.rerollShown) {
+        d.rerollShown = true;
+        d.beginReroll();
+      }
+      if (d.exploded && !d.burstShown) {
+        d.burstShown = true;
+        state.surface.burst(d.x, d.y, d.size);
+        if (navigator.vibrate) navigator.vibrate([14, 30, 22]);
+      }
+    }
   }
 
   // Spin-in-place dice never move, so the grid spacing already holds — running
@@ -984,6 +1133,9 @@ function drawFrame(dt) {
   state.surface.drawRests(ctx, t, state.dice);
   state.surface.draw(ctx, t);
   for (const d of state.dice) d.draw(ctx, t);
+  // Bursts go over the dice: an explosion happens in front of the thing that
+  // exploded, not behind it.
+  state.surface.drawBursts(ctx, t);
 }
 
 function frame(now) {

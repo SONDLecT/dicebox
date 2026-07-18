@@ -2,7 +2,7 @@
 // precache all of them and never hit the network after install.
 
 // Bump on every asset change, or installed copies keep serving the old app.
-const CACHE = 'dicebox-v15';
+const CACHE = 'dicebox-v16';
 
 // './' only — never './index.html'. The edge redirects /index.html to / with a
 // 307, and a redirected response makes cache.addAll reject the whole batch,

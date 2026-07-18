@@ -222,6 +222,11 @@ body {
   font-size: 12px;
 }
 
+.colophon-sep {
+  color: var(--muted);
+  margin: 0 6px;
+}
+
 .help .colophon a {
   color: var(--accent);
   text-decoration: none;
@@ -569,6 +574,9 @@ body {
   position: relative;
   overflow: hidden;
   isolation: isolate;
+  /* The row scrolls horizontally and so does a scrub gesture, so the button
+     claims its own pointer events rather than losing them to the scroller. */
+  touch-action: pan-y;
 }
 
 .dbtn-fill {
@@ -663,6 +671,33 @@ body {
 .sheet-option:hover,
 .sheet-option:focus-visible {
   background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+/* How many of this die are staged. Dragging the button sideways is quicker, but
+   only a typed number lands on an exact count. */
+.sheet-count {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 10px 10px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--hair);
+}
+
+.sheet-count-label {
+  font-size: 14px;
+  color: var(--line);
+}
+
+.sheet-count-field {
+  width: 46px;
+}
+
+/* Dragging a die button to dial its count. */
+.dbtn[data-scrubbing] {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 /* Another modifier already answers this question, so it cannot also apply. */

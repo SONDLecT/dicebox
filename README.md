@@ -4,8 +4,9 @@ An offline dice roller for tabletop RPGs. No build step, no dependencies, no
 network.
 
 Try it at **[dicebox.trollskull.cc](https://dicebox.trollskull.cc)** — that is a
-demo instance, not a service. Run your own copy if you want one that stays put;
-see [Running it yourself](#running-it-yourself).
+demo instance, not a service. To keep a copy of your own, see
+[Getting it offline](#getting-it-offline): download it as a single file, install
+it from the browser, or host it yourself.
 
 ## About
 
@@ -39,53 +40,6 @@ explodes — while two that answer the same one replace each other.
 The `d?` button opens a picker for any side count from 1 to 1000, and a die you
 choose there gets a button of its own.
 
-## Running it yourself
-
-There is no build step and no backend. The app is a handful of static files, so
-anything that serves a directory over HTTP will do — it only needs `http://`
-rather than `file://` so the service worker can register.
-
-```sh
-python3 -m http.server 8080     # or: npx serve, php -S localhost:8080, caddy file-server
-```
-
-### Docker
-
-If you would rather run it as a container:
-
-```sh
-docker compose up -d            # http://localhost:8080
-```
-
-The image is nginx with the app copied in — nothing is compiled and nothing is
-fetched at runtime. The bundled nginx config applies the same security and cache
-headers the hosted copy uses. To serve on a different port, change the mapping in
-`docker-compose.yml`.
-
-For a home network, put it behind whatever reverse proxy you already run. It
-needs HTTPS only if you want to install it to a phone's home screen; browsers
-require a secure context for that, with `localhost` exempt.
-
-To install on a phone, open the page and use **Add to Home Screen** — or the
-**Install as an app** button in the help panel on Android. After the first load
-it runs fully offline.
-
-## Deploying
-
-Deploys to Cloudflare as static assets, with no Worker script in front of them:
-
-```sh
-npm run deploy    # runs the tests, then wrangler deploy
-npm run dev       # local preview through wrangler
-```
-
-`.assetsignore` keeps tests and tooling out of the upload. `_headers` sets a
-strict CSP and marks `sw.js` `no-cache` — a stale service worker would pin every
-other asset to its old version.
-
-**Bump `CACHE` in `sw.js` whenever you change an asset**, or installed copies
-will keep serving the old app.
-
 ## Notation
 
 | Input | Meaning |
@@ -113,17 +67,7 @@ The button row carries every rung of the Dungeon Crawl Classics chain:
 d1 d2 d3 d4 d5 d6 d7 d8 d10 d12 d14 d16 d20 d24 d30
 ```
 
-## Design
-
-White dice on a white field, drawn as pure line work — no fill, no shadow. Depth
-comes only from back-facing edges at 22% opacity. A faint ellipse sits under each
-resting die so it reads as touching a surface.
-
-Every die is a real tumbling solid — there are no flat tokens or placeholder
-shapes. Numerals are painted onto the face plane in 3D, skewed with the face so
-they track the die as it turns rather than floating flat over it.
-
-### Dice for any number of sides
+## How the dice are drawn
 
 A fair die must be **isohedral**: every face equivalent under the solid's
 symmetry group, so each face has equal probability. Two families cover every
@@ -162,70 +106,72 @@ instead of pretending with twelve — 108 of the 118 dice from d3 to d120 have
 exactly one facet per side. Above that the shape becomes representative, since
 more facets than the die is drawn wide cannot be told apart.
 
-### Animation
-
-Rolls of 24 dice or fewer are thrown across the tray, easing toward the grid slot
-each was assigned and pushing apart on contact. Larger rolls spin in place: the
-dice land in the same grid either way, so the flight and collision work buys
-nothing and costs every frame.
-
-Choosing a resting orientation is the most expensive thing in the frame, so it is
-rationed — a few dice per frame, with a floor so nothing waits forever. That
-keeps 200d50 inside the 16.7ms frame budget on a Raspberry Pi. Past 220 dice the
-result appears immediately; the total is what anyone rolling that many wants.
-
 ## Randomness
 
 `crypto.getRandomValues` with rejection sampling, so there's no modulo bias.
 `Math.random()` is not used anywhere in the roll path.
 
-## Tests
+## Getting it offline
+
+Three ways, easiest first.
+
+### Download one file
+
+Grab **[`dist/dicebox.html`](dist/dicebox.html)** and open it. That is the entire
+app in a single 118KB file — no server, no install, no network. Put it on a USB
+stick, email it to yourself, keep it in a folder with your character sheets. It
+works the same on a laptop with the wifi off.
+
+### Install it from the web
+
+Open [the demo](https://dicebox.trollskull.cc) and install it. After the first
+load it runs offline, because a service worker keeps a local copy.
+
+| Browser | How |
+| --- | --- |
+| Chrome, Edge (desktop) | Install icon in the address bar, or ⋮ → Cast, save and share → Install page as app |
+| Chrome (Android) | The **Install as an app** button in the help panel, or ⋮ → Add to Home screen |
+| Safari (iOS/iPadOS) | Share → Add to Home Screen |
+| Safari (macOS) | File → Add to Dock |
+| Firefox | No install support on desktop. Bookmark it — it still works offline once loaded — or use the single-file build above |
+
+### Run your own copy
+
+There is no build step and no backend, so anything that serves a directory over
+HTTP will do. It needs `http://` rather than `file://` only so the service worker
+can register; the single-file build has no such requirement.
 
 ```sh
-npm test                      # every suite
-node tools/test.mjs           # notation, ranges, modifiers, distribution
-node tools/test-render.mjs    # polyhedron geometry + settling simulation
-node tools/test-pool.mjs      # tap-to-build pool, modifiers, round-tripping
-node tools/test-markup.mjs    # html/css/js seams, manifest, offline integrity
-node tools/test-load.mjs      # app.js against the real markup in a DOM shim
+python3 -m http.server 8080     # or: npx serve, php -S localhost:8080, caddy file-server
 ```
 
-The geometry suite checks Euler's `V - E + F = 2` for every solid, which is what
-catches bad face recovery — the kind of bug that shows up as a d12 with phantom
-faces through its middle. It also verifies that every face from d2 to d120 is
-coplanar, that dice settle showing a face to the camera, and that multiple dice
-never come to rest overlapping.
+### Docker
 
-When testing planarity, derive the face plane from three of its vertices. Using
-the centroid direction as the normal is wrong for kite faces, whose plane is not
-perpendicular to the centroid ray — that mistake reports every valid
-trapezohedron as broken.
-
-## Files
-
-```
-index.html          markup
-style.css           tokens + layout
-dice.js             notation parser and roller (no DOM)
-render.js           polyhedra, wireframe drawing, throw simulation
-app.js              controller, canvas loop, input, the pool
-sw.js               cache-first service worker
-worker.js           sets headers at the edge; serves the assets
-wrangler.jsonc      Cloudflare static-assets config
-_headers            reference copy of the header policy
-.assetsignore       keeps tooling out of the upload
-.env.example        the variables tools/deploy.mjs expects
-Dockerfile          nginx image for self-hosting
-docker-compose.yml  one-command local instance
-docker/             nginx config and security headers
-tools/              icon generation, tests, preview sheet, deploy
-```
-
-`dice.js` and `render.js` have no DOM dependency, so both can be tested directly.
-
-## Regenerating assets
+If you would rather run it as a container:
 
 ```sh
-node tools/make-icons.cjs   # PWA icons
-node tools/preview.cjs      # contact sheet of every die shape
+docker compose up -d            # http://localhost:8080
 ```
+
+The image is nginx with the app copied in — nothing is compiled and nothing is
+fetched at runtime. The bundled nginx config applies the same security and cache
+headers the hosted copy uses. To serve on a different port, change the mapping in
+`docker-compose.yml`.
+
+For a home network, put it behind whatever reverse proxy you already run. It
+needs HTTPS only if you want to install it to a phone's home screen; browsers
+require a secure context for that, with `localhost` exempt.
+
+## Working on it
+
+```sh
+npm test          # every suite, including a build of the single-file bundle
+npm run bundle    # rebuild dist/dicebox.html on its own
+```
+
+The demo is deployed to Cloudflare Workers with `node tools/deploy.mjs`, which
+reads the credentials in `.env` — see `.env.example`. A small Worker fronts the
+static assets to set security and cache headers.
+
+**Bump `CACHE` in `sw.js` whenever you change an asset**, or installed copies
+will keep serving the old version.

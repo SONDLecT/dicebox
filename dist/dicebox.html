@@ -1,0 +1,3586 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>Dicebox</title>
+<meta name="description" content="An offline dice roller for tabletop RPGs.">
+
+<meta name="theme-color" content="#FCFCFA" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#141413" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Dicebox">
+<link rel="apple-touch-icon" href="data:image/png;base64,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">
+<link rel="icon" href="data:image/png;base64,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">
+<style>
+/* Dicebox — line-work dice on a near-white field.
+   The palette is almost entirely value; the one hue is reserved for the total. */
+
+:root {
+  --paper:   #FCFCFA;
+  --face:    #FFFFFF;
+  --line:    #1A1A18;
+  --muted:   #9A968C;
+  --hair:    #E4E2DC;
+  --accent:  #3D5A45;
+  --danger:  #8C3A2E;
+
+  --tap: 44px;
+  --gut: clamp(16px, 5vw, 28px);
+}
+
+:root[data-theme="dark"] {
+  --paper:  #141413;
+  --face:   #1E1E1C;
+  --line:   #F2F0EA;
+  --muted:  #6E6A62;
+  --hair:   #2A2A27;
+  --accent: #8FB79A;
+  --danger: #D98878;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper:  #141413;
+    --face:   #1E1E1C;
+    --line:   #F2F0EA;
+    --muted:  #6E6A62;
+    --hair:   #2A2A27;
+    --accent: #8FB79A;
+    --danger: #D98878;
+  }
+}
+
+* { box-sizing: border-box; }
+
+/* The `hidden` attribute is only `display: none` in the UA stylesheet, so any
+   class that sets display beats it. Without this, .sheet (display:flex) and
+   .help render on load despite being marked hidden — the sheet covered the whole
+   page in an unclickable blur. */
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overscroll-behavior: none;
+}
+
+body {
+  background: var(--paper);
+  color: var(--line);
+  font-family: "Inter Tight", system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 240ms ease, color 240ms ease;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-width: 620px;
+  margin: 0 auto;
+  padding: env(safe-area-inset-top) var(--gut) calc(env(safe-area-inset-bottom) + 12px);
+  gap: 10px;
+}
+
+/* ---- header ---- */
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 14px;
+  flex: 0 0 auto;
+}
+
+/* Present on arrival, then out of the way. Once you have rolled, the name has
+   done its job and the tray should be the only thing asking for attention. */
+.wordmark {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--muted);
+  transition: opacity 1200ms ease;
+}
+.wordmark[data-faded="1"] { opacity: 0.28; }
+
+@media (prefers-reduced-motion: reduce) {
+  .wordmark { transition-duration: 1ms; }
+}
+
+.bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ghost {
+  appearance: none;
+  border: 1px solid var(--hair);
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.ghost.icon {
+  width: 32px;
+  padding: 0;
+  font-size: 14px;
+  letter-spacing: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* One icon at a time: the sun in light mode, the moon in dark. */
+#themeToggle [data-icon] { display: none; }
+#themeToggle[data-mode="light"] [data-icon="sun"] { display: block; }
+#themeToggle[data-mode="dark"] [data-icon="moon"] { display: block; }
+
+.ghost[aria-expanded="true"] {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* ---- help ---- */
+
+/* Fills the tray rather than floating over the page: the tray is already a
+   bounded rectangle, so nothing below it shifts when the panel opens. */
+.help {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding: 4px 2px;
+  /* Opaque, not blurred: the tray is empty behind it anyway, and a frosted
+     layer reads as a different material than the rest of the app. */
+  background: var(--paper);
+  animation: help-in 180ms ease both;
+}
+.help::-webkit-scrollbar { display: none; }
+
+@keyframes help-in {
+  from { opacity: 0; transform: translateY(-3px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.syntax {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1px 14px;
+  margin: 0;
+  align-items: baseline;
+}
+
+/* Each example is tappable, so the reference doubles as a set of presets. */
+.syntax dt {
+  font-family: "Iosevka Etoile", ui-monospace, "SF Mono", monospace;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--line);
+  text-align: right;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 1px 3px;
+  margin: -1px -3px;
+  transition: color 140ms ease;
+}
+.syntax dt:hover,
+.syntax dt:focus-visible { color: var(--accent); }
+
+.syntax dd {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.help .note {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+  max-width: 44ch;
+}
+
+.help .install {
+  margin-top: 10px;
+}
+
+.install-button {
+  appearance: none;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 12.5px;
+  min-height: 30px;
+  padding: 0 12px;
+  margin-right: 8px;
+  cursor: pointer;
+}
+.install-button:disabled { opacity: 0.5; }
+
+.help .colophon {
+  margin: 10px 0 0;
+  font-size: 12px;
+}
+
+.colophon-sep {
+  color: var(--muted);
+  margin: 0 6px;
+}
+
+.help .colophon a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid currentColor;
+  padding-bottom: 1px;
+}
+
+/* ---- tray ---- */
+
+.tray {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 180px;
+  touch-action: none;
+}
+
+.tray canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* The one-time intro. Lines fade in one after another, then the whole thing
+   leaves — it should read like a title card, not a tooltip. */
+.intro {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  pointer-events: none;
+  text-align: center;
+  transition: opacity 700ms ease;
+}
+.intro[data-gone="1"] { opacity: 0; }
+
+.intro p {
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--muted);
+  opacity: 0;
+  animation: intro-line 620ms ease forwards;
+}
+.intro p:nth-child(1) { animation-delay: 260ms; }
+.intro p:nth-child(2) { animation-delay: 660ms; }
+.intro p:nth-child(3) { animation-delay: 1060ms; }
+
+@keyframes intro-line {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 0.8; transform: none; }
+}
+
+.intro-last { color: var(--accent) !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .intro p { animation-duration: 1ms; animation-delay: 0ms; opacity: 0.8; }
+}
+
+/* ---- readout ---- */
+
+.readout {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+
+.total {
+  font-family: "Iosevka Etoile", ui-monospace, "SF Mono", monospace;
+  font-size: clamp(56px, 19vw, 104px);
+  font-weight: 600;
+  line-height: 0.92;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  transition: opacity 160ms ease;
+}
+.total[data-idle="1"] { color: var(--muted); }
+.total[data-rolling="1"] { opacity: 0.35; }
+
+.breakdown {
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+  min-height: 1.3em;
+  font-variant-numeric: tabular-nums;
+  word-break: break-word;
+}
+
+/* ---- dice picker ---- */
+
+.picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+/* How many dice each tap adds. Typing a number here and tapping d6 is how you
+   get 100d6 without tapping a hundred times. */
+.counter {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  border: 1px solid var(--hair);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.counter .step {
+  border: 0;
+  border-radius: 0;
+  width: 30px;
+  height: 34px;
+}
+
+.count {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-left: 1px solid var(--hair);
+  border-right: 1px solid var(--hair);
+  background: none;
+  color: var(--line);
+  font: inherit;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  padding: 0;
+  -moz-appearance: textfield;
+}
+.count::-webkit-outer-spin-button,
+.count::-webkit-inner-spin-button { appearance: none; margin: 0; }
+
+.step {
+  appearance: none;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border: 1px solid var(--hair);
+  border-radius: 8px;
+  background: none;
+  color: var(--line);
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.dice-buttons {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  flex: 1 1 auto;
+}
+.dice-buttons::-webkit-scrollbar { display: none; }
+
+.dbtn {
+  appearance: none;
+  flex: 0 0 auto;
+  min-width: 46px;
+  min-height: 34px;
+  border: 1px solid var(--hair);
+  border-radius: 8px;
+  background: none;
+  color: var(--line);
+  font: inherit;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: border-color 160ms ease, color 160ms ease;
+}
+.dbtn:active { border-color: var(--line); }
+
+/* A die in the tray reads as selected, with its count on the button — the pool
+   is visible in the row you are already looking at, not only in the field. */
+.dbtn[aria-pressed="true"] {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Kept inside the button's padding: the hold-fill needs overflow:hidden, so
+   anything poking past the border would be clipped. */
+.dbtn[data-count]::after {
+  content: attr(data-count) "\00d7";
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 9.5px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  color: var(--accent);
+  pointer-events: none;
+}
+
+/* Make room for the badge so it never sits on the label. */
+.dbtn[data-count] {
+  padding-right: 14px;
+}
+
+/* The modifier's own glyph, bottom-left so it never collides with the count
+   badge top-right. A shared underline said "modified" but not which. */
+.dbtn[data-mod]::before {
+  content: attr(data-mod);
+  position: absolute;
+  bottom: 1px;
+  left: 4px;
+  z-index: 1;
+  font-size: 9px;
+  line-height: 1;
+  letter-spacing: 0;
+  color: var(--accent);
+  pointer-events: none;
+}
+
+.dbtn[data-mod] {
+  padding-left: 13px;
+}
+
+.sheet-option[aria-pressed="true"] .sheet-option-name {
+  color: var(--accent);
+}
+
+/* ---- custom die wheel ---- */
+
+.dial .sheet-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Scroll-snap does the physics: flick and a number settles under the marker,
+   the way a phone's timer picker behaves. */
+.wheel {
+  flex: 1 1 auto;
+  min-height: 96px;
+  max-height: 150px;
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+  position: relative;
+  /* Fades the ends so the list reads as a wheel rather than a cut-off column. */
+  mask-image: linear-gradient(transparent, #000 22%, #000 78%, transparent);
+  -webkit-mask-image: linear-gradient(transparent, #000 22%, #000 78%, transparent);
+  /* Half the visible height, so the first and last items can reach the middle. */
+  padding: 56px 0;
+}
+.wheel::-webkit-scrollbar { display: none; }
+
+.wheel-item {
+  scroll-snap-align: center;
+  height: 30px;
+  line-height: 30px;
+  text-align: center;
+  font-family: "Iosevka Etoile", ui-monospace, monospace;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  opacity: 0.45;
+  cursor: pointer;
+  transition: color 120ms ease, opacity 120ms ease;
+}
+.wheel-item[aria-selected="true"] {
+  color: var(--accent);
+  opacity: 1;
+  font-size: 19px;
+}
+
+/* The marker: two hairlines the selected number sits between. */
+.dial .sheet-panel {
+  position: relative;
+}
+.wheel::before,
+.wheel::after {
+  content: "";
+  position: sticky;
+  left: 0;
+  display: block;
+  height: 1px;
+  background: var(--hair);
+  z-index: 1;
+}
+.wheel::before { top: calc(50% - 16px); }
+.wheel::after  { bottom: calc(50% - 16px); }
+
+.dial-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 2px 2px;
+}
+
+.dial-entry {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid var(--hair);
+  border-radius: 10px;
+  padding: 0 10px;
+  min-height: var(--tap);
+  font-family: "Iosevka Etoile", ui-monospace, monospace;
+  font-size: 15px;
+  color: var(--muted);
+}
+
+.dial-entry input {
+  width: 3.6em;
+  border: 0;
+  background: none;
+  color: var(--line);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  padding: 0;
+}
+.dial-entry input:focus { outline: none; }
+
+.dial-add {
+  flex: 1 1 auto;
+}
+
+/* The custom-die button reads as an action rather than a die. */
+.dbtn.custom {
+  color: var(--muted);
+  font-family: "Iosevka Etoile", ui-monospace, monospace;
+}
+
+/* A die added through the picker. Dashed to show it is not part of the standard
+   set, but otherwise a full die: tappable, countable, holdable for modifiers. */
+.dbtn[data-custom] {
+  border-style: dashed;
+}
+
+
+/* Holding a die fills it, which both signals that a long press does something
+   and shows how much longer to hold. The fill is its own element rather than a
+   pseudo-element: ::before carries the modifier glyph and ::after the count, and
+   a third use would collide with one of them. */
+.dbtn {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  /* The row scrolls horizontally and so does a scrub gesture, so the button
+     claims its own pointer events rather than losing them to the scroller. */
+  touch-action: pan-y;
+}
+
+.dbtn-fill {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  transform: scaleX(0);
+  transform-origin: left;
+  pointer-events: none;
+}
+.dbtn[data-holding="1"] .dbtn-fill {
+  transform: scaleX(1);
+  transition: transform 450ms linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dbtn[data-holding="1"] .dbtn-fill { transition-duration: 1ms; }
+}
+
+/* ---- modifier sheet ---- */
+
+/* Fills the tray, like the help panel. A floating card over a dimmed page is a
+   different design language than the rest of this app — the tray is the surface
+   everything else happens on, so options belong there too. */
+.sheet {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow-y: auto;
+  scrollbar-width: none;
+  background: var(--paper);
+  animation: help-in 160ms ease both;
+}
+.sheet::-webkit-scrollbar { display: none; }
+
+.sheet-panel {
+  width: 100%;
+  padding: 2px;
+}
+
+.sheet-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 8px;
+  padding: 0 10px;
+  font-family: "Iosevka Etoile", ui-monospace, monospace;
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.sheet-close {
+  appearance: none;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  padding: 6px;
+  margin: -6px;
+  cursor: pointer;
+}
+
+.sheet-options {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sheet-option {
+  appearance: none;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0 12px;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  padding: 9px 10px;
+  font: inherit;
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+.sheet-option:hover,
+.sheet-option:focus-visible {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+/* How many of this die are staged. Dragging the button sideways is quicker, but
+   only a typed number lands on an exact count. */
+.sheet-count {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 10px 10px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--hair);
+}
+
+.sheet-count-label {
+  font-size: 14px;
+  color: var(--line);
+}
+
+.sheet-count-field {
+  width: 46px;
+}
+
+/* Dragging a die button to dial its count. */
+.dbtn[data-scrubbing] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Another modifier already answers this question, so it cannot also apply. */
+.sheet-option[data-blocked] {
+  opacity: 0.34;
+  cursor: default;
+}
+.sheet-option[data-blocked]:hover { background: none; }
+
+.sheet-option-name {
+  font-size: 14px;
+  color: var(--line);
+}
+
+/* The same mark the die button shows, so the row's glyphs teach themselves. */
+.sheet-option-mark {
+  display: inline-block;
+  width: 1.3em;
+  color: var(--accent);
+  font-size: 12px;
+}
+
+.sheet-option-notation {
+  font-family: "Iosevka Etoile", ui-monospace, monospace;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  text-align: right;
+}
+
+.sheet-option-hint {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 1px;
+}
+
+.clear {
+  appearance: none;
+  flex: 0 0 auto;
+  width: var(--tap);
+  min-height: var(--tap);
+  border: 1px solid var(--hair);
+  border-radius: 10px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* ---- notation entry ---- */
+
+.entry {
+  display: flex;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.entry input {
+  flex: 1 1 auto;
+  min-height: var(--tap);
+  padding: 0 14px;
+  border: 1px solid var(--hair);
+  border-radius: 10px;
+  background: var(--face);
+  color: var(--line);
+  font: inherit;
+  font-size: 16px; /* 16px keeps iOS from zooming on focus */
+}
+.entry input::placeholder { color: var(--muted); }
+.entry input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: transparent;
+}
+
+.roll {
+  appearance: none;
+  min-height: var(--tap);
+  padding: 0 22px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--line);
+  color: var(--paper);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+.roll:active { opacity: 0.8; }
+
+.error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--danger);
+  text-align: center;
+  flex: 0 0 auto;
+}
+
+/* ---- history ---- */
+
+.log {
+  flex: 0 0 auto;
+  max-height: 88px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.log::-webkit-scrollbar { display: none; }
+
+.log ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.log li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  padding: 3px 0;
+  border-top: 1px solid var(--hair);
+}
+.log li b {
+  color: var(--line);
+  font-weight: 600;
+}
+
+:where(button, input):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition-duration: 1ms !important; }
+}
+
+</style>
+</head>
+<body>
+<main class="app">
+
+  <header class="bar">
+    <h1 class="wordmark" id="wordmark">Dicebox</h1>
+    <div class="bar-actions">
+      <button id="helpToggle" class="ghost icon" aria-expanded="false"
+              aria-controls="help" aria-label="Show syntax reference">?</button>
+      <button id="themeToggle" class="ghost icon" aria-label="Switch to dark theme">
+        <svg viewBox="0 0 20 20" width="15" height="15" aria-hidden="true" focusable="false">
+          <!-- Sun: shown in light mode, so tapping it means "go dark". -->
+          <g data-icon="sun" fill="none" stroke="currentColor" stroke-width="1.4"
+             stroke-linecap="round">
+            <circle cx="10" cy="10" r="3.4"/>
+            <path d="M10 2.2v1.8M10 16v1.8M17.8 10H16M4 10H2.2
+                     M15.5 4.5l-1.3 1.3M5.8 14.2l-1.3 1.3
+                     M15.5 15.5l-1.3-1.3M5.8 5.8L4.5 4.5"/>
+          </g>
+          <!-- Moon: shown in dark mode. -->
+          <g data-icon="moon" fill="none" stroke="currentColor" stroke-width="1.4"
+             stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 11.7A6.6 6.6 0 0 1 8.3 4a6.8 6.8 0 1 0 7.7 7.7z"/>
+          </g>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <section class="tray" aria-label="Dice tray">
+    <canvas id="tray"></canvas>
+
+    <!-- Shown once on a cold open, then faded out. Everything the interface
+         does not say for itself, in as few words as it takes. -->
+    <div class="intro" id="intro">
+      <p>Tap dice to load them</p>
+      <p>Hold one for more options</p>
+      <p class="intro-last">Flick the tray to roll</p>
+    </div>
+
+    <div class="help" id="help" hidden>
+      <dl class="syntax">
+        <dt>3d6</dt>          <dd>three six-sided dice</dd>
+        <dt>1d20+5</dt>       <dd>with a modifier</dd>
+        <dt>2d6+1d8</dt>      <dd>any number of terms</dd>
+        <dt>2d20kh1</dt>      <dd>advantage — keep highest</dd>
+        <dt>2d20kl1</dt>      <dd>disadvantage — keep lowest</dd>
+        <dt>4d6dl1</dt>       <dd>drop lowest</dd>
+        <dt>1d6!</dt>         <dd>explode on a max roll</dd>
+        <dt>1d10r2</dt>       <dd>reroll 2 and under</dd>
+        <dt>d%</dt>           <dd>percentile, same as d100</dd>
+      </dl>
+      <p class="note">
+        Tap dice to build a pool; the number on the left is how many each tap
+        adds. <b>Hold a die</b> for advantage, exploding, and the rest. Any
+        number of sides works, from d1 to d1000, so a d17 or a d57 is just as
+        valid. Rolls stay on your device.
+      </p>
+      <p class="note install" id="installNote">
+        <button type="button" class="install-button" id="install" hidden>Install as an app</button>
+        <span id="installHint">This is the single-file build: it already works offline, and can be copied anywhere.</span>
+      </p>
+
+      <p class="colophon">
+        <a href="https://github.com/SONDLecT/dicebox" target="_blank" rel="noopener noreferrer">Source on GitHub</a>
+        <span class="colophon-sep">·</span>
+        <a href="https://github.com/SONDLecT/dicebox/raw/master/dist/dicebox.html"
+           target="_blank" rel="noopener noreferrer">Download as one file</a>
+      </p>
+    </div>
+
+    <!-- Opened by holding a die. Sits on the tray like the help panel, so the
+         modifiers that would otherwise need typing stay in the same surface. -->
+    <div class="sheet" id="sheet" hidden role="dialog" aria-labelledby="sheetTitle">
+      <div class="sheet-panel">
+        <p class="sheet-title">
+          <span id="sheetTitle">d20</span>
+          <button type="button" class="sheet-close" id="sheetClose"
+                  aria-label="Close options">✕</button>
+        </p>
+        <div class="sheet-options" id="sheetOptions"></div>
+      </div>
+    </div>
+
+    <!-- Custom die picker: a scroll wheel for browsing and a field for jumping
+         straight to a number. -->
+    <div class="sheet dial" id="dial" hidden role="dialog" aria-labelledby="dialTitle">
+      <div class="sheet-panel">
+        <p class="sheet-title">
+          <span id="dialTitle">Custom die</span>
+          <button type="button" class="sheet-close" id="dialClose"
+                  aria-label="Close">✕</button>
+        </p>
+
+        <div class="wheel" id="wheel" role="listbox" aria-label="Number of sides"
+             tabindex="0"></div>
+
+        <div class="dial-actions">
+          <label class="dial-entry">
+            <span>d</span>
+            <input id="dialInput" type="text" inputmode="numeric" autocomplete="off"
+                   value="20" aria-label="Number of sides">
+          </label>
+          <button type="button" class="roll dial-add" id="dialAdd">Add to tray</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <output class="readout" id="readout" aria-live="polite">
+    <span class="total" id="total">—</span>
+    <span class="breakdown" id="breakdown">Pick dice or type a roll</span>
+  </output>
+
+  <section class="picker" aria-label="Dice">
+    <div class="counter" title="How many dice each tap adds">
+      <button class="step" id="countDown" aria-label="One fewer die per tap">−</button>
+      <input id="count" class="count" type="text" inputmode="numeric"
+             value="1" autocomplete="off" aria-label="Dice per tap">
+      <button class="step" id="countUp" aria-label="One more die per tap">+</button>
+    </div>
+    <div class="dice-buttons" id="diceButtons" role="group">
+      <button class="dbtn custom" id="customDie" type="button"
+              aria-label="Choose a custom number of sides"><span class="dbtn-fill"></span>d?</button>
+    </div>
+  </section>
+
+  <form class="entry" id="entry">
+    <input id="notation" type="text" inputmode="text" autocomplete="off"
+           autocapitalize="off" spellcheck="false"
+           placeholder="Tap dice above, or type 3d6+2"
+           aria-label="Dice notation">
+    <button type="button" class="clear" id="clear" aria-label="Clear the pool">✕</button>
+    <button type="submit" class="roll">Roll</button>
+  </form>
+
+  <p class="error" id="error" role="alert" hidden></p>
+
+  <section class="log" aria-label="Recent rolls">
+    <ul id="history"></ul>
+  </section>
+
+</main>
+<script type="module">
+const __dicebox = {};
+
+// dice.js
+(() => {
+// Dice notation parser and roller.
+// Grammar: expr := term (('+'|'-') term)*
+//          term := dice | integer
+//          dice := [count] 'd' sides [modifiers]
+//          modifiers := kh<n> | kl<n> | dh<n> | dl<n> | '!' (explode) | r<n> (reroll <= n)
+
+const DCC_CHAIN = [1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 30];
+
+function stepChain(sides, steps) {
+  const i = DCC_CHAIN.indexOf(sides);
+  if (i === -1) return sides;
+  return DCC_CHAIN[Math.min(DCC_CHAIN.length - 1, Math.max(0, i + steps))];
+}
+
+const MAX_DICE = 500;
+const MAX_SIDES = 10000;
+const MAX_EXPLOSIONS = 100;
+
+// Cryptographically strong uniform integer in [1, sides], rejection-sampled to
+// avoid the modulo bias a naive `% sides` would introduce.
+function randInt(sides) {
+  if (sides <= 1) return 1;
+  const limit = Math.floor(0x100000000 / sides) * sides;
+  const buf = new Uint32Array(1);
+  let v;
+  do {
+    crypto.getRandomValues(buf);
+    v = buf[0];
+  } while (v >= limit);
+  return (v % sides) + 1;
+}
+
+class Parser {
+  constructor(src) {
+    this.src = src.toLowerCase().replace(/\s+/g, '');
+    this.pos = 0;
+  }
+  peek() { return this.src[this.pos]; }
+  eof() { return this.pos >= this.src.length; }
+
+  number() {
+    const start = this.pos;
+    while (!this.eof() && /[0-9]/.test(this.peek())) this.pos++;
+    if (start === this.pos) return null;
+    return parseInt(this.src.slice(start, this.pos), 10);
+  }
+
+  parse() {
+    const terms = [];
+    let sign = 1;
+    for (;;) {
+      const term = this.term(sign);
+      terms.push(term);
+      if (this.eof()) break;
+      const op = this.peek();
+      if (op === '+') sign = 1;
+      else if (op === '-') sign = -1;
+      else throw new Error(`Unexpected "${op}"`);
+      this.pos++;
+      if (this.eof()) throw new Error('Expression ends with an operator');
+    }
+    return terms;
+  }
+
+  term(sign) {
+    const count = this.number();
+    if (this.peek() !== 'd') {
+      if (count === null) throw new Error('Expected a number or dice term');
+      return { kind: 'const', sign, value: count };
+    }
+    this.pos++; // consume 'd'
+
+    let sides;
+    if (this.peek() === '%') { this.pos++; sides = 100; }
+    else {
+      sides = this.number();
+      if (sides === null) throw new Error('Expected number of sides after "d"');
+    }
+
+    const n = count === null ? 1 : count;
+    if (n < 1 || n > MAX_DICE) throw new Error(`Dice count must be 1-${MAX_DICE}`);
+    if (sides < 1 || sides > MAX_SIDES) throw new Error(`Sides must be 1-${MAX_SIDES}`);
+
+    const mods = { keepHigh: null, keepLow: null, explode: false, rerollBelow: null };
+    for (;;) {
+      if (this.src.startsWith('kh', this.pos)) {
+        this.pos += 2; mods.keepHigh = this.number() ?? 1;
+      } else if (this.src.startsWith('kl', this.pos)) {
+        this.pos += 2; mods.keepLow = this.number() ?? 1;
+      } else if (this.src.startsWith('dh', this.pos)) {
+        this.pos += 2; mods.keepLow = n - (this.number() ?? 1);
+      } else if (this.src.startsWith('dl', this.pos)) {
+        this.pos += 2; mods.keepHigh = n - (this.number() ?? 1);
+      } else if (this.peek() === '!') {
+        this.pos++; mods.explode = true;
+      } else if (this.peek() === 'r') {
+        this.pos++; mods.rerollBelow = this.number() ?? 1;
+      } else break;
+    }
+
+    if (mods.explode && sides === 1) {
+      throw new Error('d1 cannot explode — it would never stop');
+    }
+    return { kind: 'dice', sign, count: n, sides, mods };
+  }
+}
+
+function rollTerm(term) {
+  const { count, sides, mods } = term;
+  const dice = [];
+
+  for (let i = 0; i < count; i++) {
+    let value = randInt(sides);
+    let rerolled = false;
+
+    if (mods.rerollBelow !== null && mods.rerollBelow < sides) {
+      while (value <= mods.rerollBelow) { value = randInt(sides); rerolled = true; }
+    }
+
+    const die = { value, rerolled, exploded: false, kept: true, crit: null };
+
+    if (mods.explode) {
+      let bursts = 0;
+      while (value === sides && bursts < MAX_EXPLOSIONS) {
+        value = randInt(sides);
+        die.value += value;
+        die.exploded = true;
+        bursts++;
+      }
+    }
+
+    if (die.value === sides && !die.exploded) die.crit = 'max';
+    else if (die.value === 1) die.crit = 'min';
+
+    dice.push(die);
+  }
+
+  // Keep/drop: mark the losers rather than removing them, so the UI can grey
+  // them out instead of silently hiding dice the user watched roll.
+  const keepN = mods.keepHigh ?? mods.keepLow;
+  if (keepN !== null) {
+    const n = Math.max(0, Math.min(count, keepN));
+    const order = dice
+      .map((d, i) => ({ i, v: d.value }))
+      .sort((a, b) => (mods.keepHigh !== null ? b.v - a.v : a.v - b.v));
+    order.forEach((entry, rank) => { dice[entry.i].kept = rank < n; });
+  }
+
+  const total = dice.reduce((sum, d) => sum + (d.kept ? d.value : 0), 0);
+  return { dice, total };
+}
+
+function roll(notation) {
+  const src = String(notation || '').trim();
+  if (!src) throw new Error('Enter something like 3d6 or 1d20+5');
+
+  const terms = new Parser(src).parse();
+  let total = 0;
+  const groups = [];
+
+  for (const term of terms) {
+    if (term.kind === 'const') {
+      total += term.sign * term.value;
+      groups.push({ kind: 'const', sign: term.sign, value: term.value });
+    } else {
+      const { dice, total: sub } = rollTerm(term);
+      total += term.sign * sub;
+      groups.push({
+        kind: 'dice', sign: term.sign, count: term.count,
+        sides: term.sides, mods: term.mods, dice, subtotal: sub,
+      });
+    }
+  }
+
+  return { notation: src, groups, total };
+}
+
+function describe(groups) {
+  return groups.map((g, i) => {
+    const op = g.sign < 0 ? '−' : i === 0 ? '' : '+';
+    if (g.kind === 'const') return `${op}${g.value}`;
+    const rolls = g.dice.map(d => (d.kept ? d.value : `(${d.value})`)).join(', ');
+    return `${op}${g.count}d${g.sides} [${rolls}]`;
+  }).join(' ').trim();
+}
+
+Object.assign(__dicebox, { DCC_CHAIN, stepChain, roll, describe });
+})();
+
+// render.js
+(() => {
+// Wireframe die rendering + throw simulation.
+//
+// Dice are drawn as pure line work: no fill, no shadow. Depth comes only from
+// drawing back-facing edges at reduced opacity. The "table" is one hairline rule.
+
+const TAU = Math.PI * 2;
+
+// Unit-radius polyhedra. Faces are index loops into verts; each face carries the
+// pip value shown when that face points at the camera.
+function tetra() {
+  const v = [[1,1,1],[1,-1,-1],[-1,1,-1],[-1,-1,1]].map(norm);
+  return { verts: v, faces: [[0,1,2],[0,3,1],[0,2,3],[1,3,2]] };
+}
+function cube() {
+  const v = [];
+  for (const x of [-1,1]) for (const y of [-1,1]) for (const z of [-1,1]) v.push(norm([x,y,z]));
+  return { verts: v, faces: [[0,1,3,2],[4,6,7,5],[0,4,5,1],[2,3,7,6],[0,2,6,4],[1,5,7,3]] };
+}
+function octa() {
+  const v = [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
+  return { verts: v, faces: [[0,2,4],[2,1,4],[1,3,4],[3,0,4],[2,0,5],[1,2,5],[3,1,5],[0,3,5]] };
+}
+function dodeca() {
+  const p = (1 + Math.sqrt(5)) / 2, q = 1 / p, v = [];
+  for (const x of [-1,1]) for (const y of [-1,1]) for (const z of [-1,1]) v.push(norm([x,y,z]));
+  for (const s of [-1,1]) for (const t of [-1,1]) {
+    v.push(norm([0, s*q, t*p])); v.push(norm([s*q, t*p, 0])); v.push(norm([s*p, 0, t*q]));
+  }
+  return { verts: v, faces: hullFaces(v, 5) };
+}
+function icosa() {
+  const p = (1 + Math.sqrt(5)) / 2, v = [];
+  for (const s of [-1,1]) for (const t of [-1,1]) {
+    v.push(norm([0, s, t*p])); v.push(norm([s, t*p, 0])); v.push(norm([s*p, 0, t]));
+  }
+  return { verts: v, faces: hullFaces(v, 3) };
+}
+
+function norm(v) {
+  const m = Math.hypot(v[0], v[1], v[2]);
+  return [v[0]/m, v[1]/m, v[2]/m];
+}
+
+// Recover faces from a vertex cloud on the unit sphere by grouping vertices that
+// share a common plane. Cheaper than a full convex hull and exact for these solids.
+function hullFaces(verts, size) {
+  const faces = [], seen = new Set();
+  for (let i = 0; i < verts.length; i++) {
+    for (let j = i+1; j < verts.length; j++) {
+      for (let k = j+1; k < verts.length; k++) {
+        let n = norm(cross(sub(verts[j], verts[i]), sub(verts[k], verts[i])));
+        if (!Number.isFinite(n[0])) continue; // collinear triple
+        let d = dot(n, verts[i]);
+
+        // Orient the normal outward. Testing `d > threshold` instead would drop
+        // every face on the far side of the origin — that silently cost the
+        // icosahedron half its faces.
+        if (d < 0) { n = n.map(x => -x); d = -d; }
+        if (d < 1e-9) continue; // plane through the centre bounds nothing
+
+        // A supporting plane of the hull has every vertex on one side of it.
+        // Without this test, any coplanar set qualifies — including internal
+        // cross-sections, which gave the d12 twelve phantom faces.
+        const on = [];
+        let bounding = true;
+        for (let m = 0; m < verts.length; m++) {
+          const side = dot(n, verts[m]) - d;
+          if (Math.abs(side) < 1e-6) on.push(m);
+          else if (side > 1e-6) bounding = false;
+        }
+        if (!bounding) continue;
+        if (on.length !== size) continue;
+        const key = on.join(',');
+        if (seen.has(key)) continue;
+        seen.add(key);
+        faces.push(sortRing(on, verts, n));
+      }
+    }
+  }
+  return faces;
+}
+
+function sortRing(idx, verts, n) {
+  const c = idx.reduce((a, i) => [a[0]+verts[i][0], a[1]+verts[i][1], a[2]+verts[i][2]], [0,0,0])
+                .map(x => x / idx.length);
+  const u = norm(sub(verts[idx[0]], c));
+  const w = cross(n, u);
+  return idx.slice().sort((a, b) => {
+    const va = sub(verts[a], c), vb = sub(verts[b], c);
+    return Math.atan2(dot(va, w), dot(va, u)) - Math.atan2(dot(vb, w), dot(vb, u));
+  });
+}
+
+const sub = (a,b) => [a[0]-b[0], a[1]-b[1], a[2]-b[2]];
+const dot = (a,b) => a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+const cross = (a,b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
+
+// A fair die needs to be *isohedral*: every face equivalent under the solid's
+// symmetry group, so each has equal probability. Two families cover every face
+// count, which is how real d10s, d14s, d24s and d30s are actually made.
+
+// Bipyramid: two apexes over a regular n-gon equator gives 2n triangular faces.
+// Triangles are planar by construction, so the only tuning is apex height.
+function bipyramid(n) {
+  const H = 1.15;
+  const verts = [[0, H, 0], [0, -H, 0]];
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * TAU;
+    verts.push([Math.cos(a), 0, Math.sin(a)]);
+  }
+  const ring = i => 2 + (i % n);
+  const faces = [];
+  for (let i = 0; i < n; i++) {
+    faces.push([0, ring(i), ring(i + 1)]);
+    faces.push([1, ring(i + 1), ring(i)]);
+  }
+  return normalize({ verts, faces });
+}
+
+// Trapezohedron: two offset rings plus an apex at each pole, giving 2n kite
+// faces. The apex height is not free — the kite [apex, top_i, bot_i, top_i+1]
+// is planar only at this exact ratio. Choosing H by eye bowties every face,
+// which renders as a tangle of crossing edges.
+function trapezohedron(n, flatten = null) {
+  // Planarity fixes the apex height exactly, relative to a unit ring radius:
+  // H = 2/(1 - cos(pi/n)) - 1 with the rings at y = +/-1. That ratio is scale
+  // invariant but grows fast with n, so the raw solid is a needle: at n=15 the
+  // apex sits 60x further out than the equator. Squashing y by H brings the
+  // poles back to the ring radius, giving the near-spherical proportions a
+  // physical d30 actually has. Scaling one axis preserves planarity.
+  const h = 1;
+  const H = 2 / (1 - Math.cos(Math.PI / n)) - 1;
+  // Squashing the poles to exactly the ring radius leaves a sharp bicone, but
+  // over-squashing flattens the die into a pinwheel disc. Taller poles as n
+  // grows keep high-count dice reading as solids rather than plates. Scaling one
+  // axis preserves the planarity the apex height was solved for.
+  const squash = (1 / H) * (flatten !== null ? flatten : (n > 6 ? 1.35 : 1.0));
+
+  const verts = [[0, H * squash, 0], [0, -H * squash, 0]];
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * TAU;
+    verts.push([Math.cos(a), h * squash, Math.sin(a)]);
+  }
+  for (let i = 0; i < n; i++) {
+    const a = ((i + 0.5) / n) * TAU;
+    verts.push([Math.cos(a), -h * squash, Math.sin(a)]);
+  }
+
+  const top = i => 2 + (i % n);
+  const bot = i => 2 + n + (i % n);
+  const faces = [];
+  for (let i = 0; i < n; i++) {
+    faces.push([0, top(i), bot(i), top(i + 1)]);
+    faces.push([1, bot(i + n - 1), top(i), bot(i)]);
+  }
+  return normalize({ verts, faces });
+}
+
+// d1 is the shape people actually print for a one-sided die: a short cylinder
+// with two wedges cut out of it, so whichever way it rolls it topples onto the
+// same flat face. Every other rest position is unstable by construction.
+//
+// A Möbius strip was tried first — one surface, one edge, cute — but it reads as
+// hatching at die size, and a real d1 is the better joke: an object whose whole
+// design is that it cannot land any other way.
+function oneSided(segments = 32) {
+  const verts = [];
+  const half = 0.42;
+
+  // Two notches taken out of the rim. They have to be narrow enough that the
+  // cylinder still reads as round — cutting deep leaves a flat slab, which
+  // looks like a domino rather than a die that cannot help landing face up.
+  const gap = 0.07;   // fraction of the circle removed per wedge
+  const kept = [];
+  for (let i = 0; i < segments; i++) {
+    const f = i / segments;
+    const inWedge = (f > 0.25 - gap && f < 0.25 + gap) || (f > 0.75 - gap && f < 0.75 + gap);
+    if (inWedge) continue;
+    kept.push(f);
+  }
+
+  const top = [], bottom = [];
+  for (const f of kept) {
+    const a = f * TAU;
+    top.push(verts.push([Math.cos(a), half, Math.sin(a)]) - 1);
+    bottom.push(verts.push([Math.cos(a), -half, Math.sin(a)]) - 1);
+  }
+
+  const faces = [];
+  // The face it always lands on, and its opposite.
+  faces.push(top.slice());
+  faces.push(bottom.slice().reverse());
+
+  // Rim panels between consecutive kept segments. Where a wedge was cut the
+  // panel spans the gap, which is the flat that makes the die tip over.
+  for (let i = 0; i < kept.length; i++) {
+    const j = (i + 1) % kept.length;
+    faces.push([top[i], top[j], bottom[j], bottom[i]]);
+  }
+  return normalize({ verts, faces });
+}
+
+// d2 is a coin, not a polyhedron: a short cylinder with two large faces. Any
+// two-faced solid is impossible, and a coin is what you'd actually flip.
+function coin(segments = 20) {
+  const verts = [];
+  const half = 0.13;
+  for (let i = 0; i < segments; i++) {
+    const a = (i / segments) * TAU;
+    verts.push([Math.cos(a), half, Math.sin(a)]);
+  }
+  for (let i = 0; i < segments; i++) {
+    const a = (i / segments) * TAU;
+    verts.push([Math.cos(a), -half, Math.sin(a)]);
+  }
+  const faces = [
+    Array.from({ length: segments }, (_, i) => i),
+    Array.from({ length: segments }, (_, i) => 2 * segments - 1 - i),
+  ];
+  // The rim is drawn as quads so the edge reads as thickness, not a hairline.
+  for (let i = 0; i < segments; i++) {
+    const j = (i + 1) % segments;
+    faces.push([i, j, segments + j, segments + i]);
+  }
+  return normalize({ verts, faces });
+}
+
+// Prism barrel: n rectangular faces around the equator, with a pointed cap at
+// each pole that is never landed on. This is how physical d5s and d7s are made,
+// and unlike a bipyramid it gives an exact face count for any n — odd or even.
+// The barrel's faces are all equivalent under its rotational symmetry, so it is
+// as fair as the die needs to be.
+function prismBarrel(n) {
+  const verts = [];
+  const half = 0.62;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * TAU;
+    verts.push([Math.cos(a), half, Math.sin(a)]);
+  }
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * TAU;
+    verts.push([Math.cos(a), -half, Math.sin(a)]);
+  }
+  const apexTop = verts.push([0, half + 0.55, 0]) - 1;
+  const apexBot = verts.push([0, -half - 0.55, 0]) - 1;
+
+  const faces = [];
+  // The numbered faces: one rectangle per side.
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    faces.push([i, j, n + j, n + i]);
+  }
+  // Caps are triangle fans, so they read as tapered ends rather than flat lids.
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    faces.push([apexTop, j, i]);
+    faces.push([apexBot, n + i, n + j]);
+  }
+  return normalize({ verts, faces });
+}
+
+// Antiprism: two rings offset by half a step, joined by a band of triangles and
+// closed with a shallow pyramid at each end. Reads as a straight-sided drum
+// rather than the cones a trapezohedron gives.
+//
+// The ends are pyramids rather than flat n-gon caps on purpose. A flat cap is
+// many times the area of a band triangle, and the resting-orientation search
+// scores by visible area — so a capped antiprism landed on one of its two lids
+// almost every roll, which looked like the die had only two outcomes.
+function antiprism(n) {
+  const verts = [];
+  const half = 0.52;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * TAU;
+    verts.push([Math.cos(a), half, Math.sin(a)]);
+  }
+  for (let i = 0; i < n; i++) {
+    const a = ((i + 0.5) / n) * TAU;
+    verts.push([Math.cos(a), -half, Math.sin(a)]);
+  }
+  const apexTop = verts.push([0, half + 0.40, 0]) - 1;
+  const apexBot = verts.push([0, -half - 0.40, 0]) - 1;
+
+  const top = i => i % n;
+  const bot = i => n + (i % n);
+  const faces = [];
+  for (let i = 0; i < n; i++) {
+    faces.push([top(i), top(i + 1), bot(i)]);
+    faces.push([bot(i), top(i + 1), bot(i + 1)]);
+    faces.push([apexTop, top(i + 1), top(i)]);
+    faces.push([apexBot, bot(i), bot(i + 1)]);
+  }
+  return normalize({ verts, faces });
+}
+
+// A squat trapezohedron. Same construction as the tall one — the planar apex
+// height is not negotiable — but flattened harder, which reads as a ball of
+// facets rather than a pair of cones.
+//
+// (An actual rhombic solid was tried here and cut: pulling one ring inward to
+// turn the kites into rhombi makes every face non-planar, the same way guessing
+// the apex height did.)
+// `flatten` scales the pole height directly, so smaller values are squatter —
+// 1.0 puts the poles level with the equator, giving a ball of facets rather
+// than the pair of cones a larger value produces.
+function squat(n) {
+  return trapezohedron(n, 0.85);
+}
+
+// Elongated bipyramid: a prism band with a pyramid on each end. Reads as a
+// crystal rather than a drum or a pair of cones.
+function elongated(n) {
+  const verts = [];
+  const half = 0.62;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * TAU;
+    verts.push([Math.cos(a), half, Math.sin(a)]);
+  }
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * TAU;
+    verts.push([Math.cos(a), -half, Math.sin(a)]);
+  }
+  const apexTop = verts.push([0, half + 0.42, 0]) - 1;
+  const apexBot = verts.push([0, -half - 0.42, 0]) - 1;
+
+  const faces = [];
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    faces.push([i, j, n + j, n + i]);
+    faces.push([apexTop, j, i]);
+    faces.push([apexBot, n + i, n + j]);
+  }
+  return normalize({ verts, faces });
+}
+
+// Banded drum: rings of quads stacked up a sphere, closed with a small cap at
+// each pole. This is the family that scales — vertices spread evenly over the
+// surface instead of converging on two apexes, so a drum stays countable at 120
+// faces where a trapezohedron is an unreadable blob by 40.
+//
+// That is what makes a legible d100 possible: not fewer facets, but facets that
+// do not all run to a point.
+function drum(around, bands, profile = 1) {
+  const verts = [];
+  const rows = [];
+
+  // `profile` shapes the silhouette so drums of similar density stay tellable
+  // apart: below 1 it barrels outward, above 1 it pinches toward the poles.
+  for (let k = 0; k <= bands; k++) {
+    const y = 0.62 - (1.24 * k) / bands;
+    const r = Math.pow(Math.max(0.05, 1 - (y * 1.05) ** 2), 0.5 * profile);
+    const row = [];
+    for (let i = 0; i < around; i++) {
+      const a = (i / around) * TAU;
+      row.push(verts.push([Math.cos(a) * r, y, Math.sin(a) * r]) - 1);
+    }
+    rows.push(row);
+  }
+
+  const apexTop = verts.push([0, 0.86, 0]) - 1;
+  const apexBot = verts.push([0, -0.86, 0]) - 1;
+
+  // Rings are aligned rather than staggered, and the band faces are trapezoids
+  // whose four corners share a plane. Staggering the rows looked more like a
+  // real many-sided die but made every quad non-planar, and the front/back edge
+  // test then misclassified edges — which drew as holes in the mesh.
+  const faces = [];
+  for (let k = 0; k < bands; k++) {
+    for (let i = 0; i < around; i++) {
+      const j = (i + 1) % around;
+      faces.push([rows[k][i], rows[k][j], rows[k + 1][j], rows[k + 1][i]]);
+    }
+  }
+  for (let i = 0; i < around; i++) {
+    const j = (i + 1) % around;
+    faces.push([apexTop, rows[0][j], rows[0][i]]);
+    faces.push([apexBot, rows[bands][i], rows[bands][j]]);
+  }
+  return normalize({ verts, faces });
+}
+
+function normalize(solid) {
+  const scale = Math.max(...solid.verts.map(v => Math.hypot(...v)));
+  return { verts: solid.verts.map(v => v.map(x => x / scale)), faces: solid.faces };
+}
+
+const SOLIDS = { 4: tetra, 6: cube, 8: octa, 12: dodeca, 20: icosa };
+
+// Cache: the hull recovery in dodeca/icosa is O(v^3), and barrels get rebuilt
+// on every roll otherwise.
+const solidCache = new Map();
+
+// Above this, facets are finer than the die is ever drawn, so more only cost
+// frame time. d100 and beyond share this silhouette.
+// The pointed families (trapezohedra, bipyramids, crystals) run every facet to
+// an apex, so their edges converge and they turn illegible fast — a
+// trapezohedron is already a blob by 40 faces. Above this, dice use the drum,
+// whose vertices spread over bands and stay countable past 120.
+// Measured, not guessed: a trapezohedron is already crowded at 24 faces and an
+// unreadable blob by 40, because every facet runs to one of two apexes. The
+// drum has no such convergence and stays countable past 120.
+const POINTED_LIMIT = 22;
+
+// Ceiling on facets for any die. Measured, not guessed: at a die's drawn size a
+// banded drum is still readable here, while anything pointed is long gone.
+const MAX_FACETS = 120;
+
+// Resting-orientation searches allowed per frame. Enough that small rolls all
+// resolve at once, low enough that a 100-dice roll spreads the cost instead of
+// spiking one frame past the 16.7ms budget.
+const SEARCHES_PER_FRAME = 6;
+let searchBudget = SEARCHES_PER_FRAME;
+let searchFrame = -1;
+
+// The budget refills once per frame, driven by the render loop.
+let frameCounter = 0;
+function beginFrame() { frameCounter++; }
+
+function claimSearchBudget() {
+  if (searchFrame !== frameCounter) {
+    searchFrame = frameCounter;
+    searchBudget = SEARCHES_PER_FRAME;
+  }
+  if (searchBudget <= 0) return false;
+  searchBudget--;
+  return true;
+}
+
+// Every die gets a real, fair solid — no flat tokens.
+//
+//   - Coin for d2, since no two-faced polyhedron exists
+//   - Platonic solids where one exists (d4, d6, d8, d12, d20)
+//   - Trapezohedron for even counts: 2n kite faces. This is how physical d10s
+//     are made, and it extends to d14, d16, d24, d30 and beyond.
+//   - Prism barrel for odd counts: n numbered faces around the equator with a
+//     pointed cap at each pole. This is how physical d5s and d7s are made, and
+//     it gives an exact face count for any n — a d17 gets seventeen faces, not
+//     an eighteen-faced solid pretending.
+//
+// Every face of a given solid is equivalent under its rotational symmetry, so
+// the shape is honest about the die. (The roll itself is decided by crypto RNG
+// regardless; this is about the geometry not lying.)
+// Families used for dice too large to draw facet-per-face. Each produces a
+// clearly different silhouette: cones, a drum, a crystal, a rhombic ball.
+const LARGE_FAMILIES = [
+  n => trapezohedron(n, 1.45), // rounded cones
+  antiprism,                   // straight-sided drum
+  elongated,                   // faceted crystal
+  squat,                       // ball of facets
+];
+
+// Choose the shape from the number's own arithmetic, so it is stable across
+// rolls but varies across dice. The smallest prime factor picks the family and
+// the digit sum nudges the facet count, which spreads neighbours like d100 and
+// d102 apart instead of collapsing them onto one shape.
+// A drum with exactly `total` faces. Faces are around*bands quads plus 2*around
+// cap triangles, so total = around * (bands + 2). Picking the divisor pair
+// closest to square keeps rings and columns similar in size, which reads better
+// than a few tall bands or one very fine ring.
+function drumWithFaces(total) {
+  // Silhouette varies with the die so two drums of similar density do not read
+  // as the same object: below 1 barrels outward, above 1 pinches toward the poles.
+  const profile = 0.62 + ((total % 7) / 6) * 0.76;
+
+  // total = around * bands + 2 * around, so any divisor of `total` that leaves
+  // a workable ring count gives an exact face count. Prefer the split closest to
+  // square: a few tall bands or one very fine ring both read worse.
+  let best = null;
+  for (let bands = 1; bands <= 10; bands++) {
+    const around = total / (bands + 2);
+    if (!Number.isInteger(around) || around < 5 || around > 30) continue;
+    const squareness = Math.abs(Math.log(around / (bands + 2)));
+    if (!best || squareness < best.squareness) best = { around, bands, squareness };
+  }
+  if (best) return drum(best.around, best.bands, profile);
+
+  // No clean factorisation — 26 and 58 are the awkward cases. Rather than accept
+  // a wrong face count, take the exact ring count and put the remainder in a
+  // single ring of extra facets at one pole.
+  return drumWithRemainder(total, profile);
+}
+
+// Exact face count when `total` does not factor: build the largest drum that
+// fits, then split one cap's triangles to make up the difference.
+function drumWithRemainder(total, profile) {
+  let around = 0, bands = 0;
+  for (let a = 30; a >= 5; a--) {
+    for (let b = 1; b <= 10; b++) {
+      const faces = a * (b + 2);
+      if (faces <= total && faces > around * (bands + 2)) { around = a; bands = b; }
+    }
+  }
+  const base = drum(around, bands, profile);
+  const shortfall = total - around * (bands + 2);
+  if (shortfall <= 0) return base;
+
+  // Split that many cap triangles in two by adding a midpoint on their outer
+  // edge. Each split adds exactly one face and keeps every face planar, since a
+  // triangle's parts are triangles.
+  const verts = base.verts.map(v => v.slice());
+  const faces = base.faces.map(f => f.slice());
+  for (let n = 0; n < shortfall; n++) {
+    const idx = faces.findIndex(f => f.length === 3);
+    if (idx === -1) break;
+    const [apex, a, b] = faces[idx];
+    const mid = verts.push([
+      (verts[a][0] + verts[b][0]) / 2,
+      (verts[a][1] + verts[b][1]) / 2,
+      (verts[a][2] + verts[b][2]) / 2,
+    ]) - 1;
+    faces.splice(idx, 1, [apex, a, mid], [apex, mid, b]);
+  }
+  return { verts, faces };
+}
+
+function largeSolid(sides, budget = MAX_FACETS) {
+  let smallestFactor = sides;
+  for (let f = 2; f * f <= sides; f++) {
+    if (sides % f === 0) { smallestFactor = f; break; }
+  }
+  const digitSum = String(sides).split('').reduce((a, c) => a + Number(c), 0);
+
+  // Past what the pointed families can carry, only the drum stays countable, so
+  // high dice all use it and take their variety from proportions instead. A d100
+  // then reads as genuinely many-sided rather than as a twelve-sided fake.
+  if (sides > POINTED_LIMIT) {
+    const target = Math.min(budget, Math.round(sides * 0.8));
+    // Rounder dice get more rings; the digit sum varies the ring/column split so
+    // neighbours differ without either dimension getting too fine to read.
+    const bands = 2 + (digitSum % 3);
+    const around = Math.max(6, Math.min(22, Math.round(target / (bands + 1))));
+    return drum(around, bands);
+  }
+
+  const family = LARGE_FAMILIES[(smallestFactor + digitSum) % LARGE_FAMILIES.length];
+
+  // Facets grow with the die so a d70 visibly carries more than a d41, while
+  // the digit sum keeps neighbours from collapsing onto one shape.
+  const fromSize = Math.round(Math.sqrt(sides) * 1.5);
+  const facets = Math.max(6, Math.min(Math.floor(budget / 2), fromSize + (digitSum % 4)));
+  return family(facets);
+}
+
+// Detail is capped by how large the die is actually drawn, not just by its side
+// count. A die 12px across cannot show 80 facets — the edges land closer than a
+// pixel apart — and paying for geometry nobody can resolve is what pushed a
+// hundred-dice roll past the frame budget. Big single rolls keep full detail.
+function facetBudget(size) {
+  if (!size || size >= 60) return MAX_FACETS;
+  if (size >= 40) return 60;
+  if (size >= 26) return 36;
+  return 18;
+}
+
+function solidFor(sides, size = null) {
+  if (!Number.isFinite(sides) || sides < 1) return null;
+
+  const budget = facetBudget(size);
+  const key = `${sides}:${budget}`;
+  if (solidCache.has(key)) return solidCache.get(key);
+
+  let solid;
+  if (sides === 1) {
+    solid = oneSided();
+  } else if (sides === 2) {
+    solid = coin();
+  } else if (SOLIDS[sides]) {
+    solid = SOLIDS[sides]();
+  } else if (sides <= POINTED_LIMIT) {
+    // Few enough facets that a pointed solid still reads: exactly one face per
+    // side, in the shape a physical die of that size actually takes.
+    solid = sides % 2 === 0 && sides / 2 >= 3
+      ? trapezohedron(sides / 2)
+      : prismBarrel(sides);
+  } else if (sides <= budget) {
+    // Still one face per side, but as a drum — a pointed solid with this many
+    // facets converges into an unreadable blob, while a drum stays countable.
+    solid = drumWithFaces(sides);
+  } else {
+    // Too many faces to draw one per side, so the shape becomes representative:
+    // a family and a facet count derived from the number itself, so a d70 still
+    // carries visibly more detail than a d41 and each die keeps one shape.
+    solid = largeSolid(sides, budget);
+  }
+
+  solidCache.set(key, solid);
+  return solid;
+}
+
+class Die {
+  constructor(sides, value, x, y, size) {
+    this.sides = sides;
+    this.value = value;
+    this.size = size;
+    this.x = x; this.y = y;
+    this.vx = 0; this.vy = 0;
+    // Resolved lazily: the real size is assigned by the layout after
+    // construction, and detail depends on how large the die is actually drawn.
+    this._solid = null;
+    this._solidSize = null;
+    this.rot = [Math.random()*TAU, Math.random()*TAU, Math.random()*TAU];
+    this.spin = [0, 0, 0];
+    this.settling = false;
+    this.settled = false;
+    this.settleT = 0;
+    this.restRot = null;
+  }
+
+  throwWith(vx, vy) {
+    this.vx = vx; this.vy = vy;
+    const speed = Math.hypot(vx, vy);
+    this.spin = [
+      (Math.random()-0.5) * 0.02 * speed + 0.15,
+      (Math.random()-0.5) * 0.02 * speed + 0.15,
+      (Math.random()-0.5) * 0.02 * speed,
+    ];
+    this.settling = false;
+    this.settled = false;
+    this.targetRot = null; // recomputed for wherever this throw lands
+  }
+
+  // Geometry for this die at its current size. Re-resolved when the size
+  // changes, so a die that grows on a resize gains the detail to match.
+  get solid() {
+    const budget = facetBudget(this.size);
+    if (!this._solid || this._solidSize !== budget) {
+      this._solid = solidFor(this.sides, this.size);
+      this._solidSize = budget;
+      // Detail changed, so any pose chosen for the old geometry no longer holds.
+      this.targetRot = null;
+    }
+    return this._solid;
+  }
+
+  // Tumble in place without moving. Used for large rolls, where flying dice
+  // across the tray costs frames and reads as noise — they all end up in the
+  // same grid anyway. `delay` staggers the settle so the grid resolves in a
+  // wave rather than every die stopping on the same frame.
+  spinInPlace(delay = 0) {
+    this.vx = 0;
+    this.vy = 0;
+    // Already in its slot, so home is where it stands: the settled drift then
+    // has nothing to correct rather than pulling it somewhere new.
+    this.homeX = this.x;
+    this.homeY = this.y;
+    this.spin = [
+      0.34 + Math.random() * 0.22,
+      0.30 + Math.random() * 0.22,
+      (Math.random() - 0.5) * 0.16,
+    ];
+    this.settling = false;
+    this.settled = false;
+    this.targetRot = null;
+    this.spinHold = 0.16 + delay * 0.42;
+  }
+
+  // A rerolled die does the thing a hand does: lands, pauses long enough to see
+  // the bad number, then hops and tumbles again. Without it a reroll is
+  // invisible — 1d2r1 rerolls every single time and looked identical to a plain
+  // roll, which is the case that exposed it.
+  //
+  // Called once the die has settled; the value it lands on afterwards is the one
+  // the roller already decided, so this is presentation only.
+  beginReroll() {
+    this.rerollPause = 0.34;
+    this.rerollHop = null;
+  }
+
+  stepReroll(dt, bounds) {
+    if (this.rerollPause > 0) {
+      this.rerollPause -= dt;
+      if (this.rerollPause > 0) return true;
+      // The hop: up, over a little, and spinning again.
+      this.settled = false;
+      this.settling = false;
+      this.targetRot = null;
+      this.searchWait = 0;
+      this.spinHold = undefined;
+      this.vx = (Math.random() - 0.5) * 90;
+      this.vy = -210;
+      this.spin = [
+        0.26 + Math.random() * 0.16,
+        0.24 + Math.random() * 0.16,
+        (Math.random() - 0.5) * 0.14,
+      ];
+      this.rerollHop = true;
+      this.rerollPause = 0;
+    }
+    return false;
+  }
+
+  step(dt, bounds) {
+    // Mid-reroll: hold still for a beat, then throw the die back up.
+    if (this.rerollPause > 0) {
+      if (this.stepReroll(dt, bounds)) return;
+    }
+
+    // A settled die keeps easing toward its slot, slowly. The grid is already
+    // sorted — dice grouped by type, each group high to low — so this reads as
+    // the tray tidying itself the way a hand does after a throw. It is a
+    // separate, much gentler pull than the one during flight, and it stops once
+    // the die is close enough that further movement would not be visible.
+    if (this.settled) {
+      if (this.homeX === undefined) return;
+      const dx = this.homeX - this.x;
+      const dy = this.homeY - this.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist < 0.4) return;
+      const ease = Math.min(1, dt * 2.4);
+      this.x += dx * ease;
+      this.y += dy * ease;
+      return;
+    }
+
+    // Spin-in-place dice hold their slot: no translation, no wall bounces, and
+    // no separation work, since the grid already spaced them.
+    if (this.spinHold !== undefined && !this.settling) {
+      this.spinHold -= dt;
+      for (let i = 0; i < 3; i++) this.rot[i] += this.spin[i] * dt * 60;
+      if (this.spinHold <= 0) {
+        this.settling = true;
+        this.settleT = 0;
+        this.restRot = this.rot.slice();
+      }
+      return;
+    }
+
+    if (!this.settling) {
+      this.x += this.vx * dt;
+      this.y += this.vy * dt;
+      this.vx *= 0.94;
+      this.vy *= 0.94;
+
+      const r = this.size * 0.55;
+      if (this.x < bounds.left + r) { this.x = bounds.left + r; this.vx = Math.abs(this.vx) * 0.55; }
+      if (this.x > bounds.right - r) { this.x = bounds.right - r; this.vx = -Math.abs(this.vx) * 0.55; }
+      if (this.y < bounds.top + r) { this.y = bounds.top + r; this.vy = Math.abs(this.vy) * 0.55; }
+      if (this.y > bounds.floor - r) { this.y = bounds.floor - r; this.vy = -Math.abs(this.vy) * 0.55; }
+
+      for (let i = 0; i < 3; i++) {
+        this.rot[i] += this.spin[i] * dt * 60;
+        this.spin[i] *= 0.965;
+      }
+
+      // Ease toward the slot the layout assigned, so dice spread out instead of
+      // landing wherever momentum happens to leave them.
+      if (this.homeX !== undefined) {
+        this.vx += (this.homeX - this.x) * 3.2 * dt;
+        this.vy += (this.homeY - this.y) * 3.2 * dt;
+      }
+
+      if (Math.hypot(this.vx, this.vy) < 8 && Math.abs(this.spin[0]) < 0.02) {
+        this.settling = true;
+        this.settleT = 0;
+        this.restRot = this.rot.slice();
+      }
+    } else {
+      // Ease the tumble to a stop, rotating toward an orientation that presents
+      // a face to the camera. Landing on a pole or a vertex reads as a spike and
+      // leaves nowhere to paint the numeral.
+      //
+      // The search is the most expensive thing in the frame, so it is rationed:
+      // when a hundred dice settle together the searches otherwise bunch onto a
+      // few frames and cause a visible hitch. A die that misses its turn keeps
+      // spinning for another frame, which is invisible.
+      // A die that has waited several frames for budget takes its turn anyway.
+      // Without that floor, a caller that never advances the frame counter would
+      // leave dice spinning forever instead of merely animating less smoothly.
+      if (!this.targetRot) {
+        this.searchWait = (this.searchWait || 0) + 1;
+        if (this.searchWait < 30 && !claimSearchBudget()) return;
+        this.targetRot = this.findFaceUpRotation();
+      }
+      this.settleT = Math.min(1, this.settleT + dt * 2.2);
+      const e = 1 - Math.pow(1 - this.settleT, 3);
+      for (let i = 0; i < 3; i++) {
+        this.rot[i] = this.restRot[i] + (this.targetRot[i] - this.restRot[i]) * e;
+      }
+      if (this.settleT >= 1) this.settled = true;
+    }
+  }
+
+  // Search nearby rotations for one that turns some face toward the camera.
+  // Sampling beats solving for it: the solids differ enough in face layout that
+  // a closed form would need per-family special cases, and this runs once.
+  findFaceUpRotation() {
+    if (!this.solid) return this.rot.slice();
+    let best = this.rot.slice(), bestScore = -Infinity;
+
+    // Cost is candidates x faces x vertices, so a fixed candidate count makes
+    // high-face dice disproportionately expensive — a d50 cost ~8ms, enough to
+    // drop frames on a 100-dice roll. Many-faced solids also have a face
+    // pointing almost anywhere, so they need far fewer samples to land one.
+    const samples = this.solid.faces.length > 20 ? 40
+                  : this.solid.faces.length > 10 ? 80
+                  : 140;
+
+    for (let i = 0; i < samples; i++) {
+      // First candidate is the current pose, so an already-good landing sticks.
+      // Later candidates search the full sphere: a coin's two broad faces lie on
+      // a single axis, and a narrow search around a rim-on landing can never
+      // reach them.
+      const spread = i < samples * 0.43 ? 2.6 : TAU;
+      const cand = i === 0 ? this.rot.slice() : [
+        this.rot[0] + (Math.random() - 0.5) * spread,
+        this.rot[1] + (Math.random() - 0.5) * spread,
+        this.rot[2] + (Math.random() - 0.5) * spread,
+      ];
+      const pts = this.solid.verts.map(v => rotate(v, cand[0], cand[1], cand[2]));
+
+      // Score by projected screen area, not facing angle alone. Facing alone
+      // lets a sliver of rim beat a broad face that is only slightly turned —
+      // which is why the coin landed on its edge nearly every flip.
+      let visible = 0;
+      for (const face of this.solid.faces) {
+        const fp = face.map(i2 => pts[i2]);
+        const n = faceNormal(fp);
+        const len = Math.hypot(...n);
+        if (!len) continue;
+        const facing = n[2] / len;
+        if (facing <= 0) continue;
+        visible = Math.max(visible, facing * polygonArea(fp) * facing);
+      }
+      // Prefer a big square-on face, but stay near the pose it actually landed in.
+      const drift = Math.abs(cand[0] - this.rot[0]) + Math.abs(cand[1] - this.rot[1]);
+      const score = visible - drift * 0.02;
+      if (score > bestScore) { bestScore = score; best = cand; }
+    }
+    return best;
+  }
+
+  draw(ctx, theme) {
+    const s = this.size * 0.5;
+    ctx.save();
+    ctx.translate(this.x, this.y);
+
+    // A dropped die is still shown — you rolled it — but recedes, so the dice
+    // that actually count read at a glance. Without this the tray implies every
+    // die contributed to the total.
+    const fade = this.kept === false && this.settled ? 0.3 : 1;
+    ctx.globalAlpha = fade;
+
+    // Nothing to draw without geometry. This used to call a drawToken() that no
+    // longer exists, which threw on every frame and took the whole render loop
+    // down with it — one bad die blanked the tray until a reload.
+    if (!this.solid) {
+      ctx.restore();
+      return;
+    }
+
+    const [rx, ry, rz] = this.rot;
+    const pts = this.solid.verts.map(v => rotate(v, rx, ry, rz));
+    const proj = pts.map(p => {
+      const d = 4 / (4 - p[2]);
+      return [p[0] * s * d, p[1] * s * d, p[2]];
+    });
+
+    // Back edges first, faint; front edges over them at full strength.
+    const edges = new Map();
+    for (const face of this.solid.faces) {
+      const n = faceNormal(face.map(i => pts[i]));
+      const front = n[2] > 0;
+      for (let i = 0; i < face.length; i++) {
+        const a = face[i], b = face[(i+1) % face.length];
+        const key = a < b ? `${a}:${b}` : `${b}:${a}`;
+        edges.set(key, (edges.get(key) || false) || front);
+      }
+    }
+
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    for (const pass of [false, true]) {
+      ctx.beginPath();
+      for (const [key, front] of edges) {
+        if (front !== pass) continue;
+        const [a, b] = key.split(':').map(Number);
+        ctx.moveTo(proj[a][0], proj[a][1]);
+        ctx.lineTo(proj[b][0], proj[b][1]);
+      }
+      ctx.strokeStyle = theme.line;
+      // Scaled rather than set, so a dropped die's fade survives this pass.
+      ctx.globalAlpha = fade * (pass ? 1 : 0.22);
+      ctx.lineWidth = pass ? 1.6 : 1.1;
+      ctx.stroke();
+    }
+    ctx.globalAlpha = fade;
+
+    this.drawValue(ctx, theme, s, pts, proj);
+    ctx.restore();
+  }
+
+  // What happened to this die, in the same hairline vocabulary as the dice: a
+  // burst for an exploded die, a cycle for a rerolled one. Small enough to
+  // ignore, present enough to answer "why is this d6 showing 14".
+  // A ring inscribed on the numeral's own face, in the same skewed plane the
+  // digits sit in, so it reads as marked *on* the die rather than as a badge
+  // floating over it. Two rings for a die that both exploded and rerolled.
+  //
+  // The motion does most of the work now — an exploding die throws a burst, a
+  // rerolled one hops and tumbles again — so this only has to persist the fact
+  // after everything has settled.
+  drawFaceMark(ctx, theme, size) {
+    const rings = (this.exploded ? 1 : 0) + (this.rerolled ? 1 : 0);
+    if (!rings || !this.settled) return;
+
+    ctx.save();
+    ctx.strokeStyle = theme.accent;
+    ctx.globalAlpha = 0.55;
+    ctx.lineWidth = 1;
+    for (let i = 0; i < rings; i++) {
+      ctx.beginPath();
+      ctx.arc(0, 0, size * (0.78 + i * 0.2), 0, TAU);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // Paint the numeral onto the face that most directly faces the camera, using
+  // that face's own plane. The glyph is skewed to sit in the surface rather than
+  // floating flat over the shape, so it tracks the die as it tumbles.
+  drawValue(ctx, theme, s, pts, proj) {
+    // Pick the face by visible screen area, matching findFaceUpRotation. Going
+    // by facing angle alone paints the numeral on whatever sliver happens to
+    // point at the camera — on a coin, that meant a digit on the rim.
+    let best = null, bestFacing = 0, bestScore = 0;
+    for (const face of this.solid.faces) {
+      const fp = face.map(i => pts[i]);
+      const n = faceNormal(fp);
+      const len = Math.hypot(...n);
+      if (!len) continue;
+      const facing = n[2] / len;
+      if (facing <= 0.2) continue;
+      const score = facing * polygonArea(fp);
+      if (score > bestScore) { bestScore = score; bestFacing = facing; best = face; }
+    }
+    if (!best) return;
+
+    // Face centre in screen space, and an in-plane axis to skew the glyph with.
+    const c2 = best.reduce((a, i) => [a[0] + proj[i][0], a[1] + proj[i][1]], [0, 0])
+                   .map(v => v / best.length);
+
+    // The transform below maps the glyph's local +x onto (ux, uy), so this is the
+    // direction the text reads along. Pick the face's own axis that runs closest
+    // to screen-right, which keeps the numeral upright.
+    //
+    // Using the first vertex instead — as this did — left the glyph at whatever
+    // rotation that vertex happened to sit at, so numerals regularly landed
+    // upside down and a 63 read as a 39 at a glance.
+    let ux = 1, uy = 0, bestAlign = -Infinity;
+    for (const i of best) {
+      let vx = proj[i][0] - c2[0];
+      let vy = proj[i][1] - c2[1];
+      const len = Math.hypot(vx, vy);
+      if (len < 1e-6) continue;
+      vx /= len; vy /= len;
+      // A face has no inherent top, so a direction and its opposite are equally
+      // valid; take whichever reads left-to-right.
+      for (const [cx, cy] of [[vx, vy], [-vx, -vy]]) {
+        if (cx > bestAlign) { bestAlign = cx; ux = cx; uy = cy; }
+      }
+    }
+
+    // A staged die has no value yet: it is waiting on the tray to be thrown, so
+    // it shows as an empty shape rather than a number it does not have.
+    if (this.value === null || this.value === undefined) return;
+    const label = String(this.value);
+    // Long labels (d100 can show 3 digits) need to shrink to stay on the face.
+    const fit = label.length > 2 ? 0.34 : label.length > 1 ? 0.42 : 0.52;
+    const size = Math.max(7, s * fit * (0.55 + 0.45 * bestFacing));
+
+    ctx.save();
+    ctx.translate(c2[0], c2[1]);
+    // Rotate to the face's own axis, then squash vertically by how much the
+    // face is turned away — the same foreshortening the edges already show.
+    ctx.transform(ux, uy, -uy * bestFacing, ux * bestFacing, 0, 0);
+    ctx.font = `600 ${size}px "Iosevka Etoile", ui-monospace, monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = theme.line;
+    ctx.globalAlpha = this.settled ? 1 : 0.35 + 0.65 * bestFacing;
+    ctx.fillText(label, 0, 0);
+    // Drawn here so it shares the face's skew: the ring sits in the surface with
+    // the numeral rather than floating flat over the die.
+    this.drawFaceMark(ctx, theme, size);
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  }
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function rotate(v, rx, ry, rz) {
+  let [x, y, z] = v;
+  let c = Math.cos(rx), s = Math.sin(rx);
+  [y, z] = [y*c - z*s, y*s + z*c];
+  c = Math.cos(ry); s = Math.sin(ry);
+  [x, z] = [x*c + z*s, -x*s + z*c];
+  c = Math.cos(rz); s = Math.sin(rz);
+  [x, y] = [x*c - y*s, x*s + y*c];
+  return [x, y, z];
+}
+
+// Area of a planar polygon in 3D, via the magnitude of its summed cross products.
+function polygonArea(pts) {
+  let n = [0, 0, 0];
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i], b = pts[(i + 1) % pts.length];
+    n = [n[0] + (a[1]*b[2] - a[2]*b[1]),
+         n[1] + (a[2]*b[0] - a[0]*b[2]),
+         n[2] + (a[0]*b[1] - a[1]*b[0])];
+  }
+  return Math.hypot(...n) / 2;
+}
+
+function faceNormal(pts) {
+  const n = cross(sub(pts[1], pts[0]), sub(pts[2], pts[0]));
+  const c = pts.reduce((a, p) => [a[0]+p[0], a[1]+p[1], a[2]+p[2]], [0,0,0]);
+  // Point the normal outward from the centroid before testing facing.
+  return dot(n, c) < 0 ? n.map(x => -x) : n;
+}
+
+// Push overlapping dice apart. Runs every frame, including after they settle, so
+// a die can never come to rest on top of another one.
+function separate(dice, bounds, iterations = 3) {
+  for (let pass = 0; pass < iterations; pass++) {
+    let moved = false;
+    for (let i = 0; i < dice.length; i++) {
+      for (let j = i + 1; j < dice.length; j++) {
+        const a = dice[i], b = dice[j];
+        const min = (a.size + b.size) * 0.5 * 0.92;
+        let dx = b.x - a.x, dy = b.y - a.y;
+        let dist = Math.hypot(dx, dy);
+        if (dist >= min) continue;
+
+        // Perfectly coincident dice have no separation axis; nudge deterministically.
+        if (dist < 1e-6) { dx = (i % 2 ? 1 : -1); dy = (j % 2 ? 1 : -1); dist = Math.hypot(dx, dy); }
+
+        const push = (min - dist) / 2;
+        const nx = (dx / dist) * push, ny = (dy / dist) * push;
+        a.x -= nx; a.y -= ny;
+        b.x += nx; b.y += ny;
+        moved = true;
+      }
+    }
+    for (const d of dice) {
+      const r = d.size * 0.5;
+      d.x = Math.max(bounds.left + r, Math.min(bounds.right - r, d.x));
+      d.y = Math.max(bounds.top + r, Math.min(bounds.floor - r, d.y));
+    }
+    if (!moved) break;
+  }
+}
+
+// Contact marks under the dice themselves.
+//
+// This used to draw a floor line across the tray with ripples expanding on it
+// wherever a die landed. Because the dice come to rest all over the tray and the
+// line sat at the bottom, the ripples read as unrelated marks in a strip rather
+// than as anything the dice were touching. A mark directly beneath each die does
+// the job the floor line was supposed to do.
+class Surface {
+  constructor() { this.marks = []; this.bursts = []; }
+
+  impact(x, y, size) { this.marks.push({ x, y, size, t: 0 }); }
+
+  // A die that exploded throws a burst of rays. It is the one moment the app
+  // raises its voice, so it is bigger than anything else on the tray — but still
+  // hairlines, so it belongs to the same drawing rather than arriving from
+  // another app.
+  burst(x, y, size) {
+    const rays = [];
+    const count = 14;
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * TAU + Math.random() * 0.2;
+      rays.push({ a, reach: 0.8 + Math.random() * 0.7 });
+    }
+    this.bursts.push({ x, y, size, rays, t: 0 });
+  }
+
+  step(dt) {
+    this.marks = this.marks.filter(m => (m.t += dt) < 0.9);
+    this.bursts = this.bursts.filter(b => (b.t += dt) < 0.75);
+  }
+
+  drawBursts(ctx, theme) {
+    if (!this.bursts.length) return;
+    ctx.save();
+    ctx.lineCap = 'round';
+    for (const b of this.bursts) {
+      const p = b.t / 0.75;
+      const e = 1 - Math.pow(1 - p, 3);   // fast out, slow to a stop
+      const fade = Math.pow(1 - p, 1.6);
+
+      ctx.strokeStyle = theme.accent;
+      ctx.globalAlpha = fade;
+
+      // Rays flung outward, each leaving a gap behind it so the burst reads as
+      // moving rather than as a fixed starburst.
+      ctx.lineWidth = 1.7;
+      ctx.beginPath();
+      for (const ray of b.rays) {
+        const inner = b.size * (0.35 + e * ray.reach * 1.5);
+        const outer = inner + b.size * 0.34 * (1 - p * 0.7);
+        ctx.moveTo(b.x + Math.cos(ray.a) * inner, b.y + Math.sin(ray.a) * inner);
+        ctx.lineTo(b.x + Math.cos(ray.a) * outer, b.y + Math.sin(ray.a) * outer);
+      }
+      ctx.stroke();
+
+      // A shock ring, thinning as it grows.
+      ctx.lineWidth = 1.2 * (1 - p);
+      ctx.globalAlpha = fade * 0.7;
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.size * (0.3 + e * 1.5), 0, TAU);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  draw(ctx, theme) {
+    ctx.save();
+    ctx.strokeStyle = theme.muted;
+    ctx.lineWidth = 1;
+    for (const m of this.marks) {
+      const e = 1 - Math.pow(1 - m.t / 0.9, 2);
+      ctx.globalAlpha = 0.28 * (1 - m.t / 0.9);
+      ctx.beginPath();
+      ctx.ellipse(m.x, m.y + m.size * 0.42, m.size * (0.34 + e * 0.5),
+                  m.size * (0.08 + e * 0.12), 0, 0, TAU);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // A faint ellipse under each resting die, so it reads as sitting on a surface
+  // rather than floating in the middle of the tray.
+  drawRests(ctx, theme, dice) {
+    ctx.save();
+    ctx.strokeStyle = theme.muted;
+    ctx.globalAlpha = 0.16;
+    ctx.lineWidth = 1;
+    for (const d of dice) {
+      if (!d.settled) continue;
+      // A dropped die loses its contact mark too, so the kept dice are the only
+      // ones that read as sitting on the table.
+      if (d.kept === false) continue;
+      ctx.beginPath();
+      ctx.ellipse(d.x, d.y + d.size * 0.46, d.size * 0.34, d.size * 0.07, 0, 0, TAU);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+
+Object.assign(__dicebox, { beginFrame, solidFor, Die, separate, Surface });
+})();
+
+// app.js
+(() => {
+const { roll, describe, Die, Surface, separate, beginFrame, solidFor } = __dicebox;
+
+
+const $ = id => document.getElementById(id);
+const canvas = $('tray');
+const ctx = canvas.getContext('2d');
+
+// One row of dice, ordered by size: the standard RPG set plus every Dungeon
+// Crawl Classics chain rung, plus d100. Gaps like d9 and d11 are deliberate —
+// no published system uses them, and the notation field covers anything here.
+const QUICK = [1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 30, 100];
+
+// Above this many dice, throwing them across the tray stops being legible and
+// the pairwise separation gets expensive. Larger rolls spin in place instead.
+const THROW_LIMIT = 24;
+
+// Above this, even spinning in place costs more per frame than the animation is
+// worth — measured at ~39ms/frame for 400 dice on a Raspberry Pi, well past the
+// 16.7ms budget. Bigger rolls show their result immediately; the total is what
+// anyone rolling 500 dice actually wants.
+const ANIMATE_LIMIT = 220;
+
+const state = {
+  count: 1,
+  // What a tap on an empty tray rolls, when nothing is staged.
+  defaultSides: 20,
+  dice: [],
+  surface: new Surface(),
+  bounds: { left: 0, right: 0, top: 0, floor: 0 },
+  last: null,
+};
+
+// ---- theme ----
+
+// With nothing stored the page follows the system setting, and keeps following
+// it if that changes. Choosing a theme pins it until it is cleared.
+const systemDark = window.matchMedia('(prefers-color-scheme: dark)');
+
+function isDark() {
+  const pinned = document.documentElement.dataset.theme;
+  if (pinned === 'dark') return true;
+  if (pinned === 'light') return false;
+  return systemDark.matches;
+}
+
+const stored = localStorage.getItem('dicebox:theme');
+if (stored === 'dark' || stored === 'light') document.documentElement.dataset.theme = stored;
+syncThemeLabel();
+
+$('themeToggle').addEventListener('click', () => {
+  document.documentElement.dataset.theme = isDark() ? 'light' : 'dark';
+  localStorage.setItem('dicebox:theme', document.documentElement.dataset.theme);
+  syncThemeLabel();
+  updateThemeColor();
+});
+
+systemDark.addEventListener('change', () => {
+  if (document.documentElement.dataset.theme) return; // pinned by choice
+  syncThemeLabel();
+  updateThemeColor();
+});
+
+// The button shows the theme you are in and switches to the other one, so the
+// label has to describe the destination rather than the icon.
+function syncThemeLabel() {
+  const dark = isDark();
+  $('themeToggle').dataset.mode = dark ? 'dark' : 'light';
+  $('themeToggle').setAttribute('aria-label',
+    dark ? 'Switch to light theme' : 'Switch to dark theme');
+}
+
+function updateThemeColor() {
+  const paper = theme().paper;
+  document.querySelectorAll('meta[name="theme-color"]').forEach(m => m.setAttribute('content', paper));
+}
+
+function theme() {
+  const s = getComputedStyle(document.documentElement);
+  return {
+    paper: s.getPropertyValue('--paper').trim(),
+    line:  s.getPropertyValue('--line').trim(),
+    muted: s.getPropertyValue('--muted').trim(),
+    accent: s.getPropertyValue('--accent').trim(),
+  };
+}
+
+// ---- canvas sizing ----
+
+function resize() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+  const r = canvas.getBoundingClientRect();
+  canvas.width = Math.round(r.width * dpr);
+  canvas.height = Math.round(r.height * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  state.bounds = { left: 8, right: r.width - 8, top: 8, floor: r.height - 18 };
+  layoutSettled();
+}
+new ResizeObserver(resize).observe(canvas.parentElement);
+
+// After a resize the previous positions may be off-screen, so re-place the dice.
+//
+// This must lay out the whole tray, not just the dice that have already come to
+// rest. Gridding a subset computes rows, columns and size for that smaller
+// count, so mid-roll the settled dice were re-placed into a layout meant for
+// fewer dice — landing on top of the ones still in flight, at a different size.
+// Dice in flight keep their target slot updated so they arrive in the right
+// place; dice at rest move immediately.
+function layoutSettled() {
+  if (!state.dice.length) return;
+
+  // Compute slots for the whole tray, then apply them without teleporting dice
+  // that are still in flight — those get their destination updated instead.
+  const flying = state.dice.map(d => ({
+    d, inFlight: !d.settled && d.homeX !== undefined,
+    x: d.x, y: d.y,
+  }));
+
+  placeGrid(state.dice);
+
+  for (const f of flying) {
+    if (!f.inFlight) continue;
+    f.d.homeX = f.d.x;
+    f.d.homeY = f.d.y;
+    f.d.x = f.x;
+    f.d.y = f.y;
+  }
+}
+
+// Below this, dice keep the order they were rolled in. A handful small enough to
+// read at a glance does not need sorting, and the scatter of dice arriving in
+// whatever slot they reach looks better than a filing cabinet.
+const TIDY_THRESHOLD = 8;
+
+// The order dice come to rest in: the way you would tidy a handful on a table —
+// all the d6s together, all the d20s together, each group ordered high to low,
+// and the dropped dice pushed to the end of their group.
+function tidyOrder(dice) {
+  if (dice.length < TIDY_THRESHOLD) return dice;
+
+  const groupOrder = [];
+  for (const d of dice) if (!groupOrder.includes(d.sides)) groupOrder.push(d.sides);
+  groupOrder.sort((a, b) => a - b);
+
+  return dice.slice().sort((a, b) => {
+    const byType = groupOrder.indexOf(a.sides) - groupOrder.indexOf(b.sides);
+    if (byType) return byType;
+    // Dice that did not count sit at the end of their own group.
+    const aKept = a.kept === false ? 1 : 0;
+    const bKept = b.kept === false ? 1 : 0;
+    if (aKept !== bKept) return aKept - bKept;
+    return (b.value ?? 0) - (a.value ?? 0);
+  });
+}
+
+function placeGrid(dice) {
+  const { left, right, top, floor } = state.bounds;
+  const w = right - left, h = floor - top;
+  const cols = Math.ceil(Math.sqrt(dice.length * (w / Math.max(h, 1))));
+  const rows = Math.ceil(dice.length / cols);
+  const cw = w / cols, ch = h / rows;
+  // Cap the size so a lone die doesn't fill the whole tray, and floor it so a
+  // large handful stays legible.
+  const size = Math.max(26, Math.min(96, Math.min(cw, ch) * 0.78));
+
+  // Slots are assigned in tidy order rather than roll order, so the drift toward
+  // the grid also sorts the dice — the same thing a hand does after a throw.
+  tidyOrder(dice).forEach((d, i) => {
+    const c = i % cols, r = Math.floor(i / cols);
+    d.x = left + cw * (c + 0.5);
+    d.y = top + ch * (r + 0.5);
+    d.size = size;
+  });
+}
+
+// ---- rolling ----
+
+function doRoll(notation) {
+  let result;
+  try {
+    result = roll(notation);
+  } catch (err) {
+    showError(err.message);
+    return;
+  }
+  clearError();
+
+  state.last = result;
+  $('notation').value = result.notation;
+
+  const flat = [];
+  for (const g of result.groups) {
+    if (g.kind !== 'dice') continue;
+    for (const d of g.dice) {
+      flat.push({
+        sides: g.sides,
+        value: d.value,
+        // Carried onto the tray so a die can show what happened to it: dropped
+        // dice fade, exploded and rerolled ones get a mark.
+        kept: d.kept,
+        exploded: d.exploded,
+        rerolled: d.rerolled,
+      });
+    }
+  }
+
+  state.dice = flat.map(f => {
+    const die = new Die(f.sides, f.value, 0, 0, 40);
+    die.kept = f.kept;
+    die.exploded = f.exploded;
+    die.rerolled = f.rerolled;
+    return die;
+  });
+  placeGrid(state.dice);
+
+  // Small rolls get thrown across the tray. Large ones spin in place: the dice
+  // end up in the same grid either way, so for 100d6 the flight and collisions
+  // buy nothing and cost every frame. Spinning in place keeps every die animated
+  // at a fraction of the work.
+  const mode = flat.length === 0 || flat.length > ANIMATE_LIMIT ? 'none'
+             : flat.length <= THROW_LIMIT ? 'throw'
+             : 'spin';
+
+  if (mode === 'throw') {
+    // Each die keeps the grid slot placeGrid gave it and is thrown *toward* it.
+    // Launching from random positions instead is what made dice pile up.
+    for (const d of state.dice) {
+      d.homeX = d.x;
+      d.homeY = d.y;
+      const fromLeft = Math.random() < 0.5;
+      d.x = fromLeft ? state.bounds.left + 12 : state.bounds.right - 12;
+      d.y = state.bounds.top + 12 + Math.random() * 30;
+      d.throwWith((d.homeX - d.x) * 2.4, (d.homeY - d.y) * 2.4);
+    }
+    $('total').dataset.rolling = '1';
+    setTimeout(() => finish(result), 620 + rerollDelay(flat));
+  } else if (mode === 'spin') {
+    // Stagger the starts so the grid resolves in a wave instead of snapping.
+    state.dice.forEach((d, i) => d.spinInPlace(i / state.dice.length));
+    $('total').dataset.rolling = '1';
+    setTimeout(() => finish(result), 700 + rerollDelay(flat));
+  } else {
+    for (const d of state.dice) { d.settled = true; d.settling = true; d.settleT = 1; }
+    finish(result);
+  }
+
+  if (navigator.vibrate) navigator.vibrate(mode === 'none' ? 10 : [8, 40, 12]);
+  hideHint();
+}
+
+// A rerolled die lands, pauses, hops and tumbles again, so the total has to wait
+// for the second landing or it would appear while dice are still moving. Only
+// paid when something actually rerolled.
+function rerollDelay(flat) {
+  return flat.some(f => f.rerolled) ? 700 : 0;
+}
+
+function finish(result) {
+  delete $('total').dataset.rolling;
+  delete $('total').dataset.idle;
+  $('total').textContent = String(result.total);
+  $('breakdown').textContent = describe(result.groups);
+  addHistory(result);
+  // The name has done its job by the first roll; let the tray have the page.
+  $('wordmark').dataset.faded = '1';
+}
+
+function addHistory(result) {
+  const li = document.createElement('li');
+  const label = document.createElement('span');
+  label.textContent = result.notation;
+  const val = document.createElement('b');
+  val.textContent = String(result.total);
+  li.append(label, val);
+  const list = $('history');
+  list.prepend(li);
+  while (list.children.length > 12) list.lastElementChild.remove();
+}
+
+function showError(msg) {
+  const el = $('error');
+  el.textContent = msg;
+  el.hidden = false;
+}
+function clearError() { $('error').hidden = true; }
+
+// ---- controls ----
+
+$('entry').addEventListener('submit', e => {
+  e.preventDefault();
+  doRoll($('notation').value);
+  $('notation').blur();
+});
+
+// Typing keeps the buttons in step, so the field and the row never disagree
+// about what is loaded.
+// Typing is another way of staging dice, so the tray follows the field as it is
+// edited: backspace away "+2d3" and those dice leave the tray immediately.
+$('notation').addEventListener('input', () => {
+  pool = parsePool($('notation').value);
+  // Typing an unusual die earns it a button too, so the row always accounts for
+  // everything in the pool.
+  for (const sides of pool.keys()) {
+    if (sides >= 1 && sides <= MAX_SIDES) ensureDieButton(sides);
+  }
+  stageFromPool({ writeField: false });
+});
+
+// ---- help ----
+
+const help = $('help');
+const helpToggle = $('helpToggle');
+
+function setHelp(open) {
+  if (open) { closeSheet(); closeDial(); }
+  help.hidden = !open;
+  helpToggle.setAttribute('aria-expanded', String(open));
+  helpToggle.setAttribute('aria-label', open ? 'Hide syntax reference' : 'Show syntax reference');
+  if (open) hideHint();
+}
+
+helpToggle.addEventListener('click', () => setHelp(help.hidden));
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !help.hidden) {
+    setHelp(false);
+    helpToggle.focus();
+  }
+});
+
+// Tapping an example loads it, so the reference doubles as a set of presets.
+help.querySelectorAll('.syntax dt').forEach(dt => {
+  dt.tabIndex = 0;
+  dt.role = 'button';
+  const use = () => {
+    $('notation').value = dt.textContent.trim();
+    setHelp(false);
+    doRoll(dt.textContent.trim());
+  };
+  dt.addEventListener('click', use);
+  dt.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); use(); }
+  });
+});
+
+// ---- the pool ----
+//
+// Tapping dice builds a pool: tap d20 twice and d6 once and you have 2d20+1d6,
+// which is what an attack roll actually looks like. The pool writes itself into
+// the notation field, so the field stays the single source of truth and typing
+// notation by hand still works exactly as before.
+
+const diceButtons = $('diceButtons');
+
+// sides -> { count, mods }. Insertion order is preserved, so the notation reads
+// back in the order the dice were tapped.
+//
+// `mods` holds one suffix per slot. Modifiers in different slots stack — 4d6dl1!
+// drops the lowest *and* explodes — while two in the same slot replace each
+// other, because "keep the highest" and "drop the lowest" both answer the same
+// question and cannot both apply.
+const SLOTS = ['keep', 'burst', 'reroll'];
+
+const SLOT_OF = [
+  [/^(kh|kl|dh|dl)/, 'keep'],
+  [/^!/, 'burst'],
+  [/^r/, 'reroll'],
+];
+
+function slotFor(suffix) {
+  for (const [pattern, slot] of SLOT_OF) if (pattern.test(suffix)) return slot;
+  return 'keep';
+}
+
+// The roller expects keep/drop before the explode and reroll flags.
+const entryNotation = (sides, { count, mods }) =>
+  `${count}d${sides}` + SLOTS.map(s => (mods && mods[s]) || '').join('');
+
+let pool = new Map();
+
+function poolNotation() {
+  return [...pool].map(([sides, e]) => entryNotation(sides, e)).join('+');
+}
+
+function addToPool(sides, count = 1) {
+  // Typing in the field and then tapping a die should extend what is there, not
+  // silently discard it. Anything unparseable is replaced instead.
+  if (!poolMatchesField()) {
+    pool = parsePool($('notation').value);
+  }
+  const cur = pool.get(sides) || { count: 0, mods: {} };
+  pool.set(sides, { count: cur.count + count, mods: cur.mods });
+  syncPool();
+}
+
+// Set how many of one die are staged, keeping whatever modifiers it carries.
+// Zero removes it entirely.
+function setDieCount(sides, count) {
+  if (!poolMatchesField()) pool = parsePool($('notation').value);
+
+  const cur = pool.get(sides);
+  const next = Math.max(0, Math.min(999, Math.round(count)));
+  if (next === (cur ? cur.count : 0)) return;
+
+  if (next === 0) pool.delete(sides);
+  else pool.set(sides, { count: next, mods: cur ? cur.mods : {} });
+  syncPool();
+}
+
+function poolMatchesField() {
+  return $('notation').value.trim().toLowerCase() === poolNotation().toLowerCase();
+}
+
+// Recover a pool from NdM notation, including per-group modifiers, so a staged
+// roll survives a round trip through the text field. Arithmetic terms (+2, -1)
+// and subtraction can't be represented, so those roll fine but start a fresh
+// pool on the next tap.
+function parsePool(text) {
+  const next = new Map();
+  const src = String(text || '').toLowerCase().replace(/\s+/g, '');
+  if (!src) return next;
+
+  for (const term of src.split('+')) {
+    // Modifiers may appear in any order and more than one may apply, so they are
+    // read one at a time rather than matched as a single optional group.
+    const head = /^(\d*)d(\d+)/.exec(term);
+    if (!head) return new Map();
+    const n = head[1] === '' ? 1 : parseInt(head[1], 10);
+    const sides = parseInt(head[2], 10);
+    if (!sides) return new Map();
+
+    const mods = {};
+    let rest = term.slice(head[0].length);
+    while (rest) {
+      const mod = /^((?:kh|kl|dh|dl)\d+|!|r\d+)/.exec(rest);
+      if (!mod) return new Map(); // trailing junk: not a pool the row can show
+      const slot = slotFor(mod[1]);
+      if (mods[slot]) return new Map(); // two in one slot cannot both apply
+      mods[slot] = mod[1];
+      rest = rest.slice(mod[0].length);
+    }
+
+    const cur = next.get(sides);
+    // Two groups of the same die with different modifiers can't merge into one
+    // entry, so the pool declines to represent it rather than losing one.
+    if (cur && SLOTS.some(s => (cur.mods[s] || '') !== (mods[s] || ''))) return new Map();
+    next.set(sides, { count: (cur ? cur.count : 0) + n, mods });
+  }
+  return next;
+}
+
+// Show the pool as unrolled dice waiting on the tray, so tapping summons the
+// dice you are about to throw rather than only changing text.
+function syncPool() {
+  stageFromPool({ writeField: true });
+}
+
+// Put the pool on the tray as unrolled dice. `writeField` is false when the pool
+// came *from* the field, so typing is never overwritten mid-edit — the tray
+// follows what you type rather than fighting it.
+function stageFromPool({ writeField }) {
+  const notation = poolNotation();
+  if (writeField) $('notation').value = notation;
+  clearError();
+
+  const staged = [];
+  for (const [sides, entry] of pool) {
+    for (let i = 0; i < entry.count; i++) staged.push(new Die(sides, null, 0, 0, 40));
+  }
+  state.dice = staged.slice(0, ANIMATE_LIMIT);
+  placeGrid(state.dice);
+  for (const d of state.dice) {
+    d.settled = true;
+    d.settling = true;
+    d.settleT = 1;
+    d.rot = [0.5, 0.6, 0.1];
+    d.homeX = d.x;
+    d.homeY = d.y;
+  }
+
+  $('total').dataset.idle = '1';
+  $('total').textContent = '—';
+  $('breakdown').textContent = staged.length
+    ? `${staged.length} ${staged.length === 1 ? 'die' : 'dice'} ready`
+    : 'Pick dice or type a roll';
+  markPool();
+  hideHint();
+}
+
+// Mirror the pool onto the buttons: a die in the tray reads as selected, and its
+// count shows on the button. The pool is then visible where you are already
+// looking, instead of only in the notation field.
+function markPool() {
+  for (const b of diceButtons.children) {
+    // The custom-die button opens a picker rather than standing for a die, so
+    // it never carries pool state.
+    if (!b.dataset.sides) continue;
+    const entry = pool.get(Number(b.dataset.sides));
+    const n = entry ? entry.count : 0;
+    b.setAttribute('aria-pressed', String(n > 0));
+    if (n > 1) b.dataset.count = String(n);
+    else delete b.dataset.count;
+    // Each modifier gets its own glyph, and stacked ones sit side by side. One
+    // shared underline told you a die was modified but not how.
+    const glyphs = entry
+      ? SLOTS.filter(s => entry.mods && entry.mods[s]).map(s => modifierGlyph(entry.mods[s]))
+      : [];
+    if (glyphs.length) {
+      b.dataset.mod = glyphs.map(g => g.mark).join('');
+      b.title = `d${b.dataset.sides} — ${glyphs.map(g => g.label).join(', ')}`;
+    } else {
+      delete b.dataset.mod;
+      b.removeAttribute('title');
+    }
+  }
+}
+
+// Marks shown on a die button, chosen to say which modifier without a legend:
+// arrows point the way the kept die goes, a burst means exploding, a cycle means
+// reroll. Drop shares the arrow but points at what leaves.
+const MODIFIER_GLYPHS = [
+  [/^kh/, { mark: '▲', label: 'advantage — keep highest' }],
+  [/^kl/, { mark: '▼', label: 'disadvantage — keep lowest' }],
+  [/^dl/, { mark: '⌃', label: 'drop lowest' }],
+  [/^dh/, { mark: '⌄', label: 'drop highest' }],
+  [/^!/,  { mark: '✳', label: 'exploding' }],
+  [/^r/,  { mark: '↻', label: 'reroll' }],
+];
+
+function modifierGlyph(mod) {
+  for (const [pattern, glyph] of MODIFIER_GLYPHS) {
+    if (pattern.test(mod)) return glyph;
+  }
+  return { mark: '•', label: mod };
+}
+
+function clearPool() {
+  pool = new Map();
+  state.dice = [];
+  $('notation').value = '';
+  $('total').dataset.idle = '1';
+  $('total').textContent = '—';
+  $('breakdown').textContent = 'Pick dice or type a roll';
+  markPool();
+  clearError();
+}
+
+$('clear').addEventListener('click', () => {
+  clearPool();
+  $('notation').focus();
+});
+
+// ---- how many per tap ----
+
+const countField = $('count');
+
+function perTap() {
+  const n = parseInt(countField.value, 10);
+  return Number.isFinite(n) && n > 0 ? Math.min(n, 500) : 1;
+}
+
+function setPerTap(n) {
+  countField.value = String(Math.max(1, Math.min(500, n)));
+}
+
+$('countUp').addEventListener('click', () => setPerTap(perTap() + 1));
+$('countDown').addEventListener('click', () => setPerTap(perTap() - 1));
+countField.addEventListener('change', () => setPerTap(perTap()));
+countField.addEventListener('focus', () => countField.select());
+
+// ---- dice buttons ----
+
+for (const sides of QUICK) {
+  diceButtons.append(makeDieButton(sides));
+}
+
+function makeDieButton(sides) {
+  const b = document.createElement('button');
+  b.className = 'dbtn';
+  b.type = 'button';
+  b.dataset.sides = String(sides);
+
+  // The hold-fill is its own element: ::before carries the modifier glyph and
+  // ::after the count, so a pseudo-element here would collide with one of them.
+  const fill = document.createElement('span');
+  fill.className = 'dbtn-fill';
+  b.append(fill, document.createTextNode(`d${sides}`));
+  b.addEventListener('click', () => addToPool(sides, perTap()));
+  attachModifierSheet(b, sides);
+  return b;
+}
+
+// A die made with the custom picker earns a button of its own, in size order,
+// so it behaves like every other die — tappable, countable, and holdable for
+// modifiers. Without one a d46 could be staged but never modified.
+function ensureDieButton(sides) {
+  const existing = [...diceButtons.children]
+    .find(b => Number(b.dataset.sides) === sides);
+  if (existing) return existing;
+
+  const button = makeDieButton(sides);
+  button.dataset.custom = '1';
+
+  const after = [...diceButtons.children]
+    .find(b => b.dataset.sides && Number(b.dataset.sides) > sides);
+  diceButtons.insertBefore(button, after || null);
+  return button;
+}
+
+// ---- custom die ----
+//
+// A scroll wheel, the way a phone's timer picker works: flick through the
+// numbers and one snaps under the marker. Scroll-snap does the physics, so
+// there is no momentum code to write and it feels native on both platforms.
+// The field beside it is for jumping straight to a number like 57.
+
+const MAX_SIDES = 1000;
+const dial = $('dial');
+const wheel = $('wheel');
+const dialInput = $('dialInput');
+
+for (let n = 1; n <= MAX_SIDES; n++) {
+  const item = document.createElement('div');
+  item.className = 'wheel-item';
+  item.dataset.value = String(n);
+  item.textContent = `d${n}`;
+  item.setAttribute('role', 'option');
+  wheel.append(item);
+}
+
+const wheelItem = n => wheel.children[n - 1];
+
+function dialValue() {
+  const n = parseInt(dialInput.value, 10);
+  return Number.isFinite(n) && n >= 1 ? Math.min(n, MAX_SIDES) : 20;
+}
+
+function centreWheel(n, smooth = false) {
+  const item = wheelItem(n);
+  if (!item) return;
+  wheel.scrollTo({
+    top: item.offsetTop - (wheel.clientHeight - item.offsetHeight) / 2,
+    behavior: smooth ? 'smooth' : 'auto',
+  });
+}
+
+function setDial(n, { scroll = true, focusField = false } = {}) {
+  const value = Math.max(1, Math.min(MAX_SIDES, n));
+  dialInput.value = String(value);
+  for (const item of wheel.children) {
+    item.setAttribute('aria-selected', String(Number(item.dataset.value) === value));
+  }
+  if (scroll) centreWheel(value);
+  if (focusField) dialInput.select();
+}
+
+// Read back whichever item settled under the marker.
+let wheelSettle = null;
+wheel.addEventListener('scroll', () => {
+  clearTimeout(wheelSettle);
+  wheelSettle = setTimeout(() => {
+    const middle = wheel.scrollTop + wheel.clientHeight / 2;
+    let closest = 1, best = Infinity;
+    for (const item of wheel.children) {
+      const d = Math.abs(item.offsetTop + item.offsetHeight / 2 - middle);
+      if (d < best) { best = d; closest = Number(item.dataset.value); }
+    }
+    setDial(closest, { scroll: false });
+  }, 90);
+});
+
+wheel.addEventListener('click', e => {
+  const item = e.target.closest('.wheel-item');
+  if (item) setDial(Number(item.dataset.value));
+});
+
+wheel.addEventListener('keydown', e => {
+  const step = e.key === 'ArrowUp' ? -1 : e.key === 'ArrowDown' ? 1
+             : e.key === 'PageUp' ? -10 : e.key === 'PageDown' ? 10 : 0;
+  if (!step) return;
+  e.preventDefault();
+  setDial(dialValue() + step);
+});
+
+dialInput.addEventListener('input', () => {
+  const n = parseInt(dialInput.value, 10);
+  if (Number.isFinite(n) && n >= 1 && n <= MAX_SIDES) setDial(n, { scroll: true });
+});
+dialInput.addEventListener('focus', () => dialInput.select());
+
+function openDial() {
+  setHelp(false);
+  closeSheet();
+  dial.hidden = false;
+  setDial(dialValue());
+  hideHint();
+}
+
+function closeDial() { dial.hidden = true; }
+
+$('customDie').addEventListener('click', openDial);
+$('dialClose').addEventListener('click', closeDial);
+$('dialAdd').addEventListener('click', () => {
+  const sides = dialValue();
+  closeDial();
+  const button = ensureDieButton(sides);
+  addToPool(sides, perTap());
+  button.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+});
+
+// ---- modifier sheet ----
+//
+// Long-press (or right-click) a die for the modifiers that would otherwise need
+// typing. Everything the notation supports is reachable without the text field,
+// but none of it takes up space until it is asked for.
+
+const sheet = $('sheet');
+const sheetOptions = $('sheetOptions');
+
+function modifiersFor(sides) {
+  const mods = [];
+  if (sides >= 4) {
+    mods.push(
+      { label: 'Advantage', suffix: 'kh1', hint: 'roll two, keep the best', min: 2 },
+      { label: 'Disadvantage', suffix: 'kl1', hint: 'roll two, keep the worst', min: 2 },
+    );
+  }
+  mods.push(
+    { label: 'Drop lowest', suffix: 'dl1', hint: 'discard the worst die', min: 2 },
+    { label: 'Drop highest', suffix: 'dh1', hint: 'discard the best die', min: 2 },
+  );
+  if (sides > 1) {
+    mods.push(
+      { label: 'Exploding', suffix: '!', hint: `reroll and add on a ${sides}`, min: 1 },
+      { label: 'Reroll 1s', suffix: 'r1', hint: 'reroll any 1', min: 1 },
+    );
+  }
+  mods.push({ label: 'No modifier', suffix: '', hint: 'roll these dice plainly', min: 1 });
+  return mods;
+}
+
+// How many of this die a modifier would apply to: whatever is already staged,
+// or one tap's worth if none are. Keep/drop needs at least two dice to mean
+// anything, so those raise the count rather than silently doing nothing.
+function modifierCount(sides, mod) {
+  const staged = pool.get(sides);
+  const base = staged ? staged.count : perTap();
+  return Math.max(mod.min, base);
+}
+
+// Modifiers in different slots stack; one already active toggles back off.
+function applyModifier(sides, mod) {
+  if (!poolMatchesField()) pool = parsePool($('notation').value);
+
+  const cur = pool.get(sides);
+  const mods = { ...(cur ? cur.mods : {}) };
+
+  if (!mod.suffix) {
+    // "No modifier" clears everything but keeps the dice.
+    for (const slot of SLOTS) delete mods[slot];
+  } else {
+    const slot = slotFor(mod.suffix);
+    if (mods[slot] === mod.suffix) delete mods[slot];  // tapping it again removes it
+    else mods[slot] = mod.suffix;
+  }
+
+  pool.set(sides, { count: modifierCount(sides, mod), mods });
+  syncPool();
+}
+
+function openSheet(sides) {
+  // All three fill the tray, so only one can be up at a time.
+  setHelp(false);
+  closeDial();
+  $('sheetTitle').textContent = `d${sides}`;
+  sheetOptions.replaceChildren();
+
+  const current = pool.get(sides);
+
+  // How many of this die are staged, adjustable exactly. Dragging the button
+  // sideways is quicker, but a number you can type is the only way to land on a
+  // specific count without counting taps.
+  const row = document.createElement('div');
+  row.className = 'sheet-count';
+
+  const label = document.createElement('span');
+  label.className = 'sheet-count-label';
+  label.textContent = 'How many';
+
+  const minus = document.createElement('button');
+  minus.type = 'button';
+  minus.className = 'step';
+  minus.textContent = '−';
+  minus.setAttribute('aria-label', `One fewer d${sides}`);
+
+  const field = document.createElement('input');
+  field.type = 'text';
+  field.inputMode = 'numeric';
+  field.className = 'count sheet-count-field';
+  field.value = String(current ? current.count : 0);
+  field.setAttribute('aria-label', `Number of d${sides}`);
+
+  const plus = document.createElement('button');
+  plus.type = 'button';
+  plus.className = 'step';
+  plus.textContent = '+';
+  plus.setAttribute('aria-label', `One more d${sides}`);
+
+  const readField = () => {
+    const n = parseInt(field.value, 10);
+    return Number.isFinite(n) && n >= 0 ? Math.min(n, 999) : 0;
+  };
+  const applyCount = n => {
+    setDieCount(sides, n);
+    field.value = String(Math.max(0, Math.min(999, Math.round(n))));
+    refreshSheetPreviews(sides);
+  };
+
+  minus.addEventListener('click', () => applyCount(readField() - 1));
+  plus.addEventListener('click', () => applyCount(readField() + 1));
+  field.addEventListener('change', () => applyCount(readField()));
+  field.addEventListener('focus', () => field.select());
+
+  const counter = document.createElement('div');
+  counter.className = 'counter';
+  counter.append(minus, field, plus);
+  row.append(label, counter);
+  sheetOptions.append(row);
+
+  for (const mod of modifiersFor(sides)) {
+    const active = current ? current.mods || {} : {};
+    const slot = mod.suffix ? slotFor(mod.suffix) : null;
+    const isOn = Boolean(mod.suffix) && active[slot] === mod.suffix;
+    // Something else already answers this question — "keep the highest" and
+    // "drop the lowest" cannot both apply — so it is shown as unavailable
+    // rather than silently replacing what is there.
+    const blocked = Boolean(slot) && Boolean(active[slot]) && !isOn;
+
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'sheet-option';
+    b.dataset.suffix = mod.suffix;
+    b.dataset.min = String(mod.min);
+    if (isOn) b.setAttribute('aria-pressed', 'true');
+    if (blocked) {
+      b.disabled = true;
+      b.dataset.blocked = '1';
+    }
+
+    const name = document.createElement('span');
+    name.className = 'sheet-option-name';
+    // Lead with the same glyph the die button will show, so the mark on the row
+    // is learnable rather than a code to decipher.
+    if (mod.suffix) {
+      const mark = document.createElement('span');
+      mark.className = 'sheet-option-mark';
+      mark.textContent = modifierGlyph(mod.suffix).mark;
+      name.append(mark);
+    }
+    name.append(mod.label);
+
+    // Preview exactly what will be staged, including whatever is already on the
+    // die, so stacking is visible before it is committed.
+    const preview = { ...active };
+    if (mod.suffix) {
+      if (isOn) delete preview[slot];
+      else preview[slot] = mod.suffix;
+    } else {
+      for (const s of SLOTS) delete preview[s];
+    }
+
+    const notation = document.createElement('span');
+    notation.className = 'sheet-option-notation';
+    notation.textContent = blocked
+      ? '—'
+      : entryNotation(sides, { count: modifierCount(sides, mod), mods: preview });
+
+    const hint = document.createElement('span');
+    hint.className = 'sheet-option-hint';
+    hint.textContent = blocked
+      ? `already ${modifierGlyph(active[slot]).label}`
+      : isOn ? 'tap to remove' : mod.hint;
+
+    b.append(name, notation, hint);
+    // The modifier attaches to this die's group and leaves the rest of the pool
+    // alone, so picking advantage on a d6 does not disturb a staged d20. It
+    // stages rather than rolls, matching every other way dice get added.
+    b.addEventListener('click', () => {
+      closeSheet();
+      applyModifier(sides, mod);
+    });
+    sheetOptions.append(b);
+  }
+
+  sheet.hidden = false;
+  sheetOptions.firstElementChild?.focus();
+}
+
+// The modifier rows preview what they would stage, so changing the count has to
+// update them or they advertise a number that is no longer true.
+function refreshSheetPreviews(sides) {
+  for (const option of sheetOptions.querySelectorAll('.sheet-option')) {
+    const suffix = option.dataset.suffix || '';
+    const min = Number(option.dataset.min || 1);
+    const notation = option.querySelector('.sheet-option-notation');
+    if (!notation || option.dataset.blocked) continue;
+
+    const cur = pool.get(sides);
+    const mods = { ...(cur ? cur.mods : {}) };
+    if (suffix) mods[slotFor(suffix)] = suffix;
+    else for (const s of SLOTS) delete mods[s];
+
+    const base = cur ? cur.count : perTap();
+    notation.textContent = entryNotation(sides, { count: Math.max(min, base), mods });
+  }
+}
+
+function closeSheet() {
+  sheet.hidden = true;
+}
+
+$('sheetClose').addEventListener('click', closeSheet);
+
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (!sheet.hidden) closeSheet();
+  if (!dial.hidden) closeDial();
+});
+
+// Long-press on touch, right-click on desktop — long-press has no mouse
+// equivalent, and the feature should not be touch-only.
+function attachModifierSheet(button, sides) {
+  let timer = null;
+  let longPressed = false;
+  let scrub = null;
+
+  const start = e => {
+    longPressed = false;
+    // Sliding sideways from here adjusts how many of this die are staged, so a
+    // count can be dialled from 37 to 3 in one gesture instead of 34 taps.
+    scrub = {
+      x: e.clientX,
+      startCount: (pool.get(sides) || { count: 0 }).count,
+      moved: false,
+      pointerId: e.pointerId,
+    };
+    // The fill is the affordance: it shows a hold is doing something, and how
+    // much longer to hold. Duration matches the CSS transition.
+    button.dataset.holding = '1';
+    timer = setTimeout(() => {
+      longPressed = true;
+      delete button.dataset.holding;
+      if (navigator.vibrate) navigator.vibrate(12);
+      openSheet(sides);
+    }, 450);
+  };
+
+  const cancel = () => {
+    clearTimeout(timer);
+    timer = null;
+    delete button.dataset.holding;
+    delete button.dataset.scrubbing;
+    scrub = null;
+  };
+
+  button.addEventListener('pointerdown', e => {
+    start(e);
+    button.setPointerCapture?.(e.pointerId);
+  });
+
+  button.addEventListener('pointermove', e => {
+    if (!scrub) return;
+    const dx = e.clientX - scrub.x;
+    if (!scrub.moved) {
+      if (Math.abs(dx) < 8) return;
+      // It is a drag, not a tap or a hold.
+      scrub.moved = true;
+      clearTimeout(timer);
+      timer = null;
+      delete button.dataset.holding;
+      button.dataset.scrubbing = '1';
+    }
+    // Accelerates with distance: small nudges are precise, long drags cover the
+    // range without a marathon swipe.
+    const steps = Math.sign(dx) * Math.round(Math.pow(Math.abs(dx) / 14, 1.55));
+    setDieCount(sides, Math.max(0, scrub.startCount + steps));
+  });
+
+  const finish = () => {
+    if (scrub && scrub.moved) {
+      // The drag already set the count; suppress the click that follows.
+      longPressed = true;
+    }
+    cancel();
+  };
+
+  button.addEventListener('pointerup', finish);
+  button.addEventListener('pointercancel', cancel);
+  button.addEventListener('pointerleave', () => { if (!scrub || !scrub.moved) cancel(); });
+
+  // Swallow the click that follows a long press or a drag, so neither also
+  // stages another die.
+  button.addEventListener('click', e => {
+    if (longPressed) { e.preventDefault(); e.stopImmediatePropagation(); longPressed = false; }
+  }, true);
+
+  button.addEventListener('contextmenu', e => {
+    e.preventDefault();
+    cancel();
+    openSheet(sides);
+  });
+}
+
+// ---- flick to throw ----
+
+let drag = null;
+canvas.addEventListener('pointerdown', e => {
+  drag = { x: e.clientX, y: e.clientY, t: performance.now() };
+  canvas.setPointerCapture(e.pointerId);
+});
+canvas.addEventListener('pointerup', e => {
+  if (!drag) return;
+  const dt = Math.max(16, performance.now() - drag.t);
+  const vx = ((e.clientX - drag.x) / dt) * 1000;
+  const vy = ((e.clientY - drag.y) / dt) * 1000;
+  const speed = Math.hypot(vx, vy);
+  const travelled = Math.hypot(e.clientX - drag.x, e.clientY - drag.y);
+  drag = null;
+
+  // Tapping a staged die takes it back off the tray, which is how you drop one
+  // die from a handful without clearing everything or editing the text.
+  if (speed < 120 && travelled < 10 && removeDieAt(e.clientX, e.clientY)) return;
+
+  // Throw whatever is staged; failing that, re-roll the last notation. The tray
+  // is never a dead surface, so a tap on an empty one rolls the selected die.
+  const target = $('notation').value.trim()
+    || (state.last && state.last.notation)
+    || `d${state.defaultSides}`;
+
+  doRoll(target);
+  if (speed > 120) {
+    for (const d of state.dice) d.throwWith(vx * 0.5, Math.abs(vy) * 0.5 + 200);
+  }
+});
+
+// Remove one staged die under the given screen point. Only staged dice can be
+// picked off: once a roll has happened the numbers are a result, not a pool, and
+// quietly editing them would be lying about what was rolled.
+function removeDieAt(clientX, clientY) {
+  if (!state.dice.length || state.dice.some(d => d.value !== null)) return false;
+
+  const rect = canvas.getBoundingClientRect();
+  const x = clientX - rect.left;
+  const y = clientY - rect.top;
+
+  let hit = null, best = Infinity;
+  for (const d of state.dice) {
+    const dist = Math.hypot(d.x - x, d.y - y);
+    if (dist < d.size * 0.62 && dist < best) { best = dist; hit = d; }
+  }
+  if (!hit) return false;
+
+  const entry = pool.get(hit.sides);
+  if (!entry) return false;
+
+  if (entry.count > 1) pool.set(hit.sides, { count: entry.count - 1, mods: entry.mods });
+  else pool.delete(hit.sides);
+
+  if (navigator.vibrate) navigator.vibrate(8);
+  syncPool();
+  return true;
+}
+canvas.addEventListener('pointercancel', () => { drag = null; });
+
+// ---- intro ----
+//
+// Plays once per cold open and clears on the first interaction, whichever comes
+// first. It teaches the two things the interface cannot say for itself: that
+// taps load dice, and that holding a die offers more.
+
+const intro = $('intro');
+let introTimer = setTimeout(hideHint, 3400);
+let introGone = false;
+
+function hideHint() {
+  if (introGone) return;
+  introGone = true;
+  clearTimeout(introTimer);
+  intro.dataset.gone = '1';
+  // Removed rather than left transparent, so it can never eat a tap.
+  setTimeout(() => intro.remove(), 800);
+}
+
+// ---- loop ----
+
+let prev = performance.now();
+let loopFaults = 0;
+
+function drawFrame(dt) {
+  const t = theme();
+  const r = canvas.getBoundingClientRect();
+  ctx.clearRect(0, 0, r.width, r.height);
+
+  state.surface.step(dt);
+  beginFrame();
+
+  for (const d of state.dice) {
+    const wasSettled = d.settled;
+    d.step(dt, state.bounds);
+    if (!wasSettled && d.settled) {
+      state.surface.impact(d.x, d.y, d.size);
+      // A rerolled die lands once, then throws itself again. Doing it here
+      // rather than at roll time means the pause starts when the die actually
+      // stops, however long its first tumble took.
+      if (d.rerolled && !d.rerollShown) {
+        d.rerollShown = true;
+        d.beginReroll();
+      }
+      if (d.exploded && !d.burstShown) {
+        d.burstShown = true;
+        state.surface.burst(d.x, d.y, d.size);
+        if (navigator.vibrate) navigator.vibrate([14, 30, 22]);
+      }
+    }
+  }
+
+  // Spin-in-place dice never move, so the grid spacing already holds — running
+  // O(n^2) separation over 100+ of them every frame would be pure waste.
+  if (state.dice.length > 1 && state.dice.length <= THROW_LIMIT) {
+    separate(state.dice, state.bounds);
+  }
+
+  // Contact marks sit under the dice, so they draw first.
+  state.surface.drawRests(ctx, t, state.dice);
+  state.surface.draw(ctx, t);
+  for (const d of state.dice) d.draw(ctx, t);
+  // Bursts go over the dice: an explosion happens in front of the thing that
+  // exploded, not behind it.
+  state.surface.drawBursts(ctx, t);
+}
+
+function frame(now) {
+  const dt = Math.min(0.05, (now - prev) / 1000);
+  prev = now;
+
+  // The loop must survive a bad frame. Scheduling the next one before drawing —
+  // and dropping the dice that faulted — means a rendering bug degrades to a
+  // cleared tray instead of freezing the app until a reload, which is what
+  // happened when a d1 hit a code path that no longer existed.
+  requestAnimationFrame(frame);
+
+  try {
+    drawFrame(dt);
+    loopFaults = 0;
+  } catch (err) {
+    loopFaults++;
+    console.error('Dicebox: frame failed', err);
+    if (loopFaults >= 3) {
+      state.dice = [];
+      loopFaults = 0;
+      showError('Something went wrong drawing that roll. The tray was cleared.');
+    }
+  }
+}
+
+resize();
+updateThemeColor();
+requestAnimationFrame(frame);
+
+// ---- install ----
+//
+// Chrome and Edge fire beforeinstallprompt and let the page trigger the install
+// flow. Safari never does, so iOS gets the manual route spelled out instead of a
+// button that cannot work.
+
+let installEvent = null;
+const installButton = $('install');
+const installHint = $('installHint');
+
+const standalone = window.matchMedia('(display-mode: standalone)').matches
+  || window.navigator.standalone === true;
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  installEvent = e;
+  if (standalone) return;
+  installButton.hidden = false;
+  installHint.textContent = 'Works offline once installed.';
+});
+
+installButton.addEventListener('click', async () => {
+  if (!installEvent) return;
+  installButton.disabled = true;
+  installEvent.prompt();
+  const { outcome } = await installEvent.userChoice;
+  installEvent = null;
+  if (outcome === 'accepted') {
+    installButton.hidden = true;
+    installHint.textContent = 'Installed. It works offline from here.';
+  } else {
+    installButton.disabled = false;
+  }
+});
+
+window.addEventListener('appinstalled', () => {
+  installButton.hidden = true;
+  installHint.textContent = 'Installed. It works offline from here.';
+});
+
+if (standalone) {
+  installHint.textContent = 'Running as an app. Rolls work offline.';
+} else if (/iphone|ipad|ipod/i.test(navigator.userAgent)) {
+  // Safari offers no install API, so name the actual menu items.
+  installHint.textContent = 'To install: tap Share, then Add to Home Screen. It works offline.';
+}
+
+// Service worker omitted: this build is a single local file.
+
+})();
+</script>
+</body>
+</html>

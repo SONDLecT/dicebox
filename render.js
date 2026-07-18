@@ -654,7 +654,47 @@ export class Die {
     this.spinHold = 0.16 + delay * 0.42;
   }
 
+  // A rerolled die does the thing a hand does: lands, pauses long enough to see
+  // the bad number, then hops and tumbles again. Without it a reroll is
+  // invisible — 1d2r1 rerolls every single time and looked identical to a plain
+  // roll, which is the case that exposed it.
+  //
+  // Called once the die has settled; the value it lands on afterwards is the one
+  // the roller already decided, so this is presentation only.
+  beginReroll() {
+    this.rerollPause = 0.34;
+    this.rerollHop = null;
+  }
+
+  stepReroll(dt, bounds) {
+    if (this.rerollPause > 0) {
+      this.rerollPause -= dt;
+      if (this.rerollPause > 0) return true;
+      // The hop: up, over a little, and spinning again.
+      this.settled = false;
+      this.settling = false;
+      this.targetRot = null;
+      this.searchWait = 0;
+      this.spinHold = undefined;
+      this.vx = (Math.random() - 0.5) * 90;
+      this.vy = -210;
+      this.spin = [
+        0.26 + Math.random() * 0.16,
+        0.24 + Math.random() * 0.16,
+        (Math.random() - 0.5) * 0.14,
+      ];
+      this.rerollHop = true;
+      this.rerollPause = 0;
+    }
+    return false;
+  }
+
   step(dt, bounds) {
+    // Mid-reroll: hold still for a beat, then throw the die back up.
+    if (this.rerollPause > 0) {
+      if (this.stepReroll(dt, bounds)) return;
+    }
+
     // A settled die keeps easing toward its slot, slowly. The grid is already
     // sorted — dice grouped by type, each group high to low — so this reads as
     // the tray tidying itself the way a hand does after a throw. It is a
@@ -846,52 +886,33 @@ export class Die {
     ctx.globalAlpha = fade;
 
     this.drawValue(ctx, theme, s, pts, proj);
-    this.drawMarks(ctx, theme, s);
     ctx.restore();
   }
 
   // What happened to this die, in the same hairline vocabulary as the dice: a
   // burst for an exploded die, a cycle for a rerolled one. Small enough to
   // ignore, present enough to answer "why is this d6 showing 14".
-  drawMarks(ctx, theme, s) {
-    if (!this.settled) return;
-    const marks = [];
-    if (this.exploded) marks.push('burst');
-    if (this.rerolled) marks.push('cycle');
-    if (!marks.length) return;
+  // A ring inscribed on the numeral's own face, in the same skewed plane the
+  // digits sit in, so it reads as marked *on* the die rather than as a badge
+  // floating over it. Two rings for a die that both exploded and rerolled.
+  //
+  // The motion does most of the work now — an exploding die throws a burst, a
+  // rerolled one hops and tumbles again — so this only has to persist the fact
+  // after everything has settled.
+  drawFaceMark(ctx, theme, size) {
+    const rings = (this.exploded ? 1 : 0) + (this.rerolled ? 1 : 0);
+    if (!rings || !this.settled) return;
 
-    const r = s * 0.2;
-    marks.forEach((mark, i) => {
-      const x = s * 0.72;
-      const y = -s * 0.72 + i * r * 2.4;
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.strokeStyle = theme.accent;
-      ctx.lineWidth = 1.2;
-      ctx.lineCap = 'round';
-
-      if (mark === 'burst') {
-        // Six short rays: the die kept going past its maximum.
-        ctx.beginPath();
-        for (let k = 0; k < 6; k++) {
-          const a = (k / 6) * TAU;
-          ctx.moveTo(Math.cos(a) * r * 0.32, Math.sin(a) * r * 0.32);
-          ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
-        }
-        ctx.stroke();
-      } else {
-        // An open circle with a tick: it came round again.
-        ctx.beginPath();
-        ctx.arc(0, 0, r * 0.72, 0.5, TAU - 0.35);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(r * 0.62, -r * 0.52);
-        ctx.lineTo(r * 0.72, -r * 0.05);
-        ctx.lineTo(r * 0.2, -r * 0.16);
-        ctx.stroke();
-      }
-      ctx.restore();
-    });
+    ctx.save();
+    ctx.strokeStyle = theme.accent;
+    ctx.globalAlpha = 0.55;
+    ctx.lineWidth = 1;
+    for (let i = 0; i < rings; i++) {
+      ctx.beginPath();
+      ctx.arc(0, 0, size * (0.78 + i * 0.2), 0, TAU);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   // Paint the numeral onto the face that most directly faces the camera, using
@@ -958,6 +979,9 @@ export class Die {
     ctx.fillStyle = theme.line;
     ctx.globalAlpha = this.settled ? 1 : 0.35 + 0.65 * bestFacing;
     ctx.fillText(label, 0, 0);
+    // Drawn here so it shares the face's skew: the ring sits in the surface with
+    // the numeral rather than floating flat over the die.
+    this.drawFaceMark(ctx, theme, size);
     ctx.restore();
     ctx.globalAlpha = 1;
   }
@@ -1042,12 +1066,61 @@ export function separate(dice, bounds, iterations = 3) {
 // than as anything the dice were touching. A mark directly beneath each die does
 // the job the floor line was supposed to do.
 export class Surface {
-  constructor() { this.marks = []; }
+  constructor() { this.marks = []; this.bursts = []; }
 
   impact(x, y, size) { this.marks.push({ x, y, size, t: 0 }); }
 
+  // A die that exploded throws a burst of rays. It is the one moment the app
+  // raises its voice, so it is bigger than anything else on the tray — but still
+  // hairlines, so it belongs to the same drawing rather than arriving from
+  // another app.
+  burst(x, y, size) {
+    const rays = [];
+    const count = 14;
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * TAU + Math.random() * 0.2;
+      rays.push({ a, reach: 0.8 + Math.random() * 0.7 });
+    }
+    this.bursts.push({ x, y, size, rays, t: 0 });
+  }
+
   step(dt) {
     this.marks = this.marks.filter(m => (m.t += dt) < 0.9);
+    this.bursts = this.bursts.filter(b => (b.t += dt) < 0.75);
+  }
+
+  drawBursts(ctx, theme) {
+    if (!this.bursts.length) return;
+    ctx.save();
+    ctx.lineCap = 'round';
+    for (const b of this.bursts) {
+      const p = b.t / 0.75;
+      const e = 1 - Math.pow(1 - p, 3);   // fast out, slow to a stop
+      const fade = Math.pow(1 - p, 1.6);
+
+      ctx.strokeStyle = theme.accent;
+      ctx.globalAlpha = fade;
+
+      // Rays flung outward, each leaving a gap behind it so the burst reads as
+      // moving rather than as a fixed starburst.
+      ctx.lineWidth = 1.7;
+      ctx.beginPath();
+      for (const ray of b.rays) {
+        const inner = b.size * (0.35 + e * ray.reach * 1.5);
+        const outer = inner + b.size * 0.34 * (1 - p * 0.7);
+        ctx.moveTo(b.x + Math.cos(ray.a) * inner, b.y + Math.sin(ray.a) * inner);
+        ctx.lineTo(b.x + Math.cos(ray.a) * outer, b.y + Math.sin(ray.a) * outer);
+      }
+      ctx.stroke();
+
+      // A shock ring, thinning as it grows.
+      ctx.lineWidth = 1.2 * (1 - p);
+      ctx.globalAlpha = fade * 0.7;
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.size * (0.3 + e * 1.5), 0, TAU);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   draw(ctx, theme) {
