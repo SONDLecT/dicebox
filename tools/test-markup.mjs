@@ -1,6 +1,6 @@
 // Static checks on the markup and stylesheet. These catch wiring mistakes that
 // the logic tests cannot see, because they live in the gap between files.
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -64,11 +64,50 @@ const unlabelled = buttons.filter(([, attrs, text]) =>
 ok('icon-only buttons are labelled', unlabelled.length === 0, `${unlabelled.length} unlabelled`);
 
 // --- offline integrity ---
+// Read the real precache list rather than grepping the file, so a path that
+// only appears in a comment cannot satisfy the check.
+const swCode = sw.replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
+const precache = (swCode.match(/const ASSETS = \[([\s\S]*?)\]/)?.[1] || '')
+  .split(',').map(s => s.trim().replace(/['"]/g, '')).filter(Boolean);
+
+ok('precache list is populated', precache.length > 5, `${precache.length} entries`);
+
 // A file referenced by the page but missing from the precache list breaks the
 // app offline, which is the one thing this app promises.
 const refs = [...html.matchAll(/(?:src|href)="(?!https?:|#)([^"]+)"/g)].map(m => m[1]);
-const uncached = refs.filter(r => !sw.includes(r.replace(/^\.\//, '')));
+const uncached = refs.filter(r => {
+  const bare = r.replace(/^\.\//, '');
+  // index.html is served at './' and must not be precached under its own name.
+  if (bare === 'index.html') return false;
+  return !precache.some(p => p.replace(/^\.\//, '') === bare);
+});
 ok('every local asset is precached', uncached.length === 0, uncached.join(', '));
+
+// The edge rewrites /index.html to / with a 307. Precaching the redirecting URL
+// makes the install fail, and an installed app whose start_url redirects will
+// not launch — that is exactly how the home-screen shortcut broke.
+ok('index.html is not precached', !precache.includes('./index.html'));
+ok('the app shell is precached', precache.includes('./'));
+
+const manifest = JSON.parse(readFileSync(join(root, 'manifest.webmanifest'), 'utf8'));
+ok('start_url does not redirect', !/index\.html$/.test(manifest.start_url),
+   manifest.start_url);
+ok('start_url is inside scope', manifest.start_url.startsWith(manifest.scope));
+ok('manifest declares an id', typeof manifest.id === 'string' && manifest.id.length > 0);
+ok('manifest is standalone', manifest.display === 'standalone');
+
+// Every icon the manifest promises has to exist, or the install prompt is
+// refused outright on Android.
+for (const icon of manifest.icons) {
+  ok(`icon ${icon.src} exists`, existsSync(join(root, icon.src)));
+}
+ok('has a maskable icon', manifest.icons.some(i => (i.purpose || '').includes('maskable')));
+ok('has a 512px icon', manifest.icons.some(i => i.sizes === '512x512'));
+
+// Replaying a redirected response from cache re-triggers the redirect, which
+// browsers reject for navigations.
+ok('service worker refuses to cache redirects', /res\.redirected/.test(swCode));
+ok('navigations resolve to the shell', /cache\.match\('\.\/'/.test(swCode));
 
 ok('no external resources', !/(?:src|href)="https?:\/\/(?!github)/.test(html));
 

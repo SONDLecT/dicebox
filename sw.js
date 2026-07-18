@@ -2,11 +2,13 @@
 // precache all of them and never hit the network after install.
 
 // Bump on every asset change, or installed copies keep serving the old app.
-const CACHE = 'dicebox-v8';
+const CACHE = 'dicebox-v9';
 
+// './' only — never './index.html'. The edge redirects /index.html to / with a
+// 307, and a redirected response makes cache.addAll reject the whole batch,
+// which would leave the app with no offline cache at all.
 const ASSETS = [
   './',
-  './index.html',
   './style.css',
   './app.js',
   './dice.js',
@@ -21,7 +23,19 @@ const ASSETS = [
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE)
-      .then(c => c.addAll(ASSETS))
+      // Fetched one at a time rather than through addAll: a single failure there
+      // rejects the whole batch and leaves nothing cached, so one unavailable
+      // icon would cost the app its entire offline copy.
+      .then(cache => Promise.all(ASSETS.map(async url => {
+        try {
+          // 'reload' skips the HTTP cache, so installing always stores fresh
+          // copies rather than whatever the browser happens to be holding.
+          const res = await fetch(new Request(url, { cache: 'reload' }));
+          if (res.ok) await cache.put(url, res);
+        } catch {
+          // Offline or blocked: the fetch handler will cache it on first use.
+        }
+      })))
       .then(() => self.skipWaiting())
   );
 });
@@ -37,24 +51,42 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const { request } = event;
   if (request.method !== 'GET') return;
+  if (new URL(request.url).origin !== self.location.origin) return;
 
-  event.respondWith(
-    caches.match(request, { ignoreSearch: true }).then(hit => {
-      if (hit) return hit;
-      return fetch(request)
-        .then(res => {
-          if (res.ok && new URL(request.url).origin === self.location.origin) {
-            const copy = res.clone();
-            caches.open(CACHE).then(c => c.put(request, copy));
-          }
-          return res;
-        })
-        .catch(() => {
-          // A navigation that misses the cache while offline still gets the app
-          // shell rather than the browser's dinosaur.
-          if (request.mode === 'navigate') return caches.match('./index.html');
-          return new Response('', { status: 504, statusText: 'Offline' });
-        });
-    })
-  );
+  event.respondWith(handle(request));
 });
+
+async function handle(request) {
+  const cache = await caches.open(CACHE);
+
+  // Every navigation resolves to the app shell. The edge redirects /index.html
+  // to /, and an installed app launching at a redirecting URL fails to load —
+  // so navigations are answered from the shell rather than followed.
+  if (request.mode === 'navigate') {
+    const shell = await cache.match('./', { ignoreSearch: true });
+    if (shell) return shell;
+    try {
+      const res = await fetch(request);
+      if (res.ok && !res.redirected) await cache.put('./', res.clone());
+      return res;
+    } catch {
+      return new Response('Dicebox is offline and has no cached copy yet.', {
+        status: 503,
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+      });
+    }
+  }
+
+  const hit = await cache.match(request, { ignoreSearch: true });
+  if (hit) return hit;
+
+  try {
+    const res = await fetch(request);
+    // Redirected responses are not stored: replaying one from cache re-triggers
+    // the redirect and browsers reject it for navigations.
+    if (res.ok && !res.redirected) cache.put(request, res.clone());
+    return res;
+  } catch {
+    return new Response('', { status: 504, statusText: 'Offline' });
+  }
+}
