@@ -1,7 +1,8 @@
 // Cache-first service worker. The whole app is a handful of static files, so we
 // precache all of them and never hit the network after install.
 
-const CACHE = 'dicebox-v1';
+// Bump on every asset change, or installed copies keep serving the old app.
+const CACHE = 'dicebox-v2';
 
 const ASSETS = [
   './',
