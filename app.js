@@ -1,14 +1,14 @@
-import { roll, describe, stepChain } from './dice.js';
+import { roll, describe } from './dice.js';
 import { Die, Surface, separate, beginFrame } from './render.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('tray');
 const ctx = canvas.getContext('2d');
 
-// One row of dice, ordered by size. This is the full Dungeon Crawl Classics
-// chain plus d2 and d100, so the chain's +/- buttons step along this same row —
-// a separate chain row would just be these buttons twice.
-const QUICK = [2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 30, 100];
+// One row of dice, ordered by size: the standard RPG set plus every Dungeon
+// Crawl Classics chain rung, plus d100. Gaps like d9 and d11 are deliberate —
+// no published system uses them, and the notation field covers anything here.
+const QUICK = [1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 30, 100];
 
 // Above this many dice, throwing them across the tray stops being legible and
 // the pairwise separation gets expensive. Larger rolls spin in place instead.
@@ -22,7 +22,8 @@ const ANIMATE_LIMIT = 220;
 
 const state = {
   count: 1,
-  chainSides: 20,
+  // What a tap on an empty tray rolls, when nothing is staged.
+  defaultSides: 20,
   dice: [],
   surface: new Surface(),
   bounds: { left: 0, right: 0, top: 0, floor: 0 },
@@ -196,6 +197,13 @@ $('entry').addEventListener('submit', e => {
   $('notation').blur();
 });
 
+// Typing keeps the buttons in step, so the field and the row never disagree
+// about what is loaded.
+$('notation').addEventListener('input', () => {
+  pool = parsePool($('notation').value);
+  markPool();
+});
+
 // ---- help ----
 
 const help = $('help');
@@ -248,13 +256,13 @@ function poolNotation() {
   return [...pool].map(([sides, n]) => `${n}d${sides}`).join('+');
 }
 
-function addToPool(sides) {
+function addToPool(sides, count = 1) {
   // Typing in the field and then tapping a die should extend what is there, not
   // silently discard it. Anything unparseable is replaced instead.
   if (!poolMatchesField()) {
     pool = parsePool($('notation').value);
   }
-  pool.set(sides, (pool.get(sides) || 0) + 1);
+  pool.set(sides, (pool.get(sides) || 0) + count);
   syncPool();
 }
 
@@ -303,7 +311,20 @@ function syncPool() {
   $('total').dataset.idle = '1';
   $('total').textContent = '—';
   $('breakdown').textContent = notation ? `${staged.length} dice ready` : 'Pick dice or type a roll';
+  markPool();
   hideHint();
+}
+
+// Mirror the pool onto the buttons: a die in the tray reads as selected, and its
+// count shows on the button. The pool is then visible where you are already
+// looking, instead of only in the notation field.
+function markPool() {
+  for (const b of diceButtons.children) {
+    const n = pool.get(Number(b.dataset.sides)) || 0;
+    b.setAttribute('aria-pressed', String(n > 0));
+    if (n > 1) b.dataset.count = String(n);
+    else delete b.dataset.count;
+  }
 }
 
 function clearPool() {
@@ -313,6 +334,7 @@ function clearPool() {
   $('total').dataset.idle = '1';
   $('total').textContent = '—';
   $('breakdown').textContent = 'Pick dice or type a roll';
+  markPool();
   clearError();
 }
 
@@ -321,54 +343,156 @@ $('clear').addEventListener('click', () => {
   $('notation').focus();
 });
 
-// One row, ordered by size. The DCC chain values are all here, so the +/- steps
-// move along this same row instead of needing a second one.
+// ---- how many per tap ----
+
+const countField = $('count');
+
+function perTap() {
+  const n = parseInt(countField.value, 10);
+  return Number.isFinite(n) && n > 0 ? Math.min(n, 500) : 1;
+}
+
+function setPerTap(n) {
+  countField.value = String(Math.max(1, Math.min(500, n)));
+}
+
+$('countUp').addEventListener('click', () => setPerTap(perTap() + 1));
+$('countDown').addEventListener('click', () => setPerTap(perTap() - 1));
+countField.addEventListener('change', () => setPerTap(perTap()));
+countField.addEventListener('focus', () => countField.select());
+
+// ---- dice buttons ----
+
 for (const sides of QUICK) {
   const b = document.createElement('button');
   b.className = 'dbtn';
   b.type = 'button';
   b.textContent = `d${sides}`;
   b.dataset.sides = String(sides);
-  b.addEventListener('click', () => {
-    state.chainSides = sides;
-    addToPool(sides);
-    markChain();
-  });
+  b.addEventListener('click', () => addToPool(sides, perTap()));
+  attachModifierSheet(b, sides);
   diceButtons.append(b);
 }
 
-// The chain buttons step the *last* die tapped up or down its rung, replacing
-// that die in the pool — the DCC "roll a d16 instead of a d20" move.
-function stepPool(dir) {
-  const from = state.chainSides;
-  const to = stepChain(from, dir);
-  if (to === from) return;
+// ---- modifier sheet ----
+//
+// Long-press (or right-click) a die for the modifiers that would otherwise need
+// typing. Everything the notation supports is reachable without the text field,
+// but none of it takes up space until it is asked for.
 
-  state.chainSides = to;
-  if (pool.has(from)) {
-    const n = pool.get(from);
-    pool.delete(from);
-    pool.set(to, (pool.get(to) || 0) + n);
-    syncPool();
-  } else {
-    addToPool(to);
+const sheet = $('sheet');
+const sheetOptions = $('sheetOptions');
+
+function modifiersFor(sides) {
+  const mods = [];
+  if (sides >= 4) {
+    mods.push(
+      { label: 'Advantage', hint: 'roll two, keep the best', build: n => `${Math.max(2, n)}d${sides}kh1` },
+      { label: 'Disadvantage', hint: 'roll two, keep the worst', build: n => `${Math.max(2, n)}d${sides}kl1` },
+    );
   }
-  markChain();
+  mods.push(
+    { label: 'Drop lowest', hint: 'discard the worst die', build: n => `${Math.max(2, n)}d${sides}dl1` },
+    { label: 'Drop highest', hint: 'discard the best die', build: n => `${Math.max(2, n)}d${sides}dh1` },
+  );
+  if (sides > 1) {
+    mods.push(
+      { label: 'Exploding', hint: `reroll and add on a ${sides}`, build: n => `${n}d${sides}!` },
+      { label: 'Reroll 1s', hint: 'reroll any 1', build: n => `${n}d${sides}r1` },
+    );
+  }
+  return mods;
 }
 
-// Highlight whichever die the chain will step from.
-function markChain() {
-  for (const b of diceButtons.children) {
-    b.setAttribute('aria-pressed', String(Number(b.dataset.sides) === state.chainSides));
+function openSheet(sides) {
+  $('sheetTitle').textContent = `d${sides}`;
+  sheetOptions.replaceChildren();
+
+  for (const mod of modifiersFor(sides)) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'sheet-option';
+
+    const name = document.createElement('span');
+    name.className = 'sheet-option-name';
+    name.textContent = mod.label;
+
+    const notation = document.createElement('span');
+    notation.className = 'sheet-option-notation';
+    notation.textContent = mod.build(perTap());
+
+    const hint = document.createElement('span');
+    hint.className = 'sheet-option-hint';
+    hint.textContent = mod.hint;
+
+    b.append(name, notation, hint);
+    // Modified rolls replace the pool: kh1/dl1 apply to one group, so mixing
+    // them into a larger pool would change what the modifier refers to.
+    b.addEventListener('click', () => {
+      closeSheet();
+      pool = new Map();
+      markPool();
+      doRoll(mod.build(perTap()));
+    });
+    sheetOptions.append(b);
   }
-  const active = [...diceButtons.children]
-    .find(b => Number(b.dataset.sides) === state.chainSides);
-  active?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+
+  sheet.hidden = false;
+  sheetOptions.firstElementChild?.focus();
 }
 
-$('chainUp').addEventListener('click', () => stepPool(1));
-$('chainDown').addEventListener('click', () => stepPool(-1));
-markChain();
+function closeSheet() {
+  sheet.hidden = true;
+}
+
+sheet.addEventListener('click', e => {
+  if (e.target === sheet) closeSheet();
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !sheet.hidden) closeSheet();
+});
+
+// Long-press on touch, right-click on desktop — long-press has no mouse
+// equivalent, and the feature should not be touch-only.
+function attachModifierSheet(button, sides) {
+  let timer = null;
+  let longPressed = false;
+
+  const start = () => {
+    longPressed = false;
+    // The fill is the affordance: it shows a hold is doing something, and how
+    // much longer to hold. Duration matches the CSS transition.
+    button.dataset.holding = '1';
+    timer = setTimeout(() => {
+      longPressed = true;
+      delete button.dataset.holding;
+      if (navigator.vibrate) navigator.vibrate(12);
+      openSheet(sides);
+    }, 450);
+  };
+  const cancel = () => {
+    clearTimeout(timer);
+    timer = null;
+    delete button.dataset.holding;
+  };
+
+  button.addEventListener('pointerdown', start);
+  button.addEventListener('pointerup', cancel);
+  button.addEventListener('pointerleave', cancel);
+  button.addEventListener('pointercancel', cancel);
+
+  // Swallow the click that follows a long press, so it does not also stage dice.
+  button.addEventListener('click', e => {
+    if (longPressed) { e.preventDefault(); e.stopImmediatePropagation(); longPressed = false; }
+  }, true);
+
+  button.addEventListener('contextmenu', e => {
+    e.preventDefault();
+    cancel();
+    openSheet(sides);
+  });
+}
 
 // ---- flick to throw ----
 
@@ -389,7 +513,7 @@ canvas.addEventListener('pointerup', e => {
   // is never a dead surface, so a tap on an empty one rolls the selected die.
   const target = $('notation').value.trim()
     || (state.last && state.last.notation)
-    || `d${state.chainSides}`;
+    || `d${state.defaultSides}`;
 
   doRoll(target);
   if (speed > 120) {
@@ -398,19 +522,31 @@ canvas.addEventListener('pointerup', e => {
 });
 canvas.addEventListener('pointercancel', () => { drag = null; });
 
-let hintTimer = setTimeout(() => $('hint').dataset.show = '1', 1400);
+// ---- intro ----
+//
+// Plays once per cold open and clears on the first interaction, whichever comes
+// first. It teaches the two things the interface cannot say for itself: that
+// taps load dice, and that holding a die offers more.
+
+const intro = $('intro');
+let introTimer = setTimeout(hideHint, 3400);
+let introGone = false;
+
 function hideHint() {
-  clearTimeout(hintTimer);
-  $('hint').dataset.show = '0';
+  if (introGone) return;
+  introGone = true;
+  clearTimeout(introTimer);
+  intro.dataset.gone = '1';
+  // Removed rather than left transparent, so it can never eat a tap.
+  setTimeout(() => intro.remove(), 800);
 }
 
 // ---- loop ----
 
 let prev = performance.now();
-function frame(now) {
-  const dt = Math.min(0.05, (now - prev) / 1000);
-  prev = now;
+let loopFaults = 0;
 
+function drawFrame(dt) {
   const t = theme();
   const r = canvas.getBoundingClientRect();
   ctx.clearRect(0, 0, r.width, r.height);
@@ -434,8 +570,30 @@ function frame(now) {
   state.surface.drawRests(ctx, t, state.dice);
   state.surface.draw(ctx, t);
   for (const d of state.dice) d.draw(ctx, t);
+}
 
+function frame(now) {
+  const dt = Math.min(0.05, (now - prev) / 1000);
+  prev = now;
+
+  // The loop must survive a bad frame. Scheduling the next one before drawing —
+  // and dropping the dice that faulted — means a rendering bug degrades to a
+  // cleared tray instead of freezing the app until a reload, which is what
+  // happened when a d1 hit a code path that no longer existed.
   requestAnimationFrame(frame);
+
+  try {
+    drawFrame(dt);
+    loopFaults = 0;
+  } catch (err) {
+    loopFaults++;
+    console.error('Dicebox: frame failed', err);
+    if (loopFaults >= 3) {
+      state.dice = [];
+      loopFaults = 0;
+      showError('Something went wrong drawing that roll. The tray was cleared.');
+    }
+  }
 }
 
 resize();

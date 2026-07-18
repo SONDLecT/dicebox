@@ -265,11 +265,16 @@ function claimSearchBudget() {
 // the shape is honest about the die. (The roll itself is decided by crypto RNG
 // regardless; this is about the geometry not lying.)
 export function solidFor(sides) {
-  if (sides < 2) return null; // d1 has no meaningful shape
+  if (!Number.isFinite(sides) || sides < 1) return null;
   if (solidCache.has(sides)) return solidCache.get(sides);
 
   let solid;
-  if (sides === 2) {
+  if (sides === 1) {
+    // d1 is a real rung on the DCC chain, so it has to render. A rounded token
+    // is the honest shape: there is no one-faced polyhedron, and every throw
+    // shows the same face anyway.
+    solid = trapezohedron(6);
+  } else if (sides === 2) {
     solid = coin();
   } else if (SOLIDS[sides]) {
     solid = SOLIDS[sides]();
@@ -462,8 +467,10 @@ export class Die {
     ctx.save();
     ctx.translate(this.x, this.y);
 
+    // Nothing to draw without geometry. This used to call a drawToken() that no
+    // longer exists, which threw on every frame and took the whole render loop
+    // down with it — one bad die blanked the tray until a reload.
     if (!this.solid) {
-      this.drawToken(ctx, theme, s);
       ctx.restore();
       return;
     }

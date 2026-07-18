@@ -203,20 +203,45 @@ body {
   height: 100%;
 }
 
-.hint {
+/* The one-time intro. Lines fade in one after another, then the whole thing
+   leaves — it should read like a title card, not a tooltip. */
+.intro {
   position: absolute;
-  inset: auto 0 8px;
-  margin: 0;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  pointer-events: none;
   text-align: center;
-  font-size: 12px;
-  letter-spacing: 0.14em;
+  transition: opacity 700ms ease;
+}
+.intro[data-gone="1"] { opacity: 0; }
+
+.intro p {
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: 0.13em;
   text-transform: uppercase;
   color: var(--muted);
-  pointer-events: none;
   opacity: 0;
-  transition: opacity 400ms ease;
+  animation: intro-line 620ms ease forwards;
 }
-.hint[data-show="1"] { opacity: 0.75; }
+.intro p:nth-child(1) { animation-delay: 260ms; }
+.intro p:nth-child(2) { animation-delay: 660ms; }
+.intro p:nth-child(3) { animation-delay: 1060ms; }
+
+@keyframes intro-line {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 0.8; transform: none; }
+}
+
+.intro-last { color: var(--accent) !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .intro p { animation-duration: 1ms; animation-delay: 0ms; opacity: 0.8; }
+}
 
 /* ---- readout ---- */
 
@@ -257,6 +282,42 @@ body {
   gap: 8px;
   flex: 0 0 auto;
 }
+
+/* How many dice each tap adds. Typing a number here and tapping d6 is how you
+   get 100d6 without tapping a hundred times. */
+.counter {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  border: 1px solid var(--hair);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.counter .step {
+  border: 0;
+  border-radius: 0;
+  width: 30px;
+  height: 34px;
+}
+
+.count {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-left: 1px solid var(--hair);
+  border-right: 1px solid var(--hair);
+  background: none;
+  color: var(--line);
+  font: inherit;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  padding: 0;
+  -moz-appearance: textfield;
+}
+.count::-webkit-outer-spin-button,
+.count::-webkit-inner-spin-button { appearance: none; margin: 0; }
 
 .step {
   appearance: none;
@@ -299,10 +360,147 @@ body {
 }
 .dbtn:active { border-color: var(--line); }
 
-/* Marks which die the +/- chain buttons will step from. */
+/* A die in the tray reads as selected, with its count on the button — the pool
+   is visible in the row you are already looking at, not only in the field. */
 .dbtn[aria-pressed="true"] {
   color: var(--accent);
   border-color: var(--accent);
+}
+
+/* Kept inside the button's padding: the hold-fill needs overflow:hidden, so
+   anything poking past the border would be clipped. */
+.dbtn[data-count]::after {
+  content: attr(data-count) "\00d7";
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 9.5px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  color: var(--accent);
+  pointer-events: none;
+}
+
+/* Make room for the badge so it never sits on the label. */
+.dbtn[data-count] {
+  padding-right: 14px;
+}
+
+/* Holding a die fills it, which both signals that a long press does something
+   and shows how much longer to hold. The fill sits behind the label. */
+.dbtn {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.dbtn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  transform: scaleX(0);
+  transform-origin: left;
+}
+.dbtn[data-holding="1"]::before {
+  transform: scaleX(1);
+  transition: transform 450ms linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dbtn[data-holding="1"]::before { transition-duration: 1ms; }
+}
+
+/* ---- modifier sheet ---- */
+
+.sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: var(--gut);
+  padding-bottom: calc(env(safe-area-inset-bottom) + var(--gut));
+  background: color-mix(in srgb, var(--line) 12%, transparent);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+  animation: sheet-fade 140ms ease both;
+}
+
+.sheet-panel {
+  width: 100%;
+  max-width: 420px;
+  background: var(--paper);
+  border: 1px solid var(--hair);
+  border-radius: 14px;
+  padding: 14px;
+  animation: sheet-rise 180ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+
+@keyframes sheet-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes sheet-rise {
+  from { transform: translateY(12px); opacity: 0; }
+  to   { transform: none; opacity: 1; }
+}
+
+.sheet-title {
+  margin: 0 0 10px;
+  font-family: "Iosevka Etoile", ui-monospace, monospace;
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.sheet-options {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sheet-option {
+  appearance: none;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0 12px;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  padding: 9px 10px;
+  font: inherit;
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+.sheet-option:hover,
+.sheet-option:focus-visible {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.sheet-option-name {
+  font-size: 14px;
+  color: var(--line);
+}
+
+.sheet-option-notation {
+  font-family: "Iosevka Etoile", ui-monospace, monospace;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  text-align: right;
+}
+
+.sheet-option-hint {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 1px;
 }
 
 .clear {

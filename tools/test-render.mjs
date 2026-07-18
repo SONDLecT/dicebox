@@ -119,7 +119,6 @@ ok('d10 has ten faces', solidFor(10).faces.length === 10);
 ok('d14 has fourteen faces', solidFor(14).faces.length === 14);
 ok('d24 has twenty-four faces', solidFor(24).faces.length === 24);
 ok('d30 has thirty faces', solidFor(30).faces.length === 30);
-ok('d1 has no solid', solidFor(1) === null);
 
 // d2 is a coin: two broad faces plus a rim, and visibly flatter than it is wide.
 const c2 = solidFor(2);
@@ -164,6 +163,51 @@ still.throwWith(0, 0);
 let n = 0;
 while (!still.settled && n < 2000) { still.step(1/60, bounds); n++; }
 ok('zero-velocity die settles', still.settled, `after ${n} steps`);
+
+// --- drawing must never throw ---
+// Regression: d1 had no solid and draw() called a drawToken() that had been
+// removed, so it threw every frame and killed the render loop — the tray stayed
+// blank until a full reload. A die that cannot be drawn must degrade quietly.
+{
+  const noop = () => {};
+  const stubCtx = new Proxy({}, {
+    get: (_t, k) => (k === 'canvas' ? { width: 300, height: 200 } : noop),
+    set: () => true,
+  });
+  const stubTheme = { line: '#000', muted: '#999', paper: '#fff', accent: '#0a0' };
+  const tray = { left: 0, right: 300, top: 0, floor: 200 };
+
+  const broken = [];
+  for (let sides = 1; sides <= 120; sides++) {
+    try {
+      // Settled, after a full throw.
+      const a = new Die(sides, 1, 50, 50, 40);
+      a.throwWith(300, 300);
+      for (let i = 0; i < 400 && !a.settled; i++) a.step(1 / 60, tray);
+      a.draw(stubCtx, stubTheme);
+
+      // Mid-flight, before any resting pose is chosen.
+      const b = new Die(sides, sides, 50, 50, 40);
+      b.throwWith(200, 200);
+      b.step(1 / 60, tray);
+      b.draw(stubCtx, stubTheme);
+
+      // Staged: on the tray with no value yet.
+      const c = new Die(sides, null, 50, 50, 40);
+      c.settled = true; c.settling = true; c.settleT = 1;
+      c.draw(stubCtx, stubTheme);
+    } catch (err) {
+      broken.push(`d${sides}: ${err.message}`);
+    }
+  }
+  ok('d1-d120 draw without throwing', broken.length === 0, broken.slice(0, 3).join('; '));
+}
+
+// d1 is a real rung on the DCC chain, so it must have geometry to draw.
+ok('d1 has a solid', solidFor(1) !== null);
+ok('d0 has no solid', solidFor(0) === null);
+ok('negative sides rejected', solidFor(-5) === null);
+ok('non-numeric sides rejected', solidFor(NaN) === null);
 
 // --- resting orientation ---
 // A settled die must present a face to the camera. Landing pole-on or vertex-on

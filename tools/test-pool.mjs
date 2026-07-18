@@ -118,5 +118,88 @@ for (const text of ['3d6+2', '4d6kh3', '1d20!', '2d6-1', 'd%', 'garbage', '']) {
   ok('chain step merges onto existing die', poolNotation(p) === '2d16', poolNotation(p));
 }
 
+// --- button state mirrors the pool ---
+// Each die button shows selected when it is in the pool, with a count badge past
+// one. The row and the notation field must never disagree about what is loaded.
+function buttonState(pool, sides) {
+  const n = pool.get(sides) || 0;
+  return { pressed: n > 0, badge: n > 1 ? String(n) : null };
+}
+
+{
+  const p = new Map();
+  ok('unselected die has no badge',
+     buttonState(p, 6).pressed === false && buttonState(p, 6).badge === null);
+
+  add(p, 6);
+  ok('one die selected, no badge',
+     buttonState(p, 6).pressed === true && buttonState(p, 6).badge === null);
+
+  add(p, 6);
+  ok('two dice show 2', buttonState(p, 6).badge === '2');
+
+  add(p, 20);
+  ok('other die independently selected', buttonState(p, 20).pressed === true);
+  ok('untouched die stays unselected', buttonState(p, 8).pressed === false);
+}
+
+{
+  // The field is the source of truth: typing must light the same buttons.
+  const p = parsePool('3d8+1d12');
+  ok('typed notation selects d8', buttonState(p, 8).pressed && buttonState(p, 8).badge === '3');
+  ok('typed notation selects d12', buttonState(p, 12).pressed && buttonState(p, 12).badge === null);
+  ok('typed notation leaves d20 alone', buttonState(p, 20).pressed === false);
+}
+
+{
+  // A pool the field cannot represent clears every button rather than showing a
+  // stale selection that no longer matches what will roll.
+  const p = parsePool('4d6kh3');
+  ok('unpoolable notation clears buttons', [...p.keys()].length === 0);
+}
+
+// --- the count multiplier ---
+{
+  const perTap = 100;
+  const p = new Map();
+  p.set(6, (p.get(6) || 0) + perTap);
+  ok('multiplier adds in bulk', poolNotation(p) === '100d6');
+  ok('bulk pool shows its count', buttonState(p, 6).badge === '100');
+  const r = roll(poolNotation(p));
+  ok('bulk pool rolls in range', r.total >= 100 && r.total <= 600, `total ${r.total}`);
+}
+
+// --- modifier notations from the hold sheet ---
+// Every option the sheet can build must parse and roll.
+{
+  const build = [
+    n => `${Math.max(2, n)}d20kh1`,
+    n => `${Math.max(2, n)}d20kl1`,
+    n => `${Math.max(2, n)}d20dl1`,
+    n => `${Math.max(2, n)}d20dh1`,
+    n => `${n}d20!`,
+    n => `${n}d20r1`,
+  ];
+  let bad = null;
+  for (const make of build) {
+    for (const n of [1, 2, 5]) {
+      const text = make(n);
+      try {
+        const r = roll(text);
+        if (!Number.isFinite(r.total) || r.total < 1) bad = `${text} gave ${r.total}`;
+      } catch (err) { bad = `${text}: ${err.message}`; }
+    }
+  }
+  ok('every hold-sheet modifier rolls', bad === null, bad || '');
+}
+
+{
+  // Advantage needs two dice even when the multiplier says one.
+  const adv = (n => `${Math.max(2, n)}d20kh1`)(1);
+  ok('advantage forces two dice', adv === '2d20kh1', adv);
+  const r = roll(adv);
+  ok('advantage keeps one die', r.groups[0].dice.filter(d => d.kept).length === 1);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -31,7 +31,14 @@
 
   <section class="tray" aria-label="Dice tray">
     <canvas id="tray"></canvas>
-    <p class="hint" id="hint">Flick to throw</p>
+
+    <!-- Shown once on a cold open, then faded out. Everything the interface
+         does not say for itself, in as few words as it takes. -->
+    <div class="intro" id="intro" aria-hidden="true">
+      <p>Tap dice to load them</p>
+      <p>Hold one for more options</p>
+      <p class="intro-last">Flick the tray to roll</p>
+    </div>
 
     <div class="help" id="help" hidden>
       <dl class="syntax">
@@ -46,8 +53,10 @@
         <dt>d%</dt>           <dd>percentile, same as d100</dd>
       </dl>
       <p class="note">
-        Any number of sides works, from d2 to d1000. The chain steps dice up and
-        down for Dungeon Crawl Classics. Rolls stay on your device.
+        Tap dice to build a pool; the number on the left is how many each tap
+        adds. <b>Hold a die</b> for advantage, exploding, and the rest — no
+        typing needed. Any number of sides works, from d1 to d1000, so a d17 or
+        a d57 is just as valid. Rolls stay on your device.
       </p>
       <p class="colophon">
         <a href="https://github.com/" target="_blank" rel="noopener noreferrer">Source on GitHub</a>
@@ -61,12 +70,24 @@
   </output>
 
   <section class="picker" aria-label="Dice">
-    <button class="step" id="chainDown" title="Step down the dice chain"
-            aria-label="Step down the dice chain">−</button>
+    <div class="counter" title="How many dice each tap adds">
+      <button class="step" id="countDown" aria-label="One fewer die per tap">−</button>
+      <input id="count" class="count" type="text" inputmode="numeric"
+             value="1" autocomplete="off" aria-label="Dice per tap">
+      <button class="step" id="countUp" aria-label="One more die per tap">+</button>
+    </div>
     <div class="dice-buttons" id="diceButtons" role="group"></div>
-    <button class="step" id="chainUp" title="Step up the dice chain"
-            aria-label="Step up the dice chain">+</button>
   </section>
+
+  <!-- Opened by long-press (or right-click) on a die. Holds the modifiers that
+       would otherwise need typing, so the text field stays a power-user path. -->
+  <div class="sheet" id="sheet" hidden role="dialog" aria-modal="true"
+       aria-labelledby="sheetTitle">
+    <div class="sheet-panel">
+      <p class="sheet-title" id="sheetTitle">d20</p>
+      <div class="sheet-options" id="sheetOptions"></div>
+    </div>
+  </div>
 
   <form class="entry" id="entry">
     <input id="notation" type="text" inputmode="text" autocomplete="off"
