@@ -49,10 +49,41 @@ White dice on a white field, drawn as pure line work — no fill, no shadow. Dep
 comes only from back-facing edges at 22% opacity. The table is a single hairline
 that ripples when a die lands.
 
-The five Platonic solids (d4, d6, d8, d12, d20) render as true 3D wireframes.
-Every other side count draws as a flat token with the value stroked on it —
-faking a barrel for `d7` or `d100` would read worse than an honest token, and
-arbitrary sides are a first-class feature here.
+Every die is a real tumbling solid — there are no flat tokens or placeholder
+shapes. Numerals are painted onto the face plane in 3D, skewed with the face so
+they track the die as it turns rather than floating flat over it.
+
+### Dice for any number of sides
+
+A fair die must be **isohedral**: every face equivalent under the solid's
+symmetry group, so each face has equal probability. Two families cover every
+face count, which is how physical d10s, d14s, d24s and d30s are actually made:
+
+| Sides | Shape | Why |
+| --- | --- | --- |
+| 2 | coin | no two-faced polyhedron exists |
+| 4, 6, 8, 12, 20 | Platonic solid | exact regular solids |
+| even N | trapezohedron | 2n kite faces; the real d10 shape |
+| odd N | bipyramid | 2n triangles, one face never selected |
+
+The trapezohedron's apex height is not a free parameter. Each kite face
+`[apex, top_i, bot_i, top_i+1]` is planar only when
+
+```
+H = 2 / (1 - cos(pi/n)) - 1
+```
+
+with the rings at unit radius. Choosing it by eye bowties every face, which
+renders as a tangle of crossing edges. That ratio grows fast — at n=15 the apex
+sits 90x further out than the equator — so the solid is squashed along y
+afterwards to get the near-spherical proportions a real die has. Scaling a
+single axis preserves planarity.
+
+Above 32 faces the facets are too fine to read as anything but a sphere, so the
+geometry caps there while the die still reports its true side count.
+
+No true odd-faced isohedron exists, so odd dice use a bipyramid with one face
+left unselected — the same compromise physical dice make.
 
 Flick the tray to throw. A flick re-rolls the last notation; a tap rolls the
 currently selected chain die.
@@ -71,7 +102,14 @@ node tools/test-render.mjs    # polyhedron geometry + settling simulation
 
 The geometry suite checks Euler's `V - E + F = 2` for every solid, which is what
 catches bad face recovery — the kind of bug that shows up as a d12 with phantom
-faces through its middle.
+faces through its middle. It also verifies that every face from d2 to d120 is
+coplanar, that dice settle showing a face to the camera, and that multiple dice
+never come to rest overlapping.
+
+When testing planarity, derive the face plane from three of its vertices. Using
+the centroid direction as the normal is wrong for kite faces, whose plane is not
+perpendicular to the centroid ray — that mistake reports every valid
+trapezohedron as broken.
 
 ## Files
 

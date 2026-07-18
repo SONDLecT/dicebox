@@ -1,5 +1,5 @@
 import { roll, describe, DCC_CHAIN, stepChain } from './dice.js';
-import { Die, Surface } from './render.js';
+import { Die, Surface, separate } from './render.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('tray');
@@ -78,11 +78,14 @@ function placeGrid(dice) {
   const cols = Math.ceil(Math.sqrt(dice.length * (w / Math.max(h, 1))));
   const rows = Math.ceil(dice.length / cols);
   const cw = w / cols, ch = h / rows;
+  // Cap the size so a lone die doesn't fill the whole tray, and floor it so a
+  // large handful stays legible.
+  const size = Math.max(26, Math.min(96, Math.min(cw, ch) * 0.78));
   dice.forEach((d, i) => {
     const c = i % cols, r = Math.floor(i / cols);
     d.x = left + cw * (c + 0.5);
     d.y = top + ch * (r + 0.5);
-    d.size = Math.min(cw, ch) * 0.72;
+    d.size = size;
   });
 }
 
@@ -115,10 +118,15 @@ function doRoll(notation) {
   placeGrid(state.dice);
 
   if (animate) {
+    // Each die keeps the grid slot placeGrid gave it and is thrown *toward* it.
+    // Launching from random positions instead is what made dice pile up.
     for (const d of state.dice) {
-      d.x = state.bounds.left + Math.random() * (state.bounds.right - state.bounds.left);
-      d.y = state.bounds.top + 20;
-      d.throwWith((Math.random() - 0.5) * 900, 300 + Math.random() * 500);
+      d.homeX = d.x;
+      d.homeY = d.y;
+      const fromLeft = Math.random() < 0.5;
+      d.x = fromLeft ? state.bounds.left + 12 : state.bounds.right - 12;
+      d.y = state.bounds.top + 12 + Math.random() * 30;
+      d.throwWith((d.homeX - d.x) * 2.4, (d.homeY - d.y) * 2.4);
     }
     $('total').dataset.rolling = '1';
     setTimeout(() => finish(result), 620);
@@ -259,8 +267,10 @@ function frame(now) {
     const wasSettled = d.settled;
     d.step(dt, state.bounds);
     if (!wasSettled && d.settled) state.surface.impact(d.x, d.y);
-    d.draw(ctx, t);
   }
+
+  if (state.dice.length > 1) separate(state.dice, state.bounds);
+  for (const d of state.dice) d.draw(ctx, t);
 
   requestAnimationFrame(frame);
 }

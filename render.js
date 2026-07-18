@@ -95,14 +95,137 @@ const sub = (a,b) => [a[0]-b[0], a[1]-b[1], a[2]-b[2]];
 const dot = (a,b) => a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
 const cross = (a,b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
 
+// A fair die needs to be *isohedral*: every face equivalent under the solid's
+// symmetry group, so each has equal probability. Two families cover every face
+// count, which is how real d10s, d14s, d24s and d30s are actually made.
+
+// Bipyramid: two apexes over a regular n-gon equator gives 2n triangular faces.
+// Triangles are planar by construction, so the only tuning is apex height.
+function bipyramid(n) {
+  const H = 1.15;
+  const verts = [[0, H, 0], [0, -H, 0]];
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * TAU;
+    verts.push([Math.cos(a), 0, Math.sin(a)]);
+  }
+  const ring = i => 2 + (i % n);
+  const faces = [];
+  for (let i = 0; i < n; i++) {
+    faces.push([0, ring(i), ring(i + 1)]);
+    faces.push([1, ring(i + 1), ring(i)]);
+  }
+  return normalize({ verts, faces });
+}
+
+// Trapezohedron: two offset rings plus an apex at each pole, giving 2n kite
+// faces. The apex height is not free — the kite [apex, top_i, bot_i, top_i+1]
+// is planar only at this exact ratio. Choosing H by eye bowties every face,
+// which renders as a tangle of crossing edges.
+function trapezohedron(n) {
+  // Planarity fixes the apex height exactly, relative to a unit ring radius:
+  // H = 2/(1 - cos(pi/n)) - 1 with the rings at y = +/-1. That ratio is scale
+  // invariant but grows fast with n, so the raw solid is a needle: at n=15 the
+  // apex sits 60x further out than the equator. Squashing y by H brings the
+  // poles back to the ring radius, giving the near-spherical proportions a
+  // physical d30 actually has. Scaling one axis preserves planarity.
+  const h = 1;
+  const H = 2 / (1 - Math.cos(Math.PI / n)) - 1;
+  // Squashing the poles to exactly the ring radius leaves a sharp bicone, but
+  // over-squashing flattens the die into a pinwheel disc. Taller poles as n
+  // grows keep high-count dice reading as solids rather than plates.
+  const squash = (1 / H) * (n > 6 ? 1.35 : 1.0);
+
+  const verts = [[0, H * squash, 0], [0, -H * squash, 0]];
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * TAU;
+    verts.push([Math.cos(a), h * squash, Math.sin(a)]);
+  }
+  for (let i = 0; i < n; i++) {
+    const a = ((i + 0.5) / n) * TAU;
+    verts.push([Math.cos(a), -h * squash, Math.sin(a)]);
+  }
+
+  const top = i => 2 + (i % n);
+  const bot = i => 2 + n + (i % n);
+  const faces = [];
+  for (let i = 0; i < n; i++) {
+    faces.push([0, top(i), bot(i), top(i + 1)]);
+    faces.push([1, bot(i + n - 1), top(i), bot(i)]);
+  }
+  return normalize({ verts, faces });
+}
+
+// d2 is a coin, not a polyhedron: a short cylinder with two large faces. Any
+// two-faced solid is impossible, and a coin is what you'd actually flip.
+function coin(segments = 20) {
+  const verts = [];
+  const half = 0.13;
+  for (let i = 0; i < segments; i++) {
+    const a = (i / segments) * TAU;
+    verts.push([Math.cos(a), half, Math.sin(a)]);
+  }
+  for (let i = 0; i < segments; i++) {
+    const a = (i / segments) * TAU;
+    verts.push([Math.cos(a), -half, Math.sin(a)]);
+  }
+  const faces = [
+    Array.from({ length: segments }, (_, i) => i),
+    Array.from({ length: segments }, (_, i) => 2 * segments - 1 - i),
+  ];
+  // The rim is drawn as quads so the edge reads as thickness, not a hairline.
+  for (let i = 0; i < segments; i++) {
+    const j = (i + 1) % segments;
+    faces.push([i, j, segments + j, segments + i]);
+  }
+  return normalize({ verts, faces });
+}
+
+function normalize(solid) {
+  const scale = Math.max(...solid.verts.map(v => Math.hypot(...v)));
+  return { verts: solid.verts.map(v => v.map(x => x / scale)), faces: solid.faces };
+}
+
 const SOLIDS = { 4: tetra, 6: cube, 8: octa, 12: dodeca, 20: icosa };
 
-// Dice whose side count has no matching Platonic solid (d10, d100, d3, d30, d7…)
-// are drawn as a flat rounded token with the numeral stroked on it. Faking a
-// barrel or trapezohedron for every arbitrary side count would read worse than
-// an honest token, and arbitrary sides are a first-class feature here.
+// Cache: the hull recovery in dodeca/icosa is O(v^3), and barrels get rebuilt
+// on every roll otherwise.
+const solidCache = new Map();
+
+// Every die gets a real, fair solid — no flat tokens.
+//
+//   - Coin for d2, since no two-faced polyhedron exists
+//   - Platonic solids where one exists (d4, d6, d8, d12, d20)
+//   - Trapezohedron for even counts: 2n kite faces. This is how physical d10s
+//     are made, and it extends to d14, d16, d24, d30 and beyond.
+//   - Bipyramid for odd counts: 2n triangles over an n-gon equator, then one
+//     face is simply never selected. A true odd-faced isohedron doesn't exist,
+//     and this is the standard physical compromise.
+//
+// Both families are isohedral, so every face is equivalent under the solid's
+// symmetry — the geometric property that makes a die fair. (The roll itself is
+// decided by crypto RNG regardless; this is about the shape being honest.)
 export function solidFor(sides) {
-  return SOLIDS[sides] ? SOLIDS[sides]() : null;
+  if (sides < 2) return null; // d1 has no meaningful shape
+  if (solidCache.has(sides)) return solidCache.get(sides);
+
+  let solid;
+  if (sides === 2) {
+    solid = coin();
+  } else if (SOLIDS[sides]) {
+    solid = SOLIDS[sides]();
+  } else {
+    // Past ~32 faces the facets are too fine to read as anything but a sphere,
+    // so cap the geometry while the die still reports its true side count.
+    const faces = Math.min(sides, 32);
+    // A trapezohedron needs at least 3 kites per pole; below that (d2, d4) the
+    // construction degenerates, so fall back to the bipyramid.
+    solid = (faces % 2 === 0 && faces / 2 >= 3)
+      ? trapezohedron(faces / 2)
+      : bipyramid(Math.max(3, Math.ceil(faces / 2)));
+  }
+
+  solidCache.set(sides, solid);
+  return solid;
 }
 
 export class Die {
@@ -131,6 +254,7 @@ export class Die {
     ];
     this.settling = false;
     this.settled = false;
+    this.targetRot = null; // recomputed for wherever this throw lands
   }
 
   step(dt, bounds) {
@@ -153,21 +277,60 @@ export class Die {
         this.spin[i] *= 0.965;
       }
 
+      // Ease toward the slot the layout assigned, so dice spread out instead of
+      // landing wherever momentum happens to leave them.
+      if (this.homeX !== undefined) {
+        this.vx += (this.homeX - this.x) * 3.2 * dt;
+        this.vy += (this.homeY - this.y) * 3.2 * dt;
+      }
+
       if (Math.hypot(this.vx, this.vy) < 8 && Math.abs(this.spin[0]) < 0.02) {
         this.settling = true;
         this.settleT = 0;
         this.restRot = this.rot.slice();
       }
     } else {
-      // Ease the tumble to a stop. The face value is already decided by the
-      // roller; this is presentation, so we just park the die at a clean angle.
+      // Ease the tumble to a stop, rotating toward an orientation that presents
+      // a face to the camera. Landing on a pole or a vertex reads as a spike and
+      // leaves nowhere to paint the numeral.
+      if (!this.targetRot) this.targetRot = this.findFaceUpRotation();
       this.settleT = Math.min(1, this.settleT + dt * 2.2);
       const e = 1 - Math.pow(1 - this.settleT, 3);
       for (let i = 0; i < 3; i++) {
-        this.rot[i] = this.restRot[i] + this.spin[i] * 8 * e;
+        this.rot[i] = this.restRot[i] + (this.targetRot[i] - this.restRot[i]) * e;
       }
       if (this.settleT >= 1) this.settled = true;
     }
+  }
+
+  // Search nearby rotations for one that turns some face toward the camera.
+  // Sampling beats solving for it: the solids differ enough in face layout that
+  // a closed form would need per-family special cases, and this runs once.
+  findFaceUpRotation() {
+    if (!this.solid) return this.rot.slice();
+    let best = this.rot.slice(), bestScore = -Infinity;
+
+    for (let i = 0; i < 90; i++) {
+      // First candidate is the current pose, so an already-good landing sticks.
+      const cand = i === 0 ? this.rot.slice() : [
+        this.rot[0] + (Math.random() - 0.5) * 2.6,
+        this.rot[1] + (Math.random() - 0.5) * 2.6,
+        this.rot[2] + (Math.random() - 0.5) * 2.6,
+      ];
+      const pts = this.solid.verts.map(v => rotate(v, cand[0], cand[1], cand[2]));
+
+      let facing = 0;
+      for (const face of this.solid.faces) {
+        const n = faceNormal(face.map(i2 => pts[i2]));
+        const len = Math.hypot(...n);
+        if (len) facing = Math.max(facing, n[2] / len);
+      }
+      // Prefer a square-on face, but stay near the pose it actually landed in.
+      const drift = Math.abs(cand[0] - this.rot[0]) + Math.abs(cand[1] - this.rot[1]);
+      const score = facing - drift * 0.06;
+      if (score > bestScore) { bestScore = score; best = cand; }
+    }
+    return best;
   }
 
   draw(ctx, theme) {
@@ -217,37 +380,51 @@ export class Die {
     }
     ctx.globalAlpha = 1;
 
-    if (this.settled) this.drawValue(ctx, theme, s);
+    this.drawValue(ctx, theme, s, pts, proj);
     ctx.restore();
   }
 
-  // Numeral on the face pointing at the camera, so the value sits where a real
-  // die would show it rather than floating over the whole shape.
-  drawValue(ctx, theme, s) {
-    ctx.font = `600 ${s * 0.62}px "Iosevka Etoile", ui-monospace, monospace`;
+  // Paint the numeral onto the face that most directly faces the camera, using
+  // that face's own plane. The glyph is skewed to sit in the surface rather than
+  // floating flat over the shape, so it tracks the die as it tumbles.
+  drawValue(ctx, theme, s, pts, proj) {
+    let best = null, bestFacing = 0.2;
+    for (const face of this.solid.faces) {
+      const fp = face.map(i => pts[i]);
+      const n = faceNormal(fp);
+      const len = Math.hypot(...n);
+      if (!len) continue;
+      const facing = n[2] / len;
+      if (facing > bestFacing) { bestFacing = facing; best = face; }
+    }
+    if (!best) return;
+
+    // Face centre in screen space, and two in-plane axes to skew the glyph with.
+    const c2 = best.reduce((a, i) => [a[0] + proj[i][0], a[1] + proj[i][1]], [0, 0])
+                   .map(v => v / best.length);
+    const e0 = proj[best[0]];
+    let ux = e0[0] - c2[0], uy = e0[1] - c2[1];
+    const ulen = Math.hypot(ux, uy) || 1;
+    ux /= ulen; uy /= ulen;
+
+    const label = String(this.value);
+    // Long labels (d100 can show 3 digits) need to shrink to stay on the face.
+    const fit = label.length > 2 ? 0.34 : label.length > 1 ? 0.42 : 0.52;
+    const size = Math.max(7, s * fit * (0.55 + 0.45 * bestFacing));
+
+    ctx.save();
+    ctx.translate(c2[0], c2[1]);
+    // Rotate to the face's own axis, then squash vertically by how much the
+    // face is turned away — the same foreshortening the edges already show.
+    ctx.transform(ux, uy, -uy * bestFacing, ux * bestFacing, 0, 0);
+    ctx.font = `600 ${size}px "Iosevka Etoile", ui-monospace, monospace`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = theme.line;
-    ctx.fillText(String(this.value), 0, s * 0.04);
-  }
-
-  drawToken(ctx, theme, s) {
-    const r = s * 0.34;
-    ctx.beginPath();
-    roundRect(ctx, -s*0.82, -s*0.82, s*1.64, s*1.64, r);
-    ctx.strokeStyle = theme.line;
-    ctx.lineWidth = 1.6;
-    ctx.stroke();
-
-    ctx.font = `500 ${s * 0.26}px "Inter Tight", system-ui, sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = theme.muted;
-    ctx.fillText(`d${this.sides}`, 0, -s * 0.42);
-
-    ctx.font = `600 ${s * 0.6}px "Iosevka Etoile", ui-monospace, monospace`;
-    ctx.fillStyle = theme.line;
-    ctx.fillText(String(this.settled ? this.value : '·'), 0, s * 0.14);
+    ctx.globalAlpha = this.settled ? 1 : 0.35 + 0.65 * bestFacing;
+    ctx.fillText(label, 0, 0);
+    ctx.restore();
+    ctx.globalAlpha = 1;
   }
 }
 
@@ -276,6 +453,38 @@ function faceNormal(pts) {
   const c = pts.reduce((a, p) => [a[0]+p[0], a[1]+p[1], a[2]+p[2]], [0,0,0]);
   // Point the normal outward from the centroid before testing facing.
   return dot(n, c) < 0 ? n.map(x => -x) : n;
+}
+
+// Push overlapping dice apart. Runs every frame, including after they settle, so
+// a die can never come to rest on top of another one.
+export function separate(dice, bounds, iterations = 3) {
+  for (let pass = 0; pass < iterations; pass++) {
+    let moved = false;
+    for (let i = 0; i < dice.length; i++) {
+      for (let j = i + 1; j < dice.length; j++) {
+        const a = dice[i], b = dice[j];
+        const min = (a.size + b.size) * 0.5 * 0.92;
+        let dx = b.x - a.x, dy = b.y - a.y;
+        let dist = Math.hypot(dx, dy);
+        if (dist >= min) continue;
+
+        // Perfectly coincident dice have no separation axis; nudge deterministically.
+        if (dist < 1e-6) { dx = (i % 2 ? 1 : -1); dy = (j % 2 ? 1 : -1); dist = Math.hypot(dx, dy); }
+
+        const push = (min - dist) / 2;
+        const nx = (dx / dist) * push, ny = (dy / dist) * push;
+        a.x -= nx; a.y -= ny;
+        b.x += nx; b.y += ny;
+        moved = true;
+      }
+    }
+    for (const d of dice) {
+      const r = d.size * 0.5;
+      d.x = Math.max(bounds.left + r, Math.min(bounds.right - r, d.x));
+      d.y = Math.max(bounds.top + r, Math.min(bounds.floor - r, d.y));
+    }
+    if (!moved) break;
+  }
 }
 
 // One hairline for the table, plus a ripple that expands where a die lands.
