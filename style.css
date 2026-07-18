@@ -380,14 +380,44 @@ body {
   cursor: pointer;
 }
 
+/* The row holds more dice than fit, so it scrolls. Arrows appear at whichever
+   end has more to show — a scrollable strip with no visible edge reads as the
+   whole set, and everything past the eighth die goes unnoticed. */
+.dice-scroll {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .dice-buttons {
   display: flex;
   gap: 4px;
   overflow-x: auto;
   scrollbar-width: none;
   flex: 1 1 auto;
+  scroll-behavior: smooth;
+  /* Momentum scrolling on iOS. */
+  -webkit-overflow-scrolling: touch;
 }
 .dice-buttons::-webkit-scrollbar { display: none; }
+
+.nudge {
+  appearance: none;
+  flex: 0 0 auto;
+  width: 22px;
+  min-height: 34px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 19px;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+}
+.nudge:hover { color: var(--accent); }
 
 .dbtn {
   appearance: none;
@@ -574,9 +604,12 @@ body {
   position: relative;
   overflow: hidden;
   isolation: isolate;
-  /* The row scrolls horizontally and so does a scrub gesture, so the button
-     claims its own pointer events rather than losing them to the scroller. */
-  touch-action: pan-y;
+  /* Left to the browser, so a sideways drag scrolls the row. Claiming the
+     gesture for scrubbing instead made the row unscrollable on a phone, which
+     put every die past the eighth out of reach — a far worse trade than losing
+     drag-to-scrub. Scrubbing now lives behind the long press, where it does not
+     compete with panning. */
+  touch-action: manipulation;
 }
 
 .dbtn-fill {

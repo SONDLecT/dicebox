@@ -156,9 +156,15 @@
              value="1" autocomplete="off" aria-label="Dice per tap">
       <button class="step" id="countUp" aria-label="One more die per tap">+</button>
     </div>
-    <div class="dice-buttons" id="diceButtons" role="group">
-      <button class="dbtn custom" id="customDie" type="button"
-              aria-label="Choose a custom number of sides"><span class="dbtn-fill"></span>d?</button>
+    <div class="dice-scroll">
+      <button type="button" class="nudge" id="diceLeft" aria-label="Show smaller dice"
+              hidden>‹</button>
+      <div class="dice-buttons" id="diceButtons" role="group">
+        <button class="dbtn custom" id="customDie" type="button"
+                aria-label="Choose a custom number of sides"><span class="dbtn-fill"></span>d?</button>
+      </div>
+      <button type="button" class="nudge" id="diceRight" aria-label="Show larger dice"
+              hidden>›</button>
     </div>
   </section>
 

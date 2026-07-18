@@ -634,6 +634,48 @@ function makeDieButton(sides) {
   return b;
 }
 
+// ---- the row scrolls ----
+//
+// More dice than fit, so the strip pans. The arrows show only when there is
+// something that way: a scrollable row with no visible edge reads as the whole
+// set, and every die past the eighth goes unnoticed.
+
+const diceLeft = $('diceLeft');
+const diceRight = $('diceRight');
+
+function syncNudges() {
+  const max = diceButtons.scrollWidth - diceButtons.clientWidth;
+  // 2px of slack: sub-pixel layout leaves a hair of scroll that is not real.
+  const canScroll = max > 2;
+  diceLeft.hidden = !canScroll || diceButtons.scrollLeft <= 2;
+  diceRight.hidden = !canScroll || diceButtons.scrollLeft >= max - 2;
+}
+
+// Scroll by most of a screenful, keeping a die or two for continuity.
+const nudge = dir => diceButtons.scrollBy({
+  left: dir * Math.max(120, diceButtons.clientWidth * 0.7),
+  behavior: 'smooth',
+});
+
+diceLeft.addEventListener('click', () => nudge(-1));
+diceRight.addEventListener('click', () => nudge(1));
+diceButtons.addEventListener('scroll', syncNudges, { passive: true });
+new ResizeObserver(syncNudges).observe(diceButtons);
+// The buttons exist before this runs, and adding a custom die changes the width
+// too, so settle the arrows once now rather than relying on the observer's
+// first callback.
+syncNudges();
+
+// A desktop mouse has no horizontal wheel, so a plain scroll over the row pans
+// it rather than doing nothing.
+diceButtons.addEventListener('wheel', e => {
+  if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+  const max = diceButtons.scrollWidth - diceButtons.clientWidth;
+  if (max <= 2) return;
+  e.preventDefault();
+  diceButtons.scrollLeft += e.deltaY;
+}, { passive: false });
+
 // A die made with the custom picker earns a button of its own, in size order,
 // so it behaves like every other die — tappable, countable, and holdable for
 // modifiers. Without one a d46 could be staged but never modified.
@@ -648,6 +690,7 @@ function ensureDieButton(sides) {
   const after = [...diceButtons.children]
     .find(b => b.dataset.sides && Number(b.dataset.sides) > sides);
   diceButtons.insertBefore(button, after || null);
+  syncNudges();
   return button;
 }
 
@@ -1133,15 +1176,19 @@ function attachModifierSheet(button, sides) {
   let timer = null;
   let longPressed = false;
   let scrub = null;
+  let lastX = 0;
 
   const start = e => {
     longPressed = false;
-    // Sliding sideways from here adjusts how many of this die are staged, so a
-    // count can be dialled from 37 to 3 in one gesture instead of 34 taps.
+    // Where the press began, so a sideways drag can be recognised as a scroll
+    // rather than a tap. Scrubbing is not armed here: the row has to be free to
+    // pan, or every die past the eighth is unreachable on a phone.
     scrub = {
       x: e.clientX,
+      y: e.clientY,
       startCount: (pool.get(sides) || { count: 0 }).count,
       moved: false,
+      armed: false,
       pointerId: e.pointerId,
     };
     // The fill is the affordance: it shows a hold is doing something, and how
@@ -1151,6 +1198,10 @@ function attachModifierSheet(button, sides) {
       longPressed = true;
       delete button.dataset.holding;
       if (navigator.vibrate) navigator.vibrate(12);
+      // Holding still arms the scrub, so a drag that begins *after* the hold
+      // dials the count without ever fighting the scroller.
+      if (scrub) { scrub.armed = true; scrub.x = lastX; scrub.startCount =
+        (pool.get(sides) || { count: 0 }).count; }
       openSheet(sides);
     }, 450);
   };
@@ -1163,27 +1214,40 @@ function attachModifierSheet(button, sides) {
     scrub = null;
   };
 
+  // No pointer capture: capturing the pointer takes the gesture away from the
+  // scroller, which is the other half of what made the row unscrollable.
   button.addEventListener('pointerdown', e => {
+    lastX = e.clientX;
     start(e);
-    button.setPointerCapture?.(e.pointerId);
   });
 
   button.addEventListener('pointermove', e => {
+    lastX = e.clientX;
     if (!scrub) return;
     const dx = e.clientX - scrub.x;
+
+    // Before the hold completes, any real movement is a scroll or a scrub on the
+    // row itself. Cancel the press and let the browser have the gesture.
+    if (!scrub.armed) {
+      if (Math.abs(dx) > 8 || Math.abs(e.clientY - scrub.y) > 8) {
+        clearTimeout(timer);
+        timer = null;
+        delete button.dataset.holding;
+        scrub = null;
+      }
+      return;
+    }
+
     if (!scrub.moved) {
       if (Math.abs(dx) < 8) return;
-      // It is a drag, not a tap or a hold.
       scrub.moved = true;
-      clearTimeout(timer);
-      timer = null;
-      delete button.dataset.holding;
       button.dataset.scrubbing = '1';
     }
     // Accelerates with distance: small nudges are precise, long drags cover the
     // range without a marathon swipe.
     const steps = Math.sign(dx) * Math.round(Math.pow(Math.abs(dx) / 14, 1.55));
     setDieCount(sides, Math.max(0, scrub.startCount + steps));
+    refreshSheetPreviews(sides);
   });
 
   const finish = () => {
