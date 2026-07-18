@@ -598,8 +598,10 @@ export class Die {
   spinInPlace(delay = 0) {
     this.vx = 0;
     this.vy = 0;
-    this.homeX = undefined;
-    this.homeY = undefined;
+    // Already in its slot, so home is where it stands: the settled drift then
+    // has nothing to correct rather than pulling it somewhere new.
+    this.homeX = this.x;
+    this.homeY = this.y;
     this.spin = [
       0.34 + Math.random() * 0.22,
       0.30 + Math.random() * 0.22,
@@ -612,7 +614,22 @@ export class Die {
   }
 
   step(dt, bounds) {
-    if (this.settled) return;
+    // A settled die keeps easing toward its slot, slowly. The grid is already
+    // sorted — dice grouped by type, each group high to low — so this reads as
+    // the tray tidying itself the way a hand does after a throw. It is a
+    // separate, much gentler pull than the one during flight, and it stops once
+    // the die is close enough that further movement would not be visible.
+    if (this.settled) {
+      if (this.homeX === undefined) return;
+      const dx = this.homeX - this.x;
+      const dy = this.homeY - this.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist < 0.4) return;
+      const ease = Math.min(1, dt * 2.4);
+      this.x += dx * ease;
+      this.y += dy * ease;
+      return;
+    }
 
     // Spin-in-place dice hold their slot: no translation, no wall bounces, and
     // no separation work, since the grid already spaced them.
@@ -856,13 +873,30 @@ export class Die {
     }
     if (!best) return;
 
-    // Face centre in screen space, and two in-plane axes to skew the glyph with.
+    // Face centre in screen space, and an in-plane axis to skew the glyph with.
     const c2 = best.reduce((a, i) => [a[0] + proj[i][0], a[1] + proj[i][1]], [0, 0])
                    .map(v => v / best.length);
-    const e0 = proj[best[0]];
-    let ux = e0[0] - c2[0], uy = e0[1] - c2[1];
-    const ulen = Math.hypot(ux, uy) || 1;
-    ux /= ulen; uy /= ulen;
+
+    // The transform below maps the glyph's local +x onto (ux, uy), so this is the
+    // direction the text reads along. Pick the face's own axis that runs closest
+    // to screen-right, which keeps the numeral upright.
+    //
+    // Using the first vertex instead — as this did — left the glyph at whatever
+    // rotation that vertex happened to sit at, so numerals regularly landed
+    // upside down and a 63 read as a 39 at a glance.
+    let ux = 1, uy = 0, bestAlign = -Infinity;
+    for (const i of best) {
+      let vx = proj[i][0] - c2[0];
+      let vy = proj[i][1] - c2[1];
+      const len = Math.hypot(vx, vy);
+      if (len < 1e-6) continue;
+      vx /= len; vy /= len;
+      // A face has no inherent top, so a direction and its opposite are equally
+      // valid; take whichever reads left-to-right.
+      for (const [cx, cy] of [[vx, vy], [-vx, -vy]]) {
+        if (cx > bestAlign) { bestAlign = cx; ux = cx; uy = cy; }
+      }
+    }
 
     // A staged die has no value yet: it is waiting on the tray to be thrown, so
     // it shows as an empty shape rather than a number it does not have.

@@ -126,6 +126,32 @@ function layoutSettled() {
   }
 }
 
+// Below this, dice keep the order they were rolled in. A handful small enough to
+// read at a glance does not need sorting, and the scatter of dice arriving in
+// whatever slot they reach looks better than a filing cabinet.
+const TIDY_THRESHOLD = 8;
+
+// The order dice come to rest in: the way you would tidy a handful on a table —
+// all the d6s together, all the d20s together, each group ordered high to low,
+// and the dropped dice pushed to the end of their group.
+function tidyOrder(dice) {
+  if (dice.length < TIDY_THRESHOLD) return dice;
+
+  const groupOrder = [];
+  for (const d of dice) if (!groupOrder.includes(d.sides)) groupOrder.push(d.sides);
+  groupOrder.sort((a, b) => a - b);
+
+  return dice.slice().sort((a, b) => {
+    const byType = groupOrder.indexOf(a.sides) - groupOrder.indexOf(b.sides);
+    if (byType) return byType;
+    // Dice that did not count sit at the end of their own group.
+    const aKept = a.kept === false ? 1 : 0;
+    const bKept = b.kept === false ? 1 : 0;
+    if (aKept !== bKept) return aKept - bKept;
+    return (b.value ?? 0) - (a.value ?? 0);
+  });
+}
+
 function placeGrid(dice) {
   const { left, right, top, floor } = state.bounds;
   const w = right - left, h = floor - top;
@@ -135,7 +161,10 @@ function placeGrid(dice) {
   // Cap the size so a lone die doesn't fill the whole tray, and floor it so a
   // large handful stays legible.
   const size = Math.max(26, Math.min(96, Math.min(cw, ch) * 0.78));
-  dice.forEach((d, i) => {
+
+  // Slots are assigned in tidy order rather than roll order, so the drift toward
+  // the grid also sorts the dice — the same thing a hand does after a throw.
+  tidyOrder(dice).forEach((d, i) => {
     const c = i % cols, r = Math.floor(i / cols);
     d.x = left + cw * (c + 0.5);
     d.y = top + ch * (r + 0.5);
