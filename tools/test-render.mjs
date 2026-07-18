@@ -120,6 +120,30 @@ ok('d14 has fourteen faces', solidFor(14).faces.length === 14);
 ok('d24 has twenty-four faces', solidFor(24).faces.length === 24);
 ok('d30 has thirty faces', solidFor(30).faces.length === 30);
 
+// d1 is the shape people actually print for a one-sided die: a short cylinder
+// with a notch cut from each side, so it topples onto the same face whichever
+// way it rolls. A bipyramid implied a choice of face that a d1 does not have.
+{
+  const d1 = solidFor(1, 80);
+  ok('d1 has a broad face to land on', d1.faces.some(f => f.length > 4));
+  ok('d1 keeps a rounded rim', d1.faces.filter(f => f.length === 4).length >= 8);
+
+  const ys = d1.verts.map(v => v[1]);
+  const radii = d1.verts.map(v => Math.hypot(v[0], v[2]));
+  const aspect = (Math.max(...ys) - Math.min(...ys)) / (2 * Math.max(...radii));
+  ok('d1 is a squat cylinder, not a slab', aspect > 0.2 && aspect < 0.8,
+     `aspect ${aspect.toFixed(2)}`);
+
+  // The notches: two rim panels span a wider arc than the rest.
+  const rimWidths = d1.faces
+    .filter(f => f.length === 4)
+    .map(f => Math.hypot(...sub(d1.verts[f[0]], d1.verts[f[1]])));
+  const widest = Math.max(...rimWidths);
+  const typical = rimWidths.slice().sort((a, b) => a - b)[Math.floor(rimWidths.length / 2)];
+  ok('d1 has notches cut into its rim', widest > typical * 1.8,
+     `widest ${widest.toFixed(2)} vs typical ${typical.toFixed(2)}`);
+}
+
 // d2 is a coin: two broad faces plus a rim, and visibly flatter than it is wide.
 const c2 = solidFor(2);
 const flat = c2.verts.filter(v => Math.abs(v[1]) > 1e-9);

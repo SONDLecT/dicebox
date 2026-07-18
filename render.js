@@ -156,6 +156,50 @@ function trapezohedron(n, flatten = null) {
   return normalize({ verts, faces });
 }
 
+// d1 is the shape people actually print for a one-sided die: a short cylinder
+// with two wedges cut out of it, so whichever way it rolls it topples onto the
+// same flat face. Every other rest position is unstable by construction.
+//
+// A Möbius strip was tried first — one surface, one edge, cute — but it reads as
+// hatching at die size, and a real d1 is the better joke: an object whose whole
+// design is that it cannot land any other way.
+function oneSided(segments = 32) {
+  const verts = [];
+  const half = 0.42;
+
+  // Two notches taken out of the rim. They have to be narrow enough that the
+  // cylinder still reads as round — cutting deep leaves a flat slab, which
+  // looks like a domino rather than a die that cannot help landing face up.
+  const gap = 0.07;   // fraction of the circle removed per wedge
+  const kept = [];
+  for (let i = 0; i < segments; i++) {
+    const f = i / segments;
+    const inWedge = (f > 0.25 - gap && f < 0.25 + gap) || (f > 0.75 - gap && f < 0.75 + gap);
+    if (inWedge) continue;
+    kept.push(f);
+  }
+
+  const top = [], bottom = [];
+  for (const f of kept) {
+    const a = f * TAU;
+    top.push(verts.push([Math.cos(a), half, Math.sin(a)]) - 1);
+    bottom.push(verts.push([Math.cos(a), -half, Math.sin(a)]) - 1);
+  }
+
+  const faces = [];
+  // The face it always lands on, and its opposite.
+  faces.push(top.slice());
+  faces.push(bottom.slice().reverse());
+
+  // Rim panels between consecutive kept segments. Where a wedge was cut the
+  // panel spans the gap, which is the flat that makes the die tip over.
+  for (let i = 0; i < kept.length; i++) {
+    const j = (i + 1) % kept.length;
+    faces.push([top[i], top[j], bottom[j], bottom[i]]);
+  }
+  return normalize({ verts, faces });
+}
+
 // d2 is a coin, not a polyhedron: a short cylinder with two large faces. Any
 // two-faced solid is impossible, and a coin is what you'd actually flip.
 function coin(segments = 20) {
@@ -517,10 +561,7 @@ export function solidFor(sides, size = null) {
 
   let solid;
   if (sides === 1) {
-    // d1 is a real rung on the DCC chain, so it has to render. A rounded token
-    // is the honest shape: there is no one-faced polyhedron, and every throw
-    // shows the same face anyway.
-    solid = trapezohedron(6);
+    solid = oneSided();
   } else if (sides === 2) {
     solid = coin();
   } else if (SOLIDS[sides]) {
