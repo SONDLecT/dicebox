@@ -1,3 +1,10 @@
 node_modules/
 tools/preview.png
 tools/preview.svg
+
+# Cloudflare credentials — never commit these.
+.env
+.env.*
+!.env.example
+.dev.vars
+.wrangler/

@@ -79,11 +79,33 @@ function resize() {
 }
 new ResizeObserver(resize).observe(canvas.parentElement);
 
-// After a resize the previous positions may be off-screen, so re-place any dice
-// that have already come to rest instead of leaving them stranded.
+// After a resize the previous positions may be off-screen, so re-place the dice.
+//
+// This must lay out the whole tray, not just the dice that have already come to
+// rest. Gridding a subset computes rows, columns and size for that smaller
+// count, so mid-roll the settled dice were re-placed into a layout meant for
+// fewer dice — landing on top of the ones still in flight, at a different size.
+// Dice in flight keep their target slot updated so they arrive in the right
+// place; dice at rest move immediately.
 function layoutSettled() {
-  const settled = state.dice.filter(d => d.settled);
-  if (settled.length) placeGrid(settled);
+  if (!state.dice.length) return;
+
+  // Compute slots for the whole tray, then apply them without teleporting dice
+  // that are still in flight — those get their destination updated instead.
+  const flying = state.dice.map(d => ({
+    d, inFlight: !d.settled && d.homeX !== undefined,
+    x: d.x, y: d.y,
+  }));
+
+  placeGrid(state.dice);
+
+  for (const f of flying) {
+    if (!f.inFlight) continue;
+    f.d.homeX = f.d.x;
+    f.d.homeY = f.d.y;
+    f.d.x = f.x;
+    f.d.y = f.y;
+  }
 }
 
 function placeGrid(dice) {
@@ -250,11 +272,15 @@ help.querySelectorAll('.syntax dt').forEach(dt => {
 
 const diceButtons = $('diceButtons');
 
-// Insertion order is preserved, so the notation reads back in the order tapped.
+// sides -> { count, mod }. Insertion order is preserved, so the notation reads
+// back in the order the dice were tapped. `mod` is a notation suffix like "kh1"
+// that applies to that die's group only, leaving the rest of the pool alone.
 let pool = new Map();
 
+const entryNotation = (sides, { count, mod }) => `${count}d${sides}${mod || ''}`;
+
 function poolNotation() {
-  return [...pool].map(([sides, n]) => `${n}d${sides}`).join('+');
+  return [...pool].map(([sides, e]) => entryNotation(sides, e)).join('+');
 }
 
 function addToPool(sides, count = 1) {
@@ -263,7 +289,8 @@ function addToPool(sides, count = 1) {
   if (!poolMatchesField()) {
     pool = parsePool($('notation').value);
   }
-  pool.set(sides, (pool.get(sides) || 0) + count);
+  const cur = pool.get(sides) || { count: 0, mod: '' };
+  pool.set(sides, { count: cur.count + count, mod: cur.mod });
   syncPool();
 }
 
@@ -271,20 +298,26 @@ function poolMatchesField() {
   return $('notation').value.trim().toLowerCase() === poolNotation().toLowerCase();
 }
 
-// Recover a pool from plain NdM+NdM text. Anything with modifiers or arithmetic
-// can't round-trip through the Map, so those roll fine but start a fresh pool
-// on the next tap.
+// Recover a pool from NdM notation, including per-group modifiers, so a staged
+// roll survives a round trip through the text field. Arithmetic terms (+2, -1)
+// and subtraction can't be represented, so those roll fine but start a fresh
+// pool on the next tap.
 function parsePool(text) {
   const next = new Map();
   const src = String(text || '').toLowerCase().replace(/\s+/g, '');
   if (!src) return next;
   for (const term of src.split('+')) {
-    const m = /^(\d*)d(\d+)$/.exec(term);
+    const m = /^(\d*)d(\d+)((?:kh|kl|dh|dl)\d+|!|r\d+)?$/.exec(term);
     if (!m) return new Map();
     const n = m[1] === '' ? 1 : parseInt(m[1], 10);
     const sides = parseInt(m[2], 10);
+    const mod = m[3] || '';
     if (!sides) return new Map();
-    next.set(sides, (next.get(sides) || 0) + n);
+    const cur = next.get(sides);
+    // Two groups of the same die with different modifiers can't merge into one
+    // entry, so the pool declines to represent it rather than losing one.
+    if (cur && cur.mod !== mod) return new Map();
+    next.set(sides, { count: (cur ? cur.count : 0) + n, mod });
   }
   return next;
 }
@@ -297,8 +330,8 @@ function syncPool() {
   clearError();
 
   const staged = [];
-  for (const [sides, n] of pool) {
-    for (let i = 0; i < n; i++) staged.push(new Die(sides, null, 0, 0, 40));
+  for (const [sides, entry] of pool) {
+    for (let i = 0; i < entry.count; i++) staged.push(new Die(sides, null, 0, 0, 40));
   }
   state.dice = staged.slice(0, ANIMATE_LIMIT);
   placeGrid(state.dice);
@@ -321,10 +354,15 @@ function syncPool() {
 // looking, instead of only in the notation field.
 function markPool() {
   for (const b of diceButtons.children) {
-    const n = pool.get(Number(b.dataset.sides)) || 0;
+    const entry = pool.get(Number(b.dataset.sides));
+    const n = entry ? entry.count : 0;
     b.setAttribute('aria-pressed', String(n > 0));
     if (n > 1) b.dataset.count = String(n);
     else delete b.dataset.count;
+    // A die carrying a modifier is marked, so kh1/dl1 is visible on the row
+    // instead of only in the notation.
+    if (entry && entry.mod) b.dataset.mod = '1';
+    else delete b.dataset.mod;
   }
 }
 
@@ -388,21 +426,37 @@ function modifiersFor(sides) {
   const mods = [];
   if (sides >= 4) {
     mods.push(
-      { label: 'Advantage', hint: 'roll two, keep the best', build: n => `${Math.max(2, n)}d${sides}kh1` },
-      { label: 'Disadvantage', hint: 'roll two, keep the worst', build: n => `${Math.max(2, n)}d${sides}kl1` },
+      { label: 'Advantage', suffix: 'kh1', hint: 'roll two, keep the best', min: 2 },
+      { label: 'Disadvantage', suffix: 'kl1', hint: 'roll two, keep the worst', min: 2 },
     );
   }
   mods.push(
-    { label: 'Drop lowest', hint: 'discard the worst die', build: n => `${Math.max(2, n)}d${sides}dl1` },
-    { label: 'Drop highest', hint: 'discard the best die', build: n => `${Math.max(2, n)}d${sides}dh1` },
+    { label: 'Drop lowest', suffix: 'dl1', hint: 'discard the worst die', min: 2 },
+    { label: 'Drop highest', suffix: 'dh1', hint: 'discard the best die', min: 2 },
   );
   if (sides > 1) {
     mods.push(
-      { label: 'Exploding', hint: `reroll and add on a ${sides}`, build: n => `${n}d${sides}!` },
-      { label: 'Reroll 1s', hint: 'reroll any 1', build: n => `${n}d${sides}r1` },
+      { label: 'Exploding', suffix: '!', hint: `reroll and add on a ${sides}`, min: 1 },
+      { label: 'Reroll 1s', suffix: 'r1', hint: 'reroll any 1', min: 1 },
     );
   }
+  mods.push({ label: 'No modifier', suffix: '', hint: 'roll these dice plainly', min: 1 });
   return mods;
+}
+
+// How many of this die a modifier would apply to: whatever is already staged,
+// or one tap's worth if none are. Keep/drop needs at least two dice to mean
+// anything, so those raise the count rather than silently doing nothing.
+function modifierCount(sides, mod) {
+  const staged = pool.get(sides);
+  const base = staged ? staged.count : perTap();
+  return Math.max(mod.min, base);
+}
+
+function applyModifier(sides, mod) {
+  if (!poolMatchesField()) pool = parsePool($('notation').value);
+  pool.set(sides, { count: modifierCount(sides, mod), mod: mod.suffix });
+  syncPool();
 }
 
 function openSheet(sides) {
@@ -411,10 +465,17 @@ function openSheet(sides) {
   $('sheetTitle').textContent = `d${sides}`;
   sheetOptions.replaceChildren();
 
+  const current = pool.get(sides);
+
   for (const mod of modifiersFor(sides)) {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'sheet-option';
+    // Mark the modifier already on this die, so the sheet shows state rather
+    // than only offering actions.
+    if (current && (current.mod || '') === mod.suffix) {
+      b.setAttribute('aria-pressed', 'true');
+    }
 
     const name = document.createElement('span');
     name.className = 'sheet-option-name';
@@ -422,20 +483,20 @@ function openSheet(sides) {
 
     const notation = document.createElement('span');
     notation.className = 'sheet-option-notation';
-    notation.textContent = mod.build(perTap());
+    // Preview exactly what will be staged, using the dice already on the tray.
+    notation.textContent = `${modifierCount(sides, mod)}d${sides}${mod.suffix}`;
 
     const hint = document.createElement('span');
     hint.className = 'sheet-option-hint';
     hint.textContent = mod.hint;
 
     b.append(name, notation, hint);
-    // Modified rolls replace the pool: kh1/dl1 apply to one group, so mixing
-    // them into a larger pool would change what the modifier refers to.
+    // The modifier attaches to this die's group and leaves the rest of the pool
+    // alone, so picking advantage on a d6 does not disturb a staged d20. It
+    // stages rather than rolls, matching every other way dice get added.
     b.addEventListener('click', () => {
       closeSheet();
-      pool = new Map();
-      markPool();
-      doRoll(mod.build(perTap()));
+      applyModifier(sides, mod);
     });
     sheetOptions.append(b);
   }

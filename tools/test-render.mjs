@@ -317,6 +317,74 @@ for (const count of [2, 3, 5, 8, 12, 20]) {
   ok(`${count}d6 stays inside tray`, inside);
 }
 
+// Regression: a relayout that ran mid-roll used to grid only the dice that had
+// already settled. Sizing a grid for that smaller count gave those dice a much
+// larger size and different slots, so they landed on top of the ones still in
+// flight — a garbled pile at two sizes on the first roll of a big mixed handful,
+// correct on the second once everything had settled.
+{
+  const tray = { left: 8, right: 352, top: 8, floor: 222 };
+
+  const placeGrid = list => {
+    const w = tray.right - tray.left, h = tray.floor - tray.top;
+    const cols = Math.ceil(Math.sqrt(list.length * (w / Math.max(h, 1))));
+    const cw = w / cols, ch = h / Math.ceil(list.length / cols);
+    const size = Math.max(26, Math.min(96, Math.min(cw, ch) * 0.78));
+    list.forEach((d, i) => {
+      d.x = tray.left + cw * ((i % cols) + 0.5);
+      d.y = tray.top + ch * (Math.floor(i / cols) + 0.5);
+      d.size = size;
+    });
+  };
+
+  // The fixed relayout: grid the whole tray, and move a die's destination rather
+  // than the die itself while it is still travelling.
+  const relayout = dice => {
+    if (!dice.length) return;
+    const snap = dice.map(d => ({ d, inFlight: !d.settled && d.homeX !== undefined, x: d.x, y: d.y }));
+    placeGrid(dice);
+    for (const f of snap) {
+      if (!f.inFlight) continue;
+      f.d.homeX = f.d.x; f.d.homeY = f.d.y;
+      f.d.x = f.x; f.d.y = f.y;
+    }
+  };
+
+  const countOverlaps = list => {
+    let n = 0;
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length; j++) {
+        const min = (list[i].size + list[j].size) * 0.5 * 0.9;
+        if (Math.hypot(list[j].x - list[i].x, list[j].y - list[i].y) < min) n++;
+      }
+    }
+    return n;
+  };
+
+  // The reported roll: 5d14 + 25d16 + 5d20 + 5d24 + 15d30.
+  const spec = [[14, 5], [16, 25], [20, 5], [24, 5], [30, 15]];
+  let worstOverlap = 0, sizeSpreads = 0;
+
+  for (const frames of [10, 20, 30, 40, 50, 55, 60]) {
+    const dice = [];
+    for (const [sides, n] of spec) {
+      for (let i = 0; i < n; i++) dice.push(new Die(sides, 1, 0, 0, 40));
+    }
+    placeGrid(dice);
+    dice.forEach((d, i) => d.spinInPlace(i / dice.length));
+    for (let f = 0; f < frames; f++) {
+      for (const d of dice) d.step(1 / 60, tray);
+    }
+    relayout(dice);
+
+    worstOverlap = Math.max(worstOverlap, countOverlaps(dice));
+    if (new Set(dice.map(d => d.size.toFixed(2))).size > 1) sizeSpreads++;
+  }
+
+  ok('relayout mid-roll leaves no overlaps', worstOverlap === 0, `${worstOverlap} pairs`);
+  ok('relayout keeps every die the same size', sizeSpreads === 0, `${sizeSpreads} frames with mixed sizes`);
+}
+
 // Coincident dice must not produce NaN when there's no separation axis.
 const stack = [new Die(6, 1, 100, 100, 40), new Die(6, 2, 100, 100, 40)];
 separate(stack, { left: 0, right: 300, top: 0, floor: 200 });

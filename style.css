@@ -393,6 +393,19 @@ body {
   padding-right: 14px;
 }
 
+/* An underline marks a die carrying a modifier, so kh1/dl1 is visible on the
+   row rather than only in the notation field. */
+.dbtn[data-mod] {
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+
+.sheet-option[aria-pressed="true"] .sheet-option-name {
+  color: var(--accent);
+}
+
 /* Holding a die fills it, which both signals that a long press does something
    and shows how much longer to hold. The fill sits behind the label. */
 .dbtn {

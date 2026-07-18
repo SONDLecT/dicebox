@@ -12,8 +12,10 @@ const ok = (name, cond, extra = '') => {
   else { fail++; console.log(`  FAIL  ${name}${extra ? ' — ' + extra : ''}`); }
 };
 
+// Mirrors app.js: the pool maps sides -> { count, mod }, where mod is a notation
+// suffix applying to that die's group only.
 function poolNotation(pool) {
-  return [...pool].map(([sides, n]) => `${n}d${sides}`).join('+');
+  return [...pool].map(([sides, e]) => `${e.count}d${sides}${e.mod || ''}`).join('+');
 }
 
 function parsePool(text) {
@@ -21,17 +23,42 @@ function parsePool(text) {
   const src = String(text || '').toLowerCase().replace(/\s+/g, '');
   if (!src) return next;
   for (const term of src.split('+')) {
-    const m = /^(\d*)d(\d+)$/.exec(term);
+    const m = /^(\d*)d(\d+)((?:kh|kl|dh|dl)\d+|!|r\d+)?$/.exec(term);
     if (!m) return new Map();
     const n = m[1] === '' ? 1 : parseInt(m[1], 10);
     const sides = parseInt(m[2], 10);
+    const mod = m[3] || '';
     if (!sides) return new Map();
-    next.set(sides, (next.get(sides) || 0) + n);
+    const cur = next.get(sides);
+    if (cur && cur.mod !== mod) return new Map();
+    next.set(sides, { count: (cur ? cur.count : 0) + n, mod });
   }
   return next;
 }
 
-const add = (pool, sides) => { pool.set(sides, (pool.get(sides) || 0) + 1); return pool; };
+const add = (pool, sides, count = 1) => {
+  const cur = pool.get(sides) || { count: 0, mod: '' };
+  pool.set(sides, { count: cur.count + count, mod: cur.mod });
+  return pool;
+};
+
+// Modifier application, as applyModifier does it.
+const MODS = {
+  adv:     { suffix: 'kh1', min: 2 },
+  dis:     { suffix: 'kl1', min: 2 },
+  droplow: { suffix: 'dl1', min: 2 },
+  drophigh:{ suffix: 'dh1', min: 2 },
+  explode: { suffix: '!',   min: 1 },
+  reroll:  { suffix: 'r1',  min: 1 },
+  none:    { suffix: '',    min: 1 },
+};
+
+function applyModifier(pool, sides, mod, perTap = 1) {
+  const staged = pool.get(sides);
+  const base = staged ? staged.count : perTap;
+  pool.set(sides, { count: Math.max(mod.min, base), mod: mod.suffix });
+  return pool;
+}
 
 // --- building by tapping ---
 {
@@ -64,11 +91,26 @@ ok('whitespace tolerated', poolNotation(parsePool(' 2 d 6 ')) === '2d6');
 ok('case insensitive', poolNotation(parsePool('2D6')) === '2d6');
 ok('repeated terms merge', poolNotation(parsePool('1d6+2d6')) === '3d6');
 
+// Modifiers ride along on the group they belong to, so a staged modified roll
+// survives a round trip through the field.
+for (const text of ['2d20kh1', '2d20kl1', '4d6dl1', '4d6dh1', '3d6!', '2d10r1']) {
+  ok(`"${text}" round-trips with its modifier`, poolNotation(parsePool(text)) === text,
+     poolNotation(parsePool(text)));
+}
+ok('modifier survives with other dice',
+   poolNotation(parsePool('2d20kh1+1d6')) === '2d20kh1+1d6',
+   poolNotation(parsePool('2d20kh1+1d6')));
+
 // Anything the pool cannot represent must yield an empty pool, so the next tap
 // starts fresh rather than silently corrupting what the user typed.
-for (const text of ['3d6+2', '4d6kh3', '1d20!', '2d6-1', 'd%', 'garbage', '']) {
+for (const text of ['3d6+2', '2d6-1', 'd%', 'garbage', '']) {
   ok(`"${text}" is not poolable`, parsePool(text).size === 0);
 }
+
+// Two groups of the same die with different modifiers cannot merge into one
+// entry, so the pool declines rather than dropping one of them.
+ok('conflicting modifiers on one die are not poolable',
+   parsePool('2d6kh1+2d6dl1').size === 0);
 
 // --- every pool the UI can build must actually roll ---
 {
@@ -97,33 +139,142 @@ for (const text of ['3d6+2', '4d6kh3', '1d20!', '2d6-1', 'd%', 'garbage', '']) {
      `total ${r.total}`);
 }
 
-// --- chain stepping replaces dice in place ---
+// --- applying a modifier from the hold sheet ---
+// Regression: picking a modifier used to wipe the pool and rebuild the roll from
+// the per-tap count, so a staged d20 vanished and four staged d6 collapsed to
+// two. A modifier belongs to one die's group and must leave everything else be.
 {
-  // Stepping d20 -> d16 must move the whole stack of that die, not add one.
+  // Stage a d20, then a d6, then give the d6 advantage.
   const p = new Map();
-  add(p, 20); add(p, 20); add(p, 20);
-  const n = p.get(20);
-  p.delete(20);
-  p.set(16, (p.get(16) || 0) + n);
-  ok('chain step moves the whole stack', poolNotation(p) === '3d16', poolNotation(p));
+  add(p, 20);
+  add(p, 6);
+  applyModifier(p, 6, MODS.adv);
+  ok('modifier keeps the rest of the pool', p.has(20), 'the d20 was dropped');
+  ok('modifier applies to its own die only',
+     poolNotation(p) === '1d20+2d6kh1', poolNotation(p));
 }
 
 {
-  // Stepping onto a die already in the pool merges rather than duplicating.
+  // Four staged d6 must stay four when a modifier is applied.
   const p = new Map();
-  add(p, 16); add(p, 20);
-  const n = p.get(20);
-  p.delete(20);
-  p.set(16, (p.get(16) || 0) + n);
-  ok('chain step merges onto existing die', poolNotation(p) === '2d16', poolNotation(p));
+  add(p, 6, 4);
+  applyModifier(p, 6, MODS.droplow);
+  ok('modifier preserves the staged count',
+     poolNotation(p) === '4d6dl1', poolNotation(p));
+}
+
+{
+  // Keep/drop needs two dice to mean anything, so one staged die is raised.
+  const p = new Map();
+  add(p, 20);
+  applyModifier(p, 20, MODS.adv);
+  ok('advantage on one die raises it to two',
+     poolNotation(p) === '2d20kh1', poolNotation(p));
+}
+
+{
+  // Exploding has no minimum, so a lone die stays alone.
+  const p = new Map();
+  add(p, 6);
+  applyModifier(p, 6, MODS.explode);
+  ok('exploding does not inflate the count',
+     poolNotation(p) === '1d6!', poolNotation(p));
+}
+
+{
+  // With nothing staged, the modifier uses one tap's worth.
+  const p = new Map();
+  applyModifier(p, 8, MODS.explode, 5);
+  ok('modifier on an empty pool uses the multiplier',
+     poolNotation(p) === '5d8!', poolNotation(p));
+}
+
+{
+  // Picking a second modifier replaces the first rather than stacking.
+  const p = new Map();
+  add(p, 20, 3);
+  applyModifier(p, 20, MODS.adv);
+  applyModifier(p, 20, MODS.dis);
+  ok('modifiers replace rather than stack',
+     poolNotation(p) === '3d20kl1', poolNotation(p));
+}
+
+{
+  // "No modifier" clears it while keeping the dice.
+  const p = new Map();
+  add(p, 6, 3);
+  applyModifier(p, 6, MODS.explode);
+  applyModifier(p, 6, MODS.none);
+  ok('no-modifier clears the suffix', poolNotation(p) === '3d6', poolNotation(p));
+}
+
+// Every modifier, at every count, must produce notation the roller accepts.
+{
+  let bad = null;
+  for (const [name, mod] of Object.entries(MODS)) {
+    for (const staged of [1, 2, 5]) {
+      for (const sides of [4, 6, 20, 100]) {
+        const p = add(new Map(), sides, staged);
+        applyModifier(p, sides, mod);
+        const text = poolNotation(p);
+        try {
+          const r = roll(text);
+          if (!Number.isFinite(r.total) || r.total < 1) bad = `${name}: ${text} gave ${r.total}`;
+        } catch (err) { bad = `${name}: ${text} — ${err.message}`; }
+      }
+    }
+  }
+  ok('every modifier rolls at every count', bad === null, bad || '');
+}
+
+// The kept-dice count must match what the modifier promises.
+{
+  const cases = [
+    ['4d6kh1', 1], ['4d6kl1', 1],
+    ['4d6dl1', 3], ['4d6dh1', 3],
+    ['2d20kh1', 1], ['2d20kl1', 1],
+  ];
+  let bad = null;
+  for (const [text, expected] of cases) {
+    const r = roll(text);
+    const kept = r.groups[0].dice.filter(d => d.kept).length;
+    if (kept !== expected) bad = `${text} kept ${kept}, expected ${expected}`;
+  }
+  ok('keep/drop counts are correct', bad === null, bad || '');
+}
+
+// Advantage really takes the higher of two; disadvantage the lower.
+{
+  let advWrong = 0, disWrong = 0;
+  for (let i = 0; i < 400; i++) {
+    const a = roll('2d20kh1');
+    if (a.total !== Math.max(...a.groups[0].dice.map(d => d.value))) advWrong++;
+    const d = roll('2d20kl1');
+    if (d.total !== Math.min(...d.groups[0].dice.map(x => x.value))) disWrong++;
+  }
+  ok('advantage takes the higher die', advWrong === 0, `${advWrong} wrong`);
+  ok('disadvantage takes the lower die', disWrong === 0, `${disWrong} wrong`);
+}
+
+// Drop lowest must equal the sum of everything but the minimum.
+{
+  let bad = 0;
+  for (let i = 0; i < 400; i++) {
+    const r = roll('4d6dl1');
+    const vals = r.groups[0].dice.map(d => d.value).sort((x, y) => x - y);
+    const expected = vals.slice(1).reduce((s, v) => s + v, 0);
+    if (r.total !== expected) bad++;
+  }
+  ok('drop lowest discards exactly one die', bad === 0, `${bad} wrong`);
 }
 
 // --- button state mirrors the pool ---
 // Each die button shows selected when it is in the pool, with a count badge past
 // one. The row and the notation field must never disagree about what is loaded.
 function buttonState(pool, sides) {
-  const n = pool.get(sides) || 0;
-  return { pressed: n > 0, badge: n > 1 ? String(n) : null };
+  const e = pool.get(sides);
+  const n = e ? e.count : 0;
+  return { pressed: n > 0, badge: n > 1 ? String(n) : null, mod: e ? e.mod : '' };
 }
 
 {
@@ -152,17 +303,24 @@ function buttonState(pool, sides) {
 }
 
 {
+  // A modified roll still lights its button, and marks that it carries one.
+  const p = parsePool('4d6kh3');
+  ok('modified notation selects its die', buttonState(p, 6).pressed);
+  ok('modified notation marks the modifier', buttonState(p, 6).mod === 'kh3');
+}
+
+{
   // A pool the field cannot represent clears every button rather than showing a
   // stale selection that no longer matches what will roll.
-  const p = parsePool('4d6kh3');
-  ok('unpoolable notation clears buttons', [...p.keys()].length === 0);
+  const p = parsePool('3d6+2');
+  ok('arithmetic notation clears buttons', [...p.keys()].length === 0);
 }
 
 // --- the count multiplier ---
 {
   const perTap = 100;
   const p = new Map();
-  p.set(6, (p.get(6) || 0) + perTap);
+  add(p, 6, perTap);
   ok('multiplier adds in bulk', poolNotation(p) === '100d6');
   ok('bulk pool shows its count', buttonState(p, 6).badge === '100');
   const r = roll(poolNotation(p));
