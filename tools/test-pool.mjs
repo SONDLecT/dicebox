@@ -12,10 +12,17 @@ const ok = (name, cond, extra = '') => {
   else { fail++; console.log(`  FAIL  ${name}${extra ? ' — ' + extra : ''}`); }
 };
 
-// Mirrors app.js: the pool maps sides -> { count, mod }, where mod is a notation
-// suffix applying to that die's group only.
+// Mirrors app.js: the pool maps sides -> { count, mods }, where mods holds at
+// most one suffix per slot. Modifiers in different slots stack; two in the same
+// slot replace each other, because they answer the same question.
+const SLOTS = ['keep', 'burst', 'reroll'];
+const SLOT_OF = [[/^(kh|kl|dh|dl)/, 'keep'], [/^!/, 'burst'], [/^r/, 'reroll']];
+const slotFor = suffix => (SLOT_OF.find(([p]) => p.test(suffix)) || [null, 'keep'])[1];
+
 function poolNotation(pool) {
-  return [...pool].map(([sides, e]) => `${e.count}d${sides}${e.mod || ''}`).join('+');
+  return [...pool]
+    .map(([sides, e]) => `${e.count}d${sides}` + SLOTS.map(s => (e.mods && e.mods[s]) || '').join(''))
+    .join('+');
 }
 
 function parsePool(text) {
@@ -23,22 +30,31 @@ function parsePool(text) {
   const src = String(text || '').toLowerCase().replace(/\s+/g, '');
   if (!src) return next;
   for (const term of src.split('+')) {
-    const m = /^(\d*)d(\d+)((?:kh|kl|dh|dl)\d+|!|r\d+)?$/.exec(term);
-    if (!m) return new Map();
-    const n = m[1] === '' ? 1 : parseInt(m[1], 10);
-    const sides = parseInt(m[2], 10);
-    const mod = m[3] || '';
+    const head = /^(\d*)d(\d+)/.exec(term);
+    if (!head) return new Map();
+    const n = head[1] === '' ? 1 : parseInt(head[1], 10);
+    const sides = parseInt(head[2], 10);
     if (!sides) return new Map();
+    const mods = {};
+    let rest = term.slice(head[0].length);
+    while (rest) {
+      const mod = /^((?:kh|kl|dh|dl)\d+|!|r\d+)/.exec(rest);
+      if (!mod) return new Map();
+      const slot = slotFor(mod[1]);
+      if (mods[slot]) return new Map();
+      mods[slot] = mod[1];
+      rest = rest.slice(mod[0].length);
+    }
     const cur = next.get(sides);
-    if (cur && cur.mod !== mod) return new Map();
-    next.set(sides, { count: (cur ? cur.count : 0) + n, mod });
+    if (cur && SLOTS.some(s => (cur.mods[s] || '') !== (mods[s] || ''))) return new Map();
+    next.set(sides, { count: (cur ? cur.count : 0) + n, mods });
   }
   return next;
 }
 
 const add = (pool, sides, count = 1) => {
-  const cur = pool.get(sides) || { count: 0, mod: '' };
-  pool.set(sides, { count: cur.count + count, mod: cur.mod });
+  const cur = pool.get(sides) || { count: 0, mods: {} };
+  pool.set(sides, { count: cur.count + count, mods: cur.mods });
   return pool;
 };
 
@@ -56,7 +72,15 @@ const MODS = {
 function applyModifier(pool, sides, mod, perTap = 1) {
   const staged = pool.get(sides);
   const base = staged ? staged.count : perTap;
-  pool.set(sides, { count: Math.max(mod.min, base), mod: mod.suffix });
+  const mods = { ...(staged ? staged.mods : {}) };
+  if (!mod.suffix) {
+    for (const s of SLOTS) delete mods[s];
+  } else {
+    const slot = slotFor(mod.suffix);
+    if (mods[slot] === mod.suffix) delete mods[slot];
+    else mods[slot] = mod.suffix;
+  }
+  pool.set(sides, { count: Math.max(mod.min, base), mods });
   return pool;
 }
 
@@ -274,7 +298,8 @@ ok('conflicting modifiers on one die are not poolable',
 function buttonState(pool, sides) {
   const e = pool.get(sides);
   const n = e ? e.count : 0;
-  return { pressed: n > 0, badge: n > 1 ? String(n) : null, mod: e ? e.mod : '' };
+  const marks = e ? SLOTS.filter(s => e.mods && e.mods[s]).map(s => e.mods[s]) : [];
+  return { pressed: n > 0, badge: n > 1 ? String(n) : null, mod: marks.join(''), marks };
 }
 
 {
@@ -430,6 +455,124 @@ function buttonState(pool, sides) {
   applyModifier(p, 46, MODS.adv);
   ok('custom dice take modifiers', poolNotation(p) === '3d46kh1', poolNotation(p));
   ok('modified custom die rolls', roll('3d46kh1').total >= 1);
+}
+
+// --- stacking modifiers ---
+// Modifiers answering different questions apply together: 4d6dl1! drops the
+// lowest and explodes. Two answering the same question cannot both hold.
+{
+  const p = add(new Map(), 6, 4);
+  applyModifier(p, 6, MODS.droplow);
+  applyModifier(p, 6, MODS.explode);
+  ok('drop lowest and exploding stack', poolNotation(p) === '4d6dl1!', poolNotation(p));
+
+  applyModifier(p, 6, MODS.reroll);
+  ok('all three slots stack', poolNotation(p) === '4d6dl1!r1', poolNotation(p));
+
+  const r = roll(poolNotation(p));
+  ok('a fully stacked roll works', Number.isFinite(r.total) && r.total >= 3, `total ${r.total}`);
+}
+
+{
+  // Same slot replaces rather than accumulating.
+  const p = add(new Map(), 20, 2);
+  applyModifier(p, 20, MODS.adv);
+  applyModifier(p, 20, MODS.dis);
+  ok('advantage and disadvantage do not stack',
+     poolNotation(p) === '2d20kl1', poolNotation(p));
+  ok('only one keep modifier is present',
+     (poolNotation(p).match(/k[hl]/g) || []).length === 1);
+}
+
+{
+  // Drop and keep share the slot: dl1 on two dice already is advantage.
+  const p = add(new Map(), 6, 4);
+  applyModifier(p, 6, MODS.adv);
+  applyModifier(p, 6, MODS.droplow);
+  ok('keep and drop share one slot', poolNotation(p) === '4d6dl1', poolNotation(p));
+}
+
+{
+  // Choosing an active modifier again takes it off, leaving the others.
+  const p = add(new Map(), 6, 4);
+  applyModifier(p, 6, MODS.explode);
+  applyModifier(p, 6, MODS.droplow);
+  applyModifier(p, 6, MODS.explode);
+  ok('reselecting a modifier removes it', poolNotation(p) === '4d6dl1', poolNotation(p));
+}
+
+{
+  // "No modifier" clears every slot at once.
+  const p = add(new Map(), 6, 3);
+  applyModifier(p, 6, MODS.droplow);
+  applyModifier(p, 6, MODS.explode);
+  applyModifier(p, 6, MODS.reroll);
+  applyModifier(p, 6, MODS.none);
+  ok('no-modifier clears all slots', poolNotation(p) === '3d6', poolNotation(p));
+}
+
+// Stacked notation has to survive a round trip through the field.
+for (const text of ['4d6dl1!', '4d6dl1r1', '4d6dl1!r1', '2d20kh1!', '3d6!r1']) {
+  ok(`"${text}" round-trips stacked`, poolNotation(parsePool(text)) === text,
+     poolNotation(parsePool(text)));
+}
+
+// Two modifiers from one slot in typed notation is not a pool the row can show.
+ok('two keep modifiers are not poolable', parsePool('4d6kh1dl1').size === 0);
+ok('two bursts are not poolable', parsePool('4d6!!').size === 0);
+
+// Every stacked combination the sheet can build must roll.
+{
+  const keeps = [null, MODS.adv, MODS.dis, MODS.droplow, MODS.drophigh];
+  const bursts = [null, MODS.explode];
+  const rerolls = [null, MODS.reroll];
+  let bad = null;
+  for (const k of keeps) for (const b of bursts) for (const r of rerolls) {
+    const p = add(new Map(), 6, 4);
+    for (const mod of [k, b, r]) if (mod) applyModifier(p, 6, mod);
+    const text = poolNotation(p);
+    try {
+      const result = roll(text);
+      if (!Number.isFinite(result.total) || result.total < 1) bad = `${text} gave ${result.total}`;
+    } catch (err) { bad = `${text}: ${err.message}`; }
+  }
+  ok('every stacked combination rolls', bad === null, bad || '');
+}
+
+// --- per-die outcome flags reach the tray ---
+// The tray fades dropped dice and marks exploded and rerolled ones, which only
+// works if the roller reports them per die.
+{
+  const r = roll('4d6dl1');
+  const dice = r.groups[0].dice;
+  ok('dropped dice are flagged', dice.filter(d => !d.kept).length === 1);
+  ok('kept dice are flagged', dice.filter(d => d.kept).length === 3);
+  ok('total counts only kept dice',
+     r.total === dice.filter(d => d.kept).reduce((s, d) => s + d.value, 0));
+}
+
+{
+  let sawExplosion = false;
+  for (let i = 0; i < 3000 && !sawExplosion; i++) {
+    const r = roll('1d6!');
+    if (r.groups[0].dice[0].exploded) {
+      sawExplosion = true;
+      ok('an exploded die is flagged and exceeds its faces', r.total > 6, `total ${r.total}`);
+    }
+  }
+  ok('exploding dice report it', sawExplosion);
+}
+
+{
+  let sawReroll = false;
+  for (let i = 0; i < 3000 && !sawReroll; i++) {
+    const r = roll('1d6r1');
+    if (r.groups[0].dice[0].rerolled) {
+      sawReroll = true;
+      ok('a rerolled die is flagged and is not a 1', r.total !== 1, `total ${r.total}`);
+    }
+  }
+  ok('rerolled dice report it', sawReroll);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

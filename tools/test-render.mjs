@@ -241,6 +241,40 @@ ok('non-numeric sides rejected', solidFor(NaN) === null);
      `d${worstSides} has aspect ${worstAspect.toFixed(2)}:1`);
 }
 
+// --- exact facet counts ---
+// Pointed solids run every facet to an apex, so they crowd fast: a
+// trapezohedron is already unreadable by 40 faces. The banded drum has no
+// convergence and stays countable past 120, which is what lets a d100 actually
+// carry a hundred facets instead of pretending with twelve.
+{
+  let exact = 0, checked = 0;
+  const off = [];
+  for (let sides = 22; sides <= 120; sides++) {
+    const solid = solidFor(sides, 80);
+    checked++;
+    if (solid.faces.length === sides) exact++;
+    else off.push(`d${sides}:${solid.faces.length}`);
+  }
+  ok('most dice d22-d120 have a facet per side', exact / checked > 0.95,
+     `${exact}/${checked} exact, off: ${off.slice(0, 5).join(' ')}`);
+
+  ok('d100 has one hundred faces', solidFor(100, 80).faces.length === 100,
+     `${solidFor(100, 80).faces.length}`);
+  ok('d120 has one hundred and twenty faces', solidFor(120, 80).faces.length === 120);
+
+  // The awkward counts that do not factor cleanly still land exactly.
+  for (const sides of [26, 58, 62, 82]) {
+    ok(`d${sides} still lands on ${sides} faces`,
+       solidFor(sides, 80).faces.length === sides,
+       `${solidFor(sides, 80).faces.length}`);
+  }
+
+  // Detail follows drawn size: a die a few pixels across cannot show 100 facets,
+  // and paying for geometry nobody can resolve is what blew the frame budget.
+  ok('small dice carry less detail',
+     solidFor(100, 12).faces.length < solidFor(100, 80).faces.length);
+}
+
 // Every side count the custom picker offers must produce a drawable solid.
 {
   let bad = null;

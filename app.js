@@ -161,10 +161,26 @@ function doRoll(notation) {
   const flat = [];
   for (const g of result.groups) {
     if (g.kind !== 'dice') continue;
-    for (const d of g.dice) flat.push({ sides: g.sides, value: d.value });
+    for (const d of g.dice) {
+      flat.push({
+        sides: g.sides,
+        value: d.value,
+        // Carried onto the tray so a die can show what happened to it: dropped
+        // dice fade, exploded and rerolled ones get a mark.
+        kept: d.kept,
+        exploded: d.exploded,
+        rerolled: d.rerolled,
+      });
+    }
   }
 
-  state.dice = flat.map(f => new Die(f.sides, f.value, 0, 0, 40));
+  state.dice = flat.map(f => {
+    const die = new Die(f.sides, f.value, 0, 0, 40);
+    die.kept = f.kept;
+    die.exploded = f.exploded;
+    die.rerolled = f.rerolled;
+    return die;
+  });
   placeGrid(state.dice);
 
   // Small rolls get thrown across the tray. Large ones spin in place: the dice
@@ -297,12 +313,31 @@ help.querySelectorAll('.syntax dt').forEach(dt => {
 
 const diceButtons = $('diceButtons');
 
-// sides -> { count, mod }. Insertion order is preserved, so the notation reads
-// back in the order the dice were tapped. `mod` is a notation suffix like "kh1"
-// that applies to that die's group only, leaving the rest of the pool alone.
-let pool = new Map();
+// sides -> { count, mods }. Insertion order is preserved, so the notation reads
+// back in the order the dice were tapped.
+//
+// `mods` holds one suffix per slot. Modifiers in different slots stack — 4d6dl1!
+// drops the lowest *and* explodes — while two in the same slot replace each
+// other, because "keep the highest" and "drop the lowest" both answer the same
+// question and cannot both apply.
+const SLOTS = ['keep', 'burst', 'reroll'];
 
-const entryNotation = (sides, { count, mod }) => `${count}d${sides}${mod || ''}`;
+const SLOT_OF = [
+  [/^(kh|kl|dh|dl)/, 'keep'],
+  [/^!/, 'burst'],
+  [/^r/, 'reroll'],
+];
+
+function slotFor(suffix) {
+  for (const [pattern, slot] of SLOT_OF) if (pattern.test(suffix)) return slot;
+  return 'keep';
+}
+
+// The roller expects keep/drop before the explode and reroll flags.
+const entryNotation = (sides, { count, mods }) =>
+  `${count}d${sides}` + SLOTS.map(s => (mods && mods[s]) || '').join('');
+
+let pool = new Map();
 
 function poolNotation() {
   return [...pool].map(([sides, e]) => entryNotation(sides, e)).join('+');
@@ -314,8 +349,8 @@ function addToPool(sides, count = 1) {
   if (!poolMatchesField()) {
     pool = parsePool($('notation').value);
   }
-  const cur = pool.get(sides) || { count: 0, mod: '' };
-  pool.set(sides, { count: cur.count + count, mod: cur.mod });
+  const cur = pool.get(sides) || { count: 0, mods: {} };
+  pool.set(sides, { count: cur.count + count, mods: cur.mods });
   syncPool();
 }
 
@@ -331,18 +366,32 @@ function parsePool(text) {
   const next = new Map();
   const src = String(text || '').toLowerCase().replace(/\s+/g, '');
   if (!src) return next;
+
   for (const term of src.split('+')) {
-    const m = /^(\d*)d(\d+)((?:kh|kl|dh|dl)\d+|!|r\d+)?$/.exec(term);
-    if (!m) return new Map();
-    const n = m[1] === '' ? 1 : parseInt(m[1], 10);
-    const sides = parseInt(m[2], 10);
-    const mod = m[3] || '';
+    // Modifiers may appear in any order and more than one may apply, so they are
+    // read one at a time rather than matched as a single optional group.
+    const head = /^(\d*)d(\d+)/.exec(term);
+    if (!head) return new Map();
+    const n = head[1] === '' ? 1 : parseInt(head[1], 10);
+    const sides = parseInt(head[2], 10);
     if (!sides) return new Map();
+
+    const mods = {};
+    let rest = term.slice(head[0].length);
+    while (rest) {
+      const mod = /^((?:kh|kl|dh|dl)\d+|!|r\d+)/.exec(rest);
+      if (!mod) return new Map(); // trailing junk: not a pool the row can show
+      const slot = slotFor(mod[1]);
+      if (mods[slot]) return new Map(); // two in one slot cannot both apply
+      mods[slot] = mod[1];
+      rest = rest.slice(mod[0].length);
+    }
+
     const cur = next.get(sides);
     // Two groups of the same die with different modifiers can't merge into one
     // entry, so the pool declines to represent it rather than losing one.
-    if (cur && cur.mod !== mod) return new Map();
-    next.set(sides, { count: (cur ? cur.count : 0) + n, mod });
+    if (cur && SLOTS.some(s => (cur.mods[s] || '') !== (mods[s] || ''))) return new Map();
+    next.set(sides, { count: (cur ? cur.count : 0) + n, mods });
   }
   return next;
 }
@@ -387,12 +436,14 @@ function markPool() {
     b.setAttribute('aria-pressed', String(n > 0));
     if (n > 1) b.dataset.count = String(n);
     else delete b.dataset.count;
-    // Each modifier gets its own glyph. One shared underline told you a die was
-    // modified but not how, which is the part worth knowing at a glance.
-    const glyph = entry && entry.mod ? modifierGlyph(entry.mod) : null;
-    if (glyph) {
-      b.dataset.mod = glyph.mark;
-      b.title = `d${b.dataset.sides} — ${glyph.label}`;
+    // Each modifier gets its own glyph, and stacked ones sit side by side. One
+    // shared underline told you a die was modified but not how.
+    const glyphs = entry
+      ? SLOTS.filter(s => entry.mods && entry.mods[s]).map(s => modifierGlyph(entry.mods[s]))
+      : [];
+    if (glyphs.length) {
+      b.dataset.mod = glyphs.map(g => g.mark).join('');
+      b.title = `d${b.dataset.sides} — ${glyphs.map(g => g.label).join(', ')}`;
     } else {
       delete b.dataset.mod;
       b.removeAttribute('title');
@@ -633,9 +684,23 @@ function modifierCount(sides, mod) {
   return Math.max(mod.min, base);
 }
 
+// Modifiers in different slots stack; one already active toggles back off.
 function applyModifier(sides, mod) {
   if (!poolMatchesField()) pool = parsePool($('notation').value);
-  pool.set(sides, { count: modifierCount(sides, mod), mod: mod.suffix });
+
+  const cur = pool.get(sides);
+  const mods = { ...(cur ? cur.mods : {}) };
+
+  if (!mod.suffix) {
+    // "No modifier" clears everything but keeps the dice.
+    for (const slot of SLOTS) delete mods[slot];
+  } else {
+    const slot = slotFor(mod.suffix);
+    if (mods[slot] === mod.suffix) delete mods[slot];  // tapping it again removes it
+    else mods[slot] = mod.suffix;
+  }
+
+  pool.set(sides, { count: modifierCount(sides, mod), mods });
   syncPool();
 }
 
@@ -649,13 +714,21 @@ function openSheet(sides) {
   const current = pool.get(sides);
 
   for (const mod of modifiersFor(sides)) {
+    const active = current ? current.mods || {} : {};
+    const slot = mod.suffix ? slotFor(mod.suffix) : null;
+    const isOn = Boolean(mod.suffix) && active[slot] === mod.suffix;
+    // Something else already answers this question — "keep the highest" and
+    // "drop the lowest" cannot both apply — so it is shown as unavailable
+    // rather than silently replacing what is there.
+    const blocked = Boolean(slot) && Boolean(active[slot]) && !isOn;
+
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'sheet-option';
-    // Mark the modifier already on this die, so the sheet shows state rather
-    // than only offering actions.
-    if (current && (current.mod || '') === mod.suffix) {
-      b.setAttribute('aria-pressed', 'true');
+    if (isOn) b.setAttribute('aria-pressed', 'true');
+    if (blocked) {
+      b.disabled = true;
+      b.dataset.blocked = '1';
     }
 
     const name = document.createElement('span');
@@ -670,14 +743,27 @@ function openSheet(sides) {
     }
     name.append(mod.label);
 
+    // Preview exactly what will be staged, including whatever is already on the
+    // die, so stacking is visible before it is committed.
+    const preview = { ...active };
+    if (mod.suffix) {
+      if (isOn) delete preview[slot];
+      else preview[slot] = mod.suffix;
+    } else {
+      for (const s of SLOTS) delete preview[s];
+    }
+
     const notation = document.createElement('span');
     notation.className = 'sheet-option-notation';
-    // Preview exactly what will be staged, using the dice already on the tray.
-    notation.textContent = `${modifierCount(sides, mod)}d${sides}${mod.suffix}`;
+    notation.textContent = blocked
+      ? '—'
+      : entryNotation(sides, { count: modifierCount(sides, mod), mods: preview });
 
     const hint = document.createElement('span');
     hint.className = 'sheet-option-hint';
-    hint.textContent = mod.hint;
+    hint.textContent = blocked
+      ? `already ${modifierGlyph(active[slot]).label}`
+      : isOn ? 'tap to remove' : mod.hint;
 
     b.append(name, notation, hint);
     // The modifier attaches to this die's group and leaves the rest of the pool

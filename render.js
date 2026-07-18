@@ -216,9 +216,13 @@ function prismBarrel(n) {
 }
 
 // Antiprism: two rings offset by half a step, joined by a band of triangles and
-// capped at each end. Gives 2n triangles plus two n-gon caps, and reads quite
-// differently from a trapezohedron of the same face count — the silhouette is a
-// straight-sided drum rather than a pair of cones.
+// closed with a shallow pyramid at each end. Reads as a straight-sided drum
+// rather than the cones a trapezohedron gives.
+//
+// The ends are pyramids rather than flat n-gon caps on purpose. A flat cap is
+// many times the area of a band triangle, and the resting-orientation search
+// scores by visible area — so a capped antiprism landed on one of its two lids
+// almost every roll, which looked like the die had only two outcomes.
 function antiprism(n) {
   const verts = [];
   const half = 0.52;
@@ -230,16 +234,17 @@ function antiprism(n) {
     const a = ((i + 0.5) / n) * TAU;
     verts.push([Math.cos(a), -half, Math.sin(a)]);
   }
+  const apexTop = verts.push([0, half + 0.40, 0]) - 1;
+  const apexBot = verts.push([0, -half - 0.40, 0]) - 1;
 
   const top = i => i % n;
   const bot = i => n + (i % n);
-  const faces = [
-    Array.from({ length: n }, (_, i) => i),
-    Array.from({ length: n }, (_, i) => 2 * n - 1 - i),
-  ];
+  const faces = [];
   for (let i = 0; i < n; i++) {
     faces.push([top(i), top(i + 1), bot(i)]);
     faces.push([bot(i), top(i + 1), bot(i + 1)]);
+    faces.push([apexTop, top(i + 1), top(i)]);
+    faces.push([apexBot, bot(i), bot(i + 1)]);
   }
   return normalize({ verts, faces });
 }
@@ -284,6 +289,52 @@ function elongated(n) {
   return normalize({ verts, faces });
 }
 
+// Banded drum: rings of quads stacked up a sphere, closed with a small cap at
+// each pole. This is the family that scales — vertices spread evenly over the
+// surface instead of converging on two apexes, so a drum stays countable at 120
+// faces where a trapezohedron is an unreadable blob by 40.
+//
+// That is what makes a legible d100 possible: not fewer facets, but facets that
+// do not all run to a point.
+function drum(around, bands, profile = 1) {
+  const verts = [];
+  const rows = [];
+
+  // `profile` shapes the silhouette so drums of similar density stay tellable
+  // apart: below 1 it barrels outward, above 1 it pinches toward the poles.
+  for (let k = 0; k <= bands; k++) {
+    const y = 0.62 - (1.24 * k) / bands;
+    const r = Math.pow(Math.max(0.05, 1 - (y * 1.05) ** 2), 0.5 * profile);
+    const row = [];
+    for (let i = 0; i < around; i++) {
+      const a = (i / around) * TAU;
+      row.push(verts.push([Math.cos(a) * r, y, Math.sin(a) * r]) - 1);
+    }
+    rows.push(row);
+  }
+
+  const apexTop = verts.push([0, 0.86, 0]) - 1;
+  const apexBot = verts.push([0, -0.86, 0]) - 1;
+
+  // Rings are aligned rather than staggered, and the band faces are trapezoids
+  // whose four corners share a plane. Staggering the rows looked more like a
+  // real many-sided die but made every quad non-planar, and the front/back edge
+  // test then misclassified edges — which drew as holes in the mesh.
+  const faces = [];
+  for (let k = 0; k < bands; k++) {
+    for (let i = 0; i < around; i++) {
+      const j = (i + 1) % around;
+      faces.push([rows[k][i], rows[k][j], rows[k + 1][j], rows[k + 1][i]]);
+    }
+  }
+  for (let i = 0; i < around; i++) {
+    const j = (i + 1) % around;
+    faces.push([apexTop, rows[0][j], rows[0][i]]);
+    faces.push([apexBot, rows[bands][i], rows[bands][j]]);
+  }
+  return normalize({ verts, faces });
+}
+
 function normalize(solid) {
   const scale = Math.max(...solid.verts.map(v => Math.hypot(...v)));
   return { verts: solid.verts.map(v => v.map(x => x / scale)), faces: solid.faces };
@@ -297,7 +348,18 @@ const solidCache = new Map();
 
 // Above this, facets are finer than the die is ever drawn, so more only cost
 // frame time. d100 and beyond share this silhouette.
-const MAX_FACETS = 40;
+// The pointed families (trapezohedra, bipyramids, crystals) run every facet to
+// an apex, so their edges converge and they turn illegible fast — a
+// trapezohedron is already a blob by 40 faces. Above this, dice use the drum,
+// whose vertices spread over bands and stay countable past 120.
+// Measured, not guessed: a trapezohedron is already crowded at 24 faces and an
+// unreadable blob by 40, because every facet runs to one of two apexes. The
+// drum has no such convergence and stays countable past 120.
+const POINTED_LIMIT = 22;
+
+// Ceiling on facets for any die. Measured, not guessed: at a die's drawn size a
+// banded drum is still readable here, while anything pointed is long gone.
+const MAX_FACETS = 120;
 
 // Resting-orientation searches allowed per frame. Enough that small rolls all
 // resolve at once, low enough that a 100-dice roll spreads the cost instead of
@@ -347,23 +409,111 @@ const LARGE_FAMILIES = [
 // rolls but varies across dice. The smallest prime factor picks the family and
 // the digit sum nudges the facet count, which spreads neighbours like d100 and
 // d102 apart instead of collapsing them onto one shape.
-function largeSolid(sides) {
+// A drum with exactly `total` faces. Faces are around*bands quads plus 2*around
+// cap triangles, so total = around * (bands + 2). Picking the divisor pair
+// closest to square keeps rings and columns similar in size, which reads better
+// than a few tall bands or one very fine ring.
+function drumWithFaces(total) {
+  // Silhouette varies with the die so two drums of similar density do not read
+  // as the same object: below 1 barrels outward, above 1 pinches toward the poles.
+  const profile = 0.62 + ((total % 7) / 6) * 0.76;
+
+  // total = around * bands + 2 * around, so any divisor of `total` that leaves
+  // a workable ring count gives an exact face count. Prefer the split closest to
+  // square: a few tall bands or one very fine ring both read worse.
+  let best = null;
+  for (let bands = 1; bands <= 10; bands++) {
+    const around = total / (bands + 2);
+    if (!Number.isInteger(around) || around < 5 || around > 30) continue;
+    const squareness = Math.abs(Math.log(around / (bands + 2)));
+    if (!best || squareness < best.squareness) best = { around, bands, squareness };
+  }
+  if (best) return drum(best.around, best.bands, profile);
+
+  // No clean factorisation — 26 and 58 are the awkward cases. Rather than accept
+  // a wrong face count, take the exact ring count and put the remainder in a
+  // single ring of extra facets at one pole.
+  return drumWithRemainder(total, profile);
+}
+
+// Exact face count when `total` does not factor: build the largest drum that
+// fits, then split one cap's triangles to make up the difference.
+function drumWithRemainder(total, profile) {
+  let around = 0, bands = 0;
+  for (let a = 30; a >= 5; a--) {
+    for (let b = 1; b <= 10; b++) {
+      const faces = a * (b + 2);
+      if (faces <= total && faces > around * (bands + 2)) { around = a; bands = b; }
+    }
+  }
+  const base = drum(around, bands, profile);
+  const shortfall = total - around * (bands + 2);
+  if (shortfall <= 0) return base;
+
+  // Split that many cap triangles in two by adding a midpoint on their outer
+  // edge. Each split adds exactly one face and keeps every face planar, since a
+  // triangle's parts are triangles.
+  const verts = base.verts.map(v => v.slice());
+  const faces = base.faces.map(f => f.slice());
+  for (let n = 0; n < shortfall; n++) {
+    const idx = faces.findIndex(f => f.length === 3);
+    if (idx === -1) break;
+    const [apex, a, b] = faces[idx];
+    const mid = verts.push([
+      (verts[a][0] + verts[b][0]) / 2,
+      (verts[a][1] + verts[b][1]) / 2,
+      (verts[a][2] + verts[b][2]) / 2,
+    ]) - 1;
+    faces.splice(idx, 1, [apex, a, mid], [apex, mid, b]);
+  }
+  return { verts, faces };
+}
+
+function largeSolid(sides, budget = MAX_FACETS) {
   let smallestFactor = sides;
   for (let f = 2; f * f <= sides; f++) {
     if (sides % f === 0) { smallestFactor = f; break; }
   }
   const digitSum = String(sides).split('').reduce((a, c) => a + Number(c), 0);
 
+  // Past what the pointed families can carry, only the drum stays countable, so
+  // high dice all use it and take their variety from proportions instead. A d100
+  // then reads as genuinely many-sided rather than as a twelve-sided fake.
+  if (sides > POINTED_LIMIT) {
+    const target = Math.min(budget, Math.round(sides * 0.8));
+    // Rounder dice get more rings; the digit sum varies the ring/column split so
+    // neighbours differ without either dimension getting too fine to read.
+    const bands = 2 + (digitSum % 3);
+    const around = Math.max(6, Math.min(22, Math.round(target / (bands + 1))));
+    return drum(around, bands);
+  }
+
   const family = LARGE_FAMILIES[(smallestFactor + digitSum) % LARGE_FAMILIES.length];
-  // 6-11 facets around the equator: enough to read as many-sided, few enough
-  // that the edges stay distinct at the size a die is actually drawn.
-  const facets = 6 + (digitSum % 6);
+
+  // Facets grow with the die so a d70 visibly carries more than a d41, while
+  // the digit sum keeps neighbours from collapsing onto one shape.
+  const fromSize = Math.round(Math.sqrt(sides) * 1.5);
+  const facets = Math.max(6, Math.min(Math.floor(budget / 2), fromSize + (digitSum % 4)));
   return family(facets);
 }
 
-export function solidFor(sides) {
+// Detail is capped by how large the die is actually drawn, not just by its side
+// count. A die 12px across cannot show 80 facets — the edges land closer than a
+// pixel apart — and paying for geometry nobody can resolve is what pushed a
+// hundred-dice roll past the frame budget. Big single rolls keep full detail.
+function facetBudget(size) {
+  if (!size || size >= 60) return MAX_FACETS;
+  if (size >= 40) return 60;
+  if (size >= 26) return 36;
+  return 18;
+}
+
+export function solidFor(sides, size = null) {
   if (!Number.isFinite(sides) || sides < 1) return null;
-  if (solidCache.has(sides)) return solidCache.get(sides);
+
+  const budget = facetBudget(size);
+  const key = `${sides}:${budget}`;
+  if (solidCache.has(key)) return solidCache.get(key);
 
   let solid;
   if (sides === 1) {
@@ -375,20 +525,24 @@ export function solidFor(sides) {
     solid = coin();
   } else if (SOLIDS[sides]) {
     solid = SOLIDS[sides]();
-  } else if (sides <= MAX_FACETS) {
+  } else if (sides <= POINTED_LIMIT) {
+    // Few enough facets that a pointed solid still reads: exactly one face per
+    // side, in the shape a physical die of that size actually takes.
     solid = sides % 2 === 0 && sides / 2 >= 3
       ? trapezohedron(sides / 2)
       : prismBarrel(sides);
+  } else if (sides <= budget) {
+    // Still one face per side, but as a drum — a pointed solid with this many
+    // facets converges into an unreadable blob, while a drum stays countable.
+    solid = drumWithFaces(sides);
   } else {
-    // Past ~40 facets the geometry is finer than a few hundred pixels can show,
-    // so the facet count caps. Rather than give every large die the same
-    // silhouette, pick a family and a facet count from the number itself: a d30,
-    // a d57 and a d100 then look properly different from each other while each
-    // stays the same shape every time it is rolled.
-    solid = largeSolid(sides);
+    // Too many faces to draw one per side, so the shape becomes representative:
+    // a family and a facet count derived from the number itself, so a d70 still
+    // carries visibly more detail than a d41 and each die keeps one shape.
+    solid = largeSolid(sides, budget);
   }
 
-  solidCache.set(sides, solid);
+  solidCache.set(key, solid);
   return solid;
 }
 
@@ -399,7 +553,10 @@ export class Die {
     this.size = size;
     this.x = x; this.y = y;
     this.vx = 0; this.vy = 0;
-    this.solid = solidFor(sides);
+    // Resolved lazily: the real size is assigned by the layout after
+    // construction, and detail depends on how large the die is actually drawn.
+    this._solid = null;
+    this._solidSize = null;
     this.rot = [Math.random()*TAU, Math.random()*TAU, Math.random()*TAU];
     this.spin = [0, 0, 0];
     this.settling = false;
@@ -419,6 +576,19 @@ export class Die {
     this.settling = false;
     this.settled = false;
     this.targetRot = null; // recomputed for wherever this throw lands
+  }
+
+  // Geometry for this die at its current size. Re-resolved when the size
+  // changes, so a die that grows on a resize gains the detail to match.
+  get solid() {
+    const budget = facetBudget(this.size);
+    if (!this._solid || this._solidSize !== budget) {
+      this._solid = solidFor(this.sides, this.size);
+      this._solidSize = budget;
+      // Detail changed, so any pose chosen for the old geometry no longer holds.
+      this.targetRot = null;
+    }
+    return this._solid;
   }
 
   // Tumble in place without moving. Used for large rolls, where flying dice
@@ -566,6 +736,12 @@ export class Die {
     ctx.save();
     ctx.translate(this.x, this.y);
 
+    // A dropped die is still shown — you rolled it — but recedes, so the dice
+    // that actually count read at a glance. Without this the tray implies every
+    // die contributed to the total.
+    const fade = this.kept === false && this.settled ? 0.3 : 1;
+    ctx.globalAlpha = fade;
+
     // Nothing to draw without geometry. This used to call a drawToken() that no
     // longer exists, which threw on every frame and took the whole render loop
     // down with it — one bad die blanked the tray until a reload.
@@ -604,14 +780,60 @@ export class Die {
         ctx.lineTo(proj[b][0], proj[b][1]);
       }
       ctx.strokeStyle = theme.line;
-      ctx.globalAlpha = pass ? 1 : 0.22;
+      // Scaled rather than set, so a dropped die's fade survives this pass.
+      ctx.globalAlpha = fade * (pass ? 1 : 0.22);
       ctx.lineWidth = pass ? 1.6 : 1.1;
       ctx.stroke();
     }
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha = fade;
 
     this.drawValue(ctx, theme, s, pts, proj);
+    this.drawMarks(ctx, theme, s);
     ctx.restore();
+  }
+
+  // What happened to this die, in the same hairline vocabulary as the dice: a
+  // burst for an exploded die, a cycle for a rerolled one. Small enough to
+  // ignore, present enough to answer "why is this d6 showing 14".
+  drawMarks(ctx, theme, s) {
+    if (!this.settled) return;
+    const marks = [];
+    if (this.exploded) marks.push('burst');
+    if (this.rerolled) marks.push('cycle');
+    if (!marks.length) return;
+
+    const r = s * 0.2;
+    marks.forEach((mark, i) => {
+      const x = s * 0.72;
+      const y = -s * 0.72 + i * r * 2.4;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.strokeStyle = theme.accent;
+      ctx.lineWidth = 1.2;
+      ctx.lineCap = 'round';
+
+      if (mark === 'burst') {
+        // Six short rays: the die kept going past its maximum.
+        ctx.beginPath();
+        for (let k = 0; k < 6; k++) {
+          const a = (k / 6) * TAU;
+          ctx.moveTo(Math.cos(a) * r * 0.32, Math.sin(a) * r * 0.32);
+          ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+        }
+        ctx.stroke();
+      } else {
+        // An open circle with a tick: it came round again.
+        ctx.beginPath();
+        ctx.arc(0, 0, r * 0.72, 0.5, TAU - 0.35);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(r * 0.62, -r * 0.52);
+        ctx.lineTo(r * 0.72, -r * 0.05);
+        ctx.lineTo(r * 0.2, -r * 0.16);
+        ctx.stroke();
+      }
+      ctx.restore();
+    });
   }
 
   // Paint the numeral onto the face that most directly faces the camera, using
@@ -777,6 +999,9 @@ export class Surface {
     ctx.lineWidth = 1;
     for (const d of dice) {
       if (!d.settled) continue;
+      // A dropped die loses its contact mark too, so the kept dice are the only
+      // ones that read as sitting on the table.
+      if (d.kept === false) continue;
       ctx.beginPath();
       ctx.ellipse(d.x, d.y + d.size * 0.46, d.size * 0.34, d.size * 0.07, 0, 0, TAU);
       ctx.stroke();

@@ -665,6 +665,13 @@ body {
   background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
+/* Another modifier already answers this question, so it cannot also apply. */
+.sheet-option[data-blocked] {
+  opacity: 0.34;
+  cursor: default;
+}
+.sheet-option[data-blocked]:hover { background: none; }
+
 .sheet-option-name {
   font-size: 14px;
   color: var(--line);
