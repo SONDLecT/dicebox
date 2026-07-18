@@ -8,4 +8,7 @@ package.json
 package-lock.json
 wrangler.jsonc
 README.md
+# Consumed by the deploy, never served: _headers is a Pages feature, so on
+# Workers these rules are applied by the Worker script instead.
 _headers
+worker.js

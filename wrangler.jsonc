@@ -3,11 +3,23 @@
   "name": "dicebox",
   "compatibility_date": "2026-07-18",
 
-  // Assets-only: no Worker script, no `main`. Cloudflare serves the files
-  // straight from the edge, which is all a static PWA needs. Adding a Worker
-  // would put a script in front of every request for no reason.
+  // Serves the app at the custom domain. Cloudflare creates and manages the DNS
+  // record for it, so nothing needs adding by hand.
+  "routes": [
+    { "pattern": "dicebox.trollskull.cc", "custom_domain": true }
+  ],
+
+  // A tiny script fronts the assets purely to set security and cache headers —
+  // `_headers` is a Pages feature and does nothing on Workers.
+  "main": "worker.js",
+
   "assets": {
     "directory": ".",
+    "binding": "ASSETS",
+
+    // Without this, matching assets are served directly and the script never
+    // runs, so none of its headers apply.
+    "run_worker_first": true,
 
     // The service worker already handles offline navigation, so a request for
     // an unknown path should 404 rather than silently returning the app shell.
