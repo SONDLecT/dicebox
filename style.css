@@ -801,9 +801,11 @@ body {
 
 /* ---- history ---- */
 
+/* Two rows tall by default: entries now carry a breakdown line as well, so the
+   old fixed height showed barely one roll. Scrolls for the rest. */
 .log {
   flex: 0 0 auto;
-  max-height: 88px;
+  max-height: 108px;
   overflow-y: auto;
   scrollbar-width: none;
 }
@@ -819,18 +821,34 @@ body {
 }
 
 .log li {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
   font-size: 12px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
   padding: 3px 0;
   border-top: 1px solid var(--hair);
 }
+
+/* Notation on the left, total on the right. */
+.log-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
 .log li b {
   color: var(--line);
   font-weight: 600;
+}
+
+/* What each die landed on, under its own roll. Quieter than the total, since
+   the total is what you look for first and this is what you check afterwards. */
+.log-detail {
+  display: block;
+  font-family: "Iosevka Etoile", ui-monospace, monospace;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--muted);
+  opacity: 0.75;
+  word-break: break-word;
 }
 
 :where(button, input):focus-visible {

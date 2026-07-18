@@ -115,9 +115,47 @@ ok('chain jumps multiple', stepChain(6, 3) === 10);
 ok('off-chain sides unchanged', stepChain(100, 1) === 100);
 
 // --- describe ---
+// The history keeps this alongside the total, so it has to account for every
+// die: a total of 17 says nothing about which die produced it.
 ok('describe shows dropped in parens', describe(roll('4d6kh3').groups).includes('('));
 ok('describe includes notation', describe(roll('2d6').groups).startsWith('2d6'));
-ok('describe handles negative', describe(roll('1d6-2').groups).includes('−2'));
+ok('describe handles negative', describe(roll('1d6-2').groups).includes('− 2'));
+
+{
+  // Every term appears, in order, with its own dice.
+  const text = describe(roll('1d4+1d3+1d2').groups);
+  ok('describe covers every term',
+     /^1d4 \[\d\] \+ 1d3 \[\d\] \+ 1d2 \[\d\]$/.test(text), text);
+}
+
+{
+  const text = describe(roll('3d6').groups);
+  ok('describe lists each die', (text.match(/\d+/g) || []).length >= 4, text);
+}
+
+{
+  // An exploded die is marked, or a d6 reading 11 looks like a bug.
+  let marked = null;
+  for (let i = 0; i < 3000 && !marked; i++) {
+    const r = roll('1d6!');
+    if (r.groups[0].dice[0].exploded) marked = describe(r.groups);
+  }
+  ok('describe marks an exploded die', marked && marked.includes('!'), marked || 'none seen');
+}
+
+{
+  // A rerolled die is marked, so an ordinary-looking result is not mistaken for
+  // a first roll.
+  let marked = null;
+  for (let i = 0; i < 3000 && !marked; i++) {
+    const r = roll('1d4r1');
+    if (r.groups[0].dice[0].rerolled) marked = describe(r.groups);
+  }
+  ok('describe marks a rerolled die', marked && marked.includes('↻'), marked || 'none seen');
+}
+
+ok('describe of a dropped die keeps it visible',
+   /\(\d+\)/.test(describe(roll('4d6dl1').groups)));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

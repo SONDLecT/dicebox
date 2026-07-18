@@ -817,9 +817,11 @@ body {
 
 /* ---- history ---- */
 
+/* Two rows tall by default: entries now carry a breakdown line as well, so the
+   old fixed height showed barely one roll. Scrolls for the rest. */
 .log {
   flex: 0 0 auto;
-  max-height: 88px;
+  max-height: 108px;
   overflow-y: auto;
   scrollbar-width: none;
 }
@@ -835,18 +837,34 @@ body {
 }
 
 .log li {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
   font-size: 12px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
   padding: 3px 0;
   border-top: 1px solid var(--hair);
 }
+
+/* Notation on the left, total on the right. */
+.log-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
 .log li b {
   color: var(--line);
   font-weight: 600;
+}
+
+/* What each die landed on, under its own roll. Quieter than the total, since
+   the total is what you look for first and this is what you check afterwards. */
+.log-detail {
+  display: block;
+  font-family: "Iosevka Etoile", ui-monospace, monospace;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--muted);
+  opacity: 0.75;
+  word-break: break-word;
 }
 
 :where(button, input):focus-visible {
@@ -1184,13 +1202,27 @@ function roll(notation) {
   return { notation: src, groups, total };
 }
 
+// A readable account of what each die landed on. Dropped dice stay visible in
+// parentheses rather than disappearing, an exploded die is marked so a d6
+// showing 11 makes sense, and a rerolled one is marked so a result that looks
+// ordinary is not mistaken for a first roll.
 function describe(groups) {
-  return groups.map((g, i) => {
-    const op = g.sign < 0 ? '−' : i === 0 ? '' : '+';
-    if (g.kind === 'const') return `${op}${g.value}`;
-    const rolls = g.dice.map(d => (d.kept ? d.value : `(${d.value})`)).join(', ');
-    return `${op}${g.count}d${g.sides} [${rolls}]`;
-  }).join(' ').trim();
+  return groups
+    .map((g, i) => {
+      const op = g.sign < 0 ? '− ' : i === 0 ? '' : '+ ';
+      if (g.kind === 'const') return `${op}${g.value}`;
+      const rolls = g.dice
+        .map(d => {
+          let text = String(d.value);
+          if (d.exploded) text += '!';
+          if (d.rerolled) text += '↻';
+          return d.kept ? text : `(${text})`;
+        })
+        .join(', ');
+      return `${op}${g.count}d${g.sides} [${rolls}]`;
+    })
+    .join(' ')
+    .trim();
 }
 
 Object.assign(__dicebox, { DCC_CHAIN, stepChain, roll, describe });
@@ -2631,11 +2663,30 @@ function finish(result) {
 
 function addHistory(result) {
   const li = document.createElement('li');
+
+  const top = document.createElement('div');
+  top.className = 'log-line';
+
   const label = document.createElement('span');
   label.textContent = result.notation;
+
   const val = document.createElement('b');
   val.textContent = String(result.total);
-  li.append(label, val);
+
+  top.append(label, val);
+  li.append(top);
+
+  // What each die actually landed on, not just the total. The breakdown was
+  // already computed for the readout and then discarded, so a past roll could
+  // not be checked — "17" tells you nothing about which die produced it.
+  const detail = describe(result.groups);
+  if (detail && detail !== result.notation) {
+    const rolls = document.createElement('span');
+    rolls.className = 'log-detail';
+    rolls.textContent = detail;
+    li.append(rolls);
+  }
+
   const list = $('history');
   list.prepend(li);
   while (list.children.length > 12) list.lastElementChild.remove();
@@ -3132,7 +3183,7 @@ function applyModifier(sides, mod) {
   syncPool();
 }
 
-function openSheet(sides) {
+function openSheet(sides, { focus = null } = {}) {
   // All three fill the tray, so only one can be up at a time.
   setHelp(false);
   closeDial();
@@ -3249,15 +3300,26 @@ function openSheet(sides) {
     // The modifier attaches to this die's group and leaves the rest of the pool
     // alone, so picking advantage on a d6 does not disturb a staged d20. It
     // stages rather than rolls, matching every other way dice get added.
+    // The sheet stays open: modifiers in different slots stack, so picking
+    // exploding and then reroll should be two taps rather than two long
+    // presses. It closes on the X, on Escape, or by tapping outside.
     b.addEventListener('click', () => {
-      closeSheet();
       applyModifier(sides, mod);
+      // Rebuild so active and blocked states are current, then put focus back
+      // where it was — a keyboard user should not be dropped to the top of the
+      // list after every choice.
+      openSheet(sides, { focus: mod.suffix });
     });
     sheetOptions.append(b);
   }
 
   sheet.hidden = false;
-  sheetOptions.firstElementChild?.focus();
+  // Reopening after a choice keeps focus on the option just used, rather than
+  // snapping back to the top of the list.
+  const target = focus
+    ? sheetOptions.querySelector(`.sheet-option[data-suffix="${CSS.escape(focus)}"]:not([disabled])`)
+    : null;
+  (target || sheetOptions.querySelector('.sheet-option:not([disabled])'))?.focus();
 }
 
 // The modifier rows preview what they would stage, so changing the count has to
@@ -3284,6 +3346,12 @@ function closeSheet() {
 }
 
 $('sheetClose').addEventListener('click', closeSheet);
+
+// The sheet now stays open across choices, so it needs an easy way out: tapping
+// the empty space around the options closes it, as does the X and Escape.
+sheet.addEventListener('click', e => {
+  if (e.target === sheet) closeSheet();
+});
 
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;

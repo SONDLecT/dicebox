@@ -266,11 +266,30 @@ function finish(result) {
 
 function addHistory(result) {
   const li = document.createElement('li');
+
+  const top = document.createElement('div');
+  top.className = 'log-line';
+
   const label = document.createElement('span');
   label.textContent = result.notation;
+
   const val = document.createElement('b');
   val.textContent = String(result.total);
-  li.append(label, val);
+
+  top.append(label, val);
+  li.append(top);
+
+  // What each die actually landed on, not just the total. The breakdown was
+  // already computed for the readout and then discarded, so a past roll could
+  // not be checked — "17" tells you nothing about which die produced it.
+  const detail = describe(result.groups);
+  if (detail && detail !== result.notation) {
+    const rolls = document.createElement('span');
+    rolls.className = 'log-detail';
+    rolls.textContent = detail;
+    li.append(rolls);
+  }
+
   const list = $('history');
   list.prepend(li);
   while (list.children.length > 12) list.lastElementChild.remove();
@@ -767,7 +786,7 @@ function applyModifier(sides, mod) {
   syncPool();
 }
 
-function openSheet(sides) {
+function openSheet(sides, { focus = null } = {}) {
   // All three fill the tray, so only one can be up at a time.
   setHelp(false);
   closeDial();
@@ -884,15 +903,26 @@ function openSheet(sides) {
     // The modifier attaches to this die's group and leaves the rest of the pool
     // alone, so picking advantage on a d6 does not disturb a staged d20. It
     // stages rather than rolls, matching every other way dice get added.
+    // The sheet stays open: modifiers in different slots stack, so picking
+    // exploding and then reroll should be two taps rather than two long
+    // presses. It closes on the X, on Escape, or by tapping outside.
     b.addEventListener('click', () => {
-      closeSheet();
       applyModifier(sides, mod);
+      // Rebuild so active and blocked states are current, then put focus back
+      // where it was — a keyboard user should not be dropped to the top of the
+      // list after every choice.
+      openSheet(sides, { focus: mod.suffix });
     });
     sheetOptions.append(b);
   }
 
   sheet.hidden = false;
-  sheetOptions.firstElementChild?.focus();
+  // Reopening after a choice keeps focus on the option just used, rather than
+  // snapping back to the top of the list.
+  const target = focus
+    ? sheetOptions.querySelector(`.sheet-option[data-suffix="${CSS.escape(focus)}"]:not([disabled])`)
+    : null;
+  (target || sheetOptions.querySelector('.sheet-option:not([disabled])'))?.focus();
 }
 
 // The modifier rows preview what they would stage, so changing the count has to
@@ -919,6 +949,12 @@ function closeSheet() {
 }
 
 $('sheetClose').addEventListener('click', closeSheet);
+
+// The sheet now stays open across choices, so it needs an easy way out: tapping
+// the empty space around the options closes it, as does the X and Escape.
+sheet.addEventListener('click', e => {
+  if (e.target === sheet) closeSheet();
+});
 
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;

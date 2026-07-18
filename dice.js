@@ -175,11 +175,25 @@ export function roll(notation) {
   return { notation: src, groups, total };
 }
 
+// A readable account of what each die landed on. Dropped dice stay visible in
+// parentheses rather than disappearing, an exploded die is marked so a d6
+// showing 11 makes sense, and a rerolled one is marked so a result that looks
+// ordinary is not mistaken for a first roll.
 export function describe(groups) {
-  return groups.map((g, i) => {
-    const op = g.sign < 0 ? '−' : i === 0 ? '' : '+';
-    if (g.kind === 'const') return `${op}${g.value}`;
-    const rolls = g.dice.map(d => (d.kept ? d.value : `(${d.value})`)).join(', ');
-    return `${op}${g.count}d${g.sides} [${rolls}]`;
-  }).join(' ').trim();
+  return groups
+    .map((g, i) => {
+      const op = g.sign < 0 ? '− ' : i === 0 ? '' : '+ ';
+      if (g.kind === 'const') return `${op}${g.value}`;
+      const rolls = g.dice
+        .map(d => {
+          let text = String(d.value);
+          if (d.exploded) text += '!';
+          if (d.rerolled) text += '↻';
+          return d.kept ? text : `(${text})`;
+        })
+        .join(', ');
+      return `${op}${g.count}d${g.sides} [${rolls}]`;
+    })
+    .join(' ')
+    .trim();
 }
