@@ -15,3 +15,6 @@ worker.js
 
 # Shipped explicitly to the site root by tools/deploy.mjs.
 dist
+
+# Screenshots for the README; not part of the app.
+docs

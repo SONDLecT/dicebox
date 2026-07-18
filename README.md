@@ -8,6 +8,12 @@ demo instance, not a service. To keep a copy of your own, see
 [Getting it offline](#getting-it-offline): download it as a single file, install
 it from the browser, or host it yourself.
 
+<p align="center">
+  <img src="docs/roll.png" alt="Rolling 2d20+3d6, with the total and each die's result" width="360">
+  &nbsp;&nbsp;
+  <img src="docs/dark.png" alt="A mixed handful of d100, d30, d12 and d8 in dark mode" width="360">
+</p>
+
 ## About
 
 This is a personal project. I kept running into the same problem — there was no
@@ -58,53 +64,6 @@ choose there gets a button of its own.
 Sides are arbitrary from 1 to 10000, so Mothership's `d100`, DCC's `d14`/`d24`,
 and anything else all work. Dropped dice stay visible in parentheses rather than
 disappearing.
-
-## The dice chain
-
-The button row carries every rung of the Dungeon Crawl Classics chain:
-
-```
-d1 d2 d3 d4 d5 d6 d7 d8 d10 d12 d14 d16 d20 d24 d30
-```
-
-## How the dice are drawn
-
-A fair die must be **isohedral**: every face equivalent under the solid's
-symmetry group, so each face has equal probability. Two families cover every
-face count, which is how physical d10s, d14s, d24s and d30s are actually made:
-
-| Sides | Shape | Why |
-| --- | --- | --- |
-| 1 | notched cylinder | topples onto its one face however it lands |
-| 2 | coin | no two-faced polyhedron exists |
-| 4, 6, 8, 12, 20 | Platonic solid | exact regular solids |
-| even N ≤ 22 | trapezohedron | 2n kite faces; the real d10 shape |
-| odd N ≤ 22 | prism barrel | n faces around the equator; the real d7 shape |
-| N > 22 | banded drum | stays legible where pointed solids blur |
-
-A barrel gives an *exact* face count for any N, so a `d17` has seventeen
-numbered faces rather than an eighteen-faced solid pretending to be one.
-
-The trapezohedron's apex height is not a free parameter. Each kite face
-`[apex, top_i, bot_i, top_i+1]` is planar only when
-
-```
-H = 2 / (1 - cos(pi/n)) - 1
-```
-
-with the rings at unit radius. Choosing it by eye bowties every face, which
-renders as a tangle of crossing edges. That ratio grows fast — at n=15 the apex
-sits 90x further out than the equator — so the solid is squashed along y
-afterwards to get the near-spherical proportions a real die has. Scaling a
-single axis preserves planarity.
-
-Pointed solids are the constraint, not facet count: a trapezohedron runs every
-facet to one of two apexes, so it is already crowded at 24 faces and unreadable
-by 40. A banded drum has no such convergence and stays countable past 120, so
-dice above 22 sides use one. That is what lets a `d100` carry a hundred facets
-instead of pretending with twelve — 108 of the 118 dice from d3 to d120 have
-exactly one facet per side. Above that the shape becomes representative, since
-more facets than the die is drawn wide cannot be told apart.
 
 ## Randomness
 

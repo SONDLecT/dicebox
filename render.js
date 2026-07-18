@@ -946,15 +946,22 @@ export class Die {
     // Using the first vertex instead — as this did — left the glyph at whatever
     // rotation that vertex happened to sit at, so numerals regularly landed
     // upside down and a 63 read as a 39 at a glance.
-    let ux = 1, uy = 0, bestAlign = -Infinity;
-    for (const i of best) {
-      let vx = proj[i][0] - c2[0];
-      let vy = proj[i][1] - c2[1];
+    // Candidates are the face's own edge directions — the lines a numeral would
+    // be printed parallel to on a real die — plus horizontal as a fallback for
+    // faces whose edges all run steeply.
+    let ux = 1, uy = 0, bestAlign = 0.62;
+    for (let i = 0; i < best.length; i++) {
+      const a = proj[best[i]];
+      const b = proj[best[(i + 1) % best.length]];
+      let vx = b[0] - a[0];
+      let vy = b[1] - a[1];
       const len = Math.hypot(vx, vy);
       if (len < 1e-6) continue;
       vx /= len; vy /= len;
-      // A face has no inherent top, so a direction and its opposite are equally
-      // valid; take whichever reads left-to-right.
+      // An edge and its reverse are equally valid, since a face has no inherent
+      // top; take whichever reads left-to-right. Requiring a genuinely
+      // horizontal run rather than merely the least-bad one keeps a numeral from
+      // being set at 84 degrees when no edge is anywhere near level.
       for (const [cx, cy] of [[vx, vy], [-vx, -vy]]) {
         if (cx > bestAlign) { bestAlign = cx; ux = cx; uy = cy; }
       }

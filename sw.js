@@ -2,7 +2,7 @@
 // precache all of them and never hit the network after install.
 
 // Bump on every asset change, or installed copies keep serving the old app.
-const CACHE = 'dicebox-v18';
+const CACHE = 'dicebox-v20';
 
 // './' only — never './index.html'. The edge redirects /index.html to / with a
 // 307, and a redirected response makes cache.addAll reject the whole batch,
@@ -58,10 +58,21 @@ self.addEventListener('fetch', event => {
 
 async function handle(request) {
   const cache = await caches.open(CACHE);
+  const url = new URL(request.url);
 
-  // Every navigation resolves to the app shell. The edge redirects /index.html
-  // to /, and an installed app launching at a redirecting URL fails to load —
-  // so navigations are answered from the shell rather than followed.
+  // A download click counts as a navigation, so the shell rule below would
+  // answer it with index.html — which is exactly why the downloaded file arrived
+  // as the multi-file app instead of the bundle. curl and "save link as" bypass
+  // the service worker entirely, which is why those two always looked correct
+  // and hid the bug.
+  if (url.pathname.endsWith('/dicebox.html')) {
+    return fetch(request);
+  }
+
+  // Every other navigation resolves to the app shell. The edge redirects
+  // /index.html to /, and an installed app launching at a redirecting URL fails
+  // to load — so navigations are answered from the shell rather than followed.
+
   if (request.mode === 'navigate') {
     const shell = await cache.match('./', { ignoreSearch: true });
     if (shell) return shell;

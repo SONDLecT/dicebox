@@ -113,6 +113,22 @@ ok('has a 512px icon', manifest.icons.some(i => i.sizes === '512x512'));
 ok('service worker refuses to cache redirects', /res\.redirected/.test(swCode));
 ok('navigations resolve to the shell', /cache\.match\('\.\/'/.test(swCode));
 
+// Clicking a download link is a navigation, so the shell rule would answer it
+// with index.html and the downloaded "single file" would be the multi-file app
+// with dangling references. The bundle path has to skip that rule.
+{
+  const shellRule = swCode.indexOf("request.mode === 'navigate'");
+  const bundleRule = swCode.indexOf('dicebox.html');
+  ok('the bundle path bypasses the service worker',
+     bundleRule !== -1 && bundleRule < shellRule,
+     bundleRule === -1 ? 'no rule for it' : 'rule comes after the shell rule');
+}
+
+// The link has to carry `download`, or the browser renders the file instead of
+// saving it — HTML served as HTML is displayed, not downloaded.
+ok('the download link forces a save',
+   /<a href="dicebox\.html"[^>]*\sdownload/.test(html));
+
 ok('no external resources', !/(?:src|href)="https?:\/\/(?!github)/.test(html));
 
 // A stale service worker pins every other asset to its old version.
