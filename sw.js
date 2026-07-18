@@ -2,7 +2,7 @@
 // precache all of them and never hit the network after install.
 
 // Bump on every asset change, or installed copies keep serving the old app.
-const CACHE = 'dicebox-v5';
+const CACHE = 'dicebox-v8';
 
 const ASSETS = [
   './',

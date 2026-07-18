@@ -359,5 +359,78 @@ function buttonState(pool, sides) {
   ok('advantage keeps one die', r.groups[0].dice.filter(d => d.kept).length === 1);
 }
 
+// --- each modifier gets its own mark ---
+// One shared underline told you a die was modified but not which modifier, so
+// drop-lowest and exploding looked identical on the row.
+{
+  const GLYPHS = [
+    [/^kh/, '▲'], [/^kl/, '▼'], [/^dl/, '⌃'], [/^dh/, '⌄'], [/^!/, '✳'], [/^r/, '↻'],
+  ];
+  const glyphFor = mod => (GLYPHS.find(([p]) => p.test(mod)) || [null, '•'])[1];
+
+  const marks = Object.values(MODS)
+    .filter(m => m.suffix)
+    .map(m => glyphFor(m.suffix));
+
+  ok('every modifier has a distinct mark', new Set(marks).size === marks.length,
+     marks.join(' '));
+  ok('no modifier falls through to the default', !marks.includes('•'), marks.join(' '));
+
+  // The mark must follow the notation, including counts other than 1.
+  ok('kh3 reads as advantage', glyphFor('kh3') === '▲');
+  ok('dl2 reads as drop lowest', glyphFor('dl2') === '⌃');
+  ok('r2 reads as reroll', glyphFor('r2') === '↻');
+  ok('plain dice have no mark', Object.values(MODS).filter(m => !m.suffix).length === 1);
+}
+
+// --- custom dice earn a button ---
+// A die made with the picker has to behave like any other: tappable, countable,
+// and holdable for modifiers. Without a button of its own a d46 could be staged
+// but never modified.
+{
+  // Mirrors ensureDieButton's placement: keep the row in size order.
+  const insertSorted = (row, sides) => {
+    if (row.includes(sides)) return row;
+    const at = row.findIndex(s => s > sides);
+    const next = row.slice();
+    next.splice(at === -1 ? row.length : at, 0, sides);
+    return next;
+  };
+
+  const STANDARD = [1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 30, 100];
+
+  let row = insertSorted(STANDARD, 46);
+  ok('custom die lands in size order',
+     row.indexOf(46) === row.indexOf(30) + 1 && row[row.indexOf(46) + 1] === 100,
+     row.slice(row.indexOf(30)).join(','));
+
+  row = insertSorted(row, 46);
+  ok('adding the same die twice makes one button',
+     row.filter(s => s === 46).length === 1);
+
+  ok('a die below the row goes first', insertSorted(STANDARD, 0)[0] === 0);
+  ok('a die above the row goes last',
+     insertSorted(STANDARD, 500).at(-1) === 500);
+  ok('an existing die is not duplicated',
+     insertSorted(STANDARD, 20).length === STANDARD.length);
+
+  // Whatever the picker can produce must roll.
+  let bad = null;
+  for (const sides of [17, 46, 57, 99, 123, 1000]) {
+    const p = add(new Map(), sides);
+    try {
+      const r = roll(poolNotation(p));
+      if (r.total < 1 || r.total > sides) bad = `d${sides} gave ${r.total}`;
+    } catch (err) { bad = `d${sides}: ${err.message}`; }
+  }
+  ok('custom dice roll in range', bad === null, bad || '');
+
+  // And must accept modifiers like any other die.
+  const p = add(new Map(), 46, 3);
+  applyModifier(p, 46, MODS.adv);
+  ok('custom dice take modifiers', poolNotation(p) === '3d46kh1', poolNotation(p));
+  ok('modified custom die rolls', roll('3d46kh1').total >= 1);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

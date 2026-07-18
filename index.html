@@ -19,12 +19,26 @@
 <main class="app">
 
   <header class="bar">
-    <h1 class="wordmark">Dicebox</h1>
+    <h1 class="wordmark" id="wordmark">Dicebox</h1>
     <div class="bar-actions">
       <button id="helpToggle" class="ghost icon" aria-expanded="false"
               aria-controls="help" aria-label="Show syntax reference">?</button>
-      <button id="themeToggle" class="ghost" aria-label="Switch color theme">
-        <span data-theme-label>Dark</span>
+      <button id="themeToggle" class="ghost icon" aria-label="Switch to dark theme">
+        <svg viewBox="0 0 20 20" width="15" height="15" aria-hidden="true" focusable="false">
+          <!-- Sun: shown in light mode, so tapping it means "go dark". -->
+          <g data-icon="sun" fill="none" stroke="currentColor" stroke-width="1.4"
+             stroke-linecap="round">
+            <circle cx="10" cy="10" r="3.4"/>
+            <path d="M10 2.2v1.8M10 16v1.8M17.8 10H16M4 10H2.2
+                     M15.5 4.5l-1.3 1.3M5.8 14.2l-1.3 1.3
+                     M15.5 15.5l-1.3-1.3M5.8 5.8L4.5 4.5"/>
+          </g>
+          <!-- Moon: shown in dark mode. -->
+          <g data-icon="moon" fill="none" stroke="currentColor" stroke-width="1.4"
+             stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 11.7A6.6 6.6 0 0 1 8.3 4a6.8 6.8 0 1 0 7.7 7.7z"/>
+          </g>
+        </svg>
       </button>
     </div>
   </header>
@@ -58,6 +72,12 @@
         number of sides works, from d1 to d1000, so a d17 or a d57 is just as
         valid. Rolls stay on your device.
       </p>
+      <p class="note install" id="installNote">
+        <button type="button" class="install-button" id="install" hidden>Install as an app</button>
+        <span id="installHint">Add this to your home screen and it works offline, with no
+        connection needed.</span>
+      </p>
+
       <p class="colophon">
         <a href="https://github.com/" target="_blank" rel="noopener noreferrer">Source on GitHub</a>
       </p>
@@ -75,6 +95,30 @@
         <div class="sheet-options" id="sheetOptions"></div>
       </div>
     </div>
+
+    <!-- Custom die picker: a scroll wheel for browsing and a field for jumping
+         straight to a number. -->
+    <div class="sheet dial" id="dial" hidden role="dialog" aria-labelledby="dialTitle">
+      <div class="sheet-panel">
+        <p class="sheet-title">
+          <span id="dialTitle">Custom die</span>
+          <button type="button" class="sheet-close" id="dialClose"
+                  aria-label="Close">✕</button>
+        </p>
+
+        <div class="wheel" id="wheel" role="listbox" aria-label="Number of sides"
+             tabindex="0"></div>
+
+        <div class="dial-actions">
+          <label class="dial-entry">
+            <span>d</span>
+            <input id="dialInput" type="text" inputmode="numeric" autocomplete="off"
+                   value="20" aria-label="Number of sides">
+          </label>
+          <button type="button" class="roll dial-add" id="dialAdd">Add to tray</button>
+        </div>
+      </div>
+    </div>
   </section>
 
   <output class="readout" id="readout" aria-live="polite">
@@ -89,7 +133,10 @@
              value="1" autocomplete="off" aria-label="Dice per tap">
       <button class="step" id="countUp" aria-label="One more die per tap">+</button>
     </div>
-    <div class="dice-buttons" id="diceButtons" role="group"></div>
+    <div class="dice-buttons" id="diceButtons" role="group">
+      <button class="dbtn custom" id="customDie" type="button"
+              aria-label="Choose a custom number of sides"><span class="dbtn-fill"></span>d?</button>
+    </div>
   </section>
 
   <form class="entry" id="entry">

@@ -121,7 +121,7 @@ function bipyramid(n) {
 // faces. The apex height is not free — the kite [apex, top_i, bot_i, top_i+1]
 // is planar only at this exact ratio. Choosing H by eye bowties every face,
 // which renders as a tangle of crossing edges.
-function trapezohedron(n) {
+function trapezohedron(n, flatten = null) {
   // Planarity fixes the apex height exactly, relative to a unit ring radius:
   // H = 2/(1 - cos(pi/n)) - 1 with the rings at y = +/-1. That ratio is scale
   // invariant but grows fast with n, so the raw solid is a needle: at n=15 the
@@ -132,8 +132,9 @@ function trapezohedron(n) {
   const H = 2 / (1 - Math.cos(Math.PI / n)) - 1;
   // Squashing the poles to exactly the ring radius leaves a sharp bicone, but
   // over-squashing flattens the die into a pinwheel disc. Taller poles as n
-  // grows keep high-count dice reading as solids rather than plates.
-  const squash = (1 / H) * (n > 6 ? 1.35 : 1.0);
+  // grows keep high-count dice reading as solids rather than plates. Scaling one
+  // axis preserves the planarity the apex height was solved for.
+  const squash = (1 / H) * (flatten !== null ? flatten : (n > 6 ? 1.35 : 1.0));
 
   const verts = [[0, H * squash, 0], [0, -H * squash, 0]];
   for (let i = 0; i < n; i++) {
@@ -214,6 +215,75 @@ function prismBarrel(n) {
   return normalize({ verts, faces });
 }
 
+// Antiprism: two rings offset by half a step, joined by a band of triangles and
+// capped at each end. Gives 2n triangles plus two n-gon caps, and reads quite
+// differently from a trapezohedron of the same face count — the silhouette is a
+// straight-sided drum rather than a pair of cones.
+function antiprism(n) {
+  const verts = [];
+  const half = 0.52;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * TAU;
+    verts.push([Math.cos(a), half, Math.sin(a)]);
+  }
+  for (let i = 0; i < n; i++) {
+    const a = ((i + 0.5) / n) * TAU;
+    verts.push([Math.cos(a), -half, Math.sin(a)]);
+  }
+
+  const top = i => i % n;
+  const bot = i => n + (i % n);
+  const faces = [
+    Array.from({ length: n }, (_, i) => i),
+    Array.from({ length: n }, (_, i) => 2 * n - 1 - i),
+  ];
+  for (let i = 0; i < n; i++) {
+    faces.push([top(i), top(i + 1), bot(i)]);
+    faces.push([bot(i), top(i + 1), bot(i + 1)]);
+  }
+  return normalize({ verts, faces });
+}
+
+// A squat trapezohedron. Same construction as the tall one — the planar apex
+// height is not negotiable — but flattened harder, which reads as a ball of
+// facets rather than a pair of cones.
+//
+// (An actual rhombic solid was tried here and cut: pulling one ring inward to
+// turn the kites into rhombi makes every face non-planar, the same way guessing
+// the apex height did.)
+// `flatten` scales the pole height directly, so smaller values are squatter —
+// 1.0 puts the poles level with the equator, giving a ball of facets rather
+// than the pair of cones a larger value produces.
+function squat(n) {
+  return trapezohedron(n, 0.85);
+}
+
+// Elongated bipyramid: a prism band with a pyramid on each end. Reads as a
+// crystal rather than a drum or a pair of cones.
+function elongated(n) {
+  const verts = [];
+  const half = 0.62;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * TAU;
+    verts.push([Math.cos(a), half, Math.sin(a)]);
+  }
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * TAU;
+    verts.push([Math.cos(a), -half, Math.sin(a)]);
+  }
+  const apexTop = verts.push([0, half + 0.42, 0]) - 1;
+  const apexBot = verts.push([0, -half - 0.42, 0]) - 1;
+
+  const faces = [];
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    faces.push([i, j, n + j, n + i]);
+    faces.push([apexTop, j, i]);
+    faces.push([apexBot, n + i, n + j]);
+  }
+  return normalize({ verts, faces });
+}
+
 function normalize(solid) {
   const scale = Math.max(...solid.verts.map(v => Math.hypot(...v)));
   return { verts: solid.verts.map(v => v.map(x => x / scale)), faces: solid.faces };
@@ -264,6 +334,33 @@ function claimSearchBudget() {
 // Every face of a given solid is equivalent under its rotational symmetry, so
 // the shape is honest about the die. (The roll itself is decided by crypto RNG
 // regardless; this is about the geometry not lying.)
+// Families used for dice too large to draw facet-per-face. Each produces a
+// clearly different silhouette: cones, a drum, a crystal, a rhombic ball.
+const LARGE_FAMILIES = [
+  n => trapezohedron(n, 1.45), // rounded cones
+  antiprism,                   // straight-sided drum
+  elongated,                   // faceted crystal
+  squat,                       // ball of facets
+];
+
+// Choose the shape from the number's own arithmetic, so it is stable across
+// rolls but varies across dice. The smallest prime factor picks the family and
+// the digit sum nudges the facet count, which spreads neighbours like d100 and
+// d102 apart instead of collapsing them onto one shape.
+function largeSolid(sides) {
+  let smallestFactor = sides;
+  for (let f = 2; f * f <= sides; f++) {
+    if (sides % f === 0) { smallestFactor = f; break; }
+  }
+  const digitSum = String(sides).split('').reduce((a, c) => a + Number(c), 0);
+
+  const family = LARGE_FAMILIES[(smallestFactor + digitSum) % LARGE_FAMILIES.length];
+  // 6-11 facets around the equator: enough to read as many-sided, few enough
+  // that the edges stay distinct at the size a die is actually drawn.
+  const facets = 6 + (digitSum % 6);
+  return family(facets);
+}
+
 export function solidFor(sides) {
   if (!Number.isFinite(sides) || sides < 1) return null;
   if (solidCache.has(sides)) return solidCache.get(sides);
@@ -278,15 +375,17 @@ export function solidFor(sides) {
     solid = coin();
   } else if (SOLIDS[sides]) {
     solid = SOLIDS[sides]();
-  } else if (sides % 2 === 0 && sides / 2 >= 3 && sides <= MAX_FACETS) {
-    solid = trapezohedron(sides / 2);
   } else if (sides <= MAX_FACETS) {
-    solid = prismBarrel(sides);
+    solid = sides % 2 === 0 && sides / 2 >= 3
+      ? trapezohedron(sides / 2)
+      : prismBarrel(sides);
   } else {
     // Past ~40 facets the geometry is finer than a few hundred pixels can show,
-    // so cap it. The die still reports its true side count; only the silhouette
-    // stops gaining detail nobody can see.
-    solid = trapezohedron(MAX_FACETS / 2);
+    // so the facet count caps. Rather than give every large die the same
+    // silhouette, pick a family and a facet count from the number itself: a d30,
+    // a d57 and a d100 then look properly different from each other while each
+    // stays the same shape every time it is rolled.
+    solid = largeSolid(sides);
   }
 
   solidCache.set(sides, solid);

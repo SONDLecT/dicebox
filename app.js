@@ -32,23 +32,41 @@ const state = {
 
 // ---- theme ----
 
+// With nothing stored the page follows the system setting, and keeps following
+// it if that changes. Choosing a theme pins it until it is cleared.
+const systemDark = window.matchMedia('(prefers-color-scheme: dark)');
+
+function isDark() {
+  const pinned = document.documentElement.dataset.theme;
+  if (pinned === 'dark') return true;
+  if (pinned === 'light') return false;
+  return systemDark.matches;
+}
+
 const stored = localStorage.getItem('dicebox:theme');
-if (stored) document.documentElement.dataset.theme = stored;
+if (stored === 'dark' || stored === 'light') document.documentElement.dataset.theme = stored;
 syncThemeLabel();
 
 $('themeToggle').addEventListener('click', () => {
-  const root = document.documentElement;
-  const dark = getComputedStyle(root).getPropertyValue('--paper').trim().toLowerCase() === '#141413';
-  root.dataset.theme = dark ? 'light' : 'dark';
-  localStorage.setItem('dicebox:theme', root.dataset.theme);
+  document.documentElement.dataset.theme = isDark() ? 'light' : 'dark';
+  localStorage.setItem('dicebox:theme', document.documentElement.dataset.theme);
   syncThemeLabel();
   updateThemeColor();
 });
 
+systemDark.addEventListener('change', () => {
+  if (document.documentElement.dataset.theme) return; // pinned by choice
+  syncThemeLabel();
+  updateThemeColor();
+});
+
+// The button shows the theme you are in and switches to the other one, so the
+// label has to describe the destination rather than the icon.
 function syncThemeLabel() {
-  const dark = getComputedStyle(document.documentElement)
-    .getPropertyValue('--paper').trim().toLowerCase() === '#141413';
-  document.querySelector('[data-theme-label]').textContent = dark ? 'Light' : 'Dark';
+  const dark = isDark();
+  $('themeToggle').dataset.mode = dark ? 'dark' : 'light';
+  $('themeToggle').setAttribute('aria-label',
+    dark ? 'Switch to light theme' : 'Switch to dark theme');
 }
 
 function updateThemeColor() {
@@ -190,6 +208,8 @@ function finish(result) {
   $('total').textContent = String(result.total);
   $('breakdown').textContent = describe(result.groups);
   addHistory(result);
+  // The name has done its job by the first roll; let the tray have the page.
+  $('wordmark').dataset.faded = '1';
 }
 
 function addHistory(result) {
@@ -223,6 +243,11 @@ $('entry').addEventListener('submit', e => {
 // about what is loaded.
 $('notation').addEventListener('input', () => {
   pool = parsePool($('notation').value);
+  // Typing an unusual die earns it a button too, so the row always accounts for
+  // everything in the pool.
+  for (const sides of pool.keys()) {
+    if (sides >= 1 && sides <= MAX_SIDES) ensureDieButton(sides);
+  }
   markPool();
 });
 
@@ -232,7 +257,7 @@ const help = $('help');
 const helpToggle = $('helpToggle');
 
 function setHelp(open) {
-  if (open) closeSheet();
+  if (open) { closeSheet(); closeDial(); }
   help.hidden = !open;
   helpToggle.setAttribute('aria-expanded', String(open));
   helpToggle.setAttribute('aria-label', open ? 'Hide syntax reference' : 'Show syntax reference');
@@ -354,16 +379,44 @@ function syncPool() {
 // looking, instead of only in the notation field.
 function markPool() {
   for (const b of diceButtons.children) {
+    // The custom-die button opens a picker rather than standing for a die, so
+    // it never carries pool state.
+    if (!b.dataset.sides) continue;
     const entry = pool.get(Number(b.dataset.sides));
     const n = entry ? entry.count : 0;
     b.setAttribute('aria-pressed', String(n > 0));
     if (n > 1) b.dataset.count = String(n);
     else delete b.dataset.count;
-    // A die carrying a modifier is marked, so kh1/dl1 is visible on the row
-    // instead of only in the notation.
-    if (entry && entry.mod) b.dataset.mod = '1';
-    else delete b.dataset.mod;
+    // Each modifier gets its own glyph. One shared underline told you a die was
+    // modified but not how, which is the part worth knowing at a glance.
+    const glyph = entry && entry.mod ? modifierGlyph(entry.mod) : null;
+    if (glyph) {
+      b.dataset.mod = glyph.mark;
+      b.title = `d${b.dataset.sides} — ${glyph.label}`;
+    } else {
+      delete b.dataset.mod;
+      b.removeAttribute('title');
+    }
   }
+}
+
+// Marks shown on a die button, chosen to say which modifier without a legend:
+// arrows point the way the kept die goes, a burst means exploding, a cycle means
+// reroll. Drop shares the arrow but points at what leaves.
+const MODIFIER_GLYPHS = [
+  [/^kh/, { mark: '▲', label: 'advantage — keep highest' }],
+  [/^kl/, { mark: '▼', label: 'disadvantage — keep lowest' }],
+  [/^dl/, { mark: '⌃', label: 'drop lowest' }],
+  [/^dh/, { mark: '⌄', label: 'drop highest' }],
+  [/^!/,  { mark: '✳', label: 'exploding' }],
+  [/^r/,  { mark: '↻', label: 'reroll' }],
+];
+
+function modifierGlyph(mod) {
+  for (const [pattern, glyph] of MODIFIER_GLYPHS) {
+    if (pattern.test(mod)) return glyph;
+  }
+  return { mark: '•', label: mod };
 }
 
 function clearPool() {
@@ -403,15 +456,142 @@ countField.addEventListener('focus', () => countField.select());
 // ---- dice buttons ----
 
 for (const sides of QUICK) {
+  diceButtons.append(makeDieButton(sides));
+}
+
+function makeDieButton(sides) {
   const b = document.createElement('button');
   b.className = 'dbtn';
   b.type = 'button';
-  b.textContent = `d${sides}`;
   b.dataset.sides = String(sides);
+
+  // The hold-fill is its own element: ::before carries the modifier glyph and
+  // ::after the count, so a pseudo-element here would collide with one of them.
+  const fill = document.createElement('span');
+  fill.className = 'dbtn-fill';
+  b.append(fill, document.createTextNode(`d${sides}`));
   b.addEventListener('click', () => addToPool(sides, perTap()));
   attachModifierSheet(b, sides);
-  diceButtons.append(b);
+  return b;
 }
+
+// A die made with the custom picker earns a button of its own, in size order,
+// so it behaves like every other die — tappable, countable, and holdable for
+// modifiers. Without one a d46 could be staged but never modified.
+function ensureDieButton(sides) {
+  const existing = [...diceButtons.children]
+    .find(b => Number(b.dataset.sides) === sides);
+  if (existing) return existing;
+
+  const button = makeDieButton(sides);
+  button.dataset.custom = '1';
+
+  const after = [...diceButtons.children]
+    .find(b => b.dataset.sides && Number(b.dataset.sides) > sides);
+  diceButtons.insertBefore(button, after || null);
+  return button;
+}
+
+// ---- custom die ----
+//
+// A scroll wheel, the way a phone's timer picker works: flick through the
+// numbers and one snaps under the marker. Scroll-snap does the physics, so
+// there is no momentum code to write and it feels native on both platforms.
+// The field beside it is for jumping straight to a number like 57.
+
+const MAX_SIDES = 1000;
+const dial = $('dial');
+const wheel = $('wheel');
+const dialInput = $('dialInput');
+
+for (let n = 1; n <= MAX_SIDES; n++) {
+  const item = document.createElement('div');
+  item.className = 'wheel-item';
+  item.dataset.value = String(n);
+  item.textContent = `d${n}`;
+  item.setAttribute('role', 'option');
+  wheel.append(item);
+}
+
+const wheelItem = n => wheel.children[n - 1];
+
+function dialValue() {
+  const n = parseInt(dialInput.value, 10);
+  return Number.isFinite(n) && n >= 1 ? Math.min(n, MAX_SIDES) : 20;
+}
+
+function centreWheel(n, smooth = false) {
+  const item = wheelItem(n);
+  if (!item) return;
+  wheel.scrollTo({
+    top: item.offsetTop - (wheel.clientHeight - item.offsetHeight) / 2,
+    behavior: smooth ? 'smooth' : 'auto',
+  });
+}
+
+function setDial(n, { scroll = true, focusField = false } = {}) {
+  const value = Math.max(1, Math.min(MAX_SIDES, n));
+  dialInput.value = String(value);
+  for (const item of wheel.children) {
+    item.setAttribute('aria-selected', String(Number(item.dataset.value) === value));
+  }
+  if (scroll) centreWheel(value);
+  if (focusField) dialInput.select();
+}
+
+// Read back whichever item settled under the marker.
+let wheelSettle = null;
+wheel.addEventListener('scroll', () => {
+  clearTimeout(wheelSettle);
+  wheelSettle = setTimeout(() => {
+    const middle = wheel.scrollTop + wheel.clientHeight / 2;
+    let closest = 1, best = Infinity;
+    for (const item of wheel.children) {
+      const d = Math.abs(item.offsetTop + item.offsetHeight / 2 - middle);
+      if (d < best) { best = d; closest = Number(item.dataset.value); }
+    }
+    setDial(closest, { scroll: false });
+  }, 90);
+});
+
+wheel.addEventListener('click', e => {
+  const item = e.target.closest('.wheel-item');
+  if (item) setDial(Number(item.dataset.value));
+});
+
+wheel.addEventListener('keydown', e => {
+  const step = e.key === 'ArrowUp' ? -1 : e.key === 'ArrowDown' ? 1
+             : e.key === 'PageUp' ? -10 : e.key === 'PageDown' ? 10 : 0;
+  if (!step) return;
+  e.preventDefault();
+  setDial(dialValue() + step);
+});
+
+dialInput.addEventListener('input', () => {
+  const n = parseInt(dialInput.value, 10);
+  if (Number.isFinite(n) && n >= 1 && n <= MAX_SIDES) setDial(n, { scroll: true });
+});
+dialInput.addEventListener('focus', () => dialInput.select());
+
+function openDial() {
+  setHelp(false);
+  closeSheet();
+  dial.hidden = false;
+  setDial(dialValue());
+  hideHint();
+}
+
+function closeDial() { dial.hidden = true; }
+
+$('customDie').addEventListener('click', openDial);
+$('dialClose').addEventListener('click', closeDial);
+$('dialAdd').addEventListener('click', () => {
+  const sides = dialValue();
+  closeDial();
+  const button = ensureDieButton(sides);
+  addToPool(sides, perTap());
+  button.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+});
 
 // ---- modifier sheet ----
 //
@@ -460,8 +640,9 @@ function applyModifier(sides, mod) {
 }
 
 function openSheet(sides) {
-  // Both fill the tray, so only one can be up at a time.
+  // All three fill the tray, so only one can be up at a time.
   setHelp(false);
+  closeDial();
   $('sheetTitle').textContent = `d${sides}`;
   sheetOptions.replaceChildren();
 
@@ -479,7 +660,15 @@ function openSheet(sides) {
 
     const name = document.createElement('span');
     name.className = 'sheet-option-name';
-    name.textContent = mod.label;
+    // Lead with the same glyph the die button will show, so the mark on the row
+    // is learnable rather than a code to decipher.
+    if (mod.suffix) {
+      const mark = document.createElement('span');
+      mark.className = 'sheet-option-mark';
+      mark.textContent = modifierGlyph(mod.suffix).mark;
+      name.append(mark);
+    }
+    name.append(mod.label);
 
     const notation = document.createElement('span');
     notation.className = 'sheet-option-notation';
@@ -512,7 +701,9 @@ function closeSheet() {
 $('sheetClose').addEventListener('click', closeSheet);
 
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && !sheet.hidden) closeSheet();
+  if (e.key !== 'Escape') return;
+  if (!sheet.hidden) closeSheet();
+  if (!dial.hidden) closeDial();
 });
 
 // Long-press on touch, right-click on desktop — long-press has no mouse
@@ -661,6 +852,53 @@ function frame(now) {
 resize();
 updateThemeColor();
 requestAnimationFrame(frame);
+
+// ---- install ----
+//
+// Chrome and Edge fire beforeinstallprompt and let the page trigger the install
+// flow. Safari never does, so iOS gets the manual route spelled out instead of a
+// button that cannot work.
+
+let installEvent = null;
+const installButton = $('install');
+const installHint = $('installHint');
+
+const standalone = window.matchMedia('(display-mode: standalone)').matches
+  || window.navigator.standalone === true;
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  installEvent = e;
+  if (standalone) return;
+  installButton.hidden = false;
+  installHint.textContent = 'Works offline once installed.';
+});
+
+installButton.addEventListener('click', async () => {
+  if (!installEvent) return;
+  installButton.disabled = true;
+  installEvent.prompt();
+  const { outcome } = await installEvent.userChoice;
+  installEvent = null;
+  if (outcome === 'accepted') {
+    installButton.hidden = true;
+    installHint.textContent = 'Installed. It works offline from here.';
+  } else {
+    installButton.disabled = false;
+  }
+});
+
+window.addEventListener('appinstalled', () => {
+  installButton.hidden = true;
+  installHint.textContent = 'Installed. It works offline from here.';
+});
+
+if (standalone) {
+  installHint.textContent = 'Running as an app. Rolls work offline.';
+} else if (/iphone|ipad|ipod/i.test(navigator.userAgent)) {
+  // Safari offers no install API, so name the actual menu items.
+  installHint.textContent = 'To install: tap Share, then Add to Home Screen. It works offline.';
+}
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

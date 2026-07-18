@@ -79,6 +79,8 @@ body {
   flex: 0 0 auto;
 }
 
+/* Present on arrival, then out of the way. Once you have rolled, the name has
+   done its job and the tray should be the only thing asking for attention. */
 .wordmark {
   margin: 0;
   font-size: 15px;
@@ -86,6 +88,12 @@ body {
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--muted);
+  transition: opacity 1200ms ease;
+}
+.wordmark[data-faded="1"] { opacity: 0.28; }
+
+@media (prefers-reduced-motion: reduce) {
+  .wordmark { transition-duration: 1ms; }
 }
 
 .bar-actions {
@@ -114,7 +122,15 @@ body {
   padding: 0;
   font-size: 14px;
   letter-spacing: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
+
+/* One icon at a time: the sun in light mode, the moon in dark. */
+#themeToggle [data-icon] { display: none; }
+#themeToggle[data-mode="light"] [data-icon="sun"] { display: block; }
+#themeToggle[data-mode="dark"] [data-icon="moon"] { display: block; }
 
 .ghost[aria-expanded="true"] {
   color: var(--accent);
@@ -181,6 +197,25 @@ body {
   color: var(--muted);
   max-width: 44ch;
 }
+
+.help .install {
+  margin-top: 10px;
+}
+
+.install-button {
+  appearance: none;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 12.5px;
+  min-height: 30px;
+  padding: 0 12px;
+  margin-right: 8px;
+  cursor: pointer;
+}
+.install-button:disabled { opacity: 0.5; }
 
 .help .colophon {
   margin: 10px 0 0;
@@ -393,42 +428,165 @@ body {
   padding-right: 14px;
 }
 
-/* An underline marks a die carrying a modifier, so kh1/dl1 is visible on the
-   row rather than only in the notation field. */
+/* The modifier's own glyph, bottom-left so it never collides with the count
+   badge top-right. A shared underline said "modified" but not which. */
+.dbtn[data-mod]::before {
+  content: attr(data-mod);
+  position: absolute;
+  bottom: 1px;
+  left: 4px;
+  z-index: 1;
+  font-size: 9px;
+  line-height: 1;
+  letter-spacing: 0;
+  color: var(--accent);
+  pointer-events: none;
+}
+
 .dbtn[data-mod] {
-  text-decoration: underline;
-  text-decoration-color: var(--accent);
-  text-underline-offset: 3px;
-  text-decoration-thickness: 1px;
+  padding-left: 13px;
 }
 
 .sheet-option[aria-pressed="true"] .sheet-option-name {
   color: var(--accent);
 }
 
+/* ---- custom die wheel ---- */
+
+.dial .sheet-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Scroll-snap does the physics: flick and a number settles under the marker,
+   the way a phone's timer picker behaves. */
+.wheel {
+  flex: 1 1 auto;
+  min-height: 96px;
+  max-height: 150px;
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+  position: relative;
+  /* Fades the ends so the list reads as a wheel rather than a cut-off column. */
+  mask-image: linear-gradient(transparent, #000 22%, #000 78%, transparent);
+  -webkit-mask-image: linear-gradient(transparent, #000 22%, #000 78%, transparent);
+  /* Half the visible height, so the first and last items can reach the middle. */
+  padding: 56px 0;
+}
+.wheel::-webkit-scrollbar { display: none; }
+
+.wheel-item {
+  scroll-snap-align: center;
+  height: 30px;
+  line-height: 30px;
+  text-align: center;
+  font-family: "Iosevka Etoile", ui-monospace, monospace;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  opacity: 0.45;
+  cursor: pointer;
+  transition: color 120ms ease, opacity 120ms ease;
+}
+.wheel-item[aria-selected="true"] {
+  color: var(--accent);
+  opacity: 1;
+  font-size: 19px;
+}
+
+/* The marker: two hairlines the selected number sits between. */
+.dial .sheet-panel {
+  position: relative;
+}
+.wheel::before,
+.wheel::after {
+  content: "";
+  position: sticky;
+  left: 0;
+  display: block;
+  height: 1px;
+  background: var(--hair);
+  z-index: 1;
+}
+.wheel::before { top: calc(50% - 16px); }
+.wheel::after  { bottom: calc(50% - 16px); }
+
+.dial-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 2px 2px;
+}
+
+.dial-entry {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid var(--hair);
+  border-radius: 10px;
+  padding: 0 10px;
+  min-height: var(--tap);
+  font-family: "Iosevka Etoile", ui-monospace, monospace;
+  font-size: 15px;
+  color: var(--muted);
+}
+
+.dial-entry input {
+  width: 3.6em;
+  border: 0;
+  background: none;
+  color: var(--line);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  padding: 0;
+}
+.dial-entry input:focus { outline: none; }
+
+.dial-add {
+  flex: 1 1 auto;
+}
+
+/* The custom-die button reads as an action rather than a die. */
+.dbtn.custom {
+  color: var(--muted);
+  font-family: "Iosevka Etoile", ui-monospace, monospace;
+}
+
+/* A die added through the picker. Dashed to show it is not part of the standard
+   set, but otherwise a full die: tappable, countable, holdable for modifiers. */
+.dbtn[data-custom] {
+  border-style: dashed;
+}
+
+
 /* Holding a die fills it, which both signals that a long press does something
-   and shows how much longer to hold. The fill sits behind the label. */
+   and shows how much longer to hold. The fill is its own element rather than a
+   pseudo-element: ::before carries the modifier glyph and ::after the count, and
+   a third use would collide with one of them. */
 .dbtn {
   position: relative;
   overflow: hidden;
   isolation: isolate;
 }
-.dbtn::before {
-  content: "";
+
+.dbtn-fill {
   position: absolute;
   inset: 0;
   z-index: -1;
   background: color-mix(in srgb, var(--accent) 18%, transparent);
   transform: scaleX(0);
   transform-origin: left;
+  pointer-events: none;
 }
-.dbtn[data-holding="1"]::before {
+.dbtn[data-holding="1"] .dbtn-fill {
   transform: scaleX(1);
   transition: transform 450ms linear;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .dbtn[data-holding="1"]::before { transition-duration: 1ms; }
+  .dbtn[data-holding="1"] .dbtn-fill { transition-duration: 1ms; }
 }
 
 /* ---- modifier sheet ---- */
@@ -510,6 +668,14 @@ body {
 .sheet-option-name {
   font-size: 14px;
   color: var(--line);
+}
+
+/* The same mark the die button shows, so the row's glyphs teach themselves. */
+.sheet-option-mark {
+  display: inline-block;
+  width: 1.3em;
+  color: var(--accent);
+  font-size: 12px;
 }
 
 .sheet-option-notation {

@@ -18,6 +18,7 @@ const makeEl = (id = '') => {
     children: [], className: '', tabIndex: 0, role: '',
     classList: { add(){}, remove(){}, toggle(){} },
     addEventListener(){}, removeEventListener(){}, setAttribute(){}, getAttribute(){ return null; },
+    insertBefore(node){ this.children.push(node); return node; },
     removeAttribute(){}, append(){}, prepend(){}, remove(){}, replaceChildren(){},
     focus(){}, blur(){}, select(){}, scrollIntoView(){}, setPointerCapture(){},
     querySelectorAll(){ return []; }, querySelector(){ return null; },
@@ -40,11 +41,18 @@ globalThis.ResizeObserver = class { observe(){} disconnect(){} };
 globalThis.localStorage = { getItem: () => null, setItem(){}, removeItem(){} };
 globalThis.navigator = { vibrate(){}, serviceWorker: { register: () => Promise.resolve() } };
 globalThis.getComputedStyle = () => ({ getPropertyValue: () => '#FCFCFA' });
-globalThis.window = { addEventListener(){}, devicePixelRatio: 2 };
+globalThis.matchMedia = () => ({ matches: false, addEventListener(){}, removeEventListener(){}, addListener(){}, removeListener(){} });
+globalThis.window = {
+  addEventListener(){}, devicePixelRatio: 2,
+  matchMedia: globalThis.matchMedia,
+  navigator: { standalone: false },
+};
+globalThis.navigator = { ...globalThis.navigator, userAgent: 'node' };
 globalThis.document = {
   documentElement: makeEl('html'),
   getElementById: id => store.get(id) || null,
   createElement: () => makeEl(),
+  createTextNode: text => ({ nodeType: 3, textContent: String(text) }),
   querySelector: () => makeEl(),
   querySelectorAll: () => [],
   addEventListener(){},

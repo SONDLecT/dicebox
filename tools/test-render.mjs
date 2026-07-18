@@ -209,6 +209,50 @@ ok('d0 has no solid', solidFor(0) === null);
 ok('negative sides rejected', solidFor(-5) === null);
 ok('non-numeric sides rejected', solidFor(NaN) === null);
 
+// --- large dice look different from each other ---
+// Everything past the facet cap used to collapse onto one silhouette, so a d30,
+// a d57 and a d100 were indistinguishable. The family and facet count now come
+// from the number's own arithmetic: stable per die, varied across dice.
+{
+  const probe = [30, 41, 50, 57, 60, 66, 75, 100, 127, 200, 360, 1000];
+  const shapes = new Set(probe.map(s => {
+    const solid = solidFor(s);
+    return `${solid.faces.length}/${solid.verts.length}`;
+  }));
+  ok('large dice have varied silhouettes', shapes.size >= 6,
+     `only ${shapes.size} distinct among ${probe.length}`);
+
+  // Same die, same shape every time — the variety must not be random.
+  const first = solidFor(57);
+  ok('shape is stable per side count', solidFor(57) === first);
+
+  // None of them may be needles or plates; a die has to read as a solid.
+  let worstAspect = 0, worstSides = 0;
+  // d2 is exempt: a coin is supposed to be flat.
+  for (let s = 3; s <= 1000; s++) {
+    const solid = solidFor(s);
+    const ys = solid.verts.map(v => v[1]);
+    const radii = solid.verts.map(v => Math.hypot(v[0], v[2]));
+    const aspect = (Math.max(...ys) - Math.min(...ys)) / (2 * Math.max(...radii));
+    const off = Math.max(aspect, 1 / aspect);
+    if (off > worstAspect) { worstAspect = off; worstSides = s; }
+  }
+  ok('no die is a needle or a plate', worstAspect < 2.2,
+     `d${worstSides} has aspect ${worstAspect.toFixed(2)}:1`);
+}
+
+// Every side count the custom picker offers must produce a drawable solid.
+{
+  let bad = null;
+  for (let s = 1; s <= 1000 && !bad; s++) {
+    const solid = solidFor(s);
+    if (!solid) { bad = `d${s} has no solid`; break; }
+    if (maxPlanarityError(solid) > 1e-9) bad = `d${s} is not planar`;
+    if (solid.faces.length < 3) bad = `d${s} has ${solid.faces.length} faces`;
+  }
+  ok('d1-d1000 all drawable', bad === null, bad || '');
+}
+
 // --- resting orientation ---
 // A settled die must present a face to the camera. Landing pole-on or vertex-on
 // reads as a spike and leaves nowhere to paint the numeral.
