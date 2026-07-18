@@ -74,6 +74,13 @@ out = out.replace(
   '// Service worker omitted: this build is a single local file.',
 );
 
+// This build is the download, so it cannot offer one — a relative link would
+// point at a file that is not there once the page has been saved somewhere else.
+out = out.replace(
+  /\s*<span class="colophon-sep">·<\/span>\s*<!--[\s\S]*?-->\s*<a href="dicebox\.html"[^>]*>[^<]*<\/a>/,
+  '',
+);
+
 // The install button belongs to the hosted copy; a downloaded file is already
 // as installed as it gets.
 out = out.replace(

@@ -79,6 +79,10 @@ const uncached = refs.filter(r => {
   const bare = r.replace(/^\.\//, '');
   // index.html is served at './' and must not be precached under its own name.
   if (bare === 'index.html') return false;
+  // The single-file build is a download, not something the app loads. Caching a
+  // second copy of the whole app inside the app would double its footprint for
+  // nothing.
+  if (bare === 'dicebox.html') return false;
   return !precache.some(p => p.replace(/^\.\//, '') === bare);
 });
 ok('every local asset is precached', uncached.length === 0, uncached.join(', '));

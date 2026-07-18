@@ -264,7 +264,33 @@ function finish(result) {
   $('wordmark').dataset.faded = '1';
 }
 
+// The visible log stays short, but the record does not: a session's worth of
+// rolls is the interesting artifact, and truncating at twelve threw it away.
+const HISTORY_LIMIT = 500;
+const history = [];
+
+function recordRoll(result) {
+  history.push({
+    at: new Date().toISOString(),
+    notation: result.notation,
+    total: result.total,
+    detail: describe(result.groups),
+    dice: result.groups
+      .filter(g => g.kind === 'dice')
+      .flatMap(g => g.dice.map(d => ({
+        sides: g.sides,
+        value: d.value,
+        kept: d.kept,
+        exploded: d.exploded,
+        rerolled: d.rerolled,
+      }))),
+  });
+  if (history.length > HISTORY_LIMIT) history.shift();
+  $('historyCount').textContent = history.length > 12 ? `${history.length} rolls` : '';
+}
+
 function addHistory(result) {
+  recordRoll(result);
   const li = document.createElement('li');
 
   const top = document.createElement('div');
@@ -330,7 +356,7 @@ const help = $('help');
 const helpToggle = $('helpToggle');
 
 function setHelp(open) {
-  if (open) { closeSheet(); closeDial(); }
+  if (open) { closeSheet(); closeDial(); closeHistory(); }
   help.hidden = !open;
   helpToggle.setAttribute('aria-expanded', String(open));
   helpToggle.setAttribute('aria-label', open ? 'Hide syntax reference' : 'Show syntax reference');
@@ -625,6 +651,142 @@ function ensureDieButton(sides) {
   return button;
 }
 
+// ---- full history ----
+//
+// The strip above the input shows the last few rolls; this is the whole session,
+// with what every die landed on and when. Exportable, because the interesting
+// question — "are these dice actually fair?" — needs the raw rolls, not a total.
+
+const historyPanel = $('historyPanel');
+
+function openHistory() {
+  setHelp(false);
+  closeSheet();
+  closeDial();
+
+  const list = $('historyFull');
+  list.replaceChildren();
+
+  if (!history.length) {
+    const empty = document.createElement('li');
+    empty.className = 'history-empty';
+    empty.textContent = 'No rolls yet.';
+    list.append(empty);
+  }
+
+  // Newest first: the roll you are asking about is usually the last one.
+  for (const entry of [...history].reverse()) {
+    const li = document.createElement('li');
+
+    const line = document.createElement('div');
+    line.className = 'log-line';
+
+    const when = document.createElement('span');
+    when.className = 'history-time';
+    when.textContent = new Date(entry.at).toLocaleTimeString([], {
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+    });
+
+    const notation = document.createElement('span');
+    notation.className = 'history-notation';
+    notation.textContent = entry.notation;
+
+    const total = document.createElement('b');
+    total.textContent = String(entry.total);
+
+    line.append(when, notation, total);
+    li.append(line);
+
+    if (entry.detail && entry.detail !== entry.notation) {
+      const detail = document.createElement('span');
+      detail.className = 'log-detail';
+      detail.textContent = entry.detail;
+      li.append(detail);
+    }
+    list.append(li);
+  }
+
+  historyPanel.hidden = false;
+  $('historyClose').focus();
+}
+
+function closeHistory() { historyPanel.hidden = true; }
+
+$('historyOpen').addEventListener('click', openHistory);
+$('historyClose').addEventListener('click', closeHistory);
+historyPanel.addEventListener('click', e => {
+  if (e.target === historyPanel) closeHistory();
+});
+
+// One row per die rather than per roll: that is the shape you want to pivot on,
+// count faces with, or chart. A row-per-roll would bury the individual dice in
+// a text field and make the whole export useless for the question people
+// actually ask of a dice log.
+function historyCsv() {
+  const rows = [['time', 'notation', 'total', 'die', 'sides', 'value', 'kept', 'exploded', 'rerolled']];
+  for (const entry of history) {
+    entry.dice.forEach((d, i) => {
+      rows.push([
+        entry.at, entry.notation, entry.total, i + 1,
+        d.sides, d.value, d.kept ? 1 : 0, d.exploded ? 1 : 0, d.rerolled ? 1 : 0,
+      ]);
+    });
+  }
+  return rows
+    .map(r => r.map(cell => {
+      const text = String(cell);
+      return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    }).join(','))
+    .join('\n');
+}
+
+function historyText() {
+  return history
+    .map(e => `${new Date(e.at).toLocaleTimeString()}  ${e.notation} = ${e.total}\n    ${e.detail}`)
+    .join('\n');
+}
+
+function download(name, text, type) {
+  const url = URL.createObjectURL(new Blob([text], { type }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  a.click();
+  // Revoked on the next tick: the click is synchronous but the fetch is not.
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+const stamp = () => new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+
+$('historyCsv').addEventListener('click', () => {
+  if (history.length) download(`dicebox-${stamp()}.csv`, historyCsv(), 'text/csv');
+});
+
+$('historyJson').addEventListener('click', () => {
+  if (history.length) {
+    download(`dicebox-${stamp()}.json`, JSON.stringify(history, null, 2), 'application/json');
+  }
+});
+
+$('historyCopy').addEventListener('click', async () => {
+  if (!history.length) return;
+  const button = $('historyCopy');
+  try {
+    await navigator.clipboard.writeText(historyText());
+    button.textContent = 'Copied';
+  } catch {
+    button.textContent = 'Copy failed';
+  }
+  setTimeout(() => { button.textContent = 'Copy'; }, 1400);
+});
+
+$('historyClear').addEventListener('click', () => {
+  history.length = 0;
+  $('history').replaceChildren();
+  $('historyCount').textContent = '';
+  openHistory();
+});
+
 // ---- custom die ----
 //
 // A scroll wheel, the way a phone's timer picker works: flick through the
@@ -709,6 +871,7 @@ dialInput.addEventListener('focus', () => dialInput.select());
 function openDial() {
   setHelp(false);
   closeSheet();
+  closeHistory();
   dial.hidden = false;
   setDial(dialValue());
   hideHint();
@@ -790,6 +953,7 @@ function openSheet(sides, { focus = null } = {}) {
   // All three fill the tray, so only one can be up at a time.
   setHelp(false);
   closeDial();
+  closeHistory();
   $('sheetTitle').textContent = `d${sides}`;
   sheetOptions.replaceChildren();
 
@@ -960,6 +1124,7 @@ document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   if (!sheet.hidden) closeSheet();
   if (!dial.hidden) closeDial();
+  if (!historyPanel.hidden) closeHistory();
 });
 
 // Long-press on touch, right-click on desktop — long-press has no mouse

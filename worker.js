@@ -28,6 +28,21 @@ const ALWAYS_REVALIDATE = new Set(['/sw.js', '/', '/index.html', '/manifest.webm
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+
+    // The single-file build is a download, so it is served straight through with
+    // a filename attached. Left to the default handling the edge rewrites
+    // /dicebox.html to /dicebox with a 307, and a download link that redirects
+    // is the same fragility that stopped the installed app from launching.
+    if (url.pathname === '/dicebox.html') {
+      const res = await env.ASSETS.fetch(new URL('/dicebox', url));
+      const headers = new Headers(res.headers);
+      for (const [k, v] of Object.entries(SECURITY)) headers.set(k, v);
+      headers.set('Content-Type', 'text/html; charset=utf-8');
+      headers.set('Content-Disposition', 'attachment; filename="dicebox.html"');
+      headers.set('Cache-Control', 'no-cache');
+      return new Response(res.body, { status: res.status, headers });
+    }
+
     const res = await env.ASSETS.fetch(request);
 
     const headers = new Headers(res.headers);

@@ -111,16 +111,32 @@ more facets than the die is drawn wide cannot be told apart.
 `crypto.getRandomValues` with rejection sampling, so there's no modulo bias.
 `Math.random()` is not used anywhere in the roll path.
 
+## The roll log
+
+Every roll is kept for the session, with what each die landed on and when.
+**Full history** under the recent rolls opens the lot, and exports it:
+
+- **Copy** puts a readable log on the clipboard
+- **CSV** gives one row per die — time, notation, total, sides, value, and
+  whether it was kept, exploded or rerolled — which is the shape you want for
+  counting faces or checking whether a die is drifting
+- **JSON** is the same data with the structure intact
+
+Nothing leaves the browser unless you export it.
+
 ## Getting it offline
 
 Three ways, easiest first.
 
 ### Download one file
 
-Grab **[`dist/dicebox.html`](dist/dicebox.html)** and open it. That is the entire
-app in a single 118KB file — no server, no install, no network. Put it on a USB
-stick, email it to yourself, keep it in a folder with your character sheets. It
-works the same on a laptop with the wifi off.
+Grab **[dicebox.html](https://dicebox.trollskull.cc/dicebox.html)** — or the copy
+in [`dist/`](dist/dicebox.html) — and open it. That is the entire app in a single
+file: no server, no install, no network. Put it on a USB stick, email it to
+yourself, keep it in a folder with your character sheets. It works the same on a
+laptop with the wifi off.
+
+The help panel inside the app links to it too.
 
 ### Install it from the web
 

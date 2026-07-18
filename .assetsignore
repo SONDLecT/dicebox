@@ -12,3 +12,6 @@ README.md
 # Workers these rules are applied by the Worker script instead.
 _headers
 worker.js
+
+# Shipped explicitly to the site root by tools/deploy.mjs.
+dist

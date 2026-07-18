@@ -9,7 +9,7 @@
 //
 // Credentials come from .env and are never logged.
 
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -69,19 +69,24 @@ const TYPES = {
 };
 const typeOf = p => TYPES[p.slice(p.lastIndexOf('.'))] || 'application/octet-stream';
 
-const files = walk(ROOT).map(full => {
+// The single-file build is served from the site root as /dicebox.html, so the
+// help panel can link to it on the same origin. Linking GitHub's raw URL
+// instead just renders the file, since it is served as text/plain.
+const extras = [{ from: join(ROOT, 'dist', 'dicebox.html'), to: '/dicebox.html' }];
+
+const describeFile = (full, path) => {
   const body = readFileSync(full);
   // Cloudflare keys assets by a 32-char hash of contents plus extension.
   const ext = full.slice(full.lastIndexOf('.'));
   const hash = createHash('sha256').update(body).update(ext).digest('hex').slice(0, 32);
-  return {
-    path: '/' + relative(ROOT, full).split(sep).join('/'),
-    hash,
-    size: body.length,
-    body,
-    contentType: typeOf(full),
-  };
-});
+  return { path, hash, size: body.length, body, contentType: typeOf(full) };
+};
+
+const files = [
+  ...walk(ROOT).map(full =>
+    describeFile(full, '/' + relative(ROOT, full).split(sep).join('/'))),
+  ...extras.filter(e => existsSync(e.from)).map(e => describeFile(e.from, e.to)),
+];
 
 console.log(`Deploying ${files.length} files as "${SCRIPT}"`);
 for (const f of files) console.log(`  ${f.path}  ${f.size}B`);

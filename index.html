@@ -81,8 +81,9 @@
       <p class="colophon">
         <a href="https://github.com/SONDLecT/dicebox" target="_blank" rel="noopener noreferrer">Source on GitHub</a>
         <span class="colophon-sep">·</span>
-        <a href="https://github.com/SONDLecT/dicebox/raw/master/dist/dicebox.html"
-           target="_blank" rel="noopener noreferrer">Download as one file</a>
+        <!-- `download` forces a save: without it the browser just renders the
+             file, since it is HTML being served as text. -->
+        <a href="dicebox.html" download="dicebox.html">Download as one file</a>
       </p>
     </div>
 
@@ -96,6 +97,25 @@
                   aria-label="Close options">✕</button>
         </p>
         <div class="sheet-options" id="sheetOptions"></div>
+      </div>
+    </div>
+
+    <!-- Every roll this session, with what each die landed on. -->
+    <div class="sheet" id="historyPanel" hidden role="dialog"
+         aria-labelledby="historyTitle">
+      <div class="sheet-panel">
+        <p class="sheet-title">
+          <span id="historyTitle">Full history</span>
+          <button type="button" class="sheet-close" id="historyClose"
+                  aria-label="Close history">✕</button>
+        </p>
+        <ul class="history-full" id="historyFull"></ul>
+        <div class="history-actions">
+          <button type="button" class="ghost" id="historyCopy">Copy</button>
+          <button type="button" class="ghost" id="historyCsv">CSV</button>
+          <button type="button" class="ghost" id="historyJson">JSON</button>
+          <button type="button" class="ghost history-clear" id="historyClear">Clear</button>
+        </div>
       </div>
     </div>
 
@@ -155,6 +175,11 @@
 
   <section class="log" aria-label="Recent rolls">
     <ul id="history"></ul>
+    <p class="log-more">
+      <button type="button" class="log-more-button" id="historyOpen">
+        Full history <span id="historyCount" class="log-count"></span>
+      </button>
+    </p>
   </section>
 
 </main>
