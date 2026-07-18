@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>Dicebox</title>
+<meta name="description" content="An offline dice roller for tabletop RPGs.">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#FCFCFA" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#141413" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Dicebox">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="app">
+
+  <header class="bar">
+    <h1 class="wordmark">Dicebox</h1>
+    <button id="themeToggle" class="ghost" aria-label="Switch color theme">
+      <span data-theme-label>Dark</span>
+    </button>
+  </header>
+
+  <section class="tray" aria-label="Dice tray">
+    <canvas id="tray"></canvas>
+    <p class="hint" id="hint">Flick to throw</p>
+  </section>
+
+  <output class="readout" id="readout" aria-live="polite">
+    <span class="total" id="total">—</span>
+    <span class="breakdown" id="breakdown">Pick dice or type a roll</span>
+  </output>
+
+  <section class="chain" aria-label="Dungeon Crawl Classics dice chain">
+    <button class="step" id="chainDown" aria-label="Step down the dice chain">−</button>
+    <div class="rungs" id="rungs" role="group"></div>
+    <button class="step" id="chainUp" aria-label="Step up the dice chain">+</button>
+  </section>
+
+  <section class="quick" aria-label="Common dice">
+    <div class="counter">
+      <button id="countDown" aria-label="One fewer die">−</button>
+      <span id="count" aria-live="polite">1</span>
+      <button id="countUp" aria-label="One more die">+</button>
+    </div>
+    <div class="dice-buttons" id="diceButtons"></div>
+  </section>
+
+  <form class="entry" id="entry">
+    <input id="notation" type="text" inputmode="text" autocomplete="off"
+           autocapitalize="off" spellcheck="false"
+           placeholder="3d6+2, 4d6kh3, 1d20!, d%"
+           aria-label="Dice notation">
+    <button type="submit" class="roll">Roll</button>
+  </form>
+
+  <p class="error" id="error" role="alert" hidden></p>
+
+  <section class="log" aria-label="Recent rolls">
+    <ul id="history"></ul>
+  </section>
+
+</main>
+<script type="module" src="app.js"></script>
+</body>
+</html>

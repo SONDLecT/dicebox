@@ -1,0 +1,12 @@
+{
+  "name": "dicebox",
+  "version": "1.0.0",
+  "private": true,
+  "description": "An offline dice roller for tabletop RPGs.",
+  "type": "module",
+  "scripts": {
+    "test": "node tools/test.mjs",
+    "icons": "node tools/make-icons.cjs",
+    "serve": "python3 -m http.server 8080"
+  }
+}
