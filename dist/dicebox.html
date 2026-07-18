@@ -657,7 +657,7 @@ body {
   z-index: 3;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   overflow-y: auto;
   scrollbar-width: none;
   background: var(--paper);
@@ -668,6 +668,10 @@ body {
 .sheet-panel {
   width: 100%;
   padding: 2px;
+  /* Sits toward the top of a tall tray rather than floating in the middle of a
+     large empty field, which reads as stranded on a desktop window. */
+  margin-top: clamp(0px, 4vh, 28px);
+  margin-bottom: auto;
 }
 
 .sheet-title {
@@ -3914,6 +3918,13 @@ function hideHint() {
 let prev = performance.now();
 let loopFaults = 0;
 
+// True while a panel covers the tray. The dice keep simulating underneath, but
+// drawing them wastes a frame on something nobody can see — and any translucency
+// in the panel would let them ghost through.
+function trayCovered() {
+  return !sheet.hidden || !dial.hidden || !historyPanel.hidden || !help.hidden;
+}
+
 function drawFrame(dt) {
   const t = theme();
   const r = canvas.getBoundingClientRect();
@@ -3947,6 +3958,11 @@ function drawFrame(dt) {
   if (state.dice.length > 1 && state.dice.length <= THROW_LIMIT) {
     separate(state.dice, state.bounds);
   }
+
+  // A panel covers the tray, so the dice have been stepped but there is nothing
+  // to show. Skipping the draw keeps them from ghosting through anything
+  // translucent and saves the frame.
+  if (trayCovered()) return;
 
   // Contact marks sit under the dice, so they draw first.
   state.surface.drawRests(ctx, t, state.dice);

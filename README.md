@@ -9,9 +9,15 @@ demo instance, not a service. To keep a copy of your own, see
 it from the browser, or host it yourself.
 
 <p align="center">
-  <img src="docs/roll.png" alt="Rolling 2d20+3d6, with the total and each die's result" width="360">
-  &nbsp;&nbsp;
-  <img src="docs/dark.png" alt="A mixed handful of d100, d30, d12 and d8 in dark mode" width="360">
+  <img src="docs/roll.png" alt="Rolling 2d20+3d6, with the total and each die's result" width="270">
+  &nbsp;
+  <img src="docs/modifiers.png" alt="Holding a die opens advantage, disadvantage, drop high or low, exploding and reroll" width="270">
+  &nbsp;
+  <img src="docs/dark.png" alt="A mixed handful of d100, d30, d12 and d8 in dark mode" width="270">
+</p>
+
+<p align="center">
+  <em>Tap dice to build a pool · hold one for modifiers · light and dark</em>
 </p>
 
 ## About
@@ -65,10 +71,53 @@ Sides are arbitrary from 1 to 10000, so Mothership's `d100`, DCC's `d14`/`d24`,
 and anything else all work. Dropped dice stay visible in parentheses rather than
 disappearing.
 
-## Randomness
+## How the rolls work
 
-`crypto.getRandomValues` with rejection sampling, so there's no modulo bias.
-`Math.random()` is not used anywhere in the roll path.
+Every die is decided by `crypto.getRandomValues`, the browser's cryptographic
+random source. `Math.random()` is not used anywhere in the roll path — it is a
+fast pseudo-random generator, seeded per page and predictable given enough
+output, which is fine for animation and wrong for the numbers.
+
+Turning random bytes into a die takes some care. Asking for a 32-bit number and
+taking `% 20` is the obvious approach and it is subtly unfair: 2³² does not
+divide evenly by 20, so the first few faces come up very slightly more often.
+Instead a value is drawn and **rejected** if it falls in the remainder at the
+top of the range, then drawn again. Every face ends up equally likely, and the
+loop almost always finishes on the first try.
+
+### The animation is a picture, not a physics engine
+
+The number is decided the instant you roll — before anything moves. What follows
+is a drawing of that outcome, not a simulation that produces it.
+
+The dice do tumble, bounce off the walls of the tray, push each other apart and
+settle showing a face, but none of it feeds back into the result. A die that
+lands showing 17 was already a 17. This is deliberate: a real physics simulation
+would make the outcome depend on frame timing, floating-point rounding and how
+hard you flicked, none of which are fair or reproducible. Watching the dice
+should be enjoyable; it should not be what decides the roll.
+
+The same goes for the tidying afterwards — dice drift into a sorted grid, group
+by type and order high to low. That is presentation.
+
+### Why a d100 does not have exactly 100 faces you can count
+
+Each die is drawn as a real solid whose face count matches its side count, up to
+a point. From d3 to d120 that holds for 108 of the 118 possible dice — a d17 has
+seventeen faces, a d100 has a hundred.
+
+Past that, the limit is your eyes rather than the maths. At the size a die is
+drawn on a phone, facets start landing closer together than a pixel, and the
+wireframe stops reading as an object and becomes a grey smudge. Dice above ~120
+sides therefore get a representative shape: still a distinct, consistent solid
+for that number, but no longer one facet per side. A d1000 drawn honestly would
+be a circle.
+
+Shape matters too, not just count. A trapezohedron — the classic d10 form — runs
+every facet to one of two points, so its edges converge and it is already
+crowded at 24 faces. A banded drum spreads its vertices evenly and stays
+countable past 120. That is why dice above 22 sides change family: not for
+decoration, but because it is the shape that survives being small.
 
 ## The roll log
 
