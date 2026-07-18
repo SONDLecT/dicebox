@@ -1,6 +1,19 @@
 # Dicebox
 
-An offline dice roller for tabletop RPGs. No build step, no dependencies, no network.
+An offline dice roller for tabletop RPGs. No build step, no dependencies, no
+network. Live at **[dicebox.trollskull.cc](https://dicebox.trollskull.cc)**.
+
+## About
+
+This is a personal project. I kept running into the same problem — there was no
+clean, open source, offline-capable web app for rolling dice — so I built one.
+If you have had the same problem, you are welcome to it.
+
+It was made with Claude Code. If that is not your bag, that is completely fine:
+write your own, fork this, do whatever you want with it. Questions, comments,
+issues, pull requests and forks are all welcome.
+
+MIT licensed.
 
 ## Running it
 
@@ -161,10 +174,12 @@ dice.js             notation parser and roller (no DOM)
 render.js           polyhedra, wireframe drawing, throw simulation
 app.js              controller, canvas loop, input, the pool
 sw.js               cache-first service worker
+worker.js           sets headers at the edge; serves the assets
 wrangler.jsonc      Cloudflare static-assets config
-_headers            CSP and cache policy
+_headers            reference copy of the header policy
 .assetsignore       keeps tooling out of the upload
-tools/              icon generation, tests, preview sheet
+.env.example        the variables tools/deploy.mjs expects
+tools/              icon generation, tests, preview sheet, deploy
 ```
 
 `dice.js` and `render.js` have no DOM dependency, so both can be tested directly.
