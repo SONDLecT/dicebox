@@ -286,6 +286,8 @@ $('entry').addEventListener('submit', e => {
 
 // Typing keeps the buttons in step, so the field and the row never disagree
 // about what is loaded.
+// Typing is another way of staging dice, so the tray follows the field as it is
+// edited: backspace away "+2d3" and those dice leave the tray immediately.
 $('notation').addEventListener('input', () => {
   pool = parsePool($('notation').value);
   // Typing an unusual die earns it a button too, so the row always accounts for
@@ -293,7 +295,7 @@ $('notation').addEventListener('input', () => {
   for (const sides of pool.keys()) {
     if (sides >= 1 && sides <= MAX_SIDES) ensureDieButton(sides);
   }
-  markPool();
+  stageFromPool({ writeField: false });
 });
 
 // ---- help ----
@@ -428,8 +430,15 @@ function parsePool(text) {
 // Show the pool as unrolled dice waiting on the tray, so tapping summons the
 // dice you are about to throw rather than only changing text.
 function syncPool() {
+  stageFromPool({ writeField: true });
+}
+
+// Put the pool on the tray as unrolled dice. `writeField` is false when the pool
+// came *from* the field, so typing is never overwritten mid-edit — the tray
+// follows what you type rather than fighting it.
+function stageFromPool({ writeField }) {
   const notation = poolNotation();
-  $('notation').value = notation;
+  if (writeField) $('notation').value = notation;
   clearError();
 
   const staged = [];
@@ -443,11 +452,15 @@ function syncPool() {
     d.settling = true;
     d.settleT = 1;
     d.rot = [0.5, 0.6, 0.1];
+    d.homeX = d.x;
+    d.homeY = d.y;
   }
 
   $('total').dataset.idle = '1';
   $('total').textContent = '—';
-  $('breakdown').textContent = notation ? `${staged.length} dice ready` : 'Pick dice or type a roll';
+  $('breakdown').textContent = staged.length
+    ? `${staged.length} ${staged.length === 1 ? 'die' : 'dice'} ready`
+    : 'Pick dice or type a roll';
   markPool();
   hideHint();
 }
@@ -875,7 +888,12 @@ canvas.addEventListener('pointerup', e => {
   const vx = ((e.clientX - drag.x) / dt) * 1000;
   const vy = ((e.clientY - drag.y) / dt) * 1000;
   const speed = Math.hypot(vx, vy);
+  const travelled = Math.hypot(e.clientX - drag.x, e.clientY - drag.y);
   drag = null;
+
+  // Tapping a staged die takes it back off the tray, which is how you drop one
+  // die from a handful without clearing everything or editing the text.
+  if (speed < 120 && travelled < 10 && removeDieAt(e.clientX, e.clientY)) return;
 
   // Throw whatever is staged; failing that, re-roll the last notation. The tray
   // is never a dead surface, so a tap on an empty one rolls the selected die.
@@ -888,6 +906,34 @@ canvas.addEventListener('pointerup', e => {
     for (const d of state.dice) d.throwWith(vx * 0.5, Math.abs(vy) * 0.5 + 200);
   }
 });
+
+// Remove one staged die under the given screen point. Only staged dice can be
+// picked off: once a roll has happened the numbers are a result, not a pool, and
+// quietly editing them would be lying about what was rolled.
+function removeDieAt(clientX, clientY) {
+  if (!state.dice.length || state.dice.some(d => d.value !== null)) return false;
+
+  const rect = canvas.getBoundingClientRect();
+  const x = clientX - rect.left;
+  const y = clientY - rect.top;
+
+  let hit = null, best = Infinity;
+  for (const d of state.dice) {
+    const dist = Math.hypot(d.x - x, d.y - y);
+    if (dist < d.size * 0.62 && dist < best) { best = dist; hit = d; }
+  }
+  if (!hit) return false;
+
+  const entry = pool.get(hit.sides);
+  if (!entry) return false;
+
+  if (entry.count > 1) pool.set(hit.sides, { count: entry.count - 1, mods: entry.mods });
+  else pool.delete(hit.sides);
+
+  if (navigator.vibrate) navigator.vibrate(8);
+  syncPool();
+  return true;
+}
 canvas.addEventListener('pointercancel', () => { drag = null; });
 
 // ---- intro ----

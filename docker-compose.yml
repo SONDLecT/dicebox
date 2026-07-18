@@ -1,0 +1,16 @@
+services:
+  dicebox:
+    build: .
+    image: dicebox
+    container_name: dicebox
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+    # The app talks to nothing and stores nothing server-side, so it needs no
+    # volumes, no environment, and no network access beyond serving the page.
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+    security_opt:
+      - no-new-privileges:true

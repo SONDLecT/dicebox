@@ -575,5 +575,60 @@ ok('two bursts are not poolable', parsePool('4d6!!').size === 0);
   ok('rerolled dice report it', sawReroll);
 }
 
+// --- taking dice back off the tray ---
+// Tapping a staged die removes exactly one, so a handful can be trimmed without
+// clearing everything or editing the text by hand.
+function removeOne(pool, sides) {
+  const entry = pool.get(sides);
+  if (!entry) return false;
+  if (entry.count > 1) pool.set(sides, { count: entry.count - 1, mods: entry.mods });
+  else pool.delete(sides);
+  return true;
+}
+
+{
+  const p = new Map();
+  add(p, 6, 3);
+  add(p, 20, 1);
+
+  ok('removing one leaves the rest', removeOne(p, 6) && poolNotation(p) === '2d6+1d20',
+     poolNotation(p));
+
+  removeOne(p, 6);
+  removeOne(p, 6);
+  ok('removing the last of a die drops it entirely', poolNotation(p) === '1d20',
+     poolNotation(p));
+
+  ok('removing a die that is not staged does nothing', removeOne(p, 8) === false);
+
+  removeOne(p, 20);
+  ok('removing everything empties the pool', p.size === 0 && poolNotation(p) === '');
+}
+
+{
+  // A modifier survives having one of its dice removed.
+  const p = add(new Map(), 6, 4);
+  applyModifier(p, 6, MODS.droplow);
+  removeOne(p, 6);
+  ok('removing a die keeps the modifier', poolNotation(p) === '3d6dl1', poolNotation(p));
+}
+
+// --- the field and the tray stay in step ---
+// Editing the notation restages the tray, so backspacing "+2d3" makes those dice
+// leave immediately rather than lingering until the next tap.
+{
+  const staged = text => {
+    const p = parsePool(text);
+    let n = 0;
+    for (const e of p.values()) n += e.count;
+    return n;
+  };
+  ok('typing stages the dice it describes', staged('3d6+2d3') === 5);
+  ok('deleting a term removes those dice', staged('3d6') === 3);
+  ok('clearing the field empties the tray', staged('') === 0);
+  ok('a half-typed term stages nothing', staged('3d6+2d') === 0);
+  ok('growing a count adds dice', staged('12d6') === 12);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

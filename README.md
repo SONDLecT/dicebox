@@ -1,7 +1,11 @@
 # Dicebox
 
 An offline dice roller for tabletop RPGs. No build step, no dependencies, no
-network. Live at **[dicebox.trollskull.cc](https://dicebox.trollskull.cc)**.
+network.
+
+Try it at **[dicebox.trollskull.cc](https://dicebox.trollskull.cc)** — that is a
+demo instance, not a service. Run your own copy if you want one that stays put;
+see [Running it yourself](#running-it-yourself).
 
 ## About
 
@@ -15,17 +19,6 @@ issues, pull requests and forks are all welcome.
 
 MIT licensed.
 
-## Running it
-
-Any static file server works — service workers need `http://`, not `file://`:
-
-```sh
-npm run serve     # http://localhost:8080
-```
-
-To install on a phone, serve it over HTTPS (or `localhost`), open it, and use
-**Add to Home Screen**. After the first load it runs fully offline.
-
 ## Using it
 
 Tap dice to build a pool: tap `d20` twice and `d6` once and you have `2d20+1d6`,
@@ -36,9 +29,46 @@ handful is one more tap.
 Typing notation by hand works the same way — the field is the source of truth,
 and tapping a die extends whatever is already there.
 
-The `−` and `+` buttons step the selected die along the Dungeon Crawl Classics
-chain, replacing it in the pool: three `d20`s become three `d16`s, not a mixed
-handful.
+The number on the left is how many dice each tap adds, so `100` then `d6` gives
+you `100d6` without a hundred taps.
+
+**Hold a die** for advantage, disadvantage, drop high/low, exploding and reroll.
+Modifiers that answer different questions stack — `4d6dl1!` drops the lowest and
+explodes — while two that answer the same one replace each other.
+
+The `d?` button opens a picker for any side count from 1 to 1000, and a die you
+choose there gets a button of its own.
+
+## Running it yourself
+
+There is no build step and no backend. The app is a handful of static files, so
+anything that serves a directory over HTTP will do — it only needs `http://`
+rather than `file://` so the service worker can register.
+
+```sh
+python3 -m http.server 8080     # or: npx serve, php -S localhost:8080, caddy file-server
+```
+
+### Docker
+
+If you would rather run it as a container:
+
+```sh
+docker compose up -d            # http://localhost:8080
+```
+
+The image is nginx with the app copied in — nothing is compiled and nothing is
+fetched at runtime. The bundled nginx config applies the same security and cache
+headers the hosted copy uses. To serve on a different port, change the mapping in
+`docker-compose.yml`.
+
+For a home network, put it behind whatever reverse proxy you already run. It
+needs HTTPS only if you want to install it to a phone's home screen; browsers
+require a secure context for that, with `localhost` exempt.
+
+To install on a phone, open the page and use **Add to Home Screen** — or the
+**Install as an app** button in the help panel on Android. After the first load
+it runs fully offline.
 
 ## Deploying
 
@@ -77,14 +107,11 @@ disappearing.
 
 ## The dice chain
 
-Dungeon Crawl Classics steps rolls up and down a fixed chain:
+The button row carries every rung of the Dungeon Crawl Classics chain:
 
 ```
 d1 d2 d3 d4 d5 d6 d7 d8 d10 d12 d14 d16 d20 d24 d30
 ```
-
-The `−` and `+` buttons move the selected die one rung, replacing it in the pool.
-Steps clamp at both ends.
 
 ## Design
 
@@ -104,10 +131,12 @@ face count, which is how physical d10s, d14s, d24s and d30s are actually made:
 
 | Sides | Shape | Why |
 | --- | --- | --- |
+| 1 | notched cylinder | topples onto its one face however it lands |
 | 2 | coin | no two-faced polyhedron exists |
 | 4, 6, 8, 12, 20 | Platonic solid | exact regular solids |
-| even N | trapezohedron | 2n kite faces; the real d10 shape |
-| odd N | prism barrel | n faces around the equator; the real d7 shape |
+| even N ≤ 22 | trapezohedron | 2n kite faces; the real d10 shape |
+| odd N ≤ 22 | prism barrel | n faces around the equator; the real d7 shape |
+| N > 22 | banded drum | stays legible where pointed solids blur |
 
 A barrel gives an *exact* face count for any N, so a `d17` has seventeen
 numbered faces rather than an eighteen-faced solid pretending to be one.
@@ -125,8 +154,13 @@ sits 90x further out than the equator — so the solid is squashed along y
 afterwards to get the near-spherical proportions a real die has. Scaling a
 single axis preserves planarity.
 
-Above 40 facets the geometry is finer than the die is ever drawn, so it caps
-there while the die still reports its true side count.
+Pointed solids are the constraint, not facet count: a trapezohedron runs every
+facet to one of two apexes, so it is already crowded at 24 faces and unreadable
+by 40. A banded drum has no such convergence and stays countable past 120, so
+dice above 22 sides use one. That is what lets a `d100` carry a hundred facets
+instead of pretending with twelve — 108 of the 118 dice from d3 to d120 have
+exactly one facet per side. Above that the shape becomes representative, since
+more facets than the die is drawn wide cannot be told apart.
 
 ### Animation
 
@@ -148,10 +182,12 @@ result appears immediately; the total is what anyone rolling that many wants.
 ## Tests
 
 ```sh
-npm test                      # all three suites, 222 tests
+npm test                      # every suite
 node tools/test.mjs           # notation, ranges, modifiers, distribution
 node tools/test-render.mjs    # polyhedron geometry + settling simulation
-node tools/test-pool.mjs      # tap-to-build pool round-tripping
+node tools/test-pool.mjs      # tap-to-build pool, modifiers, round-tripping
+node tools/test-markup.mjs    # html/css/js seams, manifest, offline integrity
+node tools/test-load.mjs      # app.js against the real markup in a DOM shim
 ```
 
 The geometry suite checks Euler's `V - E + F = 2` for every solid, which is what
@@ -179,6 +215,9 @@ wrangler.jsonc      Cloudflare static-assets config
 _headers            reference copy of the header policy
 .assetsignore       keeps tooling out of the upload
 .env.example        the variables tools/deploy.mjs expects
+Dockerfile          nginx image for self-hosting
+docker-compose.yml  one-command local instance
+docker/             nginx config and security headers
 tools/              icon generation, tests, preview sheet, deploy
 ```
 
