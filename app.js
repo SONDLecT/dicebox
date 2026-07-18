@@ -210,6 +210,7 @@ const help = $('help');
 const helpToggle = $('helpToggle');
 
 function setHelp(open) {
+  if (open) closeSheet();
   help.hidden = !open;
   helpToggle.setAttribute('aria-expanded', String(open));
   helpToggle.setAttribute('aria-label', open ? 'Hide syntax reference' : 'Show syntax reference');
@@ -405,6 +406,8 @@ function modifiersFor(sides) {
 }
 
 function openSheet(sides) {
+  // Both fill the tray, so only one can be up at a time.
+  setHelp(false);
   $('sheetTitle').textContent = `d${sides}`;
   sheetOptions.replaceChildren();
 
@@ -445,9 +448,7 @@ function closeSheet() {
   sheet.hidden = true;
 }
 
-sheet.addEventListener('click', e => {
-  if (e.target === sheet) closeSheet();
-});
+$('sheetClose').addEventListener('click', closeSheet);
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && !sheet.hidden) closeSheet();

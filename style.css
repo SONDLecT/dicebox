@@ -38,6 +38,12 @@
 
 * { box-sizing: border-box; }
 
+/* The `hidden` attribute is only `display: none` in the UA stylesheet, so any
+   class that sets display beats it. Without this, .sheet (display:flex) and
+   .help render on load despite being marked hidden — the sheet covered the whole
+   page in an unclickable blur. */
+[hidden] { display: none !important; }
+
 html, body {
   margin: 0;
   height: 100%;
@@ -126,9 +132,9 @@ body {
   overflow-y: auto;
   scrollbar-width: none;
   padding: 4px 2px;
-  background: color-mix(in srgb, var(--paper) 93%, transparent);
-  -webkit-backdrop-filter: blur(3px);
-  backdrop-filter: blur(3px);
+  /* Opaque, not blurred: the tray is empty behind it anyway, and a frosted
+     layer reads as a different material than the rest of the app. */
+  background: var(--paper);
   animation: help-in 180ms ease both;
 }
 .help::-webkit-scrollbar { display: none; }
@@ -414,47 +420,52 @@ body {
 
 /* ---- modifier sheet ---- */
 
+/* Fills the tray, like the help panel. A floating card over a dimmed page is a
+   different design language than the rest of this app — the tray is the surface
+   everything else happens on, so options belong there too. */
 .sheet {
-  position: fixed;
+  position: absolute;
   inset: 0;
-  z-index: 10;
+  z-index: 3;
   display: flex;
-  align-items: flex-end;
+  flex-direction: column;
   justify-content: center;
-  padding: var(--gut);
-  padding-bottom: calc(env(safe-area-inset-bottom) + var(--gut));
-  background: color-mix(in srgb, var(--line) 12%, transparent);
-  -webkit-backdrop-filter: blur(2px);
-  backdrop-filter: blur(2px);
-  animation: sheet-fade 140ms ease both;
+  overflow-y: auto;
+  scrollbar-width: none;
+  background: var(--paper);
+  animation: help-in 160ms ease both;
 }
+.sheet::-webkit-scrollbar { display: none; }
 
 .sheet-panel {
   width: 100%;
-  max-width: 420px;
-  background: var(--paper);
-  border: 1px solid var(--hair);
-  border-radius: 14px;
-  padding: 14px;
-  animation: sheet-rise 180ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
-}
-
-@keyframes sheet-fade {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-@keyframes sheet-rise {
-  from { transform: translateY(12px); opacity: 0; }
-  to   { transform: none; opacity: 1; }
+  padding: 2px;
 }
 
 .sheet-title {
-  margin: 0 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 8px;
+  padding: 0 10px;
   font-family: "Iosevka Etoile", ui-monospace, monospace;
   font-size: 13px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--muted);
+}
+
+.sheet-close {
+  appearance: none;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  padding: 6px;
+  margin: -6px;
+  cursor: pointer;
 }
 
 .sheet-options {

@@ -34,7 +34,7 @@
 
     <!-- Shown once on a cold open, then faded out. Everything the interface
          does not say for itself, in as few words as it takes. -->
-    <div class="intro" id="intro" aria-hidden="true">
+    <div class="intro" id="intro">
       <p>Tap dice to load them</p>
       <p>Hold one for more options</p>
       <p class="intro-last">Flick the tray to roll</p>
@@ -62,6 +62,19 @@
         <a href="https://github.com/" target="_blank" rel="noopener noreferrer">Source on GitHub</a>
       </p>
     </div>
+
+    <!-- Opened by holding a die. Sits on the tray like the help panel, so the
+         modifiers that would otherwise need typing stay in the same surface. -->
+    <div class="sheet" id="sheet" hidden role="dialog" aria-labelledby="sheetTitle">
+      <div class="sheet-panel">
+        <p class="sheet-title">
+          <span id="sheetTitle">d20</span>
+          <button type="button" class="sheet-close" id="sheetClose"
+                  aria-label="Close options">✕</button>
+        </p>
+        <div class="sheet-options" id="sheetOptions"></div>
+      </div>
+    </div>
   </section>
 
   <output class="readout" id="readout" aria-live="polite">
@@ -78,16 +91,6 @@
     </div>
     <div class="dice-buttons" id="diceButtons" role="group"></div>
   </section>
-
-  <!-- Opened by long-press (or right-click) on a die. Holds the modifiers that
-       would otherwise need typing, so the text field stays a power-user path. -->
-  <div class="sheet" id="sheet" hidden role="dialog" aria-modal="true"
-       aria-labelledby="sheetTitle">
-    <div class="sheet-panel">
-      <p class="sheet-title" id="sheetTitle">d20</p>
-      <div class="sheet-options" id="sheetOptions"></div>
-    </div>
-  </div>
 
   <form class="entry" id="entry">
     <input id="notation" type="text" inputmode="text" autocomplete="off"
