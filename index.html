@@ -20,14 +20,39 @@
 
   <header class="bar">
     <h1 class="wordmark">Dicebox</h1>
-    <button id="themeToggle" class="ghost" aria-label="Switch color theme">
-      <span data-theme-label>Dark</span>
-    </button>
+    <div class="bar-actions">
+      <button id="helpToggle" class="ghost icon" aria-expanded="false"
+              aria-controls="help" aria-label="Show syntax reference">?</button>
+      <button id="themeToggle" class="ghost" aria-label="Switch color theme">
+        <span data-theme-label>Dark</span>
+      </button>
+    </div>
   </header>
 
   <section class="tray" aria-label="Dice tray">
     <canvas id="tray"></canvas>
     <p class="hint" id="hint">Flick to throw</p>
+
+    <div class="help" id="help" hidden>
+      <dl class="syntax">
+        <dt>3d6</dt>          <dd>three six-sided dice</dd>
+        <dt>1d20+5</dt>       <dd>with a modifier</dd>
+        <dt>2d6+1d8</dt>      <dd>any number of terms</dd>
+        <dt>2d20kh1</dt>      <dd>advantage — keep highest</dd>
+        <dt>2d20kl1</dt>      <dd>disadvantage — keep lowest</dd>
+        <dt>4d6dl1</dt>       <dd>drop lowest</dd>
+        <dt>1d6!</dt>         <dd>explode on a max roll</dd>
+        <dt>1d10r2</dt>       <dd>reroll 2 and under</dd>
+        <dt>d%</dt>           <dd>percentile, same as d100</dd>
+      </dl>
+      <p class="note">
+        Any number of sides works, from d2 to d1000. The chain steps dice up and
+        down for Dungeon Crawl Classics. Rolls stay on your device.
+      </p>
+      <p class="colophon">
+        <a href="https://github.com/" target="_blank" rel="noopener noreferrer">Source on GitHub</a>
+      </p>
+    </div>
   </section>
 
   <output class="readout" id="readout" aria-live="polite">
@@ -35,26 +60,20 @@
     <span class="breakdown" id="breakdown">Pick dice or type a roll</span>
   </output>
 
-  <section class="chain" aria-label="Dungeon Crawl Classics dice chain">
-    <button class="step" id="chainDown" aria-label="Step down the dice chain">−</button>
-    <div class="rungs" id="rungs" role="group"></div>
-    <button class="step" id="chainUp" aria-label="Step up the dice chain">+</button>
-  </section>
-
-  <section class="quick" aria-label="Common dice">
-    <div class="counter">
-      <button id="countDown" aria-label="One fewer die">−</button>
-      <span id="count" aria-live="polite">1</span>
-      <button id="countUp" aria-label="One more die">+</button>
-    </div>
-    <div class="dice-buttons" id="diceButtons"></div>
+  <section class="picker" aria-label="Dice">
+    <button class="step" id="chainDown" title="Step down the dice chain"
+            aria-label="Step down the dice chain">−</button>
+    <div class="dice-buttons" id="diceButtons" role="group"></div>
+    <button class="step" id="chainUp" title="Step up the dice chain"
+            aria-label="Step up the dice chain">+</button>
   </section>
 
   <form class="entry" id="entry">
     <input id="notation" type="text" inputmode="text" autocomplete="off"
            autocapitalize="off" spellcheck="false"
-           placeholder="3d6+2, 4d6kh3, 1d20!, d%"
+           placeholder="Tap dice above, or type 3d6+2"
            aria-label="Dice notation">
+    <button type="button" class="clear" id="clear" aria-label="Clear the pool">✕</button>
     <button type="submit" class="roll">Roll</button>
   </form>
 

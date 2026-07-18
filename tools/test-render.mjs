@@ -204,6 +204,45 @@ for (const sides of [4, 6, 8, 10, 12, 20, 24, 30, 100]) {
   ok(`d${sides} settles face-up`, worstFacing > 0.64, `worst facing ${worstFacing.toFixed(2)}`);
 }
 
+// A coin must land heads or tails, never on its rim. Scoring resting poses by
+// facing angle alone let a sliver of rim outrank a broad face turned slightly
+// away, and the d2 landed edge-on ~83% of the time with the numeral on its edge.
+{
+  const tray = { left: 0, right: 320, top: 0, floor: 200 };
+  let rim = 0;
+  for (let t = 0; t < 120; t++) {
+    const d = new Die(2, 1, 160, 40, 44);
+    d.throwWith(500 - t * 3, 500);
+    let guard = 0;
+    while (!d.settled && guard++ < 1500) d.step(1 / 60, tray);
+
+    const pts = d.solid.verts.map(v => rotate(v, d.rot[0], d.rot[1], d.rot[2]));
+    let bestScore = 0, bestVerts = 0;
+    for (const f of d.solid.faces) {
+      const p = f.map(i => pts[i]);
+      let n = cross(sub(p[1], p[0]), sub(p[2], p[0]));
+      const c = p.reduce((a, q) => [a[0]+q[0], a[1]+q[1], a[2]+q[2]], [0,0,0]);
+      if (dot(n, c) < 0) n = n.map(x => -x);
+      const len = Math.hypot(...n);
+      if (!len) continue;
+      const facing = n[2] / len;
+      if (facing <= 0) continue;
+      // Same projected-area score the renderer uses to choose the numeral face.
+      let area = [0, 0, 0];
+      for (let i = 0; i < p.length; i++) {
+        const a = p[i], b = p[(i + 1) % p.length];
+        area = [area[0] + (a[1]*b[2] - a[2]*b[1]),
+                area[1] + (a[2]*b[0] - a[0]*b[2]),
+                area[2] + (a[0]*b[1] - a[1]*b[0])];
+      }
+      const score = facing * (Math.hypot(...area) / 2);
+      if (score > bestScore) { bestScore = score; bestVerts = f.length; }
+    }
+    if (bestVerts <= 4) rim++; // rim quads, not a broad face
+  }
+  ok('d2 never lands on its rim', rim === 0, `${rim}/120 edge landings`);
+}
+
 // --- overlap ---
 // Regression: 3d6 used to land stacked because every die launched from the same
 // point. Dice must end up visibly separated and inside the tray.

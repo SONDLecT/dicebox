@@ -1,0 +1,22 @@
+# A stale service worker pins every other asset to its old version, so it must
+# always be revalidated. Everything else is safe to cache — sw.js decides when a
+# new version is picked up.
+/sw.js
+  Cache-Control: no-cache
+  Content-Type: text/javascript; charset=utf-8
+
+/manifest.webmanifest
+  Cache-Control: no-cache
+  Content-Type: application/manifest+json; charset=utf-8
+
+/index.html
+  Cache-Control: no-cache
+
+/icons/*
+  Cache-Control: public, max-age=604800
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  # No third-party anything: the app is self-contained and stays that way.
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'

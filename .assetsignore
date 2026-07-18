@@ -1,0 +1,11 @@
+# Everything here is development-only. Same format as .gitignore.
+.git
+.gitignore
+.assetsignore
+node_modules
+tools
+package.json
+package-lock.json
+wrangler.jsonc
+README.md
+_headers

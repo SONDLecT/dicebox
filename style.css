@@ -82,6 +82,12 @@ body {
   color: var(--muted);
 }
 
+.bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .ghost {
   appearance: none;
   border: 1px solid var(--hair);
@@ -95,6 +101,91 @@ body {
   padding: 0 12px;
   border-radius: 999px;
   cursor: pointer;
+}
+
+.ghost.icon {
+  width: 32px;
+  padding: 0;
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+.ghost[aria-expanded="true"] {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* ---- help ---- */
+
+/* Fills the tray rather than floating over the page: the tray is already a
+   bounded rectangle, so nothing below it shifts when the panel opens. */
+.help {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding: 4px 2px;
+  background: color-mix(in srgb, var(--paper) 93%, transparent);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  animation: help-in 180ms ease both;
+}
+.help::-webkit-scrollbar { display: none; }
+
+@keyframes help-in {
+  from { opacity: 0; transform: translateY(-3px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.syntax {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1px 14px;
+  margin: 0;
+  align-items: baseline;
+}
+
+/* Each example is tappable, so the reference doubles as a set of presets. */
+.syntax dt {
+  font-family: "Iosevka Etoile", ui-monospace, "SF Mono", monospace;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--line);
+  text-align: right;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 1px 3px;
+  margin: -1px -3px;
+  transition: color 140ms ease;
+}
+.syntax dt:hover,
+.syntax dt:focus-visible { color: var(--accent); }
+
+.syntax dd {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.help .note {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+  max-width: 44ch;
+}
+
+.help .colophon {
+  margin: 10px 0 0;
+  font-size: 12px;
+}
+
+.help .colophon a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid currentColor;
+  padding-bottom: 1px;
 }
 
 /* ---- tray ---- */
@@ -158,45 +249,13 @@ body {
   word-break: break-word;
 }
 
-/* ---- dcc chain ---- */
+/* ---- dice picker ---- */
 
-.chain {
+.picker {
   display: flex;
   align-items: center;
   gap: 8px;
   flex: 0 0 auto;
-}
-
-.rungs {
-  display: flex;
-  gap: 4px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  flex: 1 1 auto;
-  padding: 2px 0;
-}
-.rungs::-webkit-scrollbar { display: none; }
-
-.rung {
-  appearance: none;
-  flex: 0 0 auto;
-  min-width: 40px;
-  min-height: 34px;
-  padding: 0 8px;
-  border: 1px solid var(--hair);
-  border-radius: 8px;
-  background: none;
-  color: var(--muted);
-  font: inherit;
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-  cursor: pointer;
-  transition: color 160ms ease, border-color 160ms ease;
-}
-.rung[aria-pressed="true"] {
-  color: var(--accent);
-  border-color: var(--accent);
-  font-weight: 600;
 }
 
 .step {
@@ -212,42 +271,6 @@ body {
   font-size: 18px;
   line-height: 1;
   cursor: pointer;
-}
-
-/* ---- quick pick ---- */
-
-.quick {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 0 0 auto;
-}
-
-.counter {
-  display: flex;
-  align-items: center;
-  border: 1px solid var(--hair);
-  border-radius: 8px;
-  overflow: hidden;
-  flex: 0 0 auto;
-}
-.counter button {
-  appearance: none;
-  width: 32px;
-  height: 34px;
-  border: 0;
-  background: none;
-  color: var(--line);
-  font: inherit;
-  font-size: 17px;
-  cursor: pointer;
-}
-.counter span {
-  min-width: 26px;
-  text-align: center;
-  font-size: 14px;
-  font-variant-numeric: tabular-nums;
-  color: var(--muted);
 }
 
 .dice-buttons {
@@ -272,9 +295,29 @@ body {
   font-size: 13px;
   font-variant-numeric: tabular-nums;
   cursor: pointer;
-  transition: border-color 160ms ease;
+  transition: border-color 160ms ease, color 160ms ease;
 }
 .dbtn:active { border-color: var(--line); }
+
+/* Marks which die the +/- chain buttons will step from. */
+.dbtn[aria-pressed="true"] {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.clear {
+  appearance: none;
+  flex: 0 0 auto;
+  width: var(--tap);
+  min-height: var(--tap);
+  border: 1px solid var(--hair);
+  border-radius: 10px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
 
 /* ---- notation entry ---- */
 

@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "dicebox",
+  "compatibility_date": "2026-07-18",
+
+  // Assets-only: no Worker script, no `main`. Cloudflare serves the files
+  // straight from the edge, which is all a static PWA needs. Adding a Worker
+  // would put a script in front of every request for no reason.
+  "assets": {
+    "directory": ".",
+
+    // The service worker already handles offline navigation, so a request for
+    // an unknown path should 404 rather than silently returning the app shell.
+    "not_found_handling": "404-page",
+
+    // Serve /index.html at /, without redirecting away from clean URLs.
+    "html_handling": "auto-trailing-slash"
+  }
+}

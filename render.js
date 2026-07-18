@@ -180,6 +180,40 @@ function coin(segments = 20) {
   return normalize({ verts, faces });
 }
 
+// Prism barrel: n rectangular faces around the equator, with a pointed cap at
+// each pole that is never landed on. This is how physical d5s and d7s are made,
+// and unlike a bipyramid it gives an exact face count for any n — odd or even.
+// The barrel's faces are all equivalent under its rotational symmetry, so it is
+// as fair as the die needs to be.
+function prismBarrel(n) {
+  const verts = [];
+  const half = 0.62;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * TAU;
+    verts.push([Math.cos(a), half, Math.sin(a)]);
+  }
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * TAU;
+    verts.push([Math.cos(a), -half, Math.sin(a)]);
+  }
+  const apexTop = verts.push([0, half + 0.55, 0]) - 1;
+  const apexBot = verts.push([0, -half - 0.55, 0]) - 1;
+
+  const faces = [];
+  // The numbered faces: one rectangle per side.
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    faces.push([i, j, n + j, n + i]);
+  }
+  // Caps are triangle fans, so they read as tapered ends rather than flat lids.
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    faces.push([apexTop, j, i]);
+    faces.push([apexBot, n + i, n + j]);
+  }
+  return normalize({ verts, faces });
+}
+
 function normalize(solid) {
   const scale = Math.max(...solid.verts.map(v => Math.hypot(...v)));
   return { verts: solid.verts.map(v => v.map(x => x / scale)), faces: solid.faces };
@@ -191,19 +225,45 @@ const SOLIDS = { 4: tetra, 6: cube, 8: octa, 12: dodeca, 20: icosa };
 // on every roll otherwise.
 const solidCache = new Map();
 
+// Above this, facets are finer than the die is ever drawn, so more only cost
+// frame time. d100 and beyond share this silhouette.
+const MAX_FACETS = 40;
+
+// Resting-orientation searches allowed per frame. Enough that small rolls all
+// resolve at once, low enough that a 100-dice roll spreads the cost instead of
+// spiking one frame past the 16.7ms budget.
+const SEARCHES_PER_FRAME = 6;
+let searchBudget = SEARCHES_PER_FRAME;
+let searchFrame = -1;
+
+// The budget refills once per frame, driven by the render loop.
+let frameCounter = 0;
+export function beginFrame() { frameCounter++; }
+
+function claimSearchBudget() {
+  if (searchFrame !== frameCounter) {
+    searchFrame = frameCounter;
+    searchBudget = SEARCHES_PER_FRAME;
+  }
+  if (searchBudget <= 0) return false;
+  searchBudget--;
+  return true;
+}
+
 // Every die gets a real, fair solid — no flat tokens.
 //
 //   - Coin for d2, since no two-faced polyhedron exists
 //   - Platonic solids where one exists (d4, d6, d8, d12, d20)
 //   - Trapezohedron for even counts: 2n kite faces. This is how physical d10s
 //     are made, and it extends to d14, d16, d24, d30 and beyond.
-//   - Bipyramid for odd counts: 2n triangles over an n-gon equator, then one
-//     face is simply never selected. A true odd-faced isohedron doesn't exist,
-//     and this is the standard physical compromise.
+//   - Prism barrel for odd counts: n numbered faces around the equator with a
+//     pointed cap at each pole. This is how physical d5s and d7s are made, and
+//     it gives an exact face count for any n — a d17 gets seventeen faces, not
+//     an eighteen-faced solid pretending.
 //
-// Both families are isohedral, so every face is equivalent under the solid's
-// symmetry — the geometric property that makes a die fair. (The roll itself is
-// decided by crypto RNG regardless; this is about the shape being honest.)
+// Every face of a given solid is equivalent under its rotational symmetry, so
+// the shape is honest about the die. (The roll itself is decided by crypto RNG
+// regardless; this is about the geometry not lying.)
 export function solidFor(sides) {
   if (sides < 2) return null; // d1 has no meaningful shape
   if (solidCache.has(sides)) return solidCache.get(sides);
@@ -213,15 +273,15 @@ export function solidFor(sides) {
     solid = coin();
   } else if (SOLIDS[sides]) {
     solid = SOLIDS[sides]();
+  } else if (sides % 2 === 0 && sides / 2 >= 3 && sides <= MAX_FACETS) {
+    solid = trapezohedron(sides / 2);
+  } else if (sides <= MAX_FACETS) {
+    solid = prismBarrel(sides);
   } else {
-    // Past ~32 faces the facets are too fine to read as anything but a sphere,
-    // so cap the geometry while the die still reports its true side count.
-    const faces = Math.min(sides, 32);
-    // A trapezohedron needs at least 3 kites per pole; below that (d2, d4) the
-    // construction degenerates, so fall back to the bipyramid.
-    solid = (faces % 2 === 0 && faces / 2 >= 3)
-      ? trapezohedron(faces / 2)
-      : bipyramid(Math.max(3, Math.ceil(faces / 2)));
+    // Past ~40 facets the geometry is finer than a few hundred pixels can show,
+    // so cap it. The die still reports its true side count; only the silhouette
+    // stops gaining detail nobody can see.
+    solid = trapezohedron(MAX_FACETS / 2);
   }
 
   solidCache.set(sides, solid);
@@ -257,8 +317,41 @@ export class Die {
     this.targetRot = null; // recomputed for wherever this throw lands
   }
 
+  // Tumble in place without moving. Used for large rolls, where flying dice
+  // across the tray costs frames and reads as noise — they all end up in the
+  // same grid anyway. `delay` staggers the settle so the grid resolves in a
+  // wave rather than every die stopping on the same frame.
+  spinInPlace(delay = 0) {
+    this.vx = 0;
+    this.vy = 0;
+    this.homeX = undefined;
+    this.homeY = undefined;
+    this.spin = [
+      0.34 + Math.random() * 0.22,
+      0.30 + Math.random() * 0.22,
+      (Math.random() - 0.5) * 0.16,
+    ];
+    this.settling = false;
+    this.settled = false;
+    this.targetRot = null;
+    this.spinHold = 0.16 + delay * 0.42;
+  }
+
   step(dt, bounds) {
     if (this.settled) return;
+
+    // Spin-in-place dice hold their slot: no translation, no wall bounces, and
+    // no separation work, since the grid already spaced them.
+    if (this.spinHold !== undefined && !this.settling) {
+      this.spinHold -= dt;
+      for (let i = 0; i < 3; i++) this.rot[i] += this.spin[i] * dt * 60;
+      if (this.spinHold <= 0) {
+        this.settling = true;
+        this.settleT = 0;
+        this.restRot = this.rot.slice();
+      }
+      return;
+    }
 
     if (!this.settling) {
       this.x += this.vx * dt;
@@ -293,7 +386,19 @@ export class Die {
       // Ease the tumble to a stop, rotating toward an orientation that presents
       // a face to the camera. Landing on a pole or a vertex reads as a spike and
       // leaves nowhere to paint the numeral.
-      if (!this.targetRot) this.targetRot = this.findFaceUpRotation();
+      //
+      // The search is the most expensive thing in the frame, so it is rationed:
+      // when a hundred dice settle together the searches otherwise bunch onto a
+      // few frames and cause a visible hitch. A die that misses its turn keeps
+      // spinning for another frame, which is invisible.
+      // A die that has waited several frames for budget takes its turn anyway.
+      // Without that floor, a caller that never advances the frame counter would
+      // leave dice spinning forever instead of merely animating less smoothly.
+      if (!this.targetRot) {
+        this.searchWait = (this.searchWait || 0) + 1;
+        if (this.searchWait < 30 && !claimSearchBudget()) return;
+        this.targetRot = this.findFaceUpRotation();
+      }
       this.settleT = Math.min(1, this.settleT + dt * 2.2);
       const e = 1 - Math.pow(1 - this.settleT, 3);
       for (let i = 0; i < 3; i++) {
@@ -310,24 +415,43 @@ export class Die {
     if (!this.solid) return this.rot.slice();
     let best = this.rot.slice(), bestScore = -Infinity;
 
-    for (let i = 0; i < 90; i++) {
+    // Cost is candidates x faces x vertices, so a fixed candidate count makes
+    // high-face dice disproportionately expensive — a d50 cost ~8ms, enough to
+    // drop frames on a 100-dice roll. Many-faced solids also have a face
+    // pointing almost anywhere, so they need far fewer samples to land one.
+    const samples = this.solid.faces.length > 20 ? 40
+                  : this.solid.faces.length > 10 ? 80
+                  : 140;
+
+    for (let i = 0; i < samples; i++) {
       // First candidate is the current pose, so an already-good landing sticks.
+      // Later candidates search the full sphere: a coin's two broad faces lie on
+      // a single axis, and a narrow search around a rim-on landing can never
+      // reach them.
+      const spread = i < samples * 0.43 ? 2.6 : TAU;
       const cand = i === 0 ? this.rot.slice() : [
-        this.rot[0] + (Math.random() - 0.5) * 2.6,
-        this.rot[1] + (Math.random() - 0.5) * 2.6,
-        this.rot[2] + (Math.random() - 0.5) * 2.6,
+        this.rot[0] + (Math.random() - 0.5) * spread,
+        this.rot[1] + (Math.random() - 0.5) * spread,
+        this.rot[2] + (Math.random() - 0.5) * spread,
       ];
       const pts = this.solid.verts.map(v => rotate(v, cand[0], cand[1], cand[2]));
 
-      let facing = 0;
+      // Score by projected screen area, not facing angle alone. Facing alone
+      // lets a sliver of rim beat a broad face that is only slightly turned —
+      // which is why the coin landed on its edge nearly every flip.
+      let visible = 0;
       for (const face of this.solid.faces) {
-        const n = faceNormal(face.map(i2 => pts[i2]));
+        const fp = face.map(i2 => pts[i2]);
+        const n = faceNormal(fp);
         const len = Math.hypot(...n);
-        if (len) facing = Math.max(facing, n[2] / len);
+        if (!len) continue;
+        const facing = n[2] / len;
+        if (facing <= 0) continue;
+        visible = Math.max(visible, facing * polygonArea(fp) * facing);
       }
-      // Prefer a square-on face, but stay near the pose it actually landed in.
+      // Prefer a big square-on face, but stay near the pose it actually landed in.
       const drift = Math.abs(cand[0] - this.rot[0]) + Math.abs(cand[1] - this.rot[1]);
-      const score = facing - drift * 0.06;
+      const score = visible - drift * 0.02;
       if (score > bestScore) { bestScore = score; best = cand; }
     }
     return best;
@@ -388,14 +512,19 @@ export class Die {
   // that face's own plane. The glyph is skewed to sit in the surface rather than
   // floating flat over the shape, so it tracks the die as it tumbles.
   drawValue(ctx, theme, s, pts, proj) {
-    let best = null, bestFacing = 0.2;
+    // Pick the face by visible screen area, matching findFaceUpRotation. Going
+    // by facing angle alone paints the numeral on whatever sliver happens to
+    // point at the camera — on a coin, that meant a digit on the rim.
+    let best = null, bestFacing = 0, bestScore = 0;
     for (const face of this.solid.faces) {
       const fp = face.map(i => pts[i]);
       const n = faceNormal(fp);
       const len = Math.hypot(...n);
       if (!len) continue;
       const facing = n[2] / len;
-      if (facing > bestFacing) { bestFacing = facing; best = face; }
+      if (facing <= 0.2) continue;
+      const score = facing * polygonArea(fp);
+      if (score > bestScore) { bestScore = score; bestFacing = facing; best = face; }
     }
     if (!best) return;
 
@@ -407,6 +536,9 @@ export class Die {
     const ulen = Math.hypot(ux, uy) || 1;
     ux /= ulen; uy /= ulen;
 
+    // A staged die has no value yet: it is waiting on the tray to be thrown, so
+    // it shows as an empty shape rather than a number it does not have.
+    if (this.value === null || this.value === undefined) return;
     const label = String(this.value);
     // Long labels (d100 can show 3 digits) need to shrink to stay on the face.
     const fit = label.length > 2 ? 0.34 : label.length > 1 ? 0.42 : 0.52;
@@ -448,6 +580,18 @@ function rotate(v, rx, ry, rz) {
   return [x, y, z];
 }
 
+// Area of a planar polygon in 3D, via the magnitude of its summed cross products.
+function polygonArea(pts) {
+  let n = [0, 0, 0];
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i], b = pts[(i + 1) % pts.length];
+    n = [n[0] + (a[1]*b[2] - a[2]*b[1]),
+         n[1] + (a[2]*b[0] - a[0]*b[2]),
+         n[2] + (a[0]*b[1] - a[1]*b[0])];
+  }
+  return Math.hypot(...n) / 2;
+}
+
 function faceNormal(pts) {
   const n = cross(sub(pts[1], pts[0]), sub(pts[2], pts[0]));
   const c = pts.reduce((a, p) => [a[0]+p[0], a[1]+p[1], a[2]+p[2]], [0,0,0]);
@@ -487,28 +631,48 @@ export function separate(dice, bounds, iterations = 3) {
   }
 }
 
-// One hairline for the table, plus a ripple that expands where a die lands.
+// Contact marks under the dice themselves.
+//
+// This used to draw a floor line across the tray with ripples expanding on it
+// wherever a die landed. Because the dice come to rest all over the tray and the
+// line sat at the bottom, the ripples read as unrelated marks in a strip rather
+// than as anything the dice were touching. A mark directly beneath each die does
+// the job the floor line was supposed to do.
 export class Surface {
-  constructor() { this.ripples = []; }
-  impact(x, y) { this.ripples.push({ x, y, t: 0 }); }
+  constructor() { this.marks = []; }
+
+  impact(x, y, size) { this.marks.push({ x, y, size, t: 0 }); }
+
   step(dt) {
-    this.ripples = this.ripples.filter(r => (r.t += dt) < 1);
+    this.marks = this.marks.filter(m => (m.t += dt) < 0.9);
   }
-  draw(ctx, theme, bounds) {
+
+  draw(ctx, theme) {
     ctx.save();
     ctx.strokeStyle = theme.muted;
-    ctx.globalAlpha = 0.35;
     ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(bounds.left, bounds.floor);
-    ctx.lineTo(bounds.right, bounds.floor);
-    ctx.stroke();
-
-    for (const r of this.ripples) {
-      const e = 1 - Math.pow(1 - r.t, 2);
-      ctx.globalAlpha = 0.3 * (1 - r.t);
+    for (const m of this.marks) {
+      const e = 1 - Math.pow(1 - m.t / 0.9, 2);
+      ctx.globalAlpha = 0.28 * (1 - m.t / 0.9);
       ctx.beginPath();
-      ctx.ellipse(r.x, bounds.floor, 12 + e * 90, 3 + e * 16, 0, 0, TAU);
+      ctx.ellipse(m.x, m.y + m.size * 0.42, m.size * (0.34 + e * 0.5),
+                  m.size * (0.08 + e * 0.12), 0, 0, TAU);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // A faint ellipse under each resting die, so it reads as sitting on a surface
+  // rather than floating in the middle of the tray.
+  drawRests(ctx, theme, dice) {
+    ctx.save();
+    ctx.strokeStyle = theme.muted;
+    ctx.globalAlpha = 0.16;
+    ctx.lineWidth = 1;
+    for (const d of dice) {
+      if (!d.settled) continue;
+      ctx.beginPath();
+      ctx.ellipse(d.x, d.y + d.size * 0.46, d.size * 0.34, d.size * 0.07, 0, 0, TAU);
       ctx.stroke();
     }
     ctx.restore();

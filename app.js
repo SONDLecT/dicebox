@@ -1,11 +1,24 @@
-import { roll, describe, DCC_CHAIN, stepChain } from './dice.js';
-import { Die, Surface, separate } from './render.js';
+import { roll, describe, stepChain } from './dice.js';
+import { Die, Surface, separate, beginFrame } from './render.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('tray');
 const ctx = canvas.getContext('2d');
 
-const QUICK = [2, 3, 4, 6, 8, 10, 12, 14, 16, 20, 24, 30, 100];
+// One row of dice, ordered by size. This is the full Dungeon Crawl Classics
+// chain plus d2 and d100, so the chain's +/- buttons step along this same row —
+// a separate chain row would just be these buttons twice.
+const QUICK = [2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 30, 100];
+
+// Above this many dice, throwing them across the tray stops being legible and
+// the pairwise separation gets expensive. Larger rolls spin in place instead.
+const THROW_LIMIT = 24;
+
+// Above this, even spinning in place costs more per frame than the animation is
+// worth — measured at ~39ms/frame for 400 dice on a Raspberry Pi, well past the
+// 16.7ms budget. Bigger rolls show their result immediately; the total is what
+// anyone rolling 500 dice actually wants.
+const ANIMATE_LIMIT = 220;
 
 const state = {
   count: 1,
@@ -110,14 +123,18 @@ function doRoll(notation) {
     for (const d of g.dice) flat.push({ sides: g.sides, value: d.value });
   }
 
-  // Beyond a couple dozen dice, individual tumbling animations stop being
-  // readable and just cost frames — show the numbers immediately instead.
-  const animate = flat.length > 0 && flat.length <= 24;
-
   state.dice = flat.map(f => new Die(f.sides, f.value, 0, 0, 40));
   placeGrid(state.dice);
 
-  if (animate) {
+  // Small rolls get thrown across the tray. Large ones spin in place: the dice
+  // end up in the same grid either way, so for 100d6 the flight and collisions
+  // buy nothing and cost every frame. Spinning in place keeps every die animated
+  // at a fraction of the work.
+  const mode = flat.length === 0 || flat.length > ANIMATE_LIMIT ? 'none'
+             : flat.length <= THROW_LIMIT ? 'throw'
+             : 'spin';
+
+  if (mode === 'throw') {
     // Each die keeps the grid slot placeGrid gave it and is thrown *toward* it.
     // Launching from random positions instead is what made dice pile up.
     for (const d of state.dice) {
@@ -130,12 +147,17 @@ function doRoll(notation) {
     }
     $('total').dataset.rolling = '1';
     setTimeout(() => finish(result), 620);
+  } else if (mode === 'spin') {
+    // Stagger the starts so the grid resolves in a wave instead of snapping.
+    state.dice.forEach((d, i) => d.spinInPlace(i / state.dice.length));
+    $('total').dataset.rolling = '1';
+    setTimeout(() => finish(result), 700);
   } else {
     for (const d of state.dice) { d.settled = true; d.settling = true; d.settleT = 1; }
     finish(result);
   }
 
-  if (navigator.vibrate) navigator.vibrate(animate ? [8, 40, 12] : 10);
+  if (navigator.vibrate) navigator.vibrate(mode === 'none' ? 10 : [8, 40, 12]);
   hideHint();
 }
 
@@ -174,46 +196,179 @@ $('entry').addEventListener('submit', e => {
   $('notation').blur();
 });
 
-$('countUp').addEventListener('click', () => setCount(state.count + 1));
-$('countDown').addEventListener('click', () => setCount(state.count - 1));
-function setCount(n) {
-  state.count = Math.max(1, Math.min(99, n));
-  $('count').textContent = String(state.count);
+// ---- help ----
+
+const help = $('help');
+const helpToggle = $('helpToggle');
+
+function setHelp(open) {
+  help.hidden = !open;
+  helpToggle.setAttribute('aria-expanded', String(open));
+  helpToggle.setAttribute('aria-label', open ? 'Hide syntax reference' : 'Show syntax reference');
+  if (open) hideHint();
 }
 
+helpToggle.addEventListener('click', () => setHelp(help.hidden));
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !help.hidden) {
+    setHelp(false);
+    helpToggle.focus();
+  }
+});
+
+// Tapping an example loads it, so the reference doubles as a set of presets.
+help.querySelectorAll('.syntax dt').forEach(dt => {
+  dt.tabIndex = 0;
+  dt.role = 'button';
+  const use = () => {
+    $('notation').value = dt.textContent.trim();
+    setHelp(false);
+    doRoll(dt.textContent.trim());
+  };
+  dt.addEventListener('click', use);
+  dt.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); use(); }
+  });
+});
+
+// ---- the pool ----
+//
+// Tapping dice builds a pool: tap d20 twice and d6 once and you have 2d20+1d6,
+// which is what an attack roll actually looks like. The pool writes itself into
+// the notation field, so the field stays the single source of truth and typing
+// notation by hand still works exactly as before.
+
 const diceButtons = $('diceButtons');
+
+// Insertion order is preserved, so the notation reads back in the order tapped.
+let pool = new Map();
+
+function poolNotation() {
+  return [...pool].map(([sides, n]) => `${n}d${sides}`).join('+');
+}
+
+function addToPool(sides) {
+  // Typing in the field and then tapping a die should extend what is there, not
+  // silently discard it. Anything unparseable is replaced instead.
+  if (!poolMatchesField()) {
+    pool = parsePool($('notation').value);
+  }
+  pool.set(sides, (pool.get(sides) || 0) + 1);
+  syncPool();
+}
+
+function poolMatchesField() {
+  return $('notation').value.trim().toLowerCase() === poolNotation().toLowerCase();
+}
+
+// Recover a pool from plain NdM+NdM text. Anything with modifiers or arithmetic
+// can't round-trip through the Map, so those roll fine but start a fresh pool
+// on the next tap.
+function parsePool(text) {
+  const next = new Map();
+  const src = String(text || '').toLowerCase().replace(/\s+/g, '');
+  if (!src) return next;
+  for (const term of src.split('+')) {
+    const m = /^(\d*)d(\d+)$/.exec(term);
+    if (!m) return new Map();
+    const n = m[1] === '' ? 1 : parseInt(m[1], 10);
+    const sides = parseInt(m[2], 10);
+    if (!sides) return new Map();
+    next.set(sides, (next.get(sides) || 0) + n);
+  }
+  return next;
+}
+
+// Show the pool as unrolled dice waiting on the tray, so tapping summons the
+// dice you are about to throw rather than only changing text.
+function syncPool() {
+  const notation = poolNotation();
+  $('notation').value = notation;
+  clearError();
+
+  const staged = [];
+  for (const [sides, n] of pool) {
+    for (let i = 0; i < n; i++) staged.push(new Die(sides, null, 0, 0, 40));
+  }
+  state.dice = staged.slice(0, ANIMATE_LIMIT);
+  placeGrid(state.dice);
+  for (const d of state.dice) {
+    d.settled = true;
+    d.settling = true;
+    d.settleT = 1;
+    d.rot = [0.5, 0.6, 0.1];
+  }
+
+  $('total').dataset.idle = '1';
+  $('total').textContent = '—';
+  $('breakdown').textContent = notation ? `${staged.length} dice ready` : 'Pick dice or type a roll';
+  hideHint();
+}
+
+function clearPool() {
+  pool = new Map();
+  state.dice = [];
+  $('notation').value = '';
+  $('total').dataset.idle = '1';
+  $('total').textContent = '—';
+  $('breakdown').textContent = 'Pick dice or type a roll';
+  clearError();
+}
+
+$('clear').addEventListener('click', () => {
+  clearPool();
+  $('notation').focus();
+});
+
+// One row, ordered by size. The DCC chain values are all here, so the +/- steps
+// move along this same row instead of needing a second one.
 for (const sides of QUICK) {
   const b = document.createElement('button');
   b.className = 'dbtn';
   b.type = 'button';
   b.textContent = `d${sides}`;
-  b.addEventListener('click', () => doRoll(`${state.count}d${sides}`));
+  b.dataset.sides = String(sides);
+  b.addEventListener('click', () => {
+    state.chainSides = sides;
+    addToPool(sides);
+    markChain();
+  });
   diceButtons.append(b);
 }
 
-const rungs = $('rungs');
-for (const sides of DCC_CHAIN) {
-  const b = document.createElement('button');
-  b.className = 'rung';
-  b.type = 'button';
-  b.textContent = `d${sides}`;
-  b.setAttribute('aria-pressed', String(sides === state.chainSides));
-  b.addEventListener('click', () => setChain(sides, true));
-  rungs.append(b);
+// The chain buttons step the *last* die tapped up or down its rung, replacing
+// that die in the pool — the DCC "roll a d16 instead of a d20" move.
+function stepPool(dir) {
+  const from = state.chainSides;
+  const to = stepChain(from, dir);
+  if (to === from) return;
+
+  state.chainSides = to;
+  if (pool.has(from)) {
+    const n = pool.get(from);
+    pool.delete(from);
+    pool.set(to, (pool.get(to) || 0) + n);
+    syncPool();
+  } else {
+    addToPool(to);
+  }
+  markChain();
 }
 
-function setChain(sides, alsoRoll) {
-  state.chainSides = sides;
-  [...rungs.children].forEach((b, i) => {
-    b.setAttribute('aria-pressed', String(DCC_CHAIN[i] === sides));
-  });
-  const active = rungs.children[DCC_CHAIN.indexOf(sides)];
+// Highlight whichever die the chain will step from.
+function markChain() {
+  for (const b of diceButtons.children) {
+    b.setAttribute('aria-pressed', String(Number(b.dataset.sides) === state.chainSides));
+  }
+  const active = [...diceButtons.children]
+    .find(b => Number(b.dataset.sides) === state.chainSides);
   active?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
-  if (alsoRoll) doRoll(`${state.count}d${sides}`);
 }
 
-$('chainUp').addEventListener('click', () => setChain(stepChain(state.chainSides, 1), true));
-$('chainDown').addEventListener('click', () => setChain(stepChain(state.chainSides, -1), true));
+$('chainUp').addEventListener('click', () => stepPool(1));
+$('chainDown').addEventListener('click', () => stepPool(-1));
+markChain();
 
 // ---- flick to throw ----
 
@@ -230,15 +385,15 @@ canvas.addEventListener('pointerup', e => {
   const speed = Math.hypot(vx, vy);
   drag = null;
 
-  // A flick re-rolls whatever is already loaded; a tap with nothing loaded
-  // falls back to the current chain die so the tray is never a dead surface.
-  if (speed > 120 || state.last) {
-    doRoll(state.last ? state.last.notation : `${state.count}d${state.chainSides}`);
-    if (speed > 120) {
-      for (const d of state.dice) d.throwWith(vx * 0.5, Math.abs(vy) * 0.5 + 200);
-    }
-  } else {
-    doRoll(`${state.count}d${state.chainSides}`);
+  // Throw whatever is staged; failing that, re-roll the last notation. The tray
+  // is never a dead surface, so a tap on an empty one rolls the selected die.
+  const target = $('notation').value.trim()
+    || (state.last && state.last.notation)
+    || `d${state.chainSides}`;
+
+  doRoll(target);
+  if (speed > 120) {
+    for (const d of state.dice) d.throwWith(vx * 0.5, Math.abs(vy) * 0.5 + 200);
   }
 });
 canvas.addEventListener('pointercancel', () => { drag = null; });
@@ -261,15 +416,23 @@ function frame(now) {
   ctx.clearRect(0, 0, r.width, r.height);
 
   state.surface.step(dt);
-  state.surface.draw(ctx, t, state.bounds);
+  beginFrame();
 
   for (const d of state.dice) {
     const wasSettled = d.settled;
     d.step(dt, state.bounds);
-    if (!wasSettled && d.settled) state.surface.impact(d.x, d.y);
+    if (!wasSettled && d.settled) state.surface.impact(d.x, d.y, d.size);
   }
 
-  if (state.dice.length > 1) separate(state.dice, state.bounds);
+  // Spin-in-place dice never move, so the grid spacing already holds — running
+  // O(n^2) separation over 100+ of them every frame would be pure waste.
+  if (state.dice.length > 1 && state.dice.length <= THROW_LIMIT) {
+    separate(state.dice, state.bounds);
+  }
+
+  // Contact marks sit under the dice, so they draw first.
+  state.surface.drawRests(ctx, t, state.dice);
+  state.surface.draw(ctx, t);
   for (const d of state.dice) d.draw(ctx, t);
 
   requestAnimationFrame(frame);
