@@ -4155,6 +4155,11 @@ function doRoll(notation) {
     }
   }
 
+  // Your throw takes the tray outright. Dropping the claim stops a remote
+  // roll still in the air from writing its total over yours when its timer
+  // fires.
+  state.remoteClaim = null;
+
   state.dice = flat.map(f => {
     const die = new Die(f.sides, f.value, 0, 0, 40);
     die.kept = f.kept;
@@ -5372,7 +5377,10 @@ function drawFrame(dt) {
       if (d.exploded && !d.burstShown) {
         d.burstShown = true;
         state.surface.burst(d.x, d.y, d.size);
-        if (navigator.vibrate) navigator.vibrate([14, 30, 22]);
+        // The burst is drawn for anyone's die, but only your own buzzes. A
+        // phone going off for every explosion at a busy table is an irritation,
+        // and touch is the one cue worth reserving for the roll you made.
+        if (!d.remote && navigator.vibrate) navigator.vibrate([14, 30, 22]);
       }
     }
   }
@@ -5545,10 +5553,18 @@ const roomLink = createRoom({
   onNotice: showRoomNotice,
 });
 
-// A remote roll goes to the log and the tray, but never animates: the tray is
-// showing what *you* threw, and hijacking it mid-flight for someone else's roll
-// would interrupt your own dice. It is rendered settled, in place, and marked so
-// the two are never confused.
+// A remote roll animates exactly as a local one does. It has to: the point of a
+// shared tray over a shared log is watching the dice, and dropping someone
+// else's roll in fully settled reads as a notification rather than a throw.
+//
+// Nothing needs synchronising for this. The result was decided on the roller's
+// device and travels as a number, so both trays animate independently toward
+// the same outcome — a phone rendering half a second behind another is
+// invisible, because the dice were never agreeing on a trajectory, only on
+// where they stop.
+//
+// The one thing this must not do is interrupt a throw of your own, which the
+// dataset.rolling guard below covers.
 function showRemoteRoll(roll) {
   addHistory({ notation: roll.notation, groups: roll.groups, total: roll.total }, roll.name);
 
@@ -5571,22 +5587,57 @@ function showRemoteRoll(roll) {
     die.kept = f.kept;
     die.exploded = f.exploded;
     die.rerolled = f.rerolled;
-    // Settled on arrival: no throw, no tumble, no separation pass.
-    die.settled = true;
-    die.settling = true;
-    die.settleT = 1;
-    // Marks the burst and reroll effects as already shown, so a remote
-    // exploding die does not fire a burst and a buzz for a roll you did not
-    // make.
-    die.burstShown = true;
-    die.rerollShown = true;
+    // Someone else's die. Used only to keep the haptics to your own rolls; it
+    // looks identical on the tray, because whose die it is belongs in the
+    // readout rather than in the drawing.
+    die.remote = true;
     return die;
   });
   placeGrid(state.dice);
 
-  delete $('total').dataset.idle;
-  $('total').textContent = String(roll.total);
-  $('breakdown').textContent = `${roll.name} · ${describe(roll.groups)}`;
+  // The readout updates when the dice land rather than now, so the number
+  // arrives with them. Showing the total up front would answer the question the
+  // animation exists to ask.
+  // Stamped so this landing can tell whether the tray is still its own. If you
+  // rolled while someone else's dice were in the air, your throw took the tray
+  // and this timer must not overwrite your total when it fires.
+  const claim = {};
+  state.remoteClaim = claim;
+
+  const land = () => {
+    if (state.remoteClaim !== claim) return;
+    delete $('total').dataset.rolling;
+    delete $('total').dataset.idle;
+    $('total').textContent = String(roll.total);
+    $('breakdown').textContent = `${roll.name} · ${describe(roll.groups)}`;
+  };
+
+  // Same thresholds as a local roll: thrown when there are few enough to follow,
+  // spun in place when there are not.
+  const mode = flat.length <= THROW_LIMIT ? 'throw' : 'spin';
+
+  if (mode === 'throw') {
+    for (const d of state.dice) {
+      d.homeX = d.x;
+      d.homeY = d.y;
+      const fromLeft = Math.random() < 0.5;
+      d.x = fromLeft ? state.bounds.left + 12 : state.bounds.right - 12;
+      d.y = state.bounds.top + 12 + Math.random() * 30;
+      d.throwWith((d.homeX - d.x) * 2.4, (d.homeY - d.y) * 2.4);
+    }
+  } else {
+    state.dice.forEach((d, i) => d.spinInPlace(i / state.dice.length));
+  }
+
+  // Claimed for the length of the flight so a second remote roll arriving
+  // mid-animation does not reset the tray under the first, and so your own
+  // throw is not interrupted by someone else's.
+  $('total').dataset.rolling = '1';
+  $('breakdown').textContent = `${roll.name} is rolling…`;
+  setTimeout(land, (mode === 'throw' ? 620 : 700) + rerollDelay(flat));
+
+  // No vibration. A phone buzzing for every roll at a busy table is an
+  // irritation, and it is the one cue that should stay reserved for your own.
   $('wordmark').dataset.faded = '1';
   hideHint();
 }
