@@ -55,6 +55,35 @@ async function api(path, init = {}) {
   return json.result;
 }
 
+// The migration to send, or undefined when the deployed script already has it.
+// Cloudflare reports the current tag on the existing script; a fresh deploy has
+// none, and a redeploy of an unchanged tag must send nothing at all.
+async function pendingMigration() {
+  const migrations = config.migrations || [];
+  if (!migrations.length) return undefined;
+  const latest = migrations[migrations.length - 1];
+
+  // Whether the namespace exists is the question that matters, and the script
+  // settings do not answer it — they carry no migration tag at all, so reading
+  // one back always looked like "never migrated" and every redeploy tried to
+  // replay v1. The namespace listing is the authoritative record.
+  let exists = false;
+  try {
+    const res = await fetch(`${API}/accounts/${ACCOUNT}/workers/durable_objects/namespaces`, {
+      headers: { Authorization: `Bearer ${TOKEN}` },
+    });
+    const json = await res.json().catch(() => ({}));
+    exists = (json.result || []).some(
+      ns => ns.script === SCRIPT && latest.new_sqlite_classes?.includes(ns.class));
+  } catch {
+    // Treated as absent: a first deploy needs the migration, and sending one
+    // that is not needed fails loudly rather than corrupting anything.
+  }
+
+  if (exists) return undefined;
+  return { new_tag: latest.tag, new_sqlite_classes: latest.new_sqlite_classes };
+}
+
 const entry = config.main;
 const script = readFileSync(join(ROOT, 'server', entry), 'utf8');
 
@@ -73,13 +102,15 @@ const metadata = {
       type: 'plain_text', name, text,
     })),
   ],
-  // The migration is what tells Cloudflare the class exists and is
-  // SQLite-backed. Without it the binding refers to a namespace that was never
-  // created and every request to the object fails.
-  migrations: config.migrations?.length
-    ? { new_tag: config.migrations[config.migrations.length - 1].tag,
-        new_sqlite_classes: config.migrations[config.migrations.length - 1].new_sqlite_classes }
-    : undefined,
+  // The migration tells Cloudflare the class exists and is SQLite-backed.
+  // Without it the binding refers to a namespace that was never created and
+  // every request to the object fails.
+  //
+  // Sent only when the deployed tag is behind: replaying a migration that has
+  // already run is rejected outright, so every deploy after the first would
+  // fail if this were unconditional. `old_tag` is what lets Cloudflare tell the
+  // two cases apart.
+  migrations: await pendingMigration(),
   observability: config.observability,
 };
 

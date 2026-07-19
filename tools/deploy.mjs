@@ -85,8 +85,33 @@ const typeOf = p => TYPES[p.slice(p.lastIndexOf('.'))] || 'application/octet-str
 // instead just renders the file, since it is served as text/plain.
 const extras = [{ from: join(ROOT, 'dist', 'dicebox.html'), to: '/dicebox.html' }];
 
+// The relay a deployed copy talks to. Empty means no relay, which leaves the
+// app local-only — that is the default and what an unconfigured deploy gets.
+//
+// Substituted at deploy time rather than committed into index.html so that the
+// staging copy can point at the staging relay without the two ever differing in
+// the repository. A deploy with no relay configured is a supported outcome, not
+// a misconfiguration.
+const RELAY = DEV
+  ? (env.DEV_RELAY_URL || 'wss://dev.relay.dicebox.trollskull.cc/ws')
+  : (env.RELAY_URL || '');
+
+const withRelay = (full, body) => {
+  // index.html only, never the single-file build. The README promises that the
+  // downloaded file gives a real "we cannot see your rolls" guarantee because
+  // no third party serves or carries anything — shipping it pre-pointed at the
+  // demo's relay would make that false, and quietly. Someone who downloads the
+  // file and wants rooms can set the meta tag themselves, which is a decision
+  // they have made rather than one made for them.
+  if (!full.endsWith('index.html')) return body;
+  const html = body.toString('utf8').replace(
+    /(<meta name="dicebox-relay" content=")[^"]*(">)/,
+    `$1${RELAY}$2`);
+  return Buffer.from(html, 'utf8');
+};
+
 const describeFile = (full, path) => {
-  const body = readFileSync(full);
+  const body = withRelay(full, readFileSync(full));
   // Cloudflare keys assets by a 32-char hash of contents plus extension.
   const ext = full.slice(full.lastIndexOf('.'));
   const hash = createHash('sha256').update(body).update(ext).digest('hex').slice(0, 32);

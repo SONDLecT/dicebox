@@ -5,37 +5,45 @@
 // smallest script that fixes that: fetch the asset, copy the response, add the
 // headers.
 
-// The one origin the app may open a WebSocket to. Rooms do not work without it
-// — `connect-src 'self'` blocks a relay on a separate host outright — but it is
-// pinned to an exact origin rather than widened to `wss:` or `*`, and that
-// distinction is the whole point.
+// The only origin each deployment may open a WebSocket to. Rooms do not work
+// without an entry here — `connect-src 'self'` blocks a relay on a separate
+// host outright — but each is pinned to an exact origin rather than widened to
+// `wss:` or `*`, and that distinction is the whole point.
 //
 // The relay never carries key material by design. A pinned connect-src is what
 // keeps that true even if the design fails: a build that has been tampered with
 // somewhere between here and the browser still cannot post a derived key to a
-// host that is not on this line, because the browser refuses the connection
+// host that is not on this list, because the browser refuses the connection
 // before the request is made. `wss:` would allow every relay on the internet
 // and give an attacker their pick, which defeats the control entirely.
 //
-// Self-hosters change this to their own relay. Deploying without one at all is
-// fine and leaves the app local-only, which is the default anyway.
-const RELAY_ORIGIN = 'wss://relay.dicebox.trollskull.cc';
+// Staging and production are listed separately so neither can reach the other's
+// relay. Self-hosters add their own. A host absent from this list gets no
+// exception at all and stays local-only, which is the default anyway.
+const RELAY_ORIGINS = {
+  'dev.dicebox.trollskull.cc': 'wss://dev.relay.dicebox.trollskull.cc',
+  'dicebox.trollskull.cc': 'wss://relay.dicebox.trollskull.cc',
+};
 
-const SECURITY = {
-  'X-Content-Type-Options': 'nosniff',
-  'Referrer-Policy': 'no-referrer',
-  // The app is entirely self-contained apart from the relay above, so nothing
-  // may load from anywhere else.
-  'Content-Security-Policy': [
-    "default-src 'self'",
-    "script-src 'self'",
-    "style-src 'self'",
-    "img-src 'self' data:",
-    `connect-src 'self' ${RELAY_ORIGIN}`,
-    "base-uri 'none'",
-    "form-action 'none'",
-    "frame-ancestors 'none'",
-  ].join('; '),
+const securityHeaders = hostname => {
+  const relay = RELAY_ORIGINS[hostname];
+  return {
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'no-referrer',
+    // The app is entirely self-contained apart from its own relay, so nothing
+    // may load from anywhere else. A host with no relay listed above gets no
+    // connect-src exception at all, which leaves it local-only.
+    'Content-Security-Policy': [
+      "default-src 'self'",
+      "script-src 'self'",
+      "style-src 'self'",
+      "img-src 'self' data:",
+      relay ? `connect-src 'self' ${relay}` : "connect-src 'self'",
+      "base-uri 'none'",
+      "form-action 'none'",
+      "frame-ancestors 'none'",
+    ].join('; '),
+  };
 };
 
 // A stale service worker pins every other asset to its old version, so it and
@@ -53,7 +61,7 @@ export default {
     if (url.pathname === '/dicebox.html') {
       const res = await env.ASSETS.fetch(new URL('/dicebox', url));
       const headers = new Headers(res.headers);
-      for (const [k, v] of Object.entries(SECURITY)) headers.set(k, v);
+      for (const [k, v] of Object.entries(securityHeaders(url.hostname))) headers.set(k, v);
       headers.set('Content-Type', 'text/html; charset=utf-8');
       headers.set('Content-Disposition', 'attachment; filename="dicebox.html"');
       headers.set('Cache-Control', 'no-cache');
@@ -63,7 +71,7 @@ export default {
     const res = await env.ASSETS.fetch(request);
 
     const headers = new Headers(res.headers);
-    for (const [k, v] of Object.entries(SECURITY)) headers.set(k, v);
+    for (const [k, v] of Object.entries(securityHeaders(url.hostname))) headers.set(k, v);
 
     if (ALWAYS_REVALIDATE.has(url.pathname)) {
       headers.set('Cache-Control', 'no-cache');

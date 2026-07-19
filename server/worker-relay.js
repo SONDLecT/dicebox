@@ -12,6 +12,12 @@
 // and a plain Worker has no way to hold them together. Room id maps to object
 // name, so Cloudflare routes every member of a room to the same instance.
 
+// The class has to extend DurableObject for the hibernation API to work.
+// Without it `ctx.getWebSockets()` returns an empty list rather than failing, so
+// every connection believes it is alone in the room and no message is ever
+// broadcast — a silent failure that looks exactly like a routing bug.
+import { DurableObject } from 'cloudflare:workers';
+
 const PROTOCOL_VERSION = 1;
 
 const MAX_PER_ROOM = 16;
@@ -75,10 +81,9 @@ export default {
   },
 };
 
-export class Room {
+export class Room extends DurableObject {
   constructor(ctx, env) {
-    this.ctx = ctx;
-    this.env = env;
+    super(ctx, env);
   }
 
   async fetch(request) {
@@ -145,6 +150,17 @@ export class Room {
       return fail(ws, 'bad_frame', 'Frame is not an object', 4400);
     }
 
+    // The client sends `join` because the self-hosted relay reads the room id
+    // from it. Here the room was already decided by the URL before the socket
+    // was accepted, so this is a no-op rather than an error — one client has to
+    // speak to both relays, and rejecting the frame would close the connection
+    // on every join.
+    if (msg.t === 'join') {
+      if (msg.v !== PROTOCOL_VERSION) {
+        return fail(ws, 'version', 'This relay speaks protocol version 1', 4426);
+      }
+      return;
+    }
     if (msg.t === 'ping') return send(ws, { t: 'pong' });
     if (msg.t === 'leave') return ws.close(1000, 'left');
     if (msg.t !== 'send') {
