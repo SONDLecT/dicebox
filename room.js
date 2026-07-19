@@ -580,6 +580,11 @@ export function createRoom(options = {}) {
     get members() { return [...members.values()].map(m => ({ ...m })); },
     get self() { return selfId; },
     get expires() { return expiresAt; },
+    // How many messages in a row failed to decrypt. Exposed because the count
+    // is the only observable trace of a frame being rejected — a caller waiting
+    // for one to be processed has nothing else to watch, and waiting on elapsed
+    // time instead is what made the tests flaky under load.
+    get unreadable() { return decryptFails; },
 
     join(phrase) {
       if (!url) return Promise.reject(new Error('No relay is configured'));

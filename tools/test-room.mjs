@@ -134,17 +134,10 @@ const HELLO_REPLY_WINDOW_MS = 400;
 // varies, so a count that settled a roll on one run left it in flight on the
 // next, and the replay test intermittently saw its first delivery arrive during
 // the second. Waiting on the condition instead makes the tests deterministic.
-// `setImmediate` alone yields only the microtask queue, which is enough when
-// there is a condition to wait on but not when there is not: WebCrypto runs off
-// the main thread, and on a loaded machine a decryption can still be in flight
-// after any fixed number of turns. Yielding to a real timer every so often lets
-// that work actually land, which is what a caller with no observable condition
-// is relying on.
 async function settle(until, tries = 400) {
   for (let i = 0; i < tries; i++) {
     await new Promise(resolve => setImmediate(resolve));
     if (until && until()) return;
-    if (!until && i % 50 === 49) await new Promise(resolve => setTimeout(resolve, 1));
   }
 }
 
@@ -567,15 +560,16 @@ const sampleRoll = {
   const wrong = await deriveRoom('granite-osprey-saffron-thicket-zephyr');
   const stranger = newSender();
 
-  // The count of failures is module-internal, so there is no condition to wait
-  // on here — these four rely on settle yielding long enough for each
-  // decryption to actually fail. Under load that is real elapsed time, not just
-  // microtask turns, which is why settle reaches for a timer when it has no
-  // condition to test.
+  // Waits for each failure to actually be counted. Spinning a fixed number of
+  // microtask turns instead was flaky: WebCrypto runs off-thread, so under load
+  // a decryption could still be in flight after the budget was spent, leaving
+  // the run short of the threshold and the fifth message raising nothing.
   for (let i = 0; i < 4; i++) {
     sock.deliver({ t: 'msg', c: await encryptMessage(wrong, stranger, sampleRoll) });
-    await settle();
+    await settle(() => r.unreadable === i + 1);
   }
+  ok('four unreadable messages are all counted', r.unreadable === 4,
+     `counted ${r.unreadable}`);
   ok('a few unreadable messages raise no notice', events.notices.length === 0,
      events.notices.join(' | '));
 
