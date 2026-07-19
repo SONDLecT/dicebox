@@ -1,5 +1,7 @@
 import { roll, describe } from './dice.js';
 import { Die, Surface, separate, beginFrame } from './render.js';
+import { createRoom, parsePassphraseFromHash } from './room.js';
+import { generatePassphrase } from './room-crypto.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('tray');
@@ -260,6 +262,10 @@ function finish(result) {
   $('total').textContent = String(result.total);
   $('breakdown').textContent = describe(result.groups);
   addHistory(result);
+  // After addHistory, so a throw in room code could not cost the local roll its
+  // place in the log. share() is synchronous and a no-op when there is no room,
+  // which is what keeps this line off the critical path.
+  roomLink.share(result);
   // The name has done its job by the first roll; let the tray have the page.
   $('wordmark').dataset.faded = '1';
 }
@@ -269,9 +275,13 @@ function finish(result) {
 const HISTORY_LIMIT = 500;
 const history = [];
 
-function recordRoll(result) {
+// `who` is carried into the export as well as the display: a session log that
+// silently merged everyone's rolls into one column would be useless for the
+// question people actually ask of it afterwards.
+function recordRoll(result, who = null) {
   history.push({
     at: new Date().toISOString(),
+    who,
     notation: result.notation,
     total: result.total,
     detail: describe(result.groups),
@@ -289,15 +299,26 @@ function recordRoll(result) {
   $('historyCount').textContent = history.length > 12 ? `${history.length} rolls` : '';
 }
 
-function addHistory(result) {
-  recordRoll(result);
+// `who` is the display name when the roll came from someone else in the room,
+// and null for your own. It only ever reaches the DOM through textContent — the
+// name is whatever a peer put in a payload, and rendering that as markup would
+// be a real bug even among friends.
+function addHistory(result, who = null) {
+  recordRoll(result, who);
   const li = document.createElement('li');
+  if (who) li.dataset.remote = '1';
 
   const top = document.createElement('div');
   top.className = 'log-line';
 
   const label = document.createElement('span');
-  label.textContent = result.notation;
+  if (who) {
+    const by = document.createElement('span');
+    by.className = 'log-who';
+    by.textContent = who;
+    label.append(by);
+  }
+  label.append(result.notation);
 
   const val = document.createElement('b');
   val.textContent = String(result.total);
@@ -356,7 +377,7 @@ const help = $('help');
 const helpToggle = $('helpToggle');
 
 function setHelp(open) {
-  if (open) { closeSheet(); closeDial(); closeHistory(); }
+  if (open) { closeSheet(); closeDial(); closeHistory(); closeRoom(); }
   help.hidden = !open;
   helpToggle.setAttribute('aria-expanded', String(open));
   helpToggle.setAttribute('aria-label', open ? 'Hide syntax reference' : 'Show syntax reference');
@@ -706,6 +727,7 @@ function openHistory() {
   setHelp(false);
   closeSheet();
   closeDial();
+  closeRoom();
 
   const list = $('historyFull');
   list.replaceChildren();
@@ -732,7 +754,13 @@ function openHistory() {
 
     const notation = document.createElement('span');
     notation.className = 'history-notation';
-    notation.textContent = entry.notation;
+    if (entry.who) {
+      const by = document.createElement('span');
+      by.className = 'log-who';
+      by.textContent = entry.who;
+      notation.append(by);
+    }
+    notation.append(entry.notation);
 
     const total = document.createElement('b');
     total.textContent = String(entry.total);
@@ -766,11 +794,11 @@ historyPanel.addEventListener('click', e => {
 // a text field and make the whole export useless for the question people
 // actually ask of a dice log.
 function historyCsv() {
-  const rows = [['time', 'notation', 'total', 'die', 'sides', 'value', 'kept', 'exploded', 'rerolled']];
+  const rows = [['time', 'who', 'notation', 'total', 'die', 'sides', 'value', 'kept', 'exploded', 'rerolled']];
   for (const entry of history) {
     entry.dice.forEach((d, i) => {
       rows.push([
-        entry.at, entry.notation, entry.total, i + 1,
+        entry.at, entry.who || 'you', entry.notation, entry.total, i + 1,
         d.sides, d.value, d.kept ? 1 : 0, d.exploded ? 1 : 0, d.rerolled ? 1 : 0,
       ]);
     });
@@ -785,7 +813,7 @@ function historyCsv() {
 
 function historyText() {
   return history
-    .map(e => `${new Date(e.at).toLocaleTimeString()}  ${e.notation} = ${e.total}\n    ${e.detail}`)
+    .map(e => `${new Date(e.at).toLocaleTimeString()}  ${e.who ? e.who + '  ' : ''}${e.notation} = ${e.total}\n    ${e.detail}`)
     .join('\n');
 }
 
@@ -915,6 +943,7 @@ function openDial() {
   setHelp(false);
   closeSheet();
   closeHistory();
+  closeRoom();
   dial.hidden = false;
   setDial(dialValue());
   hideHint();
@@ -993,10 +1022,11 @@ function applyModifier(sides, mod) {
 }
 
 function openSheet(sides, { focus = null } = {}) {
-  // All three fill the tray, so only one can be up at a time.
+  // They all fill the tray, so only one can be up at a time.
   setHelp(false);
   closeDial();
   closeHistory();
+  closeRoom();
   $('sheetTitle').textContent = `d${sides}`;
   sheetOptions.replaceChildren();
 
@@ -1168,6 +1198,7 @@ document.addEventListener('keydown', e => {
   if (!sheet.hidden) closeSheet();
   if (!dial.hidden) closeDial();
   if (!historyPanel.hidden) closeHistory();
+  if (!roomPanel.hidden) closeRoom();
 });
 
 // Long-press on touch, right-click on desktop — long-press has no mouse
@@ -1364,7 +1395,8 @@ let loopFaults = 0;
 // drawing them wastes a frame on something nobody can see — and any translucency
 // in the panel would let them ghost through.
 function trayCovered() {
-  return !sheet.hidden || !dial.hidden || !historyPanel.hidden || !help.hidden;
+  return !sheet.hidden || !dial.hidden || !historyPanel.hidden || !help.hidden
+      || !roomPanel.hidden;
 }
 
 function drawFrame(dt) {
@@ -1494,4 +1526,292 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   });
+}
+
+// ---- rooms ----
+//
+// Sharing is strictly additive: every line below can fail, and the only thing
+// that happens is that rolls stop leaving the device. Nothing here is awaited
+// from doRoll, and no state it owns is consulted before a die is thrown.
+
+// Where the relay lives. Empty means sharing is simply unavailable — a build
+// with no relay configured shows the Share button doing nothing useful rather
+// than pretending to connect, and the local app is unaffected either way.
+const RELAY_URL = document.querySelector('meta[name="dicebox-relay"]')?.content?.trim() || '';
+
+// A name nobody has to think about, and specifically not their own. Defaulting
+// to a real name is how a casual game night ends up with a legal name sitting in
+// someone else's exported CSV — so the suggestion is always a pseudonym, and
+// changing it is one field away.
+const NAME_COLOURS = [
+  'Amber', 'Ash', 'Cobalt', 'Copper', 'Ember', 'Indigo', 'Ivory', 'Jade',
+  'Onyx', 'Rust', 'Sable', 'Slate', 'Umber', 'Verdant', 'Violet', 'Wren',
+];
+const NAME_CREATURES = [
+  'Wolf', 'Heron', 'Otter', 'Falcon', 'Badger', 'Marten', 'Raven', 'Hare',
+  'Lynx', 'Stoat', 'Adder', 'Kestrel', 'Boar', 'Shrike', 'Vixen', 'Elk',
+];
+
+// crypto.getRandomValues rather than Math.random, for the same reason the dice
+// use it: there is one source of randomness in this app and it is that one.
+function pick(list) {
+  const n = new Uint32Array(1);
+  crypto.getRandomValues(n);
+  return list[n[0] % list.length];
+}
+
+function suggestName() {
+  return `${pick(NAME_COLOURS)} ${pick(NAME_CREATURES)}`;
+}
+
+const roomPanel = $('roomPanel');
+const roomToggle = $('roomToggle');
+const roomFlag = $('shareFlag');
+const roomNameField = $('roomName');
+
+// The panel is the only privacy statement inside the app, and it has to be
+// honest about which of the two guarantees this build actually offers. A copy
+// running from file: is the whole app, already on disk and unable to change
+// under the reader, so "we cannot see your rolls" is literally true of it.
+// Anything served over http(s) — the hosted demo included — hands the browser
+// the encrypting code on every load, so the trust extends to whoever serves it.
+// The markup carries the served wording by default so that a build which never
+// reaches this line still tells the truth.
+if (location.protocol === 'file:') {
+  $('roomNote').textContent =
+    'Rolls are encrypted with the passphrase before they leave your device, ' +
+    'so the relay only ever sees ciphertext and holds nothing once everyone ' +
+    'has gone. This copy is the file on your disk, so the encrypting code ' +
+    'cannot change under you. Each player’s device reports its own rolls, ' +
+    'so a modified client could report anything.';
+}
+
+// The passphrase for the room currently joined, kept so the copy buttons work
+// after connecting. Cleared on leave along with everything else.
+let roomPhrase = null;
+
+const roomLink = createRoom({
+  url: RELAY_URL,
+  name: suggestName(),
+  onState: showRoomState,
+  onRoll: showRemoteRoll,
+  onPresence: showRoster,
+  onNotice: showRoomNotice,
+});
+
+// A remote roll goes to the log and the tray, but never animates: the tray is
+// showing what *you* threw, and hijacking it mid-flight for someone else's roll
+// would interrupt your own dice. It is rendered settled, in place, and marked so
+// the two are never confused.
+function showRemoteRoll(roll) {
+  addHistory({ notation: roll.notation, groups: roll.groups, total: roll.total }, roll.name);
+
+  // Only take the tray if it is not busy with your own throw. dataset.rolling is
+  // the honest test for that, and it is the one thing this must never touch.
+  if ($('total').dataset.rolling) return;
+
+  const flat = [];
+  for (const g of roll.groups) {
+    if (g.kind !== 'dice') continue;
+    for (const d of g.dice) {
+      flat.push({ sides: g.sides, value: d.value, kept: d.kept,
+                  exploded: d.exploded, rerolled: d.rerolled });
+    }
+  }
+  if (!flat.length || flat.length > ANIMATE_LIMIT) return;
+
+  state.dice = flat.map(f => {
+    const die = new Die(f.sides, f.value, 0, 0, 40);
+    die.kept = f.kept;
+    die.exploded = f.exploded;
+    die.rerolled = f.rerolled;
+    // Settled on arrival: no throw, no tumble, no separation pass.
+    die.settled = true;
+    die.settling = true;
+    die.settleT = 1;
+    // Marks the burst and reroll effects as already shown, so a remote
+    // exploding die does not fire a burst and a buzz for a roll you did not
+    // make.
+    die.burstShown = true;
+    die.rerollShown = true;
+    return die;
+  });
+  placeGrid(state.dice);
+
+  delete $('total').dataset.idle;
+  $('total').textContent = String(roll.total);
+  $('breakdown').textContent = `${roll.name} · ${describe(roll.groups)}`;
+  $('wordmark').dataset.faded = '1';
+  hideHint();
+}
+
+function showRoster(members) {
+  const list = $('roomRoster');
+  list.replaceChildren();
+
+  // You are not in the roster — the relay's count includes you but the presence
+  // table is built from other people's hellos, so the list is "who else".
+  if (!members.length) {
+    const empty = document.createElement('li');
+    empty.className = 'room-roster-empty';
+    empty.textContent = 'Waiting for others to join.';
+    list.append(empty);
+    return;
+  }
+
+  for (const m of members) {
+    const li = document.createElement('li');
+    // textContent, always: this string came off the wire.
+    li.textContent = m.name;
+    list.append(li);
+  }
+}
+
+// The state line and the header flag are the two places the app admits whether
+// rolls are leaving the device. They must never disagree.
+function showRoomState(next, info) {
+  const live = next === 'live';
+  roomFlag.hidden = !live;
+  roomToggle.setAttribute('aria-label',
+    live ? 'Sharing rolls — open room' : 'Share rolls with a room');
+  roomToggle.dataset.live = live ? '1' : '';
+  if (!live) delete roomToggle.dataset.live;
+
+  $('roomSetup').hidden = live;
+  $('roomLive').hidden = !live;
+
+  const line = $('roomState');
+  if (next === 'live') {
+    const others = (info.n || 1) - 1;
+    line.textContent = others > 0
+      ? `Connected. ${others} other ${others === 1 ? 'person' : 'people'} here.`
+      : 'Connected. Waiting for others.';
+  } else if (next === 'connecting') {
+    line.textContent = 'Connecting…';
+  } else if (next === 'retrying') {
+    // Deliberately not an alarm. Nothing is broken from where the user sits.
+    line.textContent = 'Reconnecting — rolls are local for now.';
+  } else if (next === 'failed') {
+    line.textContent = info.detail || 'Could not connect. Rolls stay on this device.';
+  } else {
+    line.textContent = '';
+    roomPhrase = null;
+  }
+}
+
+function showRoomNotice(text) {
+  $('roomState').textContent = text;
+}
+
+function openRoom() {
+  setHelp(false);
+  closeSheet();
+  closeDial();
+  closeHistory();
+  roomPanel.hidden = false;
+  roomToggle.setAttribute('aria-expanded', 'true');
+  if (!roomNameField.value) roomNameField.value = roomLink.name;
+  if (!RELAY_URL) {
+    $('roomState').textContent = 'No relay is configured for this copy, so rolls stay on this device.';
+    $('roomCreate').disabled = true;
+    $('roomJoin').disabled = true;
+  }
+  hideHint();
+}
+
+function closeRoom() {
+  roomPanel.hidden = true;
+  roomToggle.setAttribute('aria-expanded', 'false');
+}
+
+roomToggle.addEventListener('click', () => {
+  if (roomPanel.hidden) openRoom();
+  else closeRoom();
+});
+
+$('roomClose').addEventListener('click', closeRoom);
+roomPanel.addEventListener('click', e => {
+  if (e.target === roomPanel) closeRoom();
+});
+
+$('roomCreate').addEventListener('click', () => {
+  roomPhrase = generatePassphrase();
+  $('roomPhrase').textContent = roomPhrase;
+  $('roomMade').hidden = false;
+  // Joining your own new room is what makes the link live for whoever you send
+  // it to; a passphrase nobody has joined is just a string.
+  enterRoom(roomPhrase);
+});
+
+$('roomJoinForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const phrase = $('roomPhraseInput').value.trim();
+  if (phrase) enterRoom(phrase);
+});
+
+// The one async path in the room UI, and it is deliberately nowhere near a roll.
+// Deriving the key takes about a third of a second on a Pi, so the button says
+// what is happening rather than appearing to have missed the tap.
+function enterRoom(phrase) {
+  $('roomState').textContent = 'Deriving the room key…';
+  roomLink.setName(roomNameField.value || roomLink.name);
+  roomLink.join(phrase).then(joined => {
+    roomPhrase = joined.passphrase;
+    $('roomPhraseInput').value = '';
+    roomNameField.value = roomLink.name;
+  }).catch(err => {
+    // A failure here costs sharing and nothing else, so it is reported in the
+    // panel rather than the app's error line.
+    $('roomState').textContent = `${err.message}. Rolls stay on this device.`;
+  });
+}
+
+$('roomLeave').addEventListener('click', () => {
+  roomLink.leave();
+  roomPhrase = null;
+  $('roomMade').hidden = true;
+  $('roomState').textContent = 'Left the room. Rolls are local again.';
+});
+
+roomNameField.addEventListener('change', () => {
+  roomLink.setName(roomNameField.value);
+  // setName rejects a name that trims to nothing, so the field is put back to
+  // whatever was actually kept rather than left showing a name nobody has.
+  roomNameField.value = roomLink.name;
+});
+
+// Copy buttons, in both the created-room block and the connected block. Same
+// two actions either side of joining, so they share their handlers.
+function copyFeedback(button, text) {
+  if (!text) return;
+  const original = button.textContent;
+  navigator.clipboard.writeText(text)
+    .then(() => { button.textContent = 'Copied'; })
+    .catch(() => { button.textContent = 'Copy failed'; })
+    .then(() => setTimeout(() => { button.textContent = original; }, 1400));
+}
+
+const shareLink = () => roomPhrase
+  ? location.origin + location.pathname + '#' + roomPhrase
+  : '';
+
+for (const id of ['roomCopyPhrase', 'roomCopyPhrase2']) {
+  $(id).addEventListener('click', e => copyFeedback(e.currentTarget, roomPhrase));
+}
+for (const id of ['roomCopyLink', 'roomCopyLink2']) {
+  $(id).addEventListener('click', e => copyFeedback(e.currentTarget, shareLink()));
+}
+
+// A link with a passphrase in the fragment opens the panel with it filled in
+// rather than joining outright. Landing in a shared room because a link was
+// tapped is a surprise, and the fragment may well have come from a chat app
+// someone else can read.
+const fromLink = parsePassphraseFromHash();
+if (fromLink) {
+  $('roomPhraseInput').value = fromLink;
+  // Clear the fragment so a refresh, a screenshot or a shared URL bar does not
+  // carry the passphrase any further than it already went.
+  history.replaceState(null, '', location.pathname + location.search);
+  openRoom();
+  $('roomState').textContent = 'Someone shared a room with you. Join when you are ready.';
 }

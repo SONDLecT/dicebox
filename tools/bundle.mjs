@@ -23,9 +23,12 @@ function moduleScope(name, exportsFrom = []) {
     .replace(/^\s*import\s+[\s\S]*?from\s+'[^']*';?\s*$/gm, '')
     .replace(/^export\s+/gm, '');
 
-  // Names this module provides to the ones after it.
+  // Names this module provides to the ones after it. The `async` is optional and
+  // was once missing here, which silently dropped room-crypto.js's deriveRoom,
+  // encryptMessage and decryptMessage from the namespace — the modules were
+  // inlined, parsed and ran, and then room.js died on the first connect.
   const exported = [...read(name).matchAll(
-    /^export\s+(?:const|let|var|function|class)\s+([A-Za-z_$][\w$]*)/gm,
+    /^export\s+(?:async\s+)?(?:const|let|var|function|class)\s+([A-Za-z_$][\w$]*)/gm,
   )].map(m => m[1]);
 
   const pull = exportsFrom.length
@@ -40,12 +43,25 @@ function moduleScope(name, exportsFrom = []) {
 
 const DICE_EXPORTS = ['roll', 'describe'];
 const RENDER_EXPORTS = ['Die', 'Surface', 'separate', 'beginFrame', 'solidFor'];
+const ROOM_CRYPTO_EXPORTS = [
+  'deriveRoom', 'newSender', 'encryptMessage', 'decryptMessage',
+  'normalizePassphrase', 'generatePassphrase', 'PROTOCOL_VERSION',
+];
+const ROOM_EXPORTS = ['createRoom', 'parsePassphraseFromHash'];
 
+// room-crypto.js before room.js before app.js: each pulls only from the ones
+// above it. Omitting these two entirely is what made an earlier bundle a dead
+// shell — app.js calls createRoom at top level, so the ReferenceError aborted
+// the whole module scope and no dice button was ever wired up.
 const script = [
   'const __dicebox = {};',
   moduleScope('dice.js'),
   moduleScope('render.js'),
-  moduleScope('app.js', [...DICE_EXPORTS, ...RENDER_EXPORTS]),
+  moduleScope('room-crypto.js'),
+  moduleScope('room.js', ROOM_CRYPTO_EXPORTS),
+  moduleScope('app.js', [
+    ...DICE_EXPORTS, ...RENDER_EXPORTS, ...ROOM_CRYPTO_EXPORTS, ...ROOM_EXPORTS,
+  ]),
 ].join('\n\n');
 
 const dataUri = name =>

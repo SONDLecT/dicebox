@@ -119,6 +119,101 @@ crowded at 24 faces. A banded drum spreads its vertices evenly and stays
 countable past 120. That is why dice above 22 sides change family: not for
 decoration, but because it is the shape that survives being small.
 
+## Rooms
+
+A room shares your rolls with other people in real time. Everyone sees the same
+log; each screen animates its own dice from the result. It is for playing at a
+distance with people you already know.
+
+Rooms are **opt-in and off by default**. Dicebox is a local dice roller first
+and stays one — if you never open the Share panel, nothing about the app talks
+to a network, and none of what follows applies to you.
+
+You join by passphrase. The app generates a short phrase of ordinary words;
+whoever has it is in the room, and that is the whole membership model. Share it
+however you already talk to each other. The passphrase is what derives the
+encryption key, so it never travels over the network — the relay never receives
+it, is never sent it during a join, and has no way to ask for it.
+
+Rolling stays local whatever the network does. If the relay is unreachable your
+dice still land instantly; the app tells you it cannot share and carries on. No
+spinner, no queue, no waiting. A roll that arrives ten minutes late is worse
+than one that never arrives, so late rolls are dropped rather than held.
+
+Rooms are ephemeral. Nothing is stored, so someone joining halfway through sees
+rolls from that moment on and no earlier. A room dies after 30 minutes idle, and
+in any case 12 hours after it was created — a departed player keeps the
+passphrase forever, so expiry is the only thing here that resembles taking
+access away.
+
+### Running your own relay
+
+The relay is a small WebSocket server that forwards encrypted messages between
+people in the same room. It is a fanout and nothing else: it cannot read a roll,
+it never decides one, and it writes nothing to disk.
+
+```sh
+node server/relay.mjs                    # 127.0.0.1:8787
+docker compose --profile rooms up -d     # or as a container
+```
+
+The `rooms` profile means the relay only starts when you ask for it — plain
+`docker compose up -d` brings up the static app exactly as before.
+
+It binds loopback by default, so a fresh install is not reachable from the
+network until you decide it should be. Put it behind whatever TLS terminator you
+already run, then point the app at it by changing the relay origin in
+`docker/security-headers.conf` (self-hosted) or `worker.js` (Cloudflare).
+
+That origin is **pinned to one exact host** rather than opened up to `wss:` or
+`*`, and it is worth saying why. The relay is never given key material by
+design; the pinned origin is what keeps that true even if the design fails.
+A build tampered with somewhere between the server and the browser still cannot
+send anything to a host that is not on that line, because the browser refuses
+the connection outright. Widening it to make a setup problem go away gives that
+protection up entirely.
+
+`server/README.md` covers the configuration — limits, timeouts, origins — in
+full.
+
+### What the privacy actually is
+
+Rolls are encrypted in your browser and decrypted in the other players'
+browsers. The relay only ever sees ciphertext. Names, notation, dice values and
+totals are all inside it.
+
+**Self-hosting, or the downloaded single file, gives a real "we cannot see your
+rolls" guarantee.** You are running the code, and you can read it.
+
+**The hosted demo does not, and this is a genuine difference rather than a
+technicality.** [dicebox.trollskull.cc](https://dicebox.trollskull.cc) serves
+the JavaScript that does the encrypting. Encryption in the browser is only as
+trustworthy as the code the browser was handed, so using the demo means trusting
+me to keep serving honest code — not just today but on every load, since the app
+updates itself. I have no plans to do otherwise, but a promise is not a
+guarantee, and you should not accept one where you can have the real thing. If
+that distinction matters for your table, self-host or use the single file. Both
+are a few minutes of work and are why they exist.
+
+Two more limits worth being straight about, and neither is fixable by
+encryption:
+
+**A relay sees traffic shape.** It cannot read content, but it knows a room
+exists, how many connections are in it, when they arrive and leave, and roughly
+how much they send. Who was playing and when is visible to whoever runs the
+relay, even though what you rolled is not. Running your own is the answer if
+that matters.
+
+**Rolls are generated on each player's own device.** The app rolls honestly with
+`crypto.getRandomValues` and reports the result, but a modified client could
+report anything, and no amount of cryptography can tell an encrypted lie from an
+encrypted truth. The app does check incoming rolls for internal consistency —
+that the dice add up to the total — which catches a broken client and would not
+catch a determined one. There are deliberately no "verified roll" badges,
+because they would suggest a guarantee that does not exist. Rooms are for
+friends. If you need dice nobody at the table could have tampered with, you need
+someone else holding them.
+
 ## The roll log
 
 Every roll is kept for the session, with what each die landed on and when.

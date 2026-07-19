@@ -48,6 +48,10 @@ globalThis.window = {
   navigator: { standalone: false },
 };
 globalThis.navigator = { ...globalThis.navigator, userAgent: 'node' };
+// The room note branches on this to decide which privacy guarantee it can
+// honestly claim, so a served origin is the case to load under: it is what the
+// demo and every self-hosted build are, and it is the default wording.
+globalThis.location = { protocol: 'https:', href: 'https://example.invalid/', search: '', hash: '' };
 globalThis.document = {
   documentElement: makeEl('html'),
   getElementById: id => store.get(id) || null,

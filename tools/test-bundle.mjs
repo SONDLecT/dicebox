@@ -15,6 +15,28 @@ const html = readFileSync(bundle, 'utf8');
 const ids = [...html.matchAll(/id="([^"]+)"/g)].map(m => m[1]);
 const script = html.match(/<script type="module">([\s\S]*?)<\/script>/)[1];
 
+// A bundle once shipped without room.js or room-crypto.js in the module list.
+// It parsed, so nothing downstream complained, but app.js calls createRoom at
+// top level and the ReferenceError aborted its whole scope: no dice buttons, no
+// roll handler, no animation loop — a static shell that could not roll a die.
+// The execution check below does catch that, but only while the call stays at
+// top level, so the bindings are asserted directly too.
+//
+// deriveRoom, encryptMessage and decryptMessage are the `export async function`
+// cases the export-detection regex missed for a while. They are inlined either
+// way, so only their arrival in __dicebox distinguishes a working build.
+const required = [
+  'createRoom', 'parsePassphraseFromHash', 'generatePassphrase',
+  'deriveRoom', 'encryptMessage', 'decryptMessage',
+];
+const absent = required.filter(
+  name => !new RegExp(`Object\\.assign\\(__dicebox, \\{[^}]*\\b${name}\\b`).test(script),
+);
+if (absent.length) {
+  console.log('NOT SHARED VIA __dicebox: ' + absent.join(', '));
+  process.exit(1);
+}
+
 const makeEl = (id='') => ({
   id, hidden:false, dataset:{}, style:{}, value:'', textContent:'', children:[],
   className:'', tabIndex:0, role:'', disabled:false,
@@ -42,6 +64,10 @@ globalThis.localStorage = { getItem:()=>null, setItem(){}, removeItem(){} };
 globalThis.matchMedia = () => ({matches:false,addEventListener(){},removeEventListener(){}});
 globalThis.navigator = { vibrate(){}, userAgent:'node', serviceWorker:{register:()=>Promise.resolve()} };
 globalThis.getComputedStyle = () => ({ getPropertyValue: () => '#FCFCFA' });
+// The bundle is the single file, so file: is how it actually gets opened. It
+// also puts the room note on its stronger branch, which is the one only this
+// build can honestly claim.
+globalThis.location = { protocol: 'file:', href: 'file:///dicebox.html', search: '', hash: '' };
 globalThis.window = { addEventListener(){}, devicePixelRatio:2, matchMedia: globalThis.matchMedia, navigator:{standalone:false} };
 globalThis.document = {
   documentElement: makeEl('html'),

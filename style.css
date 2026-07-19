@@ -978,6 +978,203 @@ body {
   word-break: break-word;
 }
 
+/* ---- rooms ---- */
+
+/* The standing answer to "are my rolls leaving this device?". It sits in the
+   header rather than inside the panel, because the panel is shut almost all of
+   the time and the question is always live. */
+.share-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-right: 2px;
+}
+
+.share-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: share-pulse 2.4s ease-in-out infinite;
+}
+
+/* Slow enough to read as "on" rather than as an alert. A steady dot was too
+   easy to stop seeing; anything faster looked like something was wrong. */
+@keyframes share-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .share-dot { animation: none; }
+}
+
+/* On a narrow phone the word would push the buttons off the row; the dot alone
+   still carries it, and the panel spells it out. */
+@media (max-width: 380px) {
+  .share-flag-text { display: none; }
+}
+
+#roomToggle[data-live] {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* The before-joining half of the panel. Toggled wholesale against .room-live,
+   so it needs a display of its own for [hidden] to have something to beat. */
+.room-setup {
+  display: block;
+}
+
+.room-note,
+.room-hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+  max-width: 46ch;
+}
+
+.room-note { padding: 0 10px 12px; }
+
+/* The link sits directly under the note it belongs to, so the note above it
+   drops its own bottom padding rather than the pair reading as two blocks. */
+.room-note:has(+ .room-note-more) { padding-bottom: 6px; }
+
+.room-block {
+  padding: 12px 10px;
+  border-top: 1px solid var(--hair);
+}
+
+.room-create { width: 100%; }
+
+.room-block .room-hint { margin-top: 8px; }
+
+.room-label {
+  display: block;
+  margin: 0 0 6px;
+  font-family: "Iosevka Etoile", ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.room-made {
+  padding: 12px 10px;
+  border-top: 1px solid var(--hair);
+}
+
+/* Shown plainly and large enough to read across a table, since reading it out
+   loud is how it usually travels. Selectable, because copying by hand is the
+   fallback when the clipboard API is unavailable. */
+.room-phrase {
+  margin: 0 0 10px;
+  font-family: "Iosevka Etoile", ui-monospace, monospace;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--accent);
+  word-spacing: 0.3em;
+  word-break: break-word;
+  user-select: all;
+  -webkit-user-select: all;
+}
+
+.room-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.room-actions .ghost {
+  flex: 1 1 auto;
+  min-height: 34px;
+  padding: 0 8px;
+}
+
+.room-leave {
+  flex: 0 0 auto !important;
+  color: var(--danger) !important;
+}
+
+.room-join input,
+#roomName {
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0 12px;
+  margin-bottom: 8px;
+  border: 1px solid var(--hair);
+  border-radius: 10px;
+  background: var(--face);
+  color: var(--line);
+  font: inherit;
+  font-size: 16px; /* 16px keeps iOS from zooming on focus */
+}
+.room-join input::placeholder { color: var(--muted); }
+
+.room-join-button { width: 100%; }
+
+.room-live {
+  padding: 12px 10px;
+  border-top: 1px solid var(--hair);
+}
+
+.room-roster-label { margin-top: 14px; }
+
+.room-roster {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 26vh;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.room-roster::-webkit-scrollbar { display: none; }
+
+.room-roster li {
+  font-size: 13.5px;
+  color: var(--line);
+  padding: 5px 2px;
+  border-bottom: 1px solid var(--hair);
+}
+.room-roster li:last-child { border-bottom: 0; }
+
+.room-roster-empty {
+  color: var(--muted) !important;
+  font-size: 12.5px !important;
+}
+
+.room-state {
+  margin: 0;
+  padding: 12px 10px 2px;
+  border-top: 1px solid var(--hair);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+  min-height: 1.5em;
+}
+
+/* Someone else's roll. Marked quietly — a name in the accent colour and a rule
+   down the left — because the log is read at a glance and a loud treatment for
+   half the entries would make the whole strip harder to scan, not easier. */
+.log-who {
+  color: var(--accent);
+  margin-right: 6px;
+}
+
+.log li[data-remote] {
+  border-left: 2px solid var(--accent);
+  padding-left: 6px;
+  margin-left: -8px;
+}
+
 :where(button, input):focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;

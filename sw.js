@@ -2,7 +2,7 @@
 // precache all of them and never hit the network after install.
 
 // Bump on every asset change, or installed copies keep serving the old app.
-const CACHE = 'dicebox-v22';
+const CACHE = 'dicebox-v23';
 
 // './' only — never './index.html'. The edge redirects /index.html to / with a
 // 307, and a redirected response makes cache.addAll reject the whole batch,
@@ -13,6 +13,8 @@ const ASSETS = [
   './app.js',
   './dice.js',
   './render.js',
+  './room.js',
+  './room-crypto.js',
   './manifest.webmanifest',
   './icons/icon-192.png',
   './icons/icon-512.png',

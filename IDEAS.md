@@ -110,6 +110,32 @@ that Docker Compose already serves. Running the dice roller alone stays the
 primary path and needs no server. Adding the server is a second container for
 people who want rooms of their own.
 
+### Two different no-dependency rules
+
+The app has no runtime dependencies and that is worth protecting, but the rule
+only ever applied to the *client*: the single-file build has to inline every
+module into one HTML file, and a dependency there would break the thing that
+makes self-hosting honest.
+
+The relay is a separate service in its own container. Nothing it imports ever
+reaches a browser, so the constraint does not apply to it — and applying it
+anyway would mean hand-writing an RFC 6455 frame parser, which is untrusted
+input handling with masking, fragmentation, 64-bit lengths and partial TCP
+reads. That is precisely the code where a mature library has already had its
+bugs found.
+
+So: **the client stays dependency-free, and the relay uses `ws`.**
+
+The same reasoning is worth stating for the crypto, since "don't roll your own"
+is the right instinct and it is easy to think this project ignored it.
+`room-crypto.js` does not implement any primitive — PBKDF2, HKDF and AES-GCM all
+come from WebCrypto, which is the browser's audited implementation. What is
+hand-written is the *composition*: which primitives, what parameters, how nonces
+are built. That is unavoidable in any application using crypto, and it is where
+the design review was aimed.
+
+### Build order
+
 **Build the self-hostable relay first**, not the Cloudflare one. It is a small
 Node WebSocket server: `roomId -> set of sockets`, broadcast, nothing on disk.
 It runs in the Docker setup that already exists, it is testable locally, and it

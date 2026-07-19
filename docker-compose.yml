@@ -14,3 +14,52 @@ services:
       - /var/run
     security_opt:
       - no-new-privileges:true
+
+  # Rooms are opt-in, so the relay is behind a profile: `docker compose up -d`
+  # brings up the static app exactly as it did before this service existed, and
+  # only `--profile rooms` starts this. Anyone who does not want shared rolling
+  # should not have to run, expose or reason about a second process.
+  relay:
+    profiles: ["rooms"]
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    image: dicebox-relay
+    container_name: dicebox-relay
+    ports:
+      - "8787:8787"
+    restart: unless-stopped
+    environment:
+      # Loopback would be unreachable from outside the network namespace, so the
+      # container binds all interfaces and the port mapping above is what decides
+      # who can actually reach it. Narrow that to "127.0.0.1:8787:8787" when a
+      # reverse proxy on the host is terminating TLS.
+      DICEBOX_BIND: 0.0.0.0
+      DICEBOX_PORT: 8787
+      # Set this to the exact origin serving the app, e.g.
+      # https://dicebox.example.com. Left unset every origin may connect, which
+      # is fine for a private network and careless on a public one. It is CSRF
+      # hygiene rather than authentication — the passphrase is what decides
+      # membership, and the relay never sees it.
+      # DICEBOX_ALLOWED_ORIGINS: https://dicebox.example.com
+      # Set to 1 only when a proxy you control sets X-Forwarded-For. Trusting it
+      # otherwise lets a client claim any address it likes and walk straight
+      # through the per-IP limits.
+      DICEBOX_TRUST_PROXY: "0"
+    # Nothing is written to disk, ever — rooms live in memory and evaporate when
+    # the last connection goes. A read-only root filesystem turns that from a
+    # property of the code into one the kernel enforces, and node needs no
+    # writable path to run a single script.
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+      retries: 3

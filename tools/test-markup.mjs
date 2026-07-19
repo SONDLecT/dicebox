@@ -55,6 +55,28 @@ const unstyled = [...new Set([...htmlClasses, ...jsClasses])]
   .filter(c => c && !css.includes(`.${c}`));
 ok('every class has a style rule', unstyled.length === 0, unstyled.join(', '));
 
+// --- the privacy note ---
+// The panel is the only privacy statement inside the app, and it once carried a
+// single relay-scoped sentence in every build. On the hosted demo that read as
+// "the operator cannot see your rolls", which is false: the demo serves the
+// encrypting code and reships it on every load. The default wording must
+// therefore be the served-copy one, and the stronger claim must be reachable
+// only behind the file: check.
+const note = html.match(/<p class="room-note" id="roomNote">([\s\S]*?)<\/p>/)?.[1] || '';
+ok('the room note exists', note.length > 0);
+ok('the default note names the serving party as trusted',
+   /trusting whoever serves it/.test(note));
+ok('the default note points at the single file or self-hosting',
+   /single file/.test(note) && /self-host/.test(note));
+ok('the default note claims nothing stronger than ciphertext for the relay',
+   !/cannot see/.test(note) && !/on your disk/.test(note));
+ok('the note says rolls are self-reported', /reports its own rolls/.test(note));
+ok('the stronger claim is gated on file:',
+   /location\.protocol === 'file:'/.test(js) &&
+   js.indexOf("location.protocol === 'file:'") < js.indexOf('the file on your disk'));
+ok('the privacy section is linked from the panel',
+   /#what-the-privacy-actually-is/.test(html));
+
 // --- accessibility ---
 ok('intro is readable by screen readers', !/id="intro"[^>]*aria-hidden/.test(html));
 
@@ -86,6 +108,27 @@ const uncached = refs.filter(r => {
   return !precache.some(p => p.replace(/^\.\//, '') === bare);
 });
 ok('every local asset is precached', uncached.length === 0, uncached.join(', '));
+
+// The check above only sees files the markup names directly, so it missed the
+// room modules entirely: app.js imports them, index.html does not mention them.
+// Offline that costs the whole app rather than one feature — a module request
+// that misses the cache gets a 504, and a 504 anywhere in the graph means the
+// entry module never evaluates. Walk the imports transitively from app.js.
+const seen = new Set();
+const queue = ['app.js'];
+while (queue.length) {
+  const file = queue.shift();
+  if (seen.has(file)) continue;
+  seen.add(file);
+  const src = readFileSync(join(root, file), 'utf8');
+  for (const [, spec] of src.matchAll(/^\s*import\s[^'"]*['"](\.[^'"]+)['"]/gm)) {
+    queue.push(spec.replace(/^\.\//, ''));
+  }
+}
+const uncachedModules = [...seen].filter(m =>
+  !precache.some(p => p.replace(/^\.\//, '') === m));
+ok('every imported module is precached', uncachedModules.length === 0,
+   uncachedModules.join(', '));
 
 // The edge rewrites /index.html to / with a 307. Precaching the redirecting URL
 // makes the install fail, and an installed app whose start_url redirects will
