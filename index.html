@@ -216,6 +216,14 @@
 
         <!-- While connected. -->
         <div class="room-live" id="roomLive" hidden>
+          <!-- The passphrase stays on screen for as long as the room is open.
+               It used to live only in the setup block, which is hidden the
+               moment the connection succeeds — so it appeared for the second or
+               two the connection took and then vanished, leaving two copy
+               buttons and no way to read what they would copy. -->
+          <p class="room-label">The passphrase</p>
+          <p class="room-phrase" id="roomPhraseLive"></p>
+
           <label class="room-label" for="roomName">You are</label>
           <input id="roomName" type="text" autocomplete="off" maxlength="32"
                  spellcheck="false" aria-label="Your display name">

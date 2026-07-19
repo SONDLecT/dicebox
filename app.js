@@ -1,7 +1,7 @@
 import { roll, describe } from './dice.js';
 import { Die, Surface, separate, beginFrame } from './render.js';
 import { createRoom, parsePassphraseFromHash } from './room.js';
-import { generatePassphrase } from './room-crypto.js';
+import { generatePassphrase, normalizePassphrase } from './room-crypto.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('tray');
@@ -1731,6 +1731,11 @@ function showRoomState(next, info) {
   $('roomSetup').hidden = live;
   $('roomLive').hidden = !live;
 
+  // Whichever way you got here — created the room or typed someone's
+  // passphrase — the live view shows it, so it can be read aloud again without
+  // leaving and rejoining.
+  if (live) $('roomPhraseLive').textContent = roomPhrase || '';
+
   const line = $('roomState');
   if (next === 'live') {
     const others = (info.n || 1) - 1;
@@ -1806,11 +1811,17 @@ $('roomJoinForm').addEventListener('submit', e => {
 function enterRoom(phrase) {
   $('roomState').textContent = 'Deriving the room key…';
   roomLink.setName(roomNameField.value || roomLink.name);
+  // Held before the join resolves, not after. The connection can reach 'live'
+  // while that promise is still settling, and setRoomState reads this to fill
+  // the live view — so assigning it in the callback left the passphrase blank
+  // on exactly the fast connections it should have worked best on.
+  roomPhrase = normalizePassphrase(phrase);
   roomLink.join(phrase).then(joined => {
     roomPhrase = joined.passphrase;
     $('roomPhraseInput').value = '';
     roomNameField.value = roomLink.name;
   }).catch(err => {
+    roomPhrase = null;
     // A failure here costs sharing and nothing else, so it is reported in the
     // panel rather than the app's error line.
     $('roomState').textContent = `${err.message}. Rolls stay on this device.`;
@@ -1821,6 +1832,7 @@ $('roomLeave').addEventListener('click', () => {
   roomLink.leave();
   roomPhrase = null;
   $('roomMade').hidden = true;
+  $('roomPhraseLive').textContent = '';
   $('roomState').textContent = 'Left the room. Rolls are local again.';
 });
 
@@ -1853,16 +1865,19 @@ for (const id of ['roomCopyLink', 'roomCopyLink2']) {
   $(id).addEventListener('click', e => copyFeedback(e.currentTarget, shareLink()));
 }
 
-// A link with a passphrase in the fragment opens the panel with it filled in
-// rather than joining outright. Landing in a shared room because a link was
-// tapped is a surprise, and the fragment may well have come from a chat app
-// someone else can read.
+// A link with a passphrase in the fragment joins the room. Tapping a link
+// someone sent you *is* the decision to join, and an earlier version that only
+// prefilled the field and waited for a second tap read as the link not working.
+//
+// The panel opens with it, so what happened is visible and leaving is one tap
+// away rather than something to work out.
 const fromLink = parsePassphraseFromHash();
 if (fromLink) {
-  $('roomPhraseInput').value = fromLink;
-  // Clear the fragment so a refresh, a screenshot or a shared URL bar does not
-  // carry the passphrase any further than it already went.
+  // Cleared before joining rather than after, so a failure to connect cannot
+  // leave the passphrase sitting in the URL bar. parsePassphraseFromHash tries
+  // this too; doing it again costs nothing and covers the case where it could
+  // not.
   history.replaceState(null, '', location.pathname + location.search);
   openRoom();
-  $('roomState').textContent = 'Someone shared a room with you. Join when you are ready.';
+  enterRoom(fromLink);
 }
