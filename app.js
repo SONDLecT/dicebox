@@ -1873,11 +1873,11 @@ for (const id of ['roomCopyLink', 'roomCopyLink2']) {
 // away rather than something to work out.
 const fromLink = parsePassphraseFromHash();
 if (fromLink) {
-  // Cleared before joining rather than after, so a failure to connect cannot
-  // leave the passphrase sitting in the URL bar. parsePassphraseFromHash tries
-  // this too; doing it again costs nothing and covers the case where it could
-  // not.
-  history.replaceState(null, '', location.pathname + location.search);
+  // parsePassphraseFromHash has already cleared the fragment, inside a try
+  // because some embeddings forbid replaceState. Repeating it here unguarded
+  // threw in exactly those embeddings — and because it ran first, the throw
+  // took the two lines below with it: no panel, no join, and a link that looked
+  // like it did nothing at all.
   openRoom();
   enterRoom(fromLink);
 }
