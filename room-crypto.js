@@ -345,6 +345,18 @@ export async function decryptMessage(room, seen, wire) {
     throw new Error(`Unsupported protocol version ${msg.v}`);
   }
 
+  // The `from` field is plaintext-in-the-ciphertext: the tag stops an outsider
+  // editing it, but every room member holds the key and can simply write
+  // someone else's id into a message they encrypt under their own nonce. That
+  // was enough to wedge a victim permanently — forge from: victim, seq: 2**40,
+  // and every receiver poisons seen[victim], after which the victim's genuine
+  // messages all fail the sequence check below and vanish with no error. The
+  // nonce prefix is the only identity the sender cannot choose freely, since a
+  // second sender using it would repeat a nonce, so bind attribution to it.
+  if (msg.from !== hex(nonce.subarray(0, 4))) {
+    throw new Error('Sender id does not match the nonce');
+  }
+
   // Replay. The relay, or anyone who captured a message, could send a good roll
   // again; without this it would appear twice in everyone's tray. Sequence
   // numbers live inside the ciphertext, so they cannot be edited in transit.

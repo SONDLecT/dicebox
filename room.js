@@ -95,6 +95,13 @@ function cleanName(input) {
   return s.trim().slice(0, NAME_MAX);
 }
 
+// Appends the room id to the relay URL. Hand-assembled rather than built with
+// URL, because a relay may legitimately be configured with a path and a URL
+// round trip would need a base that a ws:// scheme does not reliably provide.
+function withRoom(url, roomId) {
+  return url + (url.includes('?') ? '&' : '?') + 'room=' + roomId;
+}
+
 function jitter(ms) {
   return Math.round(ms * (1 + (Math.random() * 2 - 1) * BACKOFF_JITTER));
 }
@@ -512,7 +519,15 @@ export function createRoom(options = {}) {
 
     let sock;
     try {
-      sock = new Socket(url);
+      // The room id goes in the query string as well as the join frame below.
+      // The self-hosted relay reads it from the frame and ignores this; the
+      // hosted one cannot, because a Durable Object is chosen by name before
+      // the socket is accepted and there is no frame to read yet. Sending it
+      // both ways lets one client speak to either relay.
+      //
+      // It is safe in a URL only because it is a hash: the passphrase itself
+      // never leaves this device, and a room id cannot be reversed into one.
+      sock = new Socket(room ? withRoom(url, room.roomId) : url);
     } catch {
       // A malformed URL throws here rather than firing onerror.
       dropSocket();

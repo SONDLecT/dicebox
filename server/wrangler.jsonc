@@ -1,0 +1,41 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "dicebox-relay",
+  "main": "worker-relay.js",
+  "compatibility_date": "2026-07-18",
+
+  "routes": [
+    { "pattern": "relay.dicebox.trollskull.cc", "custom_domain": true }
+  ],
+
+  // One object per room. Sockets in a room have to share state, and a plain
+  // Worker has no way to hold them together.
+  "durable_objects": {
+    "bindings": [
+      { "name": "ROOM", "class_name": "Room" }
+    ]
+  },
+
+  "migrations": [
+    {
+      "tag": "v1",
+      // SQLite-backed, which is what the hibernation API expects. The storage
+      // holds one timestamp per room and nothing else.
+      "new_sqlite_classes": ["Room"]
+    }
+  ],
+
+  "vars": {
+    // Without this the relay is open to any site that wants a free broadcast
+    // channel. The dev origin is listed so the staging copy can reach it.
+    "ALLOWED_ORIGINS": "https://dicebox.trollskull.cc,https://dev.dicebox.trollskull.cc"
+  },
+
+  "observability": {
+    // Off deliberately. Cloudflare's logs would record request URLs, and the
+    // room id is in the query string — a relay that cannot read rolls but does
+    // keep a log of which rooms were busy and when is a weaker promise than the
+    // one this makes.
+    "enabled": false
+  }
+}

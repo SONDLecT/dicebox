@@ -260,5 +260,29 @@ await rejects('overlong passphrase is rejected', () => deriveRoom('x'.repeat(500
   }
 }
 
+// Attribution spoofing by a room member. Everyone in a room holds the key, so
+// the tag proves nothing about which member wrote a message; only the nonce
+// prefix does. Without the check, a forged { from: victim, seq: huge } poisons
+// every receiver's seen map and the victim's real messages are dropped from
+// then on.
+{
+  const attacker = newSender();
+  const victim = newSender();
+  const seen = new Map();
+
+  const forged = await encryptMessage(room, attacker, {
+    t: 'roll', from: victim.id, seq: 2 ** 40,
+  });
+  await rejects('a message claiming another sender id is rejected',
+    () => decryptMessage(room, seen, forged));
+
+  ok('a rejected forgery leaves the victim out of the replay map',
+    !seen.has(victim.id));
+
+  const genuine = await encryptMessage(room, victim, { t: 'roll', total: 7 });
+  const got = await decryptMessage(room, seen, genuine);
+  ok('the victim can still send after a forgery attempt', got.total === 7);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

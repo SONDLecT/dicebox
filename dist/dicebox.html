@@ -3217,6 +3217,18 @@ async function decryptMessage(room, seen, wire) {
     throw new Error(`Unsupported protocol version ${msg.v}`);
   }
 
+  // The `from` field is plaintext-in-the-ciphertext: the tag stops an outsider
+  // editing it, but every room member holds the key and can simply write
+  // someone else's id into a message they encrypt under their own nonce. That
+  // was enough to wedge a victim permanently — forge from: victim, seq: 2**40,
+  // and every receiver poisons seen[victim], after which the victim's genuine
+  // messages all fail the sequence check below and vanish with no error. The
+  // nonce prefix is the only identity the sender cannot choose freely, since a
+  // second sender using it would repeat a nonce, so bind attribution to it.
+  if (msg.from !== hex(nonce.subarray(0, 4))) {
+    throw new Error('Sender id does not match the nonce');
+  }
+
   // Replay. The relay, or anyone who captured a message, could send a good roll
   // again; without this it would appear twice in everyone's tray. Sequence
   // numbers live inside the ciphertext, so they cannot be edited in transit.
@@ -3339,6 +3351,13 @@ function cleanName(input) {
     s += ch;
   }
   return s.trim().slice(0, NAME_MAX);
+}
+
+// Appends the room id to the relay URL. Hand-assembled rather than built with
+// URL, because a relay may legitimately be configured with a path and a URL
+// round trip would need a base that a ws:// scheme does not reliably provide.
+function withRoom(url, roomId) {
+  return url + (url.includes('?') ? '&' : '?') + 'room=' + roomId;
 }
 
 function jitter(ms) {
@@ -3758,7 +3777,15 @@ function createRoom(options = {}) {
 
     let sock;
     try {
-      sock = new Socket(url);
+      // The room id goes in the query string as well as the join frame below.
+      // The self-hosted relay reads it from the frame and ignores this; the
+      // hosted one cannot, because a Durable Object is chosen by name before
+      // the socket is accepted and there is no frame to read yet. Sending it
+      // both ways lets one client speak to either relay.
+      //
+      // It is safe in a URL only because it is a hash: the passphrase itself
+      // never leaves this device, and a room id cannot be reversed into one.
+      sock = new Socket(room ? withRoom(url, room.roomId) : url);
     } catch {
       // A malformed URL throws here rather than firing onerror.
       dropSocket();
