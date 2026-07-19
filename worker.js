@@ -54,6 +54,13 @@ export default {
       headers.set('Cache-Control', 'public, max-age=604800');
     }
 
+    // The staging copy is for looking at changes before they go live, not for
+    // anyone to find. Keeping it out of search results also keeps it from
+    // competing with the real demo for the same queries.
+    if (url.hostname.startsWith('dev.')) {
+      headers.set('X-Robots-Tag', 'noindex, nofollow');
+    }
+
     return new Response(res.body, {
       status: res.status,
       statusText: res.statusText,

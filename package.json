@@ -11,7 +11,8 @@
     "preview": "node tools/preview.cjs",
     "serve": "python3 -m http.server 8080",
     "dev": "wrangler dev",
-    "deploy": "npm test && wrangler deploy"
+    "deploy": "npm test && node tools/deploy.mjs",
+    "deploy:dev": "npm test && node tools/deploy.mjs --dev"
   },
   "devDependencies": {
     "wrangler": "^4"

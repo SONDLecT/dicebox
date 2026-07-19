@@ -38,8 +38,19 @@ const config = JSON.parse(
     .replace(/^\s*\/\/.*$/gm, '')       // strip line comments
     .replace(/,(\s*[}\]])/g, '$1')      // and trailing commas
 );
-const SCRIPT = config.name;
-const DOMAIN = config.routes?.[0]?.pattern;
+// `--dev` publishes to a separate Worker on its own hostname, so a change can
+// be looked at before it becomes the thing everyone gets.
+//
+// A distinct hostname rather than a /dev path on the live one: the service
+// worker's cache is keyed by origin, so sharing a host would let a dev build's
+// cache be served to the installed production app — testing could then break
+// the live copy for anyone who had it on their home screen.
+const DEV = process.argv.includes('--dev');
+
+const SCRIPT = DEV ? `${config.name}-dev` : config.name;
+const DOMAIN = DEV
+  ? (env.DEV_HOSTNAME || `dev.${config.routes?.[0]?.pattern}`)
+  : config.routes?.[0]?.pattern;
 
 // --- collect the files that ship ---
 
