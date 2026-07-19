@@ -1622,9 +1622,14 @@ const roomLink = createRoom({
 function showRemoteRoll(roll) {
   addHistory({ notation: roll.notation, groups: roll.groups, total: roll.total }, roll.name);
 
-  // Only take the tray if it is not busy with your own throw. dataset.rolling is
-  // the honest test for that, and it is the one thing this must never touch.
-  if ($('total').dataset.rolling) return;
+  // Yield to a throw of your own, but not to another remote roll. Testing
+  // dataset.rolling alone treated both the same, so once remote rolls started
+  // animating, a second one arriving inside the first one's flight was dropped
+  // from the tray — two quick rolls at one table showed as one at every other.
+  //
+  // A remote roll still in the air is simply superseded, which is what a real
+  // table does: the next handful lands and you look at that instead.
+  if ($('total').dataset.rolling && !state.remoteClaim) return;
 
   const flat = [];
   for (const g of roll.groups) {
