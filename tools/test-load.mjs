@@ -14,7 +14,11 @@ const ids = [...html.matchAll(/id="([^"]+)"/g)].map(m => m[1]);
 
 const makeEl = (id = '') => {
   const el = {
-    id, hidden: false, dataset: {}, style: {}, value: '', textContent: '',
+    // style carries the custom-property methods as well as plain keys: the
+    // history panel sets its reading size through setProperty, and a bare
+    // object silently is not a CSSStyleDeclaration.
+    id, hidden: false, dataset: {}, value: '', textContent: '',
+    style: { setProperty(){}, removeProperty(){}, getPropertyValue(){ return ''; } },
     children: [], className: '', tabIndex: 0, role: '',
     classList: { add(){}, remove(){}, toggle(){} },
     addEventListener(){}, removeEventListener(){}, setAttribute(){}, getAttribute(){ return null; },
@@ -32,22 +36,33 @@ const makeEl = (id = '') => {
 };
 
 const store = new Map(ids.map(id => [id, makeEl(id)]));
-globalThis.crypto = webcrypto;
-globalThis.performance = { now: () => 0 };
-globalThis.requestAnimationFrame = () => 0;
-globalThis.setTimeout = (fn) => 0;
-globalThis.clearTimeout = () => {};
-globalThis.ResizeObserver = class { observe(){} disconnect(){} };
-globalThis.localStorage = { getItem: () => null, setItem(){}, removeItem(){} };
-globalThis.navigator = { vibrate(){}, serviceWorker: { register: () => Promise.resolve() } };
-globalThis.getComputedStyle = () => ({ getPropertyValue: () => '#FCFCFA' });
-globalThis.matchMedia = () => ({ matches: false, addEventListener(){}, removeEventListener(){}, addListener(){}, removeListener(){} });
-globalThis.window = {
+// Newer Node defines several of these — crypto, navigator, performance — as
+// getter-only accessors on globalThis, so a plain assignment throws. That took
+// the whole suite with it, including the five files npm test runs after this
+// one, which is a lot of coverage to lose to a stub that never installed.
+//
+// defineProperty works whether the name is an accessor, an existing value, or
+// absent, so every global goes through it rather than only the ones that have
+// bitten so far.
+const define = (name, value) =>
+  Object.defineProperty(globalThis, name, { value, configurable: true, writable: true });
+
+define('crypto', webcrypto);
+define('performance', { now: () => 0 });
+define('requestAnimationFrame', () => 0);
+define('setTimeout', (fn) => 0);
+define('clearTimeout', () => {});
+define('ResizeObserver', class { observe(){} disconnect(){} });
+define('localStorage', { getItem: () => null, setItem(){}, removeItem(){} });
+define('navigator', { vibrate(){}, serviceWorker: { register: () => Promise.resolve() } });
+define('getComputedStyle', () => ({ getPropertyValue: () => '#FCFCFA' }));
+define('matchMedia', () => ({ matches: false, addEventListener(){}, removeEventListener(){}, addListener(){}, removeListener(){} }));
+define('window', {
   addEventListener(){}, devicePixelRatio: 2,
   matchMedia: globalThis.matchMedia,
   navigator: { standalone: false },
-};
-globalThis.navigator = { ...globalThis.navigator, userAgent: 'node' };
+});
+define('navigator', { ...globalThis.navigator, userAgent: 'node' });
 // The room note branches on this to decide which privacy guarantee it can
 // honestly claim, so a served origin is the case to load under: it is what the
 // demo and every self-hosted build are, and it is the default wording.
@@ -79,6 +94,31 @@ try {
   console.log('app.js evaluates cleanly against the real markup');
 } catch (err) {
   console.log('LOAD FAILED: ' + err.constructor.name + ': ' + err.message);
+  if (err.stack) console.log(err.stack.split('\n').slice(1, 4).join('\n'));
+  process.exit(1);
+}
+
+// Again, with storage that throws on the way in.
+//
+// Safari in private browsing and any browser that partitions storage for an
+// embedded copy make this raise rather than return null — and the theme is read
+// at module top level, so a throw there aborts the module and leaves a blank
+// page with no error anyone can see. The harshest real case is the property
+// access itself throwing, not just the method, so that is what is stubbed.
+//
+// A query string is what makes the second import re-execute; without it the
+// module registry returns the copy loaded above and this tests nothing.
+Object.defineProperty(globalThis, 'localStorage', {
+  configurable: true,
+  get() { throw new DOMException('The operation is insecure.', 'SecurityError'); },
+});
+
+missing.length = 0;
+try {
+  await import(join(ROOT, 'app.js') + '?storage=denied');
+  console.log('app.js survives storage being denied');
+} catch (err) {
+  console.log('LOAD FAILED WITH STORAGE DENIED: ' + err.constructor.name + ': ' + err.message);
   if (err.stack) console.log(err.stack.split('\n').slice(1, 4).join('\n'));
   process.exit(1);
 }

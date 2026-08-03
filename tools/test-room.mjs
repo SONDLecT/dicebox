@@ -136,7 +136,18 @@ const HELLO_REPLY_WINDOW_MS = 400;
 // the second. Waiting on the condition instead makes the tests deterministic.
 async function settle(until, tries = 400) {
   for (let i = 0; i < tries; i++) {
-    await new Promise(resolve => setImmediate(resolve));
+    // setImmediate drains microtasks and the check phase, which is all a
+    // promise chain that has already resolved needs. Encryption has not: it
+    // runs on the crypto threadpool, and its completion only lands when the
+    // loop actually idles. Spinning setImmediate never idles, so on a busy
+    // machine all 400 turns could burn before an encrypt came back and the
+    // assertion failed on a condition that was about to be true.
+    //
+    // A real timer every so often gives the loop that idle. It is safe here
+    // because the room under test runs on an injected fake clock — the global
+    // timer this uses is not the one being advanced.
+    if (i % 25 === 24) await new Promise(resolve => setTimeout(resolve, 1));
+    else await new Promise(resolve => setImmediate(resolve));
     if (until && until()) return;
   }
 }

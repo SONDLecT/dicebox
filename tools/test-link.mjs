@@ -40,28 +40,34 @@ async function load(historyImpl, hash = '#' + PHRASE) {
     return [id, el];
   }));
 
-  globalThis.crypto = webcrypto;
-  globalThis.performance = { now: () => 0 };
-  globalThis.requestAnimationFrame = () => 0;
-  globalThis.setTimeout = fn => { void fn; return 0; };
-  globalThis.clearTimeout = () => {};
-  globalThis.ResizeObserver = class { observe(){} disconnect(){} };
-  globalThis.matchMedia = () => ({
+  // Via defineProperty rather than assignment: newer Node makes crypto,
+  // navigator and performance getter-only on globalThis, and a plain assignment
+  // throws there.
+  const define = (name, value) =>
+    Object.defineProperty(globalThis, name, { value, configurable: true, writable: true });
+
+  define('crypto', webcrypto);
+  define('performance', { now: () => 0 });
+  define('requestAnimationFrame', () => 0);
+  define('setTimeout', fn => { void fn; return 0; });
+  define('clearTimeout', () => {});
+  define('ResizeObserver', class { observe(){} disconnect(){} });
+  define('matchMedia', () => ({
     matches: false, addEventListener(){}, removeEventListener(){},
     addListener(){}, removeListener(){},
-  });
-  globalThis.localStorage = { getItem: () => null, setItem(){}, removeItem(){} };
-  globalThis.getComputedStyle = () => ({ getPropertyValue: () => '#FCFCFA' });
-  globalThis.navigator = {
+  }));
+  define('localStorage', { getItem: () => null, setItem(){}, removeItem(){} });
+  define('getComputedStyle', () => ({ getPropertyValue: () => '#FCFCFA' }));
+  define('navigator', {
     vibrate(){}, userAgent: 'node',
     serviceWorker: { register: () => Promise.resolve() },
     clipboard: { writeText: () => Promise.resolve() },
-  };
-  globalThis.window = {
+  });
+  define('window', {
     addEventListener(){}, devicePixelRatio: 2,
     matchMedia: globalThis.matchMedia,
     navigator: { standalone: false },
-  };
+  });
   // Never opened: joining is asynchronous and the assertions here are about
   // what happens before any socket work begins.
   globalThis.WebSocket = class { constructor(){ this.readyState = 0; } send(){} close(){} };
@@ -86,7 +92,8 @@ async function load(historyImpl, hash = '#' + PHRASE) {
 
 function makeEl(id = '') {
   return {
-    id, hidden: false, dataset: {}, style: {}, value: '', textContent: '',
+    id, hidden: false, dataset: {}, value: '', textContent: '',
+    style: { setProperty(){}, removeProperty(){}, getPropertyValue(){ return ''; } },
     children: [], className: '', tabIndex: 0, role: '',
     classList: { add(){}, remove(){}, toggle(){} },
     addEventListener(){}, removeEventListener(){}, setAttribute(){},

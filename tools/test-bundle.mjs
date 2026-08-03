@@ -38,7 +38,8 @@ if (absent.length) {
 }
 
 const makeEl = (id='') => ({
-  id, hidden:false, dataset:{}, style:{}, value:'', textContent:'', children:[],
+  id, hidden:false, dataset:{}, value:'', textContent:'', children:[],
+  style: { setProperty(){}, removeProperty(){}, getPropertyValue(){ return ''; } },
   className:'', tabIndex:0, role:'', disabled:false,
   classList:{add(){},remove(){},toggle(){}},
   addEventListener(){}, removeEventListener(){}, setAttribute(){}, getAttribute(){return null;},
@@ -54,16 +55,21 @@ const makeEl = (id='') => ({
 const store = new Map(ids.map(id => [id, makeEl(id)]));
 const missing = [];
 
-globalThis.crypto = webcrypto;
-globalThis.performance = { now: () => 0 };
-globalThis.requestAnimationFrame = () => 0;
-globalThis.setTimeout = () => 0;
-globalThis.clearTimeout = () => {};
-globalThis.ResizeObserver = class { observe(){} disconnect(){} };
-globalThis.localStorage = { getItem:()=>null, setItem(){}, removeItem(){} };
-globalThis.matchMedia = () => ({matches:false,addEventListener(){},removeEventListener(){}});
-globalThis.navigator = { vibrate(){}, userAgent:'node', serviceWorker:{register:()=>Promise.resolve()} };
-globalThis.getComputedStyle = () => ({ getPropertyValue: () => '#FCFCFA' });
+// Via defineProperty rather than assignment: newer Node makes crypto, navigator
+// and performance getter-only on globalThis, and a plain assignment throws.
+const define = (name, value) =>
+  Object.defineProperty(globalThis, name, { value, configurable: true, writable: true });
+
+define('crypto', webcrypto);
+define('performance', { now: () => 0 });
+define('requestAnimationFrame', () => 0);
+define('setTimeout', () => 0);
+define('clearTimeout', () => {});
+define('ResizeObserver', class { observe(){} disconnect(){} });
+define('localStorage', { getItem:()=>null, setItem(){}, removeItem(){} });
+define('matchMedia', () => ({matches:false,addEventListener(){},removeEventListener(){}}));
+define('navigator', { vibrate(){}, userAgent:'node', serviceWorker:{register:()=>Promise.resolve()} });
+define('getComputedStyle', () => ({ getPropertyValue: () => '#FCFCFA' }));
 // The bundle is the single file, so file: is how it actually gets opened. It
 // also puts the room note on its stronger branch, which is the one only this
 // build can honestly claim.
