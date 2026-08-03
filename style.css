@@ -1133,6 +1133,22 @@ body {
   border-top: 1px solid var(--hair);
 }
 
+/* The first thing in the panel needs no rule above it — the title is already
+   the boundary, and a hairline directly under it reads as a stray line. */
+.room-block-lead {
+  border-top: 0;
+  padding-top: 4px;
+}
+
+/* The privacy note, now at the foot of the panel rather than in front of it.
+   Set apart and quieter than the controls: it is there to be found, not to be
+   read before you are allowed to roll. */
+.room-privacy {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--hair);
+}
+
 .room-create { width: 100%; }
 
 .room-block .room-hint { margin-top: 8px; }

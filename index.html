@@ -176,25 +176,14 @@
 
         <!-- Before joining. -->
         <div class="room-setup" id="roomSetup">
-          <!-- The default wording is the served-copy one, because that is what
-               is true of the demo and of every self-hosted deployment: the
-               relay is honest about ciphertext, but the encrypting code arrived
-               over the network from someone. app.js swaps in the stronger claim
-               only when running from file:, where nothing can change under the
-               reader. Getting this the wrong way round would have the demo
-               claiming a guarantee the README explicitly says it does not
-               offer. -->
-          <p class="room-note" id="roomNote">
-            Encrypted before it leaves your device — the relay only ever sees
-            ciphertext. You are trusting whoever serves this copy; the single
-            file and self-hosting are not. Each device reports its own rolls.
-          </p>
-          <p class="room-note room-note-more">
-            <a href="https://github.com/SONDLecT/dicebox#what-the-privacy-actually-is"
-               target="_blank" rel="noopener noreferrer">What the privacy actually is</a>
-          </p>
-
-          <div class="room-block">
+          <!-- Create and join come first, and the privacy note goes to the
+               bottom. It used to lead, which put both controls below the fold
+               in an Owlbear panel: the panel is a fixed popover and the sheet
+               only gets the tray's share of it, so people were scrolling past a
+               paragraph about ciphertext to reach the button they opened this
+               for. The note has not been cut down further — it is just no
+               longer standing in front of the door. -->
+          <div class="room-block room-block-lead">
             <button type="button" class="roll room-create" id="roomCreate">Create a room</button>
             <p class="room-hint" id="roomCreateHint">
               Makes a passphrase to pass round the table.
@@ -227,6 +216,26 @@
                    aria-label="Room passphrase">
             <button type="submit" class="roll room-join-button" id="roomJoin">Join</button>
           </form>
+
+          <!-- The default wording is the served-copy one, because that is what
+               is true of the demo and of every self-hosted deployment: the
+               relay is honest about ciphertext, but the encrypting code arrived
+               over the network from someone. app.js swaps in the stronger claim
+               only when running from file:, where nothing can change under the
+               reader. Getting this the wrong way round would have the demo
+               claiming a guarantee the README explicitly says it does not
+               offer. -->
+          <div class="room-privacy">
+            <p class="room-note" id="roomNote">
+              Encrypted before it leaves your device — the relay only ever sees
+              ciphertext. You are trusting whoever serves this copy; the single
+              file and self-hosting are not. Each device reports its own rolls.
+            </p>
+            <p class="room-note room-note-more">
+              <a href="https://github.com/SONDLecT/dicebox#what-the-privacy-actually-is"
+                 target="_blank" rel="noopener noreferrer">What the privacy actually is</a>
+            </p>
+          </div>
         </div>
 
         <!-- While connected. -->

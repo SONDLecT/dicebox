@@ -120,6 +120,25 @@ ok('the reading size is read through the storage guard',
    /store\.get\('dicebox:historyText'\)/.test(js) &&
    /store\.set\('dicebox:historyText'/.test(js));
 
+// --- what the share panel opens on ---
+//
+// Create and join must come before the privacy note. The note used to lead,
+// which in an Owlbear panel put both controls below the fold: the panel is a
+// fixed popover and a sheet only gets the tray's share of it, so opening Share
+// meant scrolling past a paragraph about ciphertext to reach the button you
+// opened it for. Ordering is invisible to every other check here and reverting
+// it would break nothing that fails.
+const setup = html.slice(html.indexOf('id="roomSetup"'), html.indexOf('id="roomLive"'));
+const at = needle => setup.indexOf(needle);
+ok('the share panel contains all three parts',
+   at('id="roomCreate"') !== -1 && at('id="roomJoinForm"') !== -1 && at('id="roomNote"') !== -1);
+ok('create comes before join', at('id="roomCreate"') < at('id="roomJoinForm"'));
+ok('joining comes before the privacy note', at('id="roomJoinForm"') < at('id="roomNote"'));
+// The made-room block belongs under Create, not after the join form: it is what
+// Create produces and reads as orphaned anywhere else.
+ok('the new passphrase appears under create',
+   at('id="roomCreate"') < at('id="roomMade"') && at('id="roomMade"') < at('id="roomJoinForm"'));
+
 // --- the privacy note ---
 // The panel is the only privacy statement inside the app, and it once carried a
 // single relay-scoped sentence in every build. On the hosted demo that read as
