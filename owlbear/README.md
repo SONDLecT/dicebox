@@ -58,13 +58,26 @@ The build emits `worker.js` and `wrangler.jsonc` alongside the files, so it
 deploys with the same infrastructure Dicebox already uses:
 
 ```sh
-npm run build:owlbear -- --relay=wss://relay.example.com/ws
-cd owlbear/dist && npx wrangler deploy
+npm run build:owlbear -- --relay=wss://relay.example.com/ws --host=vtt.example.com
+npm run deploy:owlbear
 ```
 
-Set a route or attach a custom domain in the generated `wrangler.jsonc` first.
-It must be a **different origin from the app** — this build permits being
-framed and the app must never be.
+`--host` must be a **different origin from the app**, and the deploy refuses to
+publish onto the app's hostname rather than trusting anyone to remember why.
+Two reasons, and the second is the one that bites:
+
+- This build permits being framed and the app must never be. Sharing a host
+  means one server sending two different `frame-ancestors` depending on the
+  path, and a path check that is ever wrong makes the whole app framable
+  without breaking anything visible.
+- The app registers a service worker at `/` with scope `/`, and a service
+  worker controls every page beneath it. A panel served from a path on the
+  app's origin is served out of the app's offline cache — inside a frame with
+  no address bar and no reload button. A stale cache there is close to
+  undiagnosable.
+
+The deploy is the same REST upload `tools/deploy.mjs` uses; wrangler would work
+too where it runs.
 
 The Worker exists purely to attach headers, and it is not optional. `_headers`
 is a Pages feature that **Workers ignore silently** — the repo's own

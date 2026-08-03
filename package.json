@@ -13,7 +13,8 @@
     "serve": "python3 -m http.server 8080",
     "dev": "wrangler dev",
     "deploy": "npm test && node tools/deploy.mjs",
-    "deploy:dev": "npm test && node tools/deploy.mjs --dev"
+    "deploy:dev": "npm test && node tools/deploy.mjs --dev",
+    "deploy:owlbear": "npm test && node tools/deploy-owlbear.mjs"
   },
   "devDependencies": {
     "wrangler": "^4"

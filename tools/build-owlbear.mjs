@@ -45,6 +45,13 @@ const args = new Map(
 const relay = args.get('relay');
 const site = args.get('site') || 'https://dicebox.trollskull.cc';
 
+// The hostname the panel is served from. Written into the generated wrangler
+// config as a custom domain, and it must not be the app's own origin — the app
+// refuses to be framed and this build does not, so sharing a host would mean
+// one server sending two different frame-ancestors depending on the path, and
+// the app's service worker would claim the panel besides.
+const host = args.get('host') && args.get('host') !== true ? String(args.get('host')) : '';
+
 // Defaults to owlbear/dist, which is the artifact you deploy. The test suite
 // builds somewhere else on purpose: if `npm test` overwrote owlbear/dist with a
 // build pointed at a fixture relay, the next deploy would ship a panel that
@@ -66,6 +73,10 @@ Usage: node tools/build-owlbear.mjs --relay=wss://relay.example.com/ws [--site=h
            Defaults to the public demo.
 
   --out    Where to build, relative to the repo root. Defaults to owlbear/dist.
+
+  --host   Hostname to serve the panel from, e.g. vtt.dicebox.example.com.
+           Written into the generated wrangler config. Must be its own origin,
+           not a path on the app's.
 `.trim());
   process.exit(1);
 }
@@ -221,6 +232,11 @@ export default {
   // app itself, because this one permits being framed and that one must not.
   "name": "dicebox-owlbear",
   "compatibility_date": "2026-07-18",
+${host ? `
+  "routes": [
+    { "pattern": "${host}", "custom_domain": true }
+  ],
+` : ''}
 
   // Not optional. Without the script nothing sets the security headers, and
   // \`_headers\` is a Pages feature that Workers ignores silently.

@@ -27,8 +27,15 @@
 
   "vars": {
     // Without this the relay is open to any site that wants a free broadcast
-    // channel. The dev origin is listed so the staging copy can reach it.
-    "ALLOWED_ORIGINS": "https://dicebox.trollskull.cc,https://dev.dicebox.trollskull.cc"
+    // channel. The dev origin is listed so the staging copy can reach it, and
+    // the vtt origin is the Owlbear panel — a separate host because that build
+    // permits being framed and the app must not, so it arrives with an Origin
+    // of its own and is refused without an entry here.
+    //
+    // This is CSRF hygiene, not authentication. The passphrase decides
+    // membership and the relay never sees it; the list only stops an unrelated
+    // site pointing its users at someone else's broadcast channel.
+    "ALLOWED_ORIGINS": "https://dicebox.trollskull.cc,https://dev.dicebox.trollskull.cc,https://vtt.dicebox.trollskull.cc"
   },
 
   "observability": {
