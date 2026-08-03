@@ -55,6 +55,36 @@ const unstyled = [...new Set([...htmlClasses, ...jsClasses])]
   .filter(c => c && !css.includes(`.${c}`));
 ok('every class has a style rule', unstyled.length === 0, unstyled.join(', '));
 
+// --- the full history escapes the tray ---
+//
+// Every sheet is positioned inside .tray, which is right for a control acting
+// on the dice underneath it and wrong for the one panel people sit and read:
+// confined there it was a third of a phone tall, which is what players
+// complained about. A revert to the shared .sheet positioning would make the
+// panel quietly small again and break nothing else, so it is asserted here
+// rather than left to be noticed at a table.
+const historyRule = /#historyPanel\s*\{([^}]*)\}/.exec(css);
+ok('the full history has positioning of its own', !!historyRule);
+if (historyRule) {
+  ok('the full history escapes the tray', /position\s*:\s*fixed/.test(historyRule[1]));
+  // The panel holds still and the list inside it scrolls. Letting the sheet
+  // scroll instead takes the title and the export buttons off screen with it.
+  ok('the full history does not scroll itself', /overflow\s*:\s*hidden/.test(historyRule[1]));
+}
+ok('the history list is what scrolls',
+   /#historyPanel\s+\.history-full\s*\{[^}]*flex\s*:\s*1 1 auto/.test(css));
+
+// One custom property moves every row, and the choice survives a reload — a
+// size that has to be set again each session is a chore rather than a setting.
+ok('the reading size is one custom property',
+   /--history-text/.test(css) && /--history-text/.test(js));
+ok('the reading size is remembered', /dicebox:historyText/.test(js));
+// Through the guarded store, not localStorage directly: this runs at load, and
+// an unguarded read throws where storage is partitioned or denied.
+ok('the reading size is read through the storage guard',
+   /store\.get\('dicebox:historyText'\)/.test(js) &&
+   /store\.set\('dicebox:historyText'/.test(js));
+
 // --- the privacy note ---
 // The panel is the only privacy statement inside the app, and it once carried a
 // single relay-scoped sentence in every build. On the hosted demo that read as

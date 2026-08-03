@@ -132,6 +132,16 @@
       <div class="sheet-panel">
         <p class="sheet-title">
           <span id="historyTitle">Full history</span>
+          <!-- Text size, not zoom: this is the one panel people sit and read
+               rather than tap, and the size that suits a phone held at arm's
+               length is not the one that suits a laptop across a table. The
+               choice is remembered. -->
+          <span class="history-size" role="group" aria-label="Text size">
+            <button type="button" class="history-size-step" id="historySmaller"
+                    aria-label="Smaller text">A−</button>
+            <button type="button" class="history-size-step" id="historyBigger"
+                    aria-label="Larger text">A+</button>
+          </span>
           <button type="button" class="sheet-close" id="historyClose"
                   aria-label="Close history">✕</button>
         </p>

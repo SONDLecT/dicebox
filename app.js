@@ -780,6 +780,40 @@ function ensureDieButton(sides) {
 
 const historyPanel = $('historyPanel');
 
+// Reading sizes, in px. Four steps rather than a slider: the useful range is
+// narrow, and a slider on a phone is a drag gesture inside a panel that already
+// scrolls. The default is a step up from where this started, because the
+// feedback that prompted this was that the smallest size was the only size.
+const HISTORY_TEXT_SIZES = [13, 15, 17, 20];
+const HISTORY_TEXT_DEFAULT = 1;
+
+let historyTextStep = (() => {
+  const saved = Number(store.get('dicebox:historyText'));
+  return Number.isInteger(saved) && saved >= 0 && saved < HISTORY_TEXT_SIZES.length
+    ? saved
+    : HISTORY_TEXT_DEFAULT;
+})();
+
+function applyHistoryText() {
+  historyPanel.style.setProperty('--history-text', `${HISTORY_TEXT_SIZES[historyTextStep]}px`);
+  // Disabled rather than hidden at the ends, so the pair does not reflow the
+  // title row as it is used.
+  $('historySmaller').disabled = historyTextStep === 0;
+  $('historyBigger').disabled = historyTextStep === HISTORY_TEXT_SIZES.length - 1;
+}
+
+function stepHistoryText(by) {
+  const next = Math.min(HISTORY_TEXT_SIZES.length - 1, Math.max(0, historyTextStep + by));
+  if (next === historyTextStep) return;
+  historyTextStep = next;
+  store.set('dicebox:historyText', String(next));
+  applyHistoryText();
+}
+
+$('historySmaller').addEventListener('click', () => stepHistoryText(-1));
+$('historyBigger').addEventListener('click', () => stepHistoryText(1));
+applyHistoryText();
+
 function openHistory() {
   setHelp(false);
   closeSheet();
