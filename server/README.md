@@ -10,6 +10,9 @@ rather than spinning or queueing. The relay only adds the shared-table feature.
 
 ## Running it
 
+The Node relay. There is a Cloudflare Worker implementation too, and which to
+pick is covered in [The other implementation](#the-other-implementation).
+
 Node 18 or newer. One dependency, `ws`, already in the project's
 `package.json`.
 
@@ -76,7 +79,68 @@ access_log /var/log/nginx/relay.log relay;
 substituting one for the other is the whole difference. Caddy and Traefik log
 full URLs by default too, so the same applies to whatever you actually run.
 
+## The other implementation
+
+There are two relays in this directory and they speak the same protocol:
+
+| | `relay.mjs` | `worker-relay.js` |
+| --- | --- | --- |
+| Runs on | Node 18+, anywhere | Cloudflare Workers |
+| State | one process, a `Map` | one Durable Object per room |
+| Configured by | `DICEBOX_*` environment variables | `vars` in `wrangler.jsonc` |
+| Deployed with | `node server/relay.mjs`, or Docker | `node tools/deploy-relay.mjs` |
+| `/health` reports | room and connection counts | only `{"ok":true,"protocol":1}` |
+| Missing `Origin` | allowed | refused |
+
+**Use the Node one unless you have a reason not to.** It is the reference
+implementation, it runs on anything, and it is the one that makes the
+self-hosting guarantee easy to check — you can read the whole thing.
+
+The Worker exists because the demo needs to survive being linked somewhere
+without a bill attached, and a dice room is idle between rolls. It uses the
+hibernation API (`ctx.acceptWebSocket()`), so an idle room evicts from memory
+while its sockets stay open. That is the difference between a real cost and a
+rounding error, and it is the only reason to prefer it.
+
+Two behavioural differences are deliberate rather than incidental:
+
+- **`/health` publishes nothing.** A self-hosted relay can report its own room
+  and connection counts, because its operator is its user. A public one would be
+  telling anyone who asks how many tables are playing right now.
+- **A missing `Origin` is refused,** where the Node relay allows it. The Node
+  relay has to accept the single-file build opened from `file://`, which has no
+  meaningful origin and is a first-class client. A public Worker has no such
+  obligation and gains nothing by being lenient.
+
+### Deploying the Worker
+
+```sh
+node tools/deploy-relay.mjs           # relay.dicebox.trollskull.cc
+node tools/deploy-relay.mjs --dev     # dev.relay.… , a separate script and DO namespace
+```
+
+Credentials come from `.env` — see `.env.example`. Configuration lives in
+`server/wrangler.jsonc`:
+
+- **`vars.ALLOWED_ORIGINS`** — comma-separated exact origins. Every origin that
+  serves a copy of the app needs an entry, including any Owlbear panel, which
+  is a separate host by design. A request whose `Origin` is not on the list gets
+  `403 forbidden_origin`, and the symptom in the app is a room that never
+  reaches "live" while everything else works.
+- **`observability.enabled` is `false`,** deliberately. Cloudflare's logs record
+  request URLs, and the room id is in the query string. A relay that cannot read
+  rolls but does keep a record of which rooms were busy and when is a weaker
+  promise than the one this makes.
+
+The limits are compiled in rather than configurable — 16 per room, 30 messages
+per 10s, 30 minutes idle, 12 hours absolute. Change them in
+`server/worker-relay.js` and redeploy. There is no per-process connection cap
+because there is no process.
+
 ## Configuration
+
+This section is the Node relay. The Worker is configured through
+`wrangler.jsonc` instead — see [The other implementation](#the-other-implementation).
 
 All via environment variables. A value that is not a positive integer is a
 startup failure with a message, not a silent fall back to the default — a

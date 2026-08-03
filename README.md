@@ -8,6 +8,12 @@ demo instance, not a service. To keep a copy of your own, see
 [Getting it offline](#getting-it-offline): download it as a single file, install
 it from the browser, or host it yourself.
 
+It stays a local dice roller unless you ask for more. Optionally it will also
+share rolls with a table over an [end-to-end encrypted room](#rooms), and there
+is an [Owlbear Rodeo panel](#in-owlbear-rodeo) that joins one as an ordinary
+member. Both are opt-in, both are off until you open the Share panel, and
+neither is needed to roll dice.
+
 <p align="center">
   <img src="docs/roll.png" alt="Rolling 2d20+3d6, with the total and each die's result" width="270">
   &nbsp;
@@ -146,11 +152,46 @@ in any case 12 hours after it was created — a departed player keeps the
 passphrase forever, so expiry is the only thing here that resembles taking
 access away.
 
+### How it fits together
+
+Three pieces, and the boundaries between them are the point:
+
+```
+  your browser                    a relay                  other browsers
+  ────────────                    ───────                  ──────────────
+  passphrase ──► key                                          key ◄── passphrase
+       │                                                             │
+       ▼                                                             ▼
+  roll ─► encrypt ─────────► ciphertext, fanned out ─────────► decrypt ─► roll
+                             (never holds a key,
+                              never stores a byte)
+```
+
+- **The app** is static files. Any web server will do, and it needs no backend
+  at all unless you want rooms.
+- **The relay** is a separate service on a **separate origin**, which is what
+  makes the guarantee checkable rather than a promise: a different party serves
+  the code than carries the messages.
+- **The passphrase never leaves the browser.** It derives a room id the relay
+  sees and a key the relay never does, through PBKDF2 and HKDF with different
+  info strings, so learning one tells you nothing about the other.
+
+The app finds its relay through one meta tag in `index.html`, and the browser
+is only allowed to reach that exact origin because the `connect-src` in your
+headers names it. Both have to agree or the socket is refused — which is
+deliberate, and covered under [Running your own relay](#running-your-own-relay).
+
+Nothing above applies until someone opens the Share panel. With no relay
+configured the app is a local dice roller and the room code never runs.
+
 ### Running your own relay
 
 The relay is a small WebSocket server that forwards encrypted messages between
 people in the same room. It is a fanout and nothing else: it cannot read a roll,
 it never decides one, and it writes nothing to disk.
+
+There are two implementations of it, speaking the same protocol. **Start with
+the Node one** — it runs anywhere, and you can read the whole thing:
 
 ```sh
 node server/relay.mjs                    # 127.0.0.1:8787
@@ -159,6 +200,17 @@ docker compose --profile rooms up -d     # or as a container
 
 The `rooms` profile means the relay only starts when you ask for it — plain
 `docker compose up -d` brings up the static app exactly as before.
+
+The second is a Cloudflare Worker backed by Durable Objects, which is what the
+demo runs. It exists for one reason: a dice room is idle between rolls, and the
+hibernation API lets an idle room evict from memory while its sockets stay open.
+If you are not paying per-request for a public instance, you do not need it.
+
+```sh
+node tools/deploy-relay.mjs              # needs .env, see .env.example
+```
+
+[`server/README.md`](server/README.md) covers both, what differs between them, and why.
 
 It binds loopback by default, so a fresh install is not reachable from the
 network until you decide it should be. Put it behind whatever TLS terminator you
@@ -169,7 +221,7 @@ One thing to set while you are there: **turn off access logging on whatever
 terminates TLS in front of the relay.** The room id travels in the request URL,
 so nginx and Caddy both write it to disk by default — the full id, not the
 eight-character prefix the relay itself logs, and it stays there long after the
-room has expired. `server/README.md` has the configuration.
+room has expired. [`server/README.md`](server/README.md) has the configuration.
 
 That origin is **pinned to one exact host** rather than opened up to `wss:` or
 `*`, and it is worth saying why. The relay is never given key material by
@@ -179,8 +231,8 @@ send anything to a host that is not on that line, because the browser refuses
 the connection outright. Widening it to make a setup problem go away gives that
 protection up entirely.
 
-`server/README.md` covers the configuration — limits, timeouts, origins — in
-full.
+[`server/README.md`](server/README.md) covers the configuration — limits,
+timeouts, origins — in full.
 
 ### In Owlbear Rodeo
 
@@ -189,14 +241,20 @@ same passphrase, same rolls, no special status. It is the same app built for an
 iframe rather than a second implementation:
 
 ```sh
-npm run build:owlbear -- --relay=wss://relay.example.com/ws
+npm run build:owlbear -- --relay=wss://relay.example.com/ws --host=vtt.example.com
+npm run deploy:owlbear
 ```
+
+It has to be its **own origin**, not a path on the app's — the panel permits
+being framed by Owlbear and the app must never be, and the app's service worker
+would otherwise claim the panel as well. The deploy refuses to publish onto the
+app's hostname rather than relying on anyone to remember that.
 
 Rolls are *not* published into the Owlbear room, so players without the
 passphrase see nothing. Doing that would mean holding the room key and handing
 plaintext to Owlbear's servers, which is a different feature with a different
-privacy story rather than a convenience to add quietly. `owlbear/README.md`
-covers hosting, headers and installing.
+privacy story rather than a convenience to add quietly.
+[`owlbear/README.md`](owlbear/README.md) covers hosting, headers and installing.
 
 ### What the privacy actually is
 
@@ -311,9 +369,35 @@ npm run bundle    # rebuild dist/dicebox.html on its own
 npm run build:owlbear -- --relay=wss://...   # the Owlbear panel
 ```
 
-The demo is deployed to Cloudflare Workers with `node tools/deploy.mjs`, which
-reads the credentials in `.env` — see `.env.example`. A small Worker fronts the
-static assets to set security and cache headers.
+### Deploying
 
-**Bump `CACHE` in `sw.js` whenever you change an asset**, or installed copies
-will keep serving the old version.
+Everything goes to Cloudflare Workers, and every script reads `.env` — see
+`.env.example` for what has to be in it.
+
+```sh
+npm run deploy:dev        # dev.dicebox.trollskull.cc
+npm run deploy            # the live site
+node tools/deploy-relay.mjs [--dev]   # the relay
+npm run deploy:owlbear    # the Owlbear panel, after build:owlbear
+```
+
+Each is a separate script rather than one with flags, because they have almost
+nothing in common: the app is static assets fronted by a header-setting Worker,
+the relay is a script with a Durable Object namespace and no assets, and the
+panel is a generated directory on an origin of its own.
+
+Three things are handled for you, and all three used to be documented
+instructions that someone had to remember:
+
+- **The service worker's cache name** is derived from a hash of everything
+  shipped beside it. A stale cache name is the worst bug this project has,
+  because it has no symptom at the origin: every file is correct and installed
+  copies keep serving the previous build regardless.
+- **The build id** shown in the help panel is the same hash, so a copy that
+  says which build it is cannot be wrong about it.
+- **The relay origin** is substituted into `index.html` at deploy time from
+  `RELAY_URL`, so staging and production can point at different relays without
+  the two ever differing in the repository.
+
+The single-file build in `dist/` is committed, so rebuild it with `npm run
+bundle` when you change anything it inlines. `npm test` does it anyway.
