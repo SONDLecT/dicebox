@@ -2212,23 +2212,48 @@ const POINTED_LIMIT = 22;
 // banded drum is still readable here, while anything pointed is long gone.
 const MAX_FACETS = 120;
 
-// Angular speed, in radians per frame, below which a die is turning slowly
-// enough to carry a readable numeral. About 17 degrees a frame. See
-// Die.stepNumeral.
+// How slowly a die must be travelling before its rotation is allowed to settle,
+// in pixels per second.
 //
-// A rotation rate rather than a time, because the question is "has this die
-// slowed enough that the glyph will stay on one facet", and dice reach that
-// point at different moments depending on how hard they were thrown.
-const NUMERAL_FADE_SPIN = 0.30;
+// This used to be 8, and it was the single reason the numeral took three
+// seconds to appear. The condition asks two questions — has it stopped moving,
+// has it stopped turning — and only the second one is about rotation. A die is
+// pulled toward its slot by a spring, so it keeps drifting long after it has
+// visibly stopped: rotation was done by ~0.9s and the 8px/s line was not
+// crossed until 2.3s, with the die already within five pixels of home.
+//
+// At 60px/s a die is about one width from its slot and moving a pixel a frame,
+// which is where a real one would already have stopped rolling. It carries on
+// gliding in while the rotation settles — see the settling branch, which eases
+// position with exactly the same curve the settled branch uses, so the handover
+// between them is invisible.
+const SETTLE_SPEED = 60;
 
-// How long the fade itself takes once it has been triggered, in seconds.
+// How fast a tumble decays, per frame.
 //
-// Deliberately a duration rather than a second speed threshold. Tying both ends
-// to the decay curve made the length of the fade a function of how fast the die
-// happened to be spinning — slow dice got a brisk fade and fast ones a listless
-// one, which is exactly backwards, and it put the worst case past 1.6s. The
-// trigger varies because the dice do; the fade should not.
-const NUMERAL_FADE_S = 0.26;
+// Named because two things now depend on it, and because it is the number that
+// decides how long a die spins. It is deliberately separate from the 0.94 that
+// damps translation: a die stops rolling across the tray and stops turning on
+// the spot for different reasons, and at 0.965 they were badly out of step —
+// dice came to a halt and then kept revolving for another two seconds.
+const SPIN_DECAY = 0.92;
+
+// How far through the settle the numeral starts to appear, as a fraction of
+// settleT.
+//
+// The settle is the only part of a throw where the die's remaining rotation is
+// bounded and known: it interpolates from the pose it stopped in to the one it
+// will rest in, over a fixed span. Everything before it is a decaying tumble
+// with a long tail — a die turning at `s` still has s / (1 - SPIN_DECAY) of arc
+// ahead of it, which even at a visually slow speed is several full turns.
+//
+// That tail is what made two earlier attempts fail. Fading on the tumble, at
+// any speed threshold, put 200 degrees of rotation under the numeral while it
+// was appearing, against the ~41 degrees between adjacent faces on a d20 — so
+// it hopped a dozen facets on the way in. Fading on the settle bounds it: the
+// easing is cubic, so from 0.55 onward the die has ~9% of its arc left, and
+// after the settle it has none at all.
+const NUMERAL_FADE_FROM = 0.55;
 
 // Resting-orientation searches allowed per frame. Enough that small rolls all
 // resolve at once, low enough that a 100-dice roll spreads the cost instead of
@@ -2526,7 +2551,7 @@ class Die {
     // First, so that the several early returns below cannot skip it. It reads
     // the previous frame's motion, which is a frame of lag on a fade lasting
     // tens of them.
-    this.stepNumeral(dt);
+    this.stepNumeral();
 
     // Mid-reroll: hold still for a beat, then throw the die back up.
     if (this.rerollPause > 0) {
@@ -2577,7 +2602,7 @@ class Die {
 
       for (let i = 0; i < 3; i++) {
         this.rot[i] += this.spin[i] * dt * 60;
-        this.spin[i] *= 0.965;
+        this.spin[i] *= SPIN_DECAY;
       }
 
       // Ease toward the slot the layout assigned, so dice spread out instead of
@@ -2587,12 +2612,25 @@ class Die {
         this.vy += (this.homeY - this.y) * 3.2 * dt;
       }
 
-      if (Math.hypot(this.vx, this.vy) < 8 && Math.abs(this.spin[0]) < 0.02) {
+      if (Math.hypot(this.vx, this.vy) < SETTLE_SPEED && Math.abs(this.spin[0]) < 0.02) {
         this.settling = true;
         this.settleT = 0;
         this.restRot = this.rot.slice();
       }
     } else {
+      // Position keeps easing while the rotation settles.
+      //
+      // Settling used to begin only once a die had all but stopped, so leaving
+      // translation out of this branch cost nothing. It now begins while the
+      // die still has a width to travel, and without this the die would freeze
+      // in mid-glide for the length of the settle and then resume — the same
+      // easing as the settled branch, so nothing changes at the handover.
+      if (this.homeX !== undefined) {
+        const ease = Math.min(1, dt * 2.4);
+        this.x += (this.homeX - this.x) * ease;
+        this.y += (this.homeY - this.y) * ease;
+      }
+
       // Ease the tumble to a stop, rotating toward an orientation that presents
       // a face to the camera. Landing on a pole or a vertex reads as a spike and
       // leaves nowhere to paint the numeral.
@@ -2784,21 +2822,20 @@ class Die {
   // because a numeral that dimmed on its way in would read as a flicker rather
   // than an arrival. Only a reset — a throw, a spin, a reroll's hop — takes it
   // back to nothing.
-  stepNumeral(dt) {
+  stepNumeral() {
     if (this.numeralIn >= 1) return;
 
-    // A die that has come to rest is showing its number, whatever route it took
-    // to get there — including one placed at rest without ever being thrown.
+    // A die at rest is showing its number, whatever route it took to get there
+    // — including one placed at rest without ever being thrown.
     if (this.settled) { this.numeralIn = 1; return; }
 
-    const slow = Math.hypot(this.spin[0], this.spin[1], this.spin[2]) < NUMERAL_FADE_SPIN;
+    // Nothing during the tumble. Its remaining rotation is unbounded in the
+    // sense that matters: several facets' worth, however slow it looks.
+    if (!this.settling) return;
 
-    // Spin-in-place dice hold a constant tumble and then settle, so their spin
-    // never decays and `slow` is never true for them. The settle is their
-    // signal instead.
-    if (!slow && !this.settling) return;
-
-    this.numeralIn = Math.min(1, this.numeralIn + dt / NUMERAL_FADE_S);
+    this.numeralIn = Math.max(this.numeralIn,
+      (this.settleT - NUMERAL_FADE_FROM) / (1 - NUMERAL_FADE_FROM));
+    this.numeralIn = Math.min(1, Math.max(0, this.numeralIn));
   }
 
   numeralAlpha() {

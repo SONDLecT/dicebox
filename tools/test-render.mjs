@@ -545,13 +545,15 @@ ok('coincident dice separate cleanly',
     ok('the numeral is hidden through the fast part of the tumble',
        r.firstVisible > 20, `appeared at frame ${r.firstVisible}`);
 
-    // The property the first attempt got wrong. The numeral must not wait on
-    // the settle machinery: `settling` needs spin[0] under 0.02 rad/frame, and
-    // spin decays 3.5% a frame from a value seeded off throw speed, so a thrown
-    // die does not settle for ~2.9s — by which point nobody is looking.
-    ok('the numeral does not wait for the die to formally settle',
-       r.fullAt !== -1 && (r.settledAt === null || r.fullAt < r.settledAt),
-       `full at ${r.ms(r.fullAt)}ms, settled at ${r.settledAt === null ? 'never' : r.ms(r.settledAt) + 'ms'}`);
+    // The die has to actually stop in a reasonable time, because the numeral
+    // now rides the settle. It once took 2.9s — not because it was still
+    // turning, but because the settle condition also waited for the die to stop
+    // drifting toward its slot at under 8px/s, which happens long after it has
+    // visibly stopped. Decoupling the two is what makes the fade land while
+    // anyone is still watching.
+    ok('the die settles while the roll is still happening',
+       r.settledAt !== null && r.ms(r.settledAt) <= 2000,
+       r.settledAt === null ? 'never settled' : `${r.ms(r.settledAt)}ms`);
 
     let dips = 0;
     for (let i = 1; i < r.alphas.length; i++) {

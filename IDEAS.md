@@ -375,28 +375,48 @@ fixes below try to keep painting a numeral throughout the tumble and differ only
 in which facet they paint it on; not painting one at all was the option neither
 considered. `Die.stepNumeral` in `render.js` is the whole implementation.
 
-The trigger is **angular speed, not the settle flags**, and the first attempt
-got this wrong in a way worth recording. Keying the fade on `settling` looked
-obviously right and did nothing at all: `settling` does not begin until
-`spin[0]` falls under 0.02 rad/frame, and `throwWith` seeds spin proportional to
-throw speed while `step` decays it 3.5% a frame — so **a thrown die does not
-formally settle for about 2.9 seconds**, while the total is announced at 620ms.
-The numeral was simply absent for the whole animation, and the unit tests passed
-because they set the flags by hand instead of running the die through `step`.
+The fade rides the **settle**, and getting there took two wrong turns worth
+recording, because both looked right and both were checked against the wrong
+thing.
 
-That 2.9s is worth knowing about on its own. It is why the contact mark and the
-tidy-into-a-grid drift both happen much later than they appear to be designed
-for. Making the tumble shorter is a one-constant change with measured effects:
+The first keyed on the `settling` flag and appeared to do nothing at all. The
+second keyed on angular speed, and put the numeral on screen while the die was
+still turning — which is the original complaint, unfixed.
 
-| `spin[i] *=` | numeral visible (p50) | worst | still spinning at 620ms |
-| --- | --- | --- | --- |
-| `0.965` (today) | 1483ms | 1817ms | 1.00 rad/frame |
-| `0.955` | 1200ms | 1483ms | 1.00 |
-| `0.94` | 967ms | 1167ms | 0.37 |
-| `0.92` | 783ms | 933ms | 0.16 |
+The measurement that settled it is the one this section already recommends:
+**the arc actually travelled, frame by frame.** Adjacent faces on a d20 are
+about 41 degrees apart, so that is the budget. The speed-triggered version spent
+200 degrees of rotation fading in and another 289 after it was fully opaque —
+roughly a dozen facets. It could not have worked at any threshold, because a die
+turning at `s` with decay `d` has `s / (1 - d)` of arc still ahead of it, and at
+the old decay that multiplier was 28.6: even a visually slow die had several
+full turns left.
 
-Left alone deliberately: it changes how long every roll visibly tumbles, which
-is a feel decision rather than a bug fix.
+Only the settle bounds that. It interpolates from the pose the die stopped in to
+the pose it rests in, over a fixed span, so the remaining arc is known. Fading
+over its tail costs 4 degrees of travel, and none after.
+
+What made the first attempt look like it did nothing was a separate bug in the
+settle condition:
+
+```js
+if (Math.hypot(this.vx, this.vy) < 8 && Math.abs(this.spin[0]) < 0.02)
+```
+
+Two questions, and only the second is about rotation. Dice are pulled toward
+their slot by a spring, so they keep drifting long after they have visibly
+stopped — rotation was done by ~0.9s while the 8px/s line was not crossed until
+**2.3s**, with the die already within five pixels of home. The settle, and
+everything hanging off it, waited on the wrong one. `SETTLE_SPEED` is now 60px/s
+— about one die width out, moving a pixel a frame — and the settling branch
+eases position so a die beginning its settle mid-glide does not freeze.
+
+That also fixed something nobody had reported: the contact mark under a die and
+the drift into the sorted grid both fire on `settled`, and had been happening a
+second and a half later than they read as designed for.
+
+`SPIN_DECAY` went from 0.965 to 0.92 in the same pass. Past that it stops
+mattering — with the velocity condition fixed, velocity is what binds.
 
 The rest of this section stands, because the rewrite it describes is still what
 binding the glyph to a facet would cost, and that remains worth not doing.
