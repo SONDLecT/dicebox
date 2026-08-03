@@ -1,0 +1,22 @@
+{
+  "name": "Dicebox",
+  "version": "1.0.0",
+  "manifest_version": 1,
+  "description": "Shared dice for a table. Rolls are encrypted with a passphrase before they leave your device.",
+  "author": "Dicebox",
+  "icon": "/icon.svg",
+  "homepage_url": "https://github.com/SONDLecT/dicebox",
+  "action": {
+    "title": "Dicebox",
+    "icon": "/icon.svg",
+    "popover": "/",
+    "width": 420,
+    "height": 700
+  },
+  "permissions": [
+    {
+      "name": "clipboard-write",
+      "reason": "Copying the room passphrase, the invite link, and the roll log."
+    }
+  ]
+}

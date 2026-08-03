@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <!-- A d20 in the same wireframe language the app draws its dice in: an outline
+       hexagon, the upper face, and the three edges that fall away from it.
+       Owlbear tints the action icon to match its own chrome, so this is stroked
+       in currentColor and carries no fill of its own. -->
+  <g fill="none" stroke="currentColor" stroke-width="1.5"
+     stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 2.4 20.3 7v10L12 21.6 3.7 17V7z"/>
+    <path d="M12 2.4 16.4 9.6 12 12.2 7.6 9.6z"/>
+    <path d="M7.6 9.6 12 12.2v9.4M16.4 9.6 12 12.2M7.6 9.6 3.7 7m12.7 2.6L20.3 7"/>
+  </g>
+</svg>

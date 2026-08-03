@@ -165,6 +165,12 @@ network until you decide it should be. Put it behind whatever TLS terminator you
 already run, then point the app at it by changing the relay origin in
 `docker/security-headers.conf` (self-hosted) or `worker.js` (Cloudflare).
 
+One thing to set while you are there: **turn off access logging on whatever
+terminates TLS in front of the relay.** The room id travels in the request URL,
+so nginx and Caddy both write it to disk by default — the full id, not the
+eight-character prefix the relay itself logs, and it stays there long after the
+room has expired. `server/README.md` has the configuration.
+
 That origin is **pinned to one exact host** rather than opened up to `wss:` or
 `*`, and it is worth saying why. The relay is never given key material by
 design; the pinned origin is what keeps that true even if the design fails.
@@ -175,6 +181,22 @@ protection up entirely.
 
 `server/README.md` covers the configuration — limits, timeouts, origins — in
 full.
+
+### In Owlbear Rodeo
+
+There is an Owlbear Rodeo panel, which joins a room as an ordinary member —
+same passphrase, same rolls, no special status. It is the same app built for an
+iframe rather than a second implementation:
+
+```sh
+npm run build:owlbear -- --relay=wss://relay.example.com/ws
+```
+
+Rolls are *not* published into the Owlbear room, so players without the
+passphrase see nothing. Doing that would mean holding the room key and handing
+plaintext to Owlbear's servers, which is a different feature with a different
+privacy story rather than a convenience to add quietly. `owlbear/README.md`
+covers hosting, headers and installing.
 
 ### What the privacy actually is
 
@@ -284,8 +306,9 @@ require a secure context for that, with `localhost` exempt.
 ## Working on it
 
 ```sh
-npm test          # every suite, including a build of the single-file bundle
+npm test          # every suite, including the single-file bundle and the panel
 npm run bundle    # rebuild dist/dicebox.html on its own
+npm run build:owlbear -- --relay=wss://...   # the Owlbear panel
 ```
 
 The demo is deployed to Cloudflare Workers with `node tools/deploy.mjs`, which

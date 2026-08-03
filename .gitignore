@@ -2,6 +2,13 @@ node_modules/
 tools/preview.png
 tools/preview.svg
 
+# The Owlbear panel is built, not written: every file in it is a copy of one at
+# the repo root, with the relay origin baked in. Committing it would mean two
+# copies of the app in the tree, drifting apart. Build it with
+# `npm run build:owlbear -- --relay=wss://...` before deploying.
+owlbear/dist/
+owlbear/.test-build/
+
 # Cloudflare credentials — never commit these.
 .env
 .env.*
