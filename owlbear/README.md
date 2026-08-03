@@ -145,6 +145,21 @@ if you would rather have it another way.
 
 ## Notes from building it
 
+**Owlbear reads the manifest cross-origin, so it needs CORS.** The install
+dialog fetches `manifest.json` from Owlbear's own page, and the action icon the
+same way. Without `Access-Control-Allow-Origin` the browser refuses to hand over
+a response that was served perfectly correctly, and the only thing you see is a
+red **failed to fetch** — which looks like the URL is wrong or the host is down.
+The worker grants it on those two files and nothing else.
+
+**Changing only headers will not bust the edge cache.** Adding that header did
+not change a byte of the manifest body, so its ETag was unchanged, so
+revalidation returned 304 and Cloudflare kept serving its stored headers —
+including the missing one. `Cache-Control: no-cache` does not help; it forces
+revalidation, and revalidation is exactly what succeeded. Bump the manifest
+version, which changes the body, or purge the URL.
+
+
 **The clipboard needs a permission.** Copying the passphrase, the invite link
 and the roll log all go through `navigator.clipboard`, which an iframe may not
 use unless the extension declares `clipboard-write`. It is in `manifest.json`

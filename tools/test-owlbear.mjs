@@ -135,6 +135,24 @@ ok('assets do not bypass the worker', /"run_worker_first":\s*true/.test(wrangler
 ok('the worker config binds the assets the worker reads',
    /"binding":\s*"ASSETS"/.test(wrangler) && /env\.ASSETS/.test(worker));
 
+// --- Owlbear can actually read the manifest ---
+//
+// Owlbear fetches the manifest, and the action icon, from its own page. That is
+// cross-origin, so without an Access-Control-Allow-Origin header the browser
+// refuses to hand over a response that was served perfectly correctly, and the
+// install dialog reports "failed to fetch" with nothing else to go on. This is
+// the first thing anyone installing the extension hits, and the file being fine
+// over curl proves nothing about it.
+ok('the manifest is readable cross-origin',
+   /Access-Control-Allow-Origin/.test(worker) && /'\/manifest\.json'/.test(worker));
+ok('the action icon is readable cross-origin', /'\/icon\.svg'/.test(worker));
+ok('_headers grants the same', /Access-Control-Allow-Origin/.test(headers));
+// Only those two. The panel's own code has no reason to be fetchable by other
+// sites, and opening it wholesale would be a wider grant than anything needs.
+ok('CORS is limited to the files Owlbear reads',
+   /const PUBLIC = new Set\(\['\/manifest\.json', '\/icon\.svg'\]\)/.test(worker));
+ok('a preflight is answered', /OPTIONS/.test(worker));
+
 // --- the manifest ---
 
 ok('the manifest targets a known manifest version', manifest.manifest_version === 1);

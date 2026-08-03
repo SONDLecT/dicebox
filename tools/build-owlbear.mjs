@@ -205,18 +205,46 @@ const HEADERS = {
   'Content-Security-Policy': ${JSON.stringify(csp)},
 };
 
+// Owlbear reads these two from its own page, which is a different origin, so
+// the browser will not hand it the response without permission to. Without
+// this, installing the extension fails at the first step with "failed to
+// fetch" and no indication that the file was served perfectly well.
+//
+// Open to any origin rather than to Owlbear's, because these are the two files
+// whose entire purpose is to be read by somebody else, they contain nothing
+// that is not already public, and pinning to one host would break the moment
+// Owlbear fetched from a different one. Everything else on this origin stays
+// unreadable cross-origin.
+const PUBLIC = new Set(['/manifest.json', '/icon.svg']);
+
+// Never served stale past a redeploy: the manifest is how Owlbear decides what
+// the extension is, and the shell is what the panel opens.
+const FRESH = new Set(['/manifest.json', '/', '/index.html']);
+
 export default {
   async fetch(request, env) {
+    const path = new URL(request.url).pathname;
+
+    // A preflight never reaches the assets, so it is answered here. Owlbear's
+    // fetch is simple enough not to trigger one today; a stricter fetch later
+    // should not break installation.
+    if (request.method === 'OPTIONS' && PUBLIC.has(path)) {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+          'Access-Control-Max-Age': '86400',
+        },
+      });
+    }
+
     const res = await env.ASSETS.fetch(request);
     const headers = new Headers(res.headers);
     for (const [k, v] of Object.entries(HEADERS)) headers.set(k, v);
 
-    const path = new URL(request.url).pathname;
-    // The manifest is what Owlbear fetches to load the extension, and the shell
-    // is what the panel opens. Neither may be served stale past a redeploy.
-    if (path === '/manifest.json' || path === '/' || path === '/index.html') {
-      headers.set('Cache-Control', 'no-cache');
-    }
+    if (PUBLIC.has(path)) headers.set('Access-Control-Allow-Origin', '*');
+    if (FRESH.has(path)) headers.set('Cache-Control', 'no-cache');
 
     return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
   },
@@ -272,12 +300,17 @@ ${host ? `
   Referrer-Policy: no-referrer
   Content-Security-Policy: ${csp}
 
-# The manifest is read by Owlbear's servers rather than by the panel, and it is
-# the file people paste into the install dialog, so it must not be framed at all
-# and must not be cached past a version bump.
+# Read cross-origin by Owlbear when the extension is installed and when the
+# action icon is drawn. Without the CORS header the browser refuses to hand
+# Owlbear the response and installation fails with "failed to fetch", however
+# correctly the file was served.
 /manifest.json
   Cache-Control: no-cache
   Content-Type: application/json; charset=utf-8
+  Access-Control-Allow-Origin: *
+
+/icon.svg
+  Access-Control-Allow-Origin: *
 
 /index.html
   Cache-Control: no-cache
