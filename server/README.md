@@ -32,12 +32,49 @@ location /ws {
     proxy_set_header Connection "upgrade";
     proxy_set_header Origin $http_origin;
     proxy_read_timeout 120s;
+
+    # The room id is in the query string, and an access log keeps it forever.
+    # See "Turn off access logging" below — this line is not optional tidying.
+    access_log off;
 }
 ```
 
 `proxy_read_timeout` matters: the default 60 s is above the client's 25 s ping,
 but a proxy that idles sockets out faster than that will cause reconnect loops
 that look like relay flapping.
+
+### Turn off access logging
+
+The relay truncates room ids to eight characters everywhere it logs, and the
+Cloudflare deployment disables request logging outright, both for the same
+reason: a full room id in a file outlives the room it describes.
+
+A TLS terminator in front of the relay undoes that by default. The room id
+travels in the query string — it has to, because the hosted relay picks a
+Durable Object by name before the socket is accepted and there is no frame to
+read yet — so nginx's default `access_log` writes
+
+```
+127.0.0.1 - - [.. ] "GET /ws?room=3f8a...e21c HTTP/1.1" 101 ...
+```
+
+for every connection. That is the complete id, not the eight-character prefix,
+and it is enough to confirm a captured id or to reconstruct who played and when
+long after the room has evaporated. The relay's own promise about logging is
+kept; the proxy in front of it is what breaks it.
+
+`access_log off;` on the location is the fix. If you need the access log for
+operational reasons, strip the query string instead of keeping the line:
+
+```nginx
+log_format relay '$remote_addr - - [$time_local] "$request_method $uri" '
+                 '$status $body_bytes_sent';
+access_log /var/log/nginx/relay.log relay;
+```
+
+`$uri` is the path with the query string already removed; `$request` is not, and
+substituting one for the other is the whole difference. Caddy and Traefik log
+full URLs by default too, so the same applies to whatever you actually run.
 
 ## Configuration
 
@@ -139,6 +176,10 @@ Never logged: ciphertext, full room ids, IP addresses, message counts per room,
 or anything else client-derived. Log files outlive the rooms they describe, and
 a relay whose logs reconstruct who played and when has given away the thing the
 encryption was there to protect.
+
+This process keeps that promise on its own and cannot keep it for you: anything
+terminating TLS in front of it sees the room id in the request URL and will log
+it by default. See [Turn off access logging](#turn-off-access-logging).
 
 ## Limits and failure behaviour
 
