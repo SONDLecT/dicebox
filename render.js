@@ -405,8 +405,27 @@ const POINTED_LIMIT = 22;
 // banded drum is still readable here, while anything pointed is long gone.
 const MAX_FACETS = 120;
 
+// How fast a die tumbles when thrown, in radians per frame before decay.
+//
+// A constant, and it was not: the spin was seeded from throw speed, and throw
+// speed is `(homeX - x) * 2.4` — proportional to how far the die has to travel,
+// which is proportional to the width of the tray. So the same roll tumbled for
+// noticeably longer in a desktop window than in an Owlbear panel, purely
+// because the panel is smaller. How long an animation runs should not be a
+// function of the viewport it runs in.
+//
+// Distance still scales with the tray, which is right — a die in a small tray
+// has less ground to cover and should cross it in the same time. Only the
+// tumble is decoupled.
+const TUMBLE = 8.4;
+
 // How slowly a die must be travelling before its rotation is allowed to settle,
 // in pixels per second.
+//
+// Absolute rather than scaled to the die. Scaling it was tried, on the argument
+// that a 40px die at 60px/s is visually faster than a 96px one — true, and it
+// trades a small inconsistency for a worse one, because dice shrink as a
+// handful grows and the roll would then take longer the more dice were in it.
 //
 // This used to be 8, and it was the single reason the numeral took three
 // seconds to appear. The condition asks two questions — has it stopped moving,
@@ -651,11 +670,10 @@ export class Die {
 
   throwWith(vx, vy) {
     this.vx = vx; this.vy = vy;
-    const speed = Math.hypot(vx, vy);
     this.spin = [
-      (Math.random()-0.5) * 0.02 * speed + 0.15,
-      (Math.random()-0.5) * 0.02 * speed + 0.15,
-      (Math.random()-0.5) * 0.02 * speed,
+      (Math.random()-0.5) * TUMBLE + 0.15,
+      (Math.random()-0.5) * TUMBLE + 0.15,
+      (Math.random()-0.5) * TUMBLE,
     ];
     this.settling = false;
     this.settled = false;
