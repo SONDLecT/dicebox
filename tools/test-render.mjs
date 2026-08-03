@@ -600,6 +600,41 @@ ok('coincident dice separate cleanly',
   }
 
   {
+    // A roll is a fixed piece of choreography and must take the same time
+    // whatever the page is managing to render.
+    //
+    // It did not. Damping was applied once per frame while the rotation it
+    // damps was integrated per second, so a slow page rolled for longer in
+    // wall-clock terms: 1.9s at 60fps against 3.0s at 30. That turned out to be
+    // what "the dice roll for half as long in the Owlbear panel" was — the
+    // panel's canvas is a quarter of the desktop tray's area and reaches frame
+    // rates the desktop one does not.
+    const atRate = fps => {
+      const dt = Math.min(0.05, 1 / fps);
+      const times = [];
+      for (let i = 0; i < 40; i++) {
+        const d = thrown();
+        let f = 0;
+        for (; f < 3000; f++) {
+          beginFrame();
+          d.step(dt, BOUNDS);
+          if (d.numeralAlpha() >= 1) break;
+        }
+        times.push(f * dt * 1000);
+      }
+      times.sort((a, b) => a - b);
+      return times[Math.floor(times.length / 2)];
+    };
+
+    const rates = [120, 60, 30, 20].map(fps => ({ fps, ms: atRate(fps) }));
+    const fastest = Math.min(...rates.map(r => r.ms));
+    const slowest = Math.max(...rates.map(r => r.ms));
+    ok('a roll takes the same time at any frame rate',
+       slowest - fastest <= 250,
+       rates.map(r => `${r.fps}fps:${Math.round(r.ms)}ms`).join(' '));
+  }
+
+  {
     // Measured over a population rather than one die. Each throw seeds its own
     // random spin, so a single sample swings by hundreds of milliseconds and an
     // assertion on one is a coin flip — which is how the first version of this

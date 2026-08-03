@@ -2268,7 +2268,22 @@ const TUMBLE = 8.4;
 // between them is invisible.
 const SETTLE_SPEED = 60;
 
-// How fast a tumble decays, per frame.
+// How fast translation decays, per 1/60s. Applied as pow(DRAG, dt * 60), for
+// the reason spelled out on SPIN_DECAY.
+const DRAG = 0.94;
+
+// How fast a tumble decays, per 1/60s.
+//
+// Per *sixtieth of a second*, not per frame, and the difference is not
+// pedantic. Both decays used to be applied once per frame while the rotation
+// they damp was integrated per second — so how long a roll lasted depended on
+// how fast the page happened to be rendering. Measured: the same throw took
+// 1.9s at 60fps and 3.0s at 30, which is exactly the shape of "the dice roll
+// for half as long in the Owlbear panel" when the panel's canvas is a quarter
+// of the area and hits frame rates the desktop tray does not.
+//
+// A roll is a fixed piece of choreography. It should take the same time on a
+// phone, on a desktop, and in a 374px panel.
 //
 // Named because two things now depend on it, and because it is the number that
 // decides how long a die spins. It is deliberately separate from the 0.94 that
@@ -2627,8 +2642,13 @@ class Die {
     if (!this.settling) {
       this.x += this.vx * dt;
       this.y += this.vy * dt;
-      this.vx *= 0.94;
-      this.vy *= 0.94;
+
+      // Damping raised to the frame's share of a 60fps step, rather than
+      // applied once per frame. See DRAG.
+      const frames = dt * 60;
+      const drag = Math.pow(DRAG, frames);
+      this.vx *= drag;
+      this.vy *= drag;
 
       const r = this.size * 0.55;
       if (this.x < bounds.left + r) { this.x = bounds.left + r; this.vx = Math.abs(this.vx) * 0.55; }
@@ -2636,9 +2656,10 @@ class Die {
       if (this.y < bounds.top + r) { this.y = bounds.top + r; this.vy = Math.abs(this.vy) * 0.55; }
       if (this.y > bounds.floor - r) { this.y = bounds.floor - r; this.vy = -Math.abs(this.vy) * 0.55; }
 
+      const slow = Math.pow(SPIN_DECAY, frames);
       for (let i = 0; i < 3; i++) {
-        this.rot[i] += this.spin[i] * dt * 60;
-        this.spin[i] *= SPIN_DECAY;
+        this.rot[i] += this.spin[i] * frames;
+        this.spin[i] *= slow;
       }
 
       // Ease toward the slot the layout assigned, so dice spread out instead of
