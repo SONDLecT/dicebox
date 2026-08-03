@@ -127,12 +127,21 @@ ok('the reading size is read through the storage guard',
 // encrypting code and reships it on every load. The default wording must
 // therefore be the served-copy one, and the stronger claim must be reachable
 // only behind the file: check.
-const note = html.match(/<p class="room-note" id="roomNote">([\s\S]*?)<\/p>/)?.[1] || '';
+// Whitespace-normalised before matching. The note is wrapped for the source
+// file, so a phrase can straddle a line break and a naive regex then reports a
+// missing claim that is plainly there — which is a test failing on formatting
+// while the thing it guards is fine.
+const note = (html.match(/<p class="room-note" id="roomNote">([\s\S]*?)<\/p>/)?.[1] || '')
+  .replace(/\s+/g, ' ').trim();
 ok('the room note exists', note.length > 0);
 ok('the default note names the serving party as trusted',
-   /trusting whoever serves it/.test(note));
+   /trusting whoever serves/.test(note), note);
 ok('the default note points at the single file or self-hosting',
-   /single file/.test(note) && /self-host/.test(note));
+   /single file/.test(note) && /self-host/.test(note), note);
+// Short enough that the create and join controls are reachable without
+// scrolling. The Owlbear panel is the constraint: it is a fixed popover, and a
+// wall of text there pushed the copy buttons off the bottom.
+ok('the note stays short enough for a panel', note.length <= 320, `${note.length} chars`);
 ok('the default note claims nothing stronger than ciphertext for the relay',
    !/cannot see/.test(note) && !/on your disk/.test(note));
 ok('the note says rolls are self-reported', /reports its own rolls/.test(note));

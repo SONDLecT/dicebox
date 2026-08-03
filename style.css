@@ -1163,8 +1163,28 @@ body {
   color: var(--accent);
   word-spacing: 0.3em;
   word-break: break-word;
+  cursor: pointer;
+  /* `all` rather than `text`: one tap takes the whole phrase, which is what
+     anyone highlighting it wants, and a partial passphrase is never useful. */
   user-select: all;
   -webkit-user-select: all;
+}
+.room-phrase:hover { opacity: 0.8; }
+
+/* The confirmation. A brief lift and a fade rather than a colour change: the
+   words are already the accent colour, so there is nothing for a colour change
+   to say. */
+.room-phrase[data-copied] { animation: phrase-copied 700ms ease; }
+
+@keyframes phrase-copied {
+  0%   { opacity: 1;    transform: none; }
+  14%  { opacity: 0.35; transform: scale(1.04); }
+  46%  { opacity: 1;    transform: scale(1.01); }
+  100% { opacity: 1;    transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .room-phrase[data-copied] { animation-duration: 1ms; }
 }
 
 .room-actions {

@@ -1710,11 +1710,9 @@ const roomNameField = $('roomName');
 // reaches this line still tells the truth.
 if (location.protocol === 'file:') {
   $('roomNote').textContent =
-    'Rolls are encrypted with the passphrase before they leave your device, ' +
-    'so the relay only ever sees ciphertext and holds nothing once everyone ' +
-    'has gone. This copy is the file on your disk, so the encrypting code ' +
-    'cannot change under you. Each player’s device reports its own rolls, ' +
-    'so a modified client could report anything.';
+    'Encrypted before it leaves your device — the relay only ever sees ' +
+    'ciphertext. This copy is the file on your disk, so the code cannot ' +
+    'change under you. Each device reports its own rolls.';
 }
 
 // The passphrase for the room currently joined, kept so the copy buttons work
@@ -1879,7 +1877,17 @@ function showRoomState(next, info) {
     line.textContent = info.detail || 'Could not connect. Rolls stay on this device.';
   } else {
     line.textContent = '';
-    roomPhrase = null;
+    // Cleared only when the room actually ended — an expiry, a refusal — and
+    // not on every 'offline'.
+    //
+    // join() leaves the previous room before starting, so a plain 'offline'
+    // with no code arrives in the middle of joining: the sequence is
+    // offline -> connecting -> live. Clearing here unconditionally wiped the
+    // passphrase that enterRoom had just stored, and the live view then
+    // rendered "The passphrase" above nothing at all. The copy buttons still
+    // worked, because the promise put it back a moment later, which is what
+    // made it look like a display bug rather than a lifecycle one.
+    if (info && info.code) roomPhrase = null;
   }
 }
 
@@ -1986,11 +1994,42 @@ const shareLink = () => roomPhrase
   ? location.origin + location.pathname + '#' + roomPhrase
   : '';
 
-for (const id of ['roomCopyPhrase', 'roomCopyPhrase2']) {
-  $(id).addEventListener('click', e => copyFeedback(e.currentTarget, roomPhrase));
-}
 for (const id of ['roomCopyLink', 'roomCopyLink2']) {
   $(id).addEventListener('click', e => copyFeedback(e.currentTarget, shareLink()));
+}
+
+// Tapping the passphrase copies it.
+//
+// A button labelled "Copy words" sitting under words you cannot copy by
+// tapping is the wrong way round — the words are the thing, and the obvious
+// gesture should be the one that works. They stay selectable, because reading
+// a passphrase aloud and dragging across it are both real ways to use it.
+//
+// The pulse is the whole confirmation. Swapping the words for "Copied" would
+// hide the one thing on screen worth looking at, and the panel is short of
+// room as it is.
+function copyPhrase(el) {
+  if (!roomPhrase) return;
+  navigator.clipboard.writeText(roomPhrase).then(() => {
+    el.dataset.copied = '1';
+    // Removed on a timer rather than on animationend: two taps inside the
+    // window would otherwise leave the attribute set with no animation
+    // running, and the next tap would do nothing visible at all.
+    setTimeout(() => { delete el.dataset.copied; }, 700);
+  }).catch(() => {
+    // Clipboard access can be refused outright, and there is nothing useful to
+    // say about it while the words are already on screen to be read.
+  });
+}
+
+for (const id of ['roomPhrase', 'roomPhraseLive']) {
+  const el = $(id);
+  el.addEventListener('click', () => copyPhrase(el));
+  el.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    copyPhrase(el);
+  });
 }
 
 // A link with a passphrase in the fragment joins the room. Tapping a link

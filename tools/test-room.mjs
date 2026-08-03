@@ -867,5 +867,35 @@ const sampleRoll = {
   r.leave();
 }
 
+// --- what a join emits, which app.js depends on ---
+//
+// join() leaves any previous room before it starts, and leave() announces
+// 'offline'. So a single successful join emits offline -> connecting -> live,
+// and the offline carries no code because nothing went wrong.
+//
+// app.js stores the passphrase before joining so the live view can show it, and
+// used to clear it on any 'offline' — so the phrase was wiped mid-join and the
+// panel rendered "The passphrase" above an empty line. The copy buttons still
+// worked, because the join promise restored it a moment later, which is exactly
+// what made it read as a display bug instead of a lifecycle one.
+//
+// Asserted here rather than in app.js because it is room.js's sequence that
+// makes the rule necessary: anything reacting to 'offline' has to be able to
+// tell a room ending from a join beginning, and the code field is the only
+// thing that distinguishes them.
+{
+  const { r, events } = await liveRoom();
+  const states = events.states.map(e => e.s);
+  ok('a join announces offline before it connects', states.includes('offline'), states.join(' -> '));
+  ok('a join reaches live', states.includes('live'), states.join(' -> '));
+
+  const offline = events.states.filter(e => e.s === 'offline');
+  ok('an offline is emitted at all', offline.length > 0);
+  ok('the offline emitted while joining carries no code',
+     offline.every(e => !(e.info && e.info.code)),
+     JSON.stringify(offline));
+  r.leave();
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

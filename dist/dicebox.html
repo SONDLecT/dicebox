@@ -1190,8 +1190,28 @@ body {
   color: var(--accent);
   word-spacing: 0.3em;
   word-break: break-word;
+  cursor: pointer;
+  /* `all` rather than `text`: one tap takes the whole phrase, which is what
+     anyone highlighting it wants, and a partial passphrase is never useful. */
   user-select: all;
   -webkit-user-select: all;
+}
+.room-phrase:hover { opacity: 0.8; }
+
+/* The confirmation. A brief lift and a fade rather than a colour change: the
+   words are already the accent colour, so there is nothing for a colour change
+   to say. */
+.room-phrase[data-copied] { animation: phrase-copied 700ms ease; }
+
+@keyframes phrase-copied {
+  0%   { opacity: 1;    transform: none; }
+  14%  { opacity: 0.35; transform: scale(1.04); }
+  46%  { opacity: 1;    transform: scale(1.01); }
+  100% { opacity: 1;    transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .room-phrase[data-copied] { animation-duration: 1ms; }
 }
 
 .room-actions {
@@ -1469,14 +1489,9 @@ body {
                claiming a guarantee the README explicitly says it does not
                offer. -->
           <p class="room-note" id="roomNote">
-            Rolls are encrypted with the passphrase before they leave your
-            device, so the relay only ever sees ciphertext and holds nothing
-            once everyone has gone. This copy was served over the network, so
-            you are also trusting whoever serves it to keep sending honest code
-            — the app updates itself on every load. Download the single file, or
-            self-host, for a guarantee that does not rest on that. Either way
-            each player's device reports its own rolls, so a modified client
-            could report anything.
+            Encrypted before it leaves your device — the relay only ever sees
+            ciphertext. You are trusting whoever serves this copy; the single
+            file and self-hosting are not. Each device reports its own rolls.
           </p>
           <p class="room-note room-note-more">
             <a href="https://github.com/SONDLecT/dicebox#what-the-privacy-actually-is"
@@ -1494,9 +1509,12 @@ body {
                rather than a wall of empty fields. -->
           <div class="room-made" id="roomMade" hidden>
             <p class="room-label">Your passphrase</p>
-            <p class="room-phrase" id="roomPhrase"></p>
+            <!-- Tapping the words copies them. They stay selectable, because
+                 reading them out and highlighting them by hand are both things
+                 people do with a passphrase. -->
+            <p class="room-phrase" id="roomPhrase" role="button" tabindex="0"
+               title="Tap to copy"></p>
             <div class="room-actions">
-              <button type="button" class="ghost" id="roomCopyPhrase">Copy words</button>
               <button type="button" class="ghost" id="roomCopyLink">Copy link</button>
             </div>
             <p class="room-hint">
@@ -1523,7 +1541,8 @@ body {
                two the connection took and then vanished, leaving two copy
                buttons and no way to read what they would copy. -->
           <p class="room-label">The passphrase</p>
-          <p class="room-phrase" id="roomPhraseLive"></p>
+          <p class="room-phrase" id="roomPhraseLive" role="button" tabindex="0"
+             title="Tap to copy"></p>
 
           <label class="room-label" for="roomName">You are</label>
           <input id="roomName" type="text" autocomplete="off" maxlength="32"
@@ -1533,7 +1552,6 @@ body {
           <ul class="room-roster" id="roomRoster"></ul>
 
           <div class="room-actions">
-            <button type="button" class="ghost" id="roomCopyPhrase2">Copy words</button>
             <button type="button" class="ghost" id="roomCopyLink2">Copy link</button>
             <button type="button" class="ghost room-leave" id="roomLeave">Leave</button>
           </div>
@@ -5953,11 +5971,9 @@ const roomNameField = $('roomName');
 // reaches this line still tells the truth.
 if (location.protocol === 'file:') {
   $('roomNote').textContent =
-    'Rolls are encrypted with the passphrase before they leave your device, ' +
-    'so the relay only ever sees ciphertext and holds nothing once everyone ' +
-    'has gone. This copy is the file on your disk, so the encrypting code ' +
-    'cannot change under you. Each player’s device reports its own rolls, ' +
-    'so a modified client could report anything.';
+    'Encrypted before it leaves your device — the relay only ever sees ' +
+    'ciphertext. This copy is the file on your disk, so the code cannot ' +
+    'change under you. Each device reports its own rolls.';
 }
 
 // The passphrase for the room currently joined, kept so the copy buttons work
@@ -6122,7 +6138,17 @@ function showRoomState(next, info) {
     line.textContent = info.detail || 'Could not connect. Rolls stay on this device.';
   } else {
     line.textContent = '';
-    roomPhrase = null;
+    // Cleared only when the room actually ended — an expiry, a refusal — and
+    // not on every 'offline'.
+    //
+    // join() leaves the previous room before starting, so a plain 'offline'
+    // with no code arrives in the middle of joining: the sequence is
+    // offline -> connecting -> live. Clearing here unconditionally wiped the
+    // passphrase that enterRoom had just stored, and the live view then
+    // rendered "The passphrase" above nothing at all. The copy buttons still
+    // worked, because the promise put it back a moment later, which is what
+    // made it look like a display bug rather than a lifecycle one.
+    if (info && info.code) roomPhrase = null;
   }
 }
 
@@ -6229,11 +6255,42 @@ const shareLink = () => roomPhrase
   ? location.origin + location.pathname + '#' + roomPhrase
   : '';
 
-for (const id of ['roomCopyPhrase', 'roomCopyPhrase2']) {
-  $(id).addEventListener('click', e => copyFeedback(e.currentTarget, roomPhrase));
-}
 for (const id of ['roomCopyLink', 'roomCopyLink2']) {
   $(id).addEventListener('click', e => copyFeedback(e.currentTarget, shareLink()));
+}
+
+// Tapping the passphrase copies it.
+//
+// A button labelled "Copy words" sitting under words you cannot copy by
+// tapping is the wrong way round — the words are the thing, and the obvious
+// gesture should be the one that works. They stay selectable, because reading
+// a passphrase aloud and dragging across it are both real ways to use it.
+//
+// The pulse is the whole confirmation. Swapping the words for "Copied" would
+// hide the one thing on screen worth looking at, and the panel is short of
+// room as it is.
+function copyPhrase(el) {
+  if (!roomPhrase) return;
+  navigator.clipboard.writeText(roomPhrase).then(() => {
+    el.dataset.copied = '1';
+    // Removed on a timer rather than on animationend: two taps inside the
+    // window would otherwise leave the attribute set with no animation
+    // running, and the next tap would do nothing visible at all.
+    setTimeout(() => { delete el.dataset.copied; }, 700);
+  }).catch(() => {
+    // Clipboard access can be refused outright, and there is nothing useful to
+    // say about it while the words are already on screen to be read.
+  });
+}
+
+for (const id of ['roomPhrase', 'roomPhraseLive']) {
+  const el = $(id);
+  el.addEventListener('click', () => copyPhrase(el));
+  el.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    copyPhrase(el);
+  });
 }
 
 // A link with a passphrase in the fragment joins the room. Tapping a link
