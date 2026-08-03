@@ -266,43 +266,125 @@ function prismBarrel(n) {
 //
 // That is what makes a legible d100 possible: not fewer facets, but facets that
 // do not all run to a point.
-function drum(around, bands, profile = 1) {
+// A solid of revolution, built from a stack of rings.
+//
+// `rings` is [[radius, height], …] read top to bottom, so the silhouette is an
+// argument rather than a formula. A band between two aligned rings is a planar
+// quad however odd the profile: its two edges are parallel segments, and two
+// parallel lines always share a plane.
+//
+// Staggered rings have to be triangulated. A quad spanning a half-step offset
+// is not flat, and non-planar faces are what made an earlier attempt at
+// staggered rows draw as holes — the front/back edge test misclassified them.
+// Triangles are planar by definition, so the stagger is safe this way round.
+function ringSolid(rings, around, opts = {}) {
+  const { stagger = false, caps = 'point', apex = 0.24 } = opts;
   const verts = [];
-  const rows = [];
 
-  // `profile` shapes the silhouette so drums of similar density stay tellable
-  // apart: below 1 it barrels outward, above 1 it pinches toward the poles.
+  const rows = rings.map(([r, y], k) => {
+    const off = stagger && k % 2 ? 0.5 : 0;
+    const row = [];
+    for (let i = 0; i < around; i++) {
+      const a = ((i + off) / around) * TAU;
+      row.push(verts.push([Math.cos(a) * r, y, Math.sin(a) * r]) - 1);
+    }
+    return row;
+  });
+
+  const faces = [];
+  for (let k = 0; k < rows.length - 1; k++) {
+    const A = rows[k], B = rows[k + 1];
+    for (let i = 0; i < around; i++) {
+      const j = (i + 1) % around;
+      if (!stagger) {
+        faces.push([A[i], A[j], B[j], B[i]]);
+      } else if (k % 2 === 0) {
+        faces.push([A[i], A[j], B[i]]);
+        faces.push([B[i], A[j], B[j]]);
+      } else {
+        faces.push([A[i], A[j], B[j]]);
+        faces.push([A[i], B[j], B[i]]);
+      }
+    }
+  }
+
+  const top = rows[0], bottom = rows[rows.length - 1];
+  if (caps === 'flat') {
+    // One polygon each end. Every vertex shares a height, so it is planar, and
+    // it gives a drum square ends instead of points.
+    faces.push([...top].reverse());
+    faces.push([...bottom]);
+  } else {
+    const tip = verts.push([0, rings[0][1] + apex, 0]) - 1;
+    const toe = verts.push([0, rings[rings.length - 1][1] - apex, 0]) - 1;
+    for (let i = 0; i < around; i++) {
+      const j = (i + 1) % around;
+      faces.push([tip, top[j], top[i]]);
+      faces.push([toe, bottom[i], bottom[j]]);
+    }
+  }
+
+  return normalize({ verts, faces });
+}
+
+// How many faces a given configuration comes to. Kept beside the generator
+// because the budget arithmetic has been wrong once already, and it was wrong
+// by exactly the caps.
+//
+// `spiked` is a kis pass, which replaces every face with a fan of triangles —
+// one per edge — so the count becomes the sum of the face lengths.
+function ringFaces(around, bands, stagger, caps, spiked) {
+  const bandFaces = stagger ? 2 * around * bands : around * bands;
+  const bandEdges = stagger ? 3 : 4;
+  const capFaces = caps === 'flat' ? 2 : 2 * around;
+  const capEdges = caps === 'flat' ? around : 3;
+  return spiked
+    ? bandFaces * bandEdges + capFaces * capEdges
+    : bandFaces + capFaces;
+}
+
+// The silhouette families. Each maps a height t, running +1 at the top to -1 at
+// the bottom, to a radius. These are what stop every large die reading as the
+// same barrel: before they existed, three quarters of the dice above d22 stood
+// between 0.86 and 0.87 as tall as they were wide.
+const PROFILES = {
+  // The original: a sphere sliced into rings.
+  round:   { r: t => Math.sqrt(Math.max(0.05, 1 - (t * 1.05) ** 2)), h: 0.62, apex: 0.24 },
+  // Nearly straight sides, faintly swollen at the equator.
+  barrel:  { r: t => 0.86 + 0.14 * (1 - t * t), h: 0.78, apex: 0.10 },
+  // Pinched in the middle, like two cones meeting.
+  waisted: { r: t => 0.52 + 0.48 * t * t, h: 0.66, apex: 0.30 },
+  // Wide at the bottom, narrowing all the way up.
+  cone:    { r: t => 0.30 + 0.70 * (1 - t) / 2, h: 0.80, apex: 0.16 },
+  // Asymmetric: a rounded shoulder over a broad base.
+  bell:    { r: t => Math.pow(Math.max(0.05, (1 - t) / 2), 0.5), h: 0.70, apex: 0.14 },
+  // Alternating wide and narrow rings, so the side steps in and out.
+  lantern: { r: (t, k) => (k % 2 ? 0.74 : 1), h: 0.60, apex: 0.26 },
+};
+
+const PROFILE_NAMES = Object.keys(PROFILES);
+
+function profileRings(name, bands) {
+  const { r, h } = PROFILES[name];
+  const rings = [];
+  for (let k = 0; k <= bands; k++) {
+    const t = bands === 0 ? 0 : 1 - (2 * k) / bands;
+    rings.push([Math.max(0.05, r(t, k)), t * h]);
+  }
+  return rings;
+}
+
+// The original drum, now one profile among several. Kept as its own function
+// because drumWithFaces needs the exact `around * (bands + 2)` face count that
+// aligned rings with pointed caps give, and reads better saying so.
+function drum(around, bands, profile = 1) {
+  const rings = [];
   for (let k = 0; k <= bands; k++) {
     const y = 0.62 - (1.24 * k) / bands;
     const r = Math.pow(Math.max(0.05, 1 - (y * 1.05) ** 2), 0.5 * profile);
-    const row = [];
-    for (let i = 0; i < around; i++) {
-      const a = (i / around) * TAU;
-      row.push(verts.push([Math.cos(a) * r, y, Math.sin(a) * r]) - 1);
-    }
-    rows.push(row);
+    rings.push([r, y]);
   }
-
-  const apexTop = verts.push([0, 0.86, 0]) - 1;
-  const apexBot = verts.push([0, -0.86, 0]) - 1;
-
-  // Rings are aligned rather than staggered, and the band faces are trapezoids
-  // whose four corners share a plane. Staggering the rows looked more like a
-  // real many-sided die but made every quad non-planar, and the front/back edge
-  // test then misclassified edges — which drew as holes in the mesh.
-  const faces = [];
-  for (let k = 0; k < bands; k++) {
-    for (let i = 0; i < around; i++) {
-      const j = (i + 1) % around;
-      faces.push([rows[k][i], rows[k][j], rows[k + 1][j], rows[k + 1][i]]);
-    }
-  }
-  for (let i = 0; i < around; i++) {
-    const j = (i + 1) % around;
-    faces.push([apexTop, rows[0][j], rows[0][i]]);
-    faces.push([apexBot, rows[bands][i], rows[bands][j]]);
-  }
-  return normalize({ verts, faces });
+  return ringSolid(rings, around, { apex: 0.24 });
 }
 
 function normalize(solid) {
@@ -501,53 +583,163 @@ function drumWithRemainder(total, profile) {
   return { verts, faces: [...quads, ...tris] };
 }
 
+// --- shapes that are not solids of revolution ---
+//
+// Everything above stacks rings around one axis, which is why a waisted drum
+// and a barrel drum still read as the same object: same silhouette family,
+// different proportions. These three leave it.
+
+// Conway's kis: raise a pyramid on every face.
+//
+// Fifteen lines, and it turns any seed into something obviously different — a
+// cube becomes a tetrakis hexahedron, an icosahedron a triakis icosahedron.
+// Every new face is a triangle, so planarity is free.
+function kis(solid, height = 0.26) {
+  const verts = solid.verts.map(v => v.slice());
+  const faces = [];
+  for (const f of solid.faces) {
+    const c = f.reduce((a, i) => [
+      a[0] + solid.verts[i][0], a[1] + solid.verts[i][1], a[2] + solid.verts[i][2],
+    ], [0, 0, 0]).map(x => x / f.length);
+    const len = Math.hypot(...c) || 1;
+    const apex = verts.push(c.map(x => (x / len) * (len + height))) - 1;
+    for (let i = 0; i < f.length; i++) faces.push([apex, f[i], f[(i + 1) % f.length]]);
+  }
+  return normalize({ verts, faces });
+}
+
+// Geodesic subdivision: split each triangle into freq² and push the result out
+// to the sphere. A triangulated ball, which reads nothing like a drum. Face
+// count is base × freq², so an icosahedron at frequency 2 is 80.
+function geodesic(base, freq) {
+  const verts = [];
+  const index = new Map();
+  const at = p => {
+    const n = Math.hypot(...p) || 1;
+    const q = [p[0] / n, p[1] / n, p[2] / n];
+    // Deduplicated by rounded position: adjacent triangles share their edges,
+    // and without this every seam would be a crack in the mesh.
+    const key = q.map(x => x.toFixed(6)).join(',');
+    if (index.has(key)) return index.get(key);
+    const i = verts.push(q) - 1;
+    index.set(key, i);
+    return i;
+  };
+  const lerp = (P, Q, s) => [
+    P[0] + (Q[0] - P[0]) * s, P[1] + (Q[1] - P[1]) * s, P[2] + (Q[2] - P[2]) * s];
+
+  const faces = [];
+  for (const f of base.faces) {
+    if (f.length !== 3) continue;
+    const [A, B, C] = f.map(i => base.verts[i]);
+    const grid = [];
+    for (let i = 0; i <= freq; i++) {
+      const P = lerp(A, B, i / freq), Q = lerp(A, C, i / freq);
+      const row = [];
+      for (let j = 0; j <= i; j++) row.push(at(i === 0 ? A : lerp(P, Q, j / i)));
+      grid.push(row);
+    }
+    for (let i = 0; i < freq; i++) {
+      for (let j = 0; j <= i; j++) {
+        faces.push([grid[i][j], grid[i + 1][j], grid[i + 1][j + 1]]);
+        if (j < i) faces.push([grid[i][j], grid[i + 1][j + 1], grid[i][j + 1]]);
+      }
+    }
+  }
+  return normalize({ verts, faces });
+}
+
+// Every ring configuration worth considering, built once. Profile is chosen
+// separately, so this is only the density and construction axes.
+const RING_CONFIGS = (() => {
+  const out = [];
+  for (const spiked of [false, true]) {
+    for (const stagger of [false, true]) {
+      for (const caps of ['point', 'flat']) {
+        for (let bands = 2; bands <= 6; bands++) {
+          for (let around = 5; around <= 30; around++) {
+            out.push({
+              around, bands, stagger, caps, spiked,
+              faces: ringFaces(around, bands, stagger, caps, spiked),
+            });
+          }
+        }
+      }
+    }
+  }
+  return out;
+})();
+
+// The non-revolution shapes, with the face count each comes to. Built lazily,
+// because geodesic subdivision is the one expensive thing in this file and most
+// sessions never roll a die that reaches it.
+let SOLID_FAMILIES = null;
+function solidFamilies() {
+  if (SOLID_FAMILIES) return SOLID_FAMILIES;
+  const seeds = { tetra: tetra(), cube: cube(), octa: octa(), dodeca: dodeca(), icosa: icosa() };
+  const made = [
+    () => kis(seeds.cube),            // tetrakis hexahedron, 24
+    () => kis(seeds.octa),            // triakis octahedron, 24
+    () => kis(seeds.dodeca),          // pentakis dodecahedron, 60
+    () => kis(seeds.icosa),           // triakis icosahedron, 60
+    () => kis(kis(seeds.tetra)),      // 36
+    () => geodesic(seeds.tetra, 3),   // 36
+    () => geodesic(seeds.tetra, 4),   // 64
+    () => geodesic(seeds.tetra, 5),   // 100
+    () => geodesic(seeds.octa, 2),    // 32
+    () => geodesic(seeds.octa, 3),    // 72
+    () => geodesic(seeds.icosa, 2),   // 80
+  ];
+  SOLID_FAMILIES = made.map(fn => {
+    const solid = fn();
+    return { solid, faces: solid.faces.length };
+  });
+  return SOLID_FAMILIES;
+}
+
 function largeSolid(sides, budget = MAX_FACETS) {
   const digitSum = String(sides).split('').reduce((a, c) => a + Number(c), 0);
+
+  // Every third die takes a shape that is not a solid of revolution, so a run
+  // of large dice is broken up by something with a different construction
+  // rather than another barrel at a different width.
+  if ((sides + digitSum) % 3 === 0) {
+    const pool = solidFamilies().filter(f => f.faces <= budget);
+    if (pool.length) return pool[(sides * 5 + digitSum) % pool.length].solid;
+  }
 
   // Detail still grows with the die, so a d900 reads as denser than a d130,
   // and stops growing at the budget the render size can carry.
   const target = Math.min(budget, Math.round(sides * 0.8));
 
-  // Every ring/column split that lands inside the budget, rather than one
-  // divisor guess.
-  //
-  // This used to compute `around = round(target / (bands + 1))` and clamp it to
-  // 22. A drum's face count is `around * (bands + 2)` — the two caps contribute
-  // a ring of triangles each — so the estimate was wrong in both directions: it
-  // overshot the budget at four bands (132 facets against 120) and, because the
-  // clamp bit for every die above about d150, it collapsed the entire range on
-  // to three shapes. 875 of the 880 dice from d121 to d1000 drew as one of
-  // three drums.
-  const all = [];
-  for (let bands = 2; bands <= 6; bands++) {
-    for (let around = 5; around <= 30; around++) {
-      all.push({ around, bands, faces: around * (bands + 2) });
-    }
-  }
+  // Silhouette first, and on its own axis, so neighbours differ in outline
+  // rather than only in how finely they are divided. Chosen from the die's own
+  // arithmetic, so a d47 is always the same d47.
+  const profile = PROFILE_NAMES[(sides + digitSum) % PROFILE_NAMES.length];
 
-  // A floor as well as a ceiling: a shape well under budget looks coarse next
-  // to its neighbours for no reason.
-  let fits = all.filter(f => f.faces <= target && f.faces >= target * 0.7);
+  // Then the density and construction that fit the budget. A floor as well as a
+  // ceiling: a shape well under budget looks coarse beside its neighbours for
+  // no reason.
+  let fits = RING_CONFIGS.filter(c => c.faces <= target && c.faces >= target * 0.7);
 
-  // The smallest drum there is has five columns and two bands, so twenty
-  // facets, and the budget at the smallest render size is eighteen. Nothing can
-  // satisfy it. Take the coarsest shapes available and still vary among them,
-  // because collapsing every large die on to one 20-facet drum is the failure
-  // this function is being fixed for.
+  // The smallest ring solid there is has twenty facets, and the budget at the
+  // smallest render size is eighteen, so nothing can satisfy it. Take the
+  // coarsest available and still vary among them, because collapsing every
+  // large die on to one shape is the failure this function exists to avoid.
   if (!fits.length) {
-    const floor = Math.min(...all.map(f => f.faces));
-    fits = all.filter(f => f.faces <= floor * 1.6);
+    const floor = Math.min(...RING_CONFIGS.map(c => c.faces));
+    fits = RING_CONFIGS.filter(c => c.faces <= floor * 1.6);
   }
 
-  // Chosen by the die's own arithmetic, so a d47 is always the same d47 and
-  // neighbours land on different splits.
-  const { around, bands } = fits[(sides * 7 + digitSum) % fits.length];
-
-  // The silhouette parameter drum() has always taken and this never passed.
-  // Same derivation drumWithFaces uses, so the two ranges agree about what a
-  // die of a given number looks like: below 1 barrels outward, above 1 pinches.
-  const profile = 0.62 + ((sides % 7) / 6) * 0.76;
-  return drum(around, bands, profile);
+  const pick = fits[(sides * 7 + digitSum) % fits.length];
+  const solid = ringSolid(profileRings(profile, pick.bands), pick.around, {
+    stagger: pick.stagger,
+    caps: pick.caps,
+    apex: PROFILES[profile].apex,
+  });
+  // A kis pass turns a drum into a ball of spikes, which is the cheapest way
+  // out of the ring silhouette: same generator, nothing like the same object.
+  return pick.spiked ? kis(solid, 0.18) : solid;
 }
 
 // Detail is capped by how large the die is actually drawn, not just by its side
