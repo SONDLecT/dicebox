@@ -1169,10 +1169,29 @@ body {
   margin-right: 6px;
 }
 
+/* Your own name, once a room makes it worth showing. Deliberately not the
+   accent colour: every line in the log carries a name now, so if yours were
+   painted like a peer's there would be no difference left for the accent to
+   carry and the strip would read as one undifferentiated block. Quiet enough
+   to be a label, loud enough to answer "which of these are mine". */
+.log-who[data-self] {
+  color: var(--muted);
+  opacity: 0.75;
+}
+
 .log li[data-remote] {
   border-left: 2px solid var(--accent);
   padding-left: 6px;
   margin-left: -8px;
+}
+
+/* Same rule in the full history, but paid for out of the existing padding
+   rather than a negative margin: these rows are inside a panel with an edge, so
+   pulling them left would hang them off it. 6px + a 2px border lands the text
+   exactly where an unmarked row's text sits. */
+.history-full li[data-remote] {
+  border-left: 2px solid var(--accent);
+  padding-left: 6px;
 }
 
 :where(button, input):focus-visible {

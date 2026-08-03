@@ -296,7 +296,7 @@ function finish(result) {
   delete $('total').dataset.idle;
   $('total').textContent = String(result.total);
   $('breakdown').textContent = describe(result.groups);
-  addHistory(result);
+  addHistory(result, selfName(), true);
   // After addHistory, so a throw in room code could not cost the local roll its
   // place in the log. share() is synchronous and a no-op when there is no room,
   // which is what keeps this line off the critical path.
@@ -310,13 +310,30 @@ function finish(result) {
 const HISTORY_LIMIT = 500;
 const history = [];
 
+// Your own display name, but only while a room is live. Rolling alone, a log
+// that labelled every line with your own name would be noise — "who rolled
+// this" is not a question that exists until someone else can.
+//
+// Read per roll rather than stamped once, so renaming yourself mid-session
+// labels what follows and leaves what came before alone. That matches how a
+// peer's name is captured: as it was at the moment of the roll.
+function selfName() {
+  return roomLink.state === 'live' ? roomLink.name : null;
+}
+
 // `who` is carried into the export as well as the display: a session log that
 // silently merged everyone's rolls into one column would be useless for the
 // question people actually ask of it afterwards.
-function recordRoll(result, who = null) {
+//
+// `mine` is separate from `who` rather than inferred from it. Both your rolls
+// and a peer's now carry a name, so the name can no longer be the thing that
+// says whose roll it was, and the log's left rule and the export's 'you' both
+// depend on knowing.
+function recordRoll(result, who = null, mine = false) {
   history.push({
     at: new Date().toISOString(),
     who,
+    mine,
     notation: result.notation,
     total: result.total,
     detail: describe(result.groups),
@@ -334,14 +351,15 @@ function recordRoll(result, who = null) {
   $('historyCount').textContent = history.length > 12 ? `${history.length} rolls` : '';
 }
 
-// `who` is the display name when the roll came from someone else in the room,
-// and null for your own. It only ever reaches the DOM through textContent — the
-// name is whatever a peer put in a payload, and rendering that as markup would
-// be a real bug even among friends.
-function addHistory(result, who = null) {
-  recordRoll(result, who);
+// `who` is the display name on the roll — yours while a room is live, the
+// sender's when it came from someone else, and null when rolling alone. It only
+// ever reaches the DOM through textContent — the name is whatever a peer put in
+// a payload, and rendering that as markup would be a real bug even among
+// friends.
+function addHistory(result, who = null, mine = false) {
+  recordRoll(result, who, mine);
   const li = document.createElement('li');
-  if (who) li.dataset.remote = '1';
+  if (who && !mine) li.dataset.remote = '1';
 
   const top = document.createElement('div');
   top.className = 'log-line';
@@ -350,6 +368,10 @@ function addHistory(result, who = null) {
   if (who) {
     const by = document.createElement('span');
     by.className = 'log-who';
+    // Your own name is marked so it can be quieter than a peer's. Painting
+    // every line in the accent colour would leave nothing standing out, which
+    // is the opposite of what naming your own rolls was asked for.
+    if (mine) by.dataset.self = '1';
     by.textContent = who;
     label.append(by);
   }
@@ -777,6 +799,7 @@ function openHistory() {
   // Newest first: the roll you are asking about is usually the last one.
   for (const entry of [...history].reverse()) {
     const li = document.createElement('li');
+    if (entry.who && !entry.mine) li.dataset.remote = '1';
 
     const line = document.createElement('div');
     line.className = 'log-line';
@@ -792,6 +815,7 @@ function openHistory() {
     if (entry.who) {
       const by = document.createElement('span');
       by.className = 'log-who';
+      if (entry.mine) by.dataset.self = '1';
       by.textContent = entry.who;
       notation.append(by);
     }
