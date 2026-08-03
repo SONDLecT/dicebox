@@ -4,7 +4,7 @@
 import { webcrypto } from 'node:crypto';
 if (!globalThis.crypto) globalThis.crypto = webcrypto;
 
-import { solidFor, Die, separate } from '../render.js';
+import { solidFor, Die, separate, beginFrame } from '../render.js';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, extra = '') => {
@@ -493,6 +493,146 @@ separate(stack, { left: 0, right: 300, top: 0, floor: 200 });
 ok('coincident dice separate cleanly',
    stack.every(d => Number.isFinite(d.x) && Number.isFinite(d.y)) &&
    Math.hypot(stack[1].x - stack[0].x, stack[1].y - stack[0].y) > 1);
+
+// --- the numeral appears only once there is a face to put it on ---
+//
+// The glyph rides whichever facet points at the camera, so painting it through
+// a tumble made the number look undecided when it had in fact been decided
+// before the die moved. It is hidden while the die turns fast and fades in as
+// it slows onto a readable face.
+//
+// Driven through step() at 60fps rather than by setting the flags directly.
+// The first attempt at this keyed the fade on `settling`, which the flag-poking
+// tests happily confirmed while the real animation never showed a numeral at
+// all: a thrown die does not reach `settling` for nearly three seconds.
+{
+  const BOUNDS = { left: 8, right: 352, top: 8, floor: 222 };
+  const DT = 1 / 60;
+
+  // Runs a die through frames, recording alpha, until `done` or the cap.
+  const run = (d, frames = 400, done = () => false) => {
+    const alphas = [];
+    let settledAt = null;
+    for (let f = 0; f < frames; f++) {
+      beginFrame();
+      d.step(DT, BOUNDS);
+      alphas.push(d.numeralAlpha());
+      if (settledAt === null && d.settled) settledAt = f;
+      if (done(d, f)) break;
+    }
+    return {
+      alphas,
+      settledAt,
+      firstVisible: alphas.findIndex(a => a > 0),
+      fullAt: alphas.findIndex(a => a >= 1),
+      ms: f => Math.round(f * DT * 1000),
+    };
+  };
+
+  const thrown = () => {
+    const d = new Die(20, 17, 20, 30, 40);
+    d.homeX = 180; d.homeY = 120;
+    d.throwWith((d.homeX - d.x) * 2.4, (d.homeY - d.y) * 2.4);
+    return d;
+  };
+
+  {
+    const d = thrown();
+    ok('a die shows no numeral the instant it is thrown', d.numeralAlpha() === 0);
+
+    const r = run(d);
+    ok('a thrown die eventually shows its numeral', r.fullAt !== -1);
+    ok('the numeral is hidden through the fast part of the tumble',
+       r.firstVisible > 20, `appeared at frame ${r.firstVisible}`);
+
+    // The property the first attempt got wrong. The numeral must not wait on
+    // the settle machinery: `settling` needs spin[0] under 0.02 rad/frame, and
+    // spin decays 3.5% a frame from a value seeded off throw speed, so a thrown
+    // die does not settle for ~2.9s — by which point nobody is looking.
+    ok('the numeral does not wait for the die to formally settle',
+       r.fullAt !== -1 && (r.settledAt === null || r.fullAt < r.settledAt),
+       `full at ${r.ms(r.fullAt)}ms, settled at ${r.settledAt === null ? 'never' : r.ms(r.settledAt) + 'ms'}`);
+
+    let dips = 0;
+    for (let i = 1; i < r.alphas.length; i++) {
+      if (r.alphas[i] < r.alphas[i - 1] - 1e-9) dips++;
+    }
+    ok('the numeral never dims once it has begun', dips === 0, `${dips} dips`);
+  }
+
+  {
+    // Spin-in-place dice are the exception the rule has to carry: their spin
+    // never decays, so there is no slowing to detect and the fade rides the
+    // settle instead. Keyed on angular speed alone they would stay blank.
+    const d = new Die(20, 17, 100, 100, 40);
+    d.spinInPlace(0);
+    const r = run(d, 200);
+    ok('a spin-in-place die shows its numeral too', r.fullAt !== -1);
+    ok('a spin-in-place die is blank while it holds its spin', r.firstVisible > 2,
+       `appeared at frame ${r.firstVisible}`);
+    ok('a spin-in-place numeral arrives promptly',
+       r.fullAt !== -1 && r.ms(r.fullAt) <= 1000, `${r.ms(r.fullAt)}ms`);
+  }
+
+  {
+    // A reroll lands, pauses so the first number can be read, then hops and
+    // tumbles again. The numeral has to leave with the hop — watching the old
+    // number go away is the entire point of animating a reroll.
+    const d = new Die(6, 4, 100, 100, 40);
+    d.spinInPlace(0);
+    // Runs past the settle rather than stopping on it: the numeral is advanced
+    // at the top of step from the previous frame's motion, so the frame that
+    // first reports `settled` is one short of a finished fade.
+    run(d, 300);
+    ok('a landed die is showing its numeral before the reroll', d.numeralAlpha() === 1);
+
+    d.beginReroll();
+    // Long enough to exhaust rerollPause, which is what triggers the hop.
+    d.step(0.5, BOUNDS);
+    ok('the numeral leaves when a rerolled die hops',
+       d.numeralAlpha() === 0,
+       `alpha=${d.numeralAlpha()} settled=${d.settled} settling=${d.settling}`);
+
+    const again = run(d, 400);
+    ok('a rerolled die shows its new numeral after landing again', again.fullAt !== -1);
+  }
+
+  {
+    // Measured over a population rather than one die. Each throw seeds its own
+    // random spin, so a single sample swings by hundreds of milliseconds and an
+    // assertion on one is a coin flip — which is how the first version of this
+    // test failed about half the time it ran.
+    const times = [];
+    for (let i = 0; i < 80; i++) {
+      const r = run(thrown(), 240, (d, f) => d.numeralAlpha() >= 1 && f > 0);
+      if (r.fullAt !== -1) times.push(r.ms(r.fullAt));
+    }
+    times.sort((a, b) => a - b);
+    const p50 = times[Math.floor(times.length * 0.5)];
+    const worst = times[times.length - 1];
+
+    ok('every die in a handful shows its numeral', times.length === 80, `${times.length}/80`);
+
+    // Bounds, not targets. They exist to catch the numeral drifting back toward
+    // the formal settle at ~2.9s, which is what the first implementation did and
+    // what made it invisible in practice. Tightening these means changing the
+    // spin decay — see the table in IDEAS.md under "Tried and reverted".
+    ok('the numeral is in before the die stops moving', p50 <= 1700, `p50 ${p50}ms`);
+    ok('no die keeps its numeral hidden for two seconds', worst <= 2000, `worst ${worst}ms`);
+
+    // Dice light up at different moments because each was thrown differently,
+    // but the spread has to read as one roll settling rather than as numbers
+    // loading in one at a time.
+    //
+    // Measured p10 to p90 rather than min to max. The extremes of 80 samples
+    // are themselves the noisiest thing here — asserting on them made this fail
+    // about one run in three on a bound the implementation comfortably meets.
+    const p10 = times[Math.floor(times.length * 0.1)];
+    const p90 = times[Math.floor(times.length * 0.9)];
+    ok('the handful lights up within a readable window of itself',
+       p90 - p10 <= 800, `${p90 - p10}ms across the middle 80%`);
+  }
+}
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

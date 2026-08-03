@@ -405,6 +405,24 @@ const POINTED_LIMIT = 22;
 // banded drum is still readable here, while anything pointed is long gone.
 const MAX_FACETS = 120;
 
+// Angular speed, in radians per frame, below which a die is turning slowly
+// enough to carry a readable numeral. About 17 degrees a frame. See
+// Die.stepNumeral.
+//
+// A rotation rate rather than a time, because the question is "has this die
+// slowed enough that the glyph will stay on one facet", and dice reach that
+// point at different moments depending on how hard they were thrown.
+const NUMERAL_FADE_SPIN = 0.30;
+
+// How long the fade itself takes once it has been triggered, in seconds.
+//
+// Deliberately a duration rather than a second speed threshold. Tying both ends
+// to the decay curve made the length of the fade a function of how fast the die
+// happened to be spinning — slow dice got a brisk fade and fast ones a listless
+// one, which is exactly backwards, and it put the worst case past 1.6s. The
+// trigger varies because the dice do; the fade should not.
+const NUMERAL_FADE_S = 0.26;
+
 // Resting-orientation searches allowed per frame. Enough that small rolls all
 // resolve at once, low enough that a 100-dice roll spreads the cost instead of
 // spiking one frame past the 16.7ms budget.
@@ -604,6 +622,8 @@ export class Die {
     this.settled = false;
     this.settleT = 0;
     this.restRot = null;
+    // How much of the numeral is showing, 0 to 1. See stepNumeral.
+    this.numeralIn = 0;
   }
 
   throwWith(vx, vy) {
@@ -617,6 +637,8 @@ export class Die {
     this.settling = false;
     this.settled = false;
     this.targetRot = null; // recomputed for wherever this throw lands
+    // Back in the air, so the number goes away again until this throw resolves.
+    this.numeralIn = 0;
   }
 
   // Geometry for this die at its current size. Re-resolved when the size
@@ -651,6 +673,7 @@ export class Die {
     this.settling = false;
     this.settled = false;
     this.targetRot = null;
+    this.numeralIn = 0;
     this.spinHold = 0.16 + delay * 0.42;
   }
 
@@ -676,6 +699,9 @@ export class Die {
       this.targetRot = null;
       this.searchWait = 0;
       this.spinHold = undefined;
+      // The point of a reroll is watching the first number go away, so the
+      // numeral has to leave with the hop rather than ride it up.
+      this.numeralIn = 0;
       this.vx = (Math.random() - 0.5) * 90;
       this.vy = -210;
       this.spin = [
@@ -690,6 +716,11 @@ export class Die {
   }
 
   step(dt, bounds) {
+    // First, so that the several early returns below cannot skip it. It reads
+    // the previous frame's motion, which is a frame of lag on a fade lasting
+    // tens of them.
+    this.stepNumeral(dt);
+
     // Mid-reroll: hold still for a beat, then throw the die back up.
     if (this.rerollPause > 0) {
       if (this.stepReroll(dt, bounds)) return;
@@ -915,10 +946,68 @@ export class Die {
     ctx.restore();
   }
 
+  // How much of the numeral to show. Nothing while the die is tumbling fast,
+  // then a fade in as it slows onto a readable face.
+  //
+  // The glyph is painted on whichever face currently points at the camera, so
+  // through a tumble it appears to hop from facet to facet. Players read that
+  // as the number still being decided, which is exactly backwards: the value
+  // was fixed before the die moved, and the tumble is a drawing of it.
+  //
+  // Binding the glyph to one facet is the obvious fix and does not work — both
+  // directions of it were tried and reverted, and IDEAS.md records why. This
+  // takes the other route and shows no number until there is one face to show
+  // it on, which costs nothing and needs no new geometry.
+  //
+  // The trigger is angular speed rather than the settle flags, and that
+  // distinction is the whole of this method. `settling` does not begin until
+  // spin[0] falls under 0.02 rad/frame, and throwWith seeds spin proportional
+  // to throw speed while step decays it by only 3.5% a frame — so a thrown die
+  // does not formally settle for about **2.9 seconds**, long after the app has
+  // announced the total at 620ms. Keyed on the settle, the numeral was simply
+  // absent for the entire animation. Keyed on how fast the die is actually
+  // turning, it arrives when the die becomes readable, which is what a player
+  // watching it means by "when it stops".
+  //
+  // Spin-in-place dice are the exception: their spin never decays, because they
+  // hold a constant tumble for a staggered interval and then settle. There is
+  // no slowing to detect, so those fade on the settle instead.
+  //
+  // Monotonic by construction: once the fade starts it only ever advances,
+  // because a numeral that dimmed on its way in would read as a flicker rather
+  // than an arrival. Only a reset — a throw, a spin, a reroll's hop — takes it
+  // back to nothing.
+  stepNumeral(dt) {
+    if (this.numeralIn >= 1) return;
+
+    // A die that has come to rest is showing its number, whatever route it took
+    // to get there — including one placed at rest without ever being thrown.
+    if (this.settled) { this.numeralIn = 1; return; }
+
+    const slow = Math.hypot(this.spin[0], this.spin[1], this.spin[2]) < NUMERAL_FADE_SPIN;
+
+    // Spin-in-place dice hold a constant tumble and then settle, so their spin
+    // never decays and `slow` is never true for them. The settle is their
+    // signal instead.
+    if (!slow && !this.settling) return;
+
+    this.numeralIn = Math.min(1, this.numeralIn + dt / NUMERAL_FADE_S);
+  }
+
+  numeralAlpha() {
+    return this.numeralIn;
+  }
+
   // Paint the numeral onto the face that most directly faces the camera, using
   // that face's own plane. The glyph is skewed to sit in the surface rather than
   // floating flat over the shape, so it tracks the die as it tumbles.
   drawValue(ctx, theme, s, pts, proj) {
+    // Nothing to paint while the die is in the air. Returning before the face
+    // search rather than after also takes the most expensive part of this
+    // method off every frame of a hundred-dice tumble.
+    const alpha = this.numeralAlpha();
+    if (alpha <= 0) return;
+
     // Pick the face by visible screen area, matching findFaceUpRotation. Going
     // by facing angle alone paints the numeral on whatever sliver happens to
     // point at the camera — on a coin, that meant a digit on the rim.
@@ -975,16 +1064,22 @@ export class Die {
     const fit = label.length > 2 ? 0.34 : label.length > 1 ? 0.42 : 0.52;
     const size = Math.max(7, s * fit * (0.55 + 0.45 * bestFacing));
 
+    // The pop. A plain fade reads as the number developing like a photograph;
+    // arriving very slightly small and growing into place reads as it landing.
+    // Small on purpose — at more than a few percent it becomes a bounce, and
+    // the tray already has enough motion at the moment dice come to rest.
+    const grown = size * (0.88 + 0.12 * alpha);
+
     ctx.save();
     ctx.translate(c2[0], c2[1]);
     // Rotate to the face's own axis, then squash vertically by how much the
     // face is turned away — the same foreshortening the edges already show.
     ctx.transform(ux, uy, -uy * bestFacing, ux * bestFacing, 0, 0);
-    ctx.font = `600 ${size}px "Iosevka Etoile", ui-monospace, monospace`;
+    ctx.font = `600 ${grown}px "Iosevka Etoile", ui-monospace, monospace`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = theme.line;
-    ctx.globalAlpha = this.settled ? 1 : 0.35 + 0.65 * bestFacing;
+    ctx.globalAlpha = alpha;
     ctx.fillText(label, 0, 0);
     // Drawn here so it shares the face's skew: the ring sits in the surface with
     // the numeral rather than floating flat over the die.

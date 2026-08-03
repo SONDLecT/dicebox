@@ -368,6 +368,39 @@ of considered themes rather than a colour picker.
 
 ## Tried and reverted: pinning the numeral to one facet
 
+**Resolved a third way — the numeral is hidden while the die turns fast and
+fades in as it slows.** A player at a real table put the complaint precisely: it
+was odd to watch a number move around while the die was still spinning. Both
+fixes below try to keep painting a numeral throughout the tumble and differ only
+in which facet they paint it on; not painting one at all was the option neither
+considered. `Die.stepNumeral` in `render.js` is the whole implementation.
+
+The trigger is **angular speed, not the settle flags**, and the first attempt
+got this wrong in a way worth recording. Keying the fade on `settling` looked
+obviously right and did nothing at all: `settling` does not begin until
+`spin[0]` falls under 0.02 rad/frame, and `throwWith` seeds spin proportional to
+throw speed while `step` decays it 3.5% a frame — so **a thrown die does not
+formally settle for about 2.9 seconds**, while the total is announced at 620ms.
+The numeral was simply absent for the whole animation, and the unit tests passed
+because they set the flags by hand instead of running the die through `step`.
+
+That 2.9s is worth knowing about on its own. It is why the contact mark and the
+tidy-into-a-grid drift both happen much later than they appear to be designed
+for. Making the tumble shorter is a one-constant change with measured effects:
+
+| `spin[i] *=` | numeral visible (p50) | worst | still spinning at 620ms |
+| --- | --- | --- | --- |
+| `0.965` (today) | 1483ms | 1817ms | 1.00 rad/frame |
+| `0.955` | 1200ms | 1483ms | 1.00 |
+| `0.94` | 967ms | 1167ms | 0.37 |
+| `0.92` | 783ms | 933ms | 0.16 |
+
+Left alone deliberately: it changes how long every roll visibly tumbles, which
+is a feel decision rather than a bug fix.
+
+The rest of this section stands, because the rewrite it describes is still what
+binding the glyph to a facet would cost, and that remains worth not doing.
+
 The numeral is painted on whichever face points at the camera, so it appears to
 move between facets while a die tumbles. Binding it to a single facet was
 attempted and reverted.
