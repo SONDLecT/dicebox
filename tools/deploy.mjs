@@ -153,19 +153,49 @@ if (!sw) {
   console.error('No /sw.js in the deploy — the offline cache would never update.');
   process.exit(1);
 }
+const rehash = f => {
+  f.size = f.body.length;
+  const ext = f.path.slice(f.path.lastIndexOf('.'));
+  f.hash = createHash('sha256').update(f.body).update(ext).digest('hex').slice(0, 32);
+};
+
+// Computed before either file is patched, so it is a hash of the code being
+// shipped rather than of a document that contains the hash of itself.
+const stamp = swCacheName(files.filter(f => f.path !== '/sw.js'));
+const buildId = stamp.replace('dicebox-', '');
+
 {
-  const name = swCacheName(files.filter(f => f.path !== '/sw.js'));
   const before = sw.body.toString('utf8');
-  const after = before.replace(/const CACHE = '[^']*';/, `const CACHE = '${name}';`);
+  const after = before.replace(/const CACHE = '[^']*';/, `const CACHE = '${stamp}';`);
   if (before === after) {
     console.error('Could not find the CACHE constant in sw.js — refusing to ship a cache that cannot be invalidated.');
     process.exit(1);
   }
   sw.body = Buffer.from(after, 'utf8');
-  sw.size = sw.body.length;
-  sw.hash = createHash('sha256').update(sw.body).update('.js').digest('hex').slice(0, 32);
-  console.log(`Service worker cache: ${name}`);
+  rehash(sw);
 }
+
+// The same id, shown in the app. A cached build that claims to be a build it is
+// not is the one failure this cannot detect, and it is also the one that cannot
+// happen: the id is inside the bytes being cached.
+{
+  const page = files.find(f => f.path === '/index.html');
+  if (!page) {
+    console.error('No /index.html in the deploy.');
+    process.exit(1);
+  }
+  const before = page.body.toString('utf8');
+  const after = before.replace(
+    /(<meta name="dicebox-build" content=")[^"]*(">)/, `$1${buildId}$2`);
+  if (before === after) {
+    console.error('Could not find the dicebox-build meta tag in index.html.');
+    process.exit(1);
+  }
+  page.body = Buffer.from(after, 'utf8');
+  rehash(page);
+}
+
+console.log(`Build ${buildId} — service worker cache ${stamp}`);
 
 console.log(`Deploying ${files.length} files as "${SCRIPT}"`);
 for (const f of files) console.log(`  ${f.path}  ${f.size}B`);

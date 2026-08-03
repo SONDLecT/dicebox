@@ -431,22 +431,20 @@ const SETTLE_SPEED = 60;
 // dice came to a halt and then kept revolving for another two seconds.
 const SPIN_DECAY = 0.92;
 
-// How far through the settle the numeral starts to appear, as a fraction of
-// settleT.
+// How long the numeral takes to appear once the die is at rest, in seconds.
 //
-// The settle is the only part of a throw where the die's remaining rotation is
-// bounded and known: it interpolates from the pose it stopped in to the one it
-// will rest in, over a fixed span. Everything before it is a decaying tumble
-// with a long tail — a die turning at `s` still has s / (1 - SPIN_DECAY) of arc
-// ahead of it, which even at a visually slow speed is several full turns.
+// It appears *after* the settle, not during it. The settle is the small final
+// movement where a die straightens up and brings a face square to the camera,
+// and until that finishes the facet under the numeral is still changing. Fading
+// across it — even across its last 45%, which is only about 4 degrees of travel
+// — still means the number arrives while the die is visibly being adjusted, and
+// that reads as arriving too early.
 //
-// That tail is what made two earlier attempts fail. Fading on the tumble, at
-// any speed threshold, put 200 degrees of rotation under the numeral while it
-// was appearing, against the ~41 degrees between adjacent faces on a d20 — so
-// it hopped a dozen facets on the way in. Fading on the settle bounds it: the
-// easing is cubic, so from 0.55 onward the die has ~9% of its arc left, and
-// after the settle it has none at all.
-const NUMERAL_FADE_FROM = 0.55;
+// So: nothing at all until the die has stopped, then a fast pop. Short enough
+// to feel like the number was revealed by the die coming to rest, long enough
+// not to be a hard cut. Rotation under the glyph while it appears is zero by
+// construction, because a settled die does not rotate at all.
+const NUMERAL_POP_S = 0.14;
 
 // Resting-orientation searches allowed per frame. Enough that small rolls all
 // resolve at once, low enough that a 100-dice roll spreads the cost instead of
@@ -744,7 +742,7 @@ export class Die {
     // First, so that the several early returns below cannot skip it. It reads
     // the previous frame's motion, which is a frame of lag on a fade lasting
     // tens of them.
-    this.stepNumeral();
+    this.stepNumeral(dt);
 
     // Mid-reroll: hold still for a beat, then throw the die back up.
     if (this.rerollPause > 0) {
@@ -1015,20 +1013,12 @@ export class Die {
   // because a numeral that dimmed on its way in would read as a flicker rather
   // than an arrival. Only a reset — a throw, a spin, a reroll's hop — takes it
   // back to nothing.
-  stepNumeral() {
+  stepNumeral(dt) {
     if (this.numeralIn >= 1) return;
-
-    // A die at rest is showing its number, whatever route it took to get there
-    // — including one placed at rest without ever being thrown.
-    if (this.settled) { this.numeralIn = 1; return; }
-
-    // Nothing during the tumble. Its remaining rotation is unbounded in the
-    // sense that matters: several facets' worth, however slow it looks.
-    if (!this.settling) return;
-
-    this.numeralIn = Math.max(this.numeralIn,
-      (this.settleT - NUMERAL_FADE_FROM) / (1 - NUMERAL_FADE_FROM));
-    this.numeralIn = Math.min(1, Math.max(0, this.numeralIn));
+    // Nothing until the die is completely at rest — through the tumble, and
+    // through the straightening that follows it.
+    if (!this.settled) return;
+    this.numeralIn = Math.min(1, this.numeralIn + dt / NUMERAL_POP_S);
   }
 
   numeralAlpha() {

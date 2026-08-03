@@ -69,8 +69,7 @@ const deploy = readFileSync(join(root, 'tools', 'deploy.mjs'), 'utf8');
 const cacheDecl = /const CACHE = '[^']*';/;
 
 ok('sw.js declares a cache name the deploy can find', cacheDecl.test(sw));
-ok('the deploy rewrites the cache name',
-   /const CACHE = '\$\{name\}';/.test(deploy) || /const CACHE = '\${name}';/.test(deploy));
+ok('the deploy rewrites the cache name', /const CACHE = '\$\{stamp\}';/.test(deploy));
 // A silent no-op substitution is the failure being guarded against, so the
 // deploy has to treat a miss as fatal rather than shipping what it found.
 ok('a failed rewrite stops the deploy',
@@ -78,6 +77,18 @@ ok('a failed rewrite stops the deploy',
 // Derived from the assets, not from the file it is written into.
 ok('the cache name is derived from the shipped assets',
    /swCacheName/.test(deploy) && /path !== '\/sw\.js'/.test(deploy));
+
+// The build id the app displays. Same hash as the cache name, so a copy that
+// says which build it is cannot be lying: the id lives inside the bytes the
+// service worker cached. This is the thing that ends "is the fix even loaded"
+// without anyone having to diff bytes over the wire.
+ok('the page carries a build meta tag', /<meta name="dicebox-build" content="">/.test(html));
+ok('the app reads the build id', /dicebox-build/.test(js));
+ok('the build id is shown', /id="build"/.test(html) && /\.build\s*\{/.test(css));
+ok('the deploy stamps the build id',
+   /dicebox-build" content="\)\[\^"\]\*\(">/.test(deploy) || /dicebox-build/.test(deploy));
+ok('the build id and the cache name are the same hash',
+   /const buildId = stamp\.replace/.test(deploy));
 
 // --- the full history escapes the tray ---
 //

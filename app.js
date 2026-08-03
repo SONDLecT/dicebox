@@ -1649,6 +1649,22 @@ try {
 // that happens is that rolls stop leaving the device. Nothing here is awaited
 // from doRoll, and no state it owns is consulted before a die is thrown.
 
+// Which build this is, stamped in at deploy time and shown in the help panel.
+//
+// A service worker serves a correct-looking app from a cache indefinitely, and
+// says nothing about it. That turned a fixed bug into two rounds of "it is
+// still broken" against code that was right on the server — the only way to
+// tell the two apart was to compare bytes over the wire. Now the app says which
+// build it is, and the answer is one tap away on the device that has the
+// problem. Empty in a checkout and in the single-file build, where there is no
+// deploy to be out of step with.
+const BUILD_ID = document.querySelector('meta[name="dicebox-build"]')?.content?.trim() || '';
+if (BUILD_ID) {
+  const stamp = $('build');
+  stamp.textContent = `build ${BUILD_ID}`;
+  stamp.hidden = false;
+}
+
 // Where the relay lives. Empty means sharing is simply unavailable — a build
 // with no relay configured shows the Share button doing nothing useful rather
 // than pretending to connect, and the local app is unaffected either way.

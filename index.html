@@ -18,6 +18,12 @@
      origin here must also appear in the connect-src of _headers or the browser
      blocks the socket. -->
 <meta name="dicebox-relay" content="">
+<!-- Filled in at deploy time with a hash of the code that was shipped. Empty in
+     a local checkout and in the single-file build, where there is no deploy to
+     be out of step with. It exists so that "is the fix actually loaded" is a
+     question you answer by looking rather than by guessing — a stale service
+     worker serves a correct-looking app indefinitely and says nothing. -->
+<meta name="dicebox-build" content="">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -110,6 +116,7 @@
         <!-- `download` forces a save: without it the browser just renders the
              file, since it is HTML being served as text. -->
         <a href="dicebox.html" download="dicebox.html">Download as one file</a>
+        <span class="build" id="build" hidden></span>
       </p>
     </div>
 

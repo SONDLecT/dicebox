@@ -222,6 +222,19 @@ body {
   font-size: 12px;
 }
 
+/* Which build is loaded. Quiet and monospaced — it is a serial number, not
+   information anyone reads on purpose, and it only earns its place on the days
+   when a cached copy is lying about what it is. */
+.build {
+  display: block;
+  margin-top: 6px;
+  font-family: "Iosevka Etoile", ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  opacity: 0.65;
+}
+
 .colophon-sep {
   color: var(--muted);
   margin: 0 6px;
