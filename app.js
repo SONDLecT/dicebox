@@ -1710,9 +1710,9 @@ const roomNameField = $('roomName');
 // reaches this line still tells the truth.
 if (location.protocol === 'file:') {
   $('roomNote').textContent =
-    'Encrypted before it leaves your device — the relay only ever sees ' +
-    'ciphertext. This copy is the file on your disk, so the code cannot ' +
-    'change under you. Each device reports its own rolls.';
+    'Rolls are end-to-end encrypted, so only people with the passphrase can ' +
+    'read them. This copy is the file on your disk, so the code cannot change ' +
+    'under you.';
 }
 
 // The passphrase for the room currently joined, kept so the copy buttons work

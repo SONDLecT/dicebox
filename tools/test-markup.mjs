@@ -140,35 +140,53 @@ ok('the new passphrase appears under create',
    at('id="roomCreate"') < at('id="roomMade"') && at('id="roomMade"') < at('id="roomJoinForm"'));
 
 // --- the privacy note ---
-// The panel is the only privacy statement inside the app, and it once carried a
-// single relay-scoped sentence in every build. On the hosted demo that read as
-// "the operator cannot see your rolls", which is false: the demo serves the
-// encrypting code and reships it on every load. The default wording must
-// therefore be the served-copy one, and the stronger claim must be reachable
-// only behind the file: check.
-// Whitespace-normalised before matching. The note is wrapped for the source
-// file, so a phrase can straddle a line break and a naive regex then reports a
-// missing claim that is plainly there — which is a test failing on formatting
-// while the thing it guards is fine.
+//
+// The panel is the only privacy statement inside the app, and what it may
+// claim differs by how the app was delivered. A served copy — the demo, and
+// every self-hosted deployment — ships the encrypting code over the network on
+// every load, so whoever serves it could change it. "Only people with the
+// passphrase can read your rolls" is therefore a promise there, and a
+// guarantee only in the single file, where nothing can change under the reader.
+//
+// That distinction used to live in the paragraph, which made it accurate and
+// unreadable: three hedged sentences that players scrolled past to reach the
+// join button. It now lives in the link, whose label has to keep saying that
+// there are limits. So the checks below moved rather than relaxed — the note
+// may not overclaim, and the link must still point at the limits.
 const note = (html.match(/<p class="room-note" id="roomNote">([\s\S]*?)<\/p>/)?.[1] || '')
   .replace(/\s+/g, ' ').trim();
 ok('the room note exists', note.length > 0);
-ok('the default note names the serving party as trusted',
-   /trusting whoever serves/.test(note), note);
-ok('the default note points at the single file or self-hosting',
-   /single file/.test(note) && /self-host/.test(note), note);
-// Short enough that the create and join controls are reachable without
-// scrolling. The Owlbear panel is the constraint: it is a fixed popover, and a
-// wall of text there pushed the copy buttons off the bottom.
-ok('the note stays short enough for a panel', note.length <= 320, `${note.length} chars`);
-ok('the default note claims nothing stronger than ciphertext for the relay',
-   !/cannot see/.test(note) && !/on your disk/.test(note));
-ok('the note says rolls are self-reported', /reports its own rolls/.test(note));
+
+// Short enough that create and join stay above the fold in an Owlbear panel.
+ok('the note stays short enough for a panel', note.length <= 260, `${note.length} chars`);
+
+// It may say what the mechanism is.
+ok('the note says rolls are end-to-end encrypted',
+   /end-to-end encrypted/.test(note), note);
+ok('the note says the relay cannot read them',
+   /relay only ever sees ciphertext/.test(note), note);
+
+// It may not claim the operator is incapable of reading rolls. That is true of
+// the single file and not of a served copy, and the difference is the whole
+// reason this section exists.
+ok('the served note claims nothing about the operator being unable',
+   !/cannot see/.test(note) && !/we cannot/i.test(note) && !/nobody (else )?can/i.test(note),
+   note);
+ok('the served note does not claim to be the file on disk',
+   !/on your disk/.test(note), note);
+
+// The link is now the only place the caveat is stated, so its label carries the
+// signal. "Find out more" would not: it promises detail, not limits.
+const moreLink = html.match(/<p class="room-note room-note-more">([\s\S]*?)<\/p>/)?.[1] || '';
+ok('the privacy section is linked from the panel',
+   /#what-the-privacy-actually-is/.test(moreLink));
+ok('the link says there are limits',
+   /does\s?n.t guarantee|cannot|limits|actually/i.test(moreLink), moreLink.trim());
+
+// The stronger claim stays gated on file:, where it is true.
 ok('the stronger claim is gated on file:',
    /location\.protocol === 'file:'/.test(js) &&
    js.indexOf("location.protocol === 'file:'") < js.indexOf('the file on your disk'));
-ok('the privacy section is linked from the panel',
-   /#what-the-privacy-actually-is/.test(html));
 
 // --- accessibility ---
 ok('intro is readable by screen readers', !/id="intro"[^>]*aria-hidden/.test(html));

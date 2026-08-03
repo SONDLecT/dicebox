@@ -1547,13 +1547,12 @@ body {
                offer. -->
           <div class="room-privacy">
             <p class="room-note" id="roomNote">
-              Encrypted before it leaves your device — the relay only ever sees
-              ciphertext. You are trusting whoever serves this copy; the single
-              file and self-hosting are not. Each device reports its own rolls.
+              Rolls are end-to-end encrypted, so only people with the passphrase
+              can read them. The relay only ever sees ciphertext.
             </p>
             <p class="room-note room-note-more">
               <a href="https://github.com/SONDLecT/dicebox#what-the-privacy-actually-is"
-                 target="_blank" rel="noopener noreferrer">What the privacy actually is</a>
+                 target="_blank" rel="noopener noreferrer">What this does and doesn't guarantee</a>
             </p>
           </div>
         </div>
@@ -5996,9 +5995,9 @@ const roomNameField = $('roomName');
 // reaches this line still tells the truth.
 if (location.protocol === 'file:') {
   $('roomNote').textContent =
-    'Encrypted before it leaves your device — the relay only ever sees ' +
-    'ciphertext. This copy is the file on your disk, so the code cannot ' +
-    'change under you. Each device reports its own rolls.';
+    'Rolls are end-to-end encrypted, so only people with the passphrase can ' +
+    'read them. This copy is the file on your disk, so the code cannot change ' +
+    'under you.';
 }
 
 // The passphrase for the room currently joined, kept so the copy buttons work
