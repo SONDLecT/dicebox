@@ -55,6 +55,30 @@ const unstyled = [...new Set([...htmlClasses, ...jsClasses])]
   .filter(c => c && !css.includes(`.${c}`));
 ok('every class has a style rule', unstyled.length === 0, unstyled.join(', '));
 
+// --- the offline cache can actually be invalidated ---
+//
+// The one deploy bug with no symptom on the server. Every asset ships
+// correctly, every check here passes, and installed copies keep serving the
+// previous build because their service worker was told to keep it. It cost a
+// round of "your fix is not working" after a deploy that changed render.js and
+// left the cache name alone.
+//
+// deploy.mjs now rewrites the constant with a hash of everything shipped
+// beside it, so the two have to keep agreeing on its shape.
+const deploy = readFileSync(join(root, 'tools', 'deploy.mjs'), 'utf8');
+const cacheDecl = /const CACHE = '[^']*';/;
+
+ok('sw.js declares a cache name the deploy can find', cacheDecl.test(sw));
+ok('the deploy rewrites the cache name',
+   /const CACHE = '\$\{name\}';/.test(deploy) || /const CACHE = '\${name}';/.test(deploy));
+// A silent no-op substitution is the failure being guarded against, so the
+// deploy has to treat a miss as fatal rather than shipping what it found.
+ok('a failed rewrite stops the deploy',
+   /Could not find the CACHE constant/.test(deploy) && /process\.exit\(1\)/.test(deploy));
+// Derived from the assets, not from the file it is written into.
+ok('the cache name is derived from the shipped assets',
+   /swCacheName/.test(deploy) && /path !== '\/sw\.js'/.test(deploy));
+
 // --- the full history escapes the tray ---
 //
 // Every sheet is positioned inside .tray, which is right for a control acting

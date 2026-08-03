@@ -96,6 +96,25 @@ const RELAY = DEV
   ? (env.DEV_RELAY_URL || 'wss://dev.relay.dicebox.trollskull.cc/ws')
   : (env.RELAY_URL || '');
 
+// The service worker's cache name, derived from the contents of everything it
+// precaches rather than typed by hand.
+//
+// A stale cache name is the worst deploy bug this project has, because it has
+// no symptom on the server: every asset is correct, every check passes, and
+// installed copies keep serving the previous build forever. It cost a round of
+// "the fix is not working" after a deploy that changed render.js and left CACHE
+// alone — the browser was faithfully serving what it had been told to keep.
+//
+// Deriving it removes the step. Same assets, same name, no redundant
+// invalidation; any asset changes and every installed copy picks it up.
+const swCacheName = assets => {
+  const hash = createHash('sha256');
+  for (const { path, body } of [...assets].sort((a, b) => (a.path < b.path ? -1 : 1))) {
+    hash.update(path).update(body);
+  }
+  return `dicebox-${hash.digest('hex').slice(0, 12)}`;
+};
+
 const withRelay = (full, body) => {
   // index.html only, never the single-file build. The README promises that the
   // downloaded file gives a real "we cannot see your rolls" guarantee because
@@ -123,6 +142,30 @@ const files = [
     describeFile(full, '/' + relative(ROOT, full).split(sep).join('/'))),
   ...extras.filter(e => existsSync(e.from)).map(e => describeFile(e.from, e.to)),
 ];
+
+// Stamp the derived cache name into the service worker.
+//
+// Hashed over every other file rather than over the precache list, so an asset
+// added to ASSETS without being added here cannot slip through. sw.js is
+// excluded because its own body is what we are about to change.
+const sw = files.find(f => f.path === '/sw.js');
+if (!sw) {
+  console.error('No /sw.js in the deploy — the offline cache would never update.');
+  process.exit(1);
+}
+{
+  const name = swCacheName(files.filter(f => f.path !== '/sw.js'));
+  const before = sw.body.toString('utf8');
+  const after = before.replace(/const CACHE = '[^']*';/, `const CACHE = '${name}';`);
+  if (before === after) {
+    console.error('Could not find the CACHE constant in sw.js — refusing to ship a cache that cannot be invalidated.');
+    process.exit(1);
+  }
+  sw.body = Buffer.from(after, 'utf8');
+  sw.size = sw.body.length;
+  sw.hash = createHash('sha256').update(sw.body).update('.js').digest('hex').slice(0, 32);
+  console.log(`Service worker cache: ${name}`);
+}
 
 console.log(`Deploying ${files.length} files as "${SCRIPT}"`);
 for (const f of files) console.log(`  ${f.path}  ${f.size}B`);

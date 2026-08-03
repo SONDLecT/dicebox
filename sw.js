@@ -1,8 +1,14 @@
 // Cache-first service worker. The whole app is a handful of static files, so we
 // precache all of them and never hit the network after install.
 
-// Bump on every asset change, or installed copies keep serving the old app.
-const CACHE = 'dicebox-v24';
+// Replaced at deploy time with a hash of every asset shipped alongside it, so
+// this never has to be remembered — see swCacheName in tools/deploy.mjs. A
+// stale cache name is the one deploy bug with no symptom on the server: the
+// files are all correct and installed copies serve the previous build anyway.
+//
+// The literal below is what a local checkout and the single-file build use, and
+// it only has to change if you are testing cache behaviour by hand.
+const CACHE = 'dicebox-dev';
 
 // './' only — never './index.html'. The edge redirects /index.html to / with a
 // 307, and a redirected response makes cache.addAll reject the whole batch,
