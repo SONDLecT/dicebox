@@ -7,6 +7,19 @@ const $ = id => document.getElementById(id);
 const canvas = $('tray');
 const ctx = canvas.getContext('2d');
 
+// Whether this copy is running inside someone else's page — the Owlbear Rodeo
+// panel, or any other iframe. A few things that are right for a page of our own
+// are wrong when embedded: installing a service worker, and offering to install
+// the app to a home screen from inside a popover that has neither an address
+// bar nor a reload button.
+//
+// Reading window.top throws when the parent is a different origin and the
+// browser is strict about it, and that throw is itself the answer: only an
+// embedded copy can be cross-origin to its parent.
+const embedded = (() => {
+  try { return window.top !== window.self; } catch { return true; }
+})();
+
 // One row of dice, ordered by size: the standard RPG set plus every Dungeon
 // Crawl Classics chain rung, plus d100. Gaps like d9 and d11 are deliberate —
 // no published system uses them, and the notation field covers anything here.
@@ -45,13 +58,30 @@ function isDark() {
   return systemDark.matches;
 }
 
-const stored = localStorage.getItem('dicebox:theme');
+// Preferences, through a guard, because reaching localStorage can throw rather
+// than return null. Safari in private browsing does it, and so does any browser
+// that partitions or blocks storage for an embedded copy — which is what an
+// Owlbear panel or any other iframe is.
+//
+// The read below runs at module top level, so a throw there took the entire app
+// with it: no dice, no error line, just a blank page and nothing to report. A
+// theme that will not persist is worth a shrug; losing the dice roller is not.
+const store = {
+  get(key) {
+    try { return localStorage.getItem(key); } catch { return null; }
+  },
+  set(key, value) {
+    try { localStorage.setItem(key, value); } catch { /* see above */ }
+  },
+};
+
+const stored = store.get('dicebox:theme');
 if (stored === 'dark' || stored === 'light') document.documentElement.dataset.theme = stored;
 syncThemeLabel();
 
 $('themeToggle').addEventListener('click', () => {
   document.documentElement.dataset.theme = isDark() ? 'light' : 'dark';
-  localStorage.setItem('dicebox:theme', document.documentElement.dataset.theme);
+  store.set('dicebox:theme', document.documentElement.dataset.theme);
   syncThemeLabel();
   updateThemeColor();
 });
@@ -1523,18 +1553,37 @@ window.addEventListener('appinstalled', () => {
   installHint.textContent = 'Installed. It works offline from here.';
 });
 
-if (standalone) {
+if (embedded) {
+  // Nothing here applies inside a panel: there is no address bar to install
+  // from, no home screen to install to, and the host page needs the network
+  // regardless. Saying so is better than leaving instructions that cannot be
+  // followed sitting in the help.
+  $('installNote').hidden = true;
+} else if (standalone) {
   installHint.textContent = 'Running as an app. Rolls work offline.';
 } else if (/iphone|ipad|ipod/i.test(navigator.userAgent)) {
   // Safari offers no install API, so name the actual menu items.
   installHint.textContent = 'To install: tap Share, then Add to Home Screen. It works offline.';
 }
 
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
-  });
-}
+// Offline support, but not when embedded.
+//
+// A copy running inside someone else's page should not install a service
+// worker. It buys nothing there, since the host page needs the network anyway,
+// and it costs the one thing that makes an embedded copy debuggable: a panel
+// with no address bar and no reload button that is being served a cached build
+// from a previous deploy is very hard to diagnose and nearly impossible to talk
+// a player through fixing.
+//
+// Wrapped because `'serviceWorker' in navigator` can throw where storage is
+// partitioned, which is exactly the embedded case.
+try {
+  if (!embedded && 'serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    });
+  }
+} catch { /* no service worker, no offline cache, everything else still works */ }
 
 // ---- rooms ----
 //
