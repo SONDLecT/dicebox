@@ -259,80 +259,6 @@ function prismBarrel(n) {
   return normalize({ verts, faces });
 }
 
-// Antiprism: two rings offset by half a step, joined by a band of triangles and
-// closed with a shallow pyramid at each end. Reads as a straight-sided drum
-// rather than the cones a trapezohedron gives.
-//
-// The ends are pyramids rather than flat n-gon caps on purpose. A flat cap is
-// many times the area of a band triangle, and the resting-orientation search
-// scores by visible area — so a capped antiprism landed on one of its two lids
-// almost every roll, which looked like the die had only two outcomes.
-function antiprism(n) {
-  const verts = [];
-  const half = 0.52;
-  for (let i = 0; i < n; i++) {
-    const a = (i / n) * TAU;
-    verts.push([Math.cos(a), half, Math.sin(a)]);
-  }
-  for (let i = 0; i < n; i++) {
-    const a = ((i + 0.5) / n) * TAU;
-    verts.push([Math.cos(a), -half, Math.sin(a)]);
-  }
-  const apexTop = verts.push([0, half + 0.40, 0]) - 1;
-  const apexBot = verts.push([0, -half - 0.40, 0]) - 1;
-
-  const top = i => i % n;
-  const bot = i => n + (i % n);
-  const faces = [];
-  for (let i = 0; i < n; i++) {
-    faces.push([top(i), top(i + 1), bot(i)]);
-    faces.push([bot(i), top(i + 1), bot(i + 1)]);
-    faces.push([apexTop, top(i + 1), top(i)]);
-    faces.push([apexBot, bot(i), bot(i + 1)]);
-  }
-  return normalize({ verts, faces });
-}
-
-// A squat trapezohedron. Same construction as the tall one — the planar apex
-// height is not negotiable — but flattened harder, which reads as a ball of
-// facets rather than a pair of cones.
-//
-// (An actual rhombic solid was tried here and cut: pulling one ring inward to
-// turn the kites into rhombi makes every face non-planar, the same way guessing
-// the apex height did.)
-// `flatten` scales the pole height directly, so smaller values are squatter —
-// 1.0 puts the poles level with the equator, giving a ball of facets rather
-// than the pair of cones a larger value produces.
-function squat(n) {
-  return trapezohedron(n, 0.85);
-}
-
-// Elongated bipyramid: a prism band with a pyramid on each end. Reads as a
-// crystal rather than a drum or a pair of cones.
-function elongated(n) {
-  const verts = [];
-  const half = 0.62;
-  for (let i = 0; i < n; i++) {
-    const a = (i / n) * TAU;
-    verts.push([Math.cos(a), half, Math.sin(a)]);
-  }
-  for (let i = 0; i < n; i++) {
-    const a = (i / n) * TAU;
-    verts.push([Math.cos(a), -half, Math.sin(a)]);
-  }
-  const apexTop = verts.push([0, half + 0.42, 0]) - 1;
-  const apexBot = verts.push([0, -half - 0.42, 0]) - 1;
-
-  const faces = [];
-  for (let i = 0; i < n; i++) {
-    const j = (i + 1) % n;
-    faces.push([i, j, n + j, n + i]);
-    faces.push([apexTop, j, i]);
-    faces.push([apexBot, n + i, n + j]);
-  }
-  return normalize({ verts, faces });
-}
-
 // Banded drum: rings of quads stacked up a sphere, closed with a small cap at
 // each pole. This is the family that scales — vertices spread evenly over the
 // surface instead of converging on two apexes, so a drum stays countable at 120
@@ -501,29 +427,6 @@ function claimSearchBudget() {
   return true;
 }
 
-// Every die gets a real, fair solid — no flat tokens.
-//
-//   - Coin for d2, since no two-faced polyhedron exists
-//   - Platonic solids where one exists (d4, d6, d8, d12, d20)
-//   - Trapezohedron for even counts: 2n kite faces. This is how physical d10s
-//     are made, and it extends to d14, d16, d24, d30 and beyond.
-//   - Prism barrel for odd counts: n numbered faces around the equator with a
-//     pointed cap at each pole. This is how physical d5s and d7s are made, and
-//     it gives an exact face count for any n — a d17 gets seventeen faces, not
-//     an eighteen-faced solid pretending.
-//
-// Every face of a given solid is equivalent under its rotational symmetry, so
-// the shape is honest about the die. (The roll itself is decided by crypto RNG
-// regardless; this is about the geometry not lying.)
-// Families used for dice too large to draw facet-per-face. Each produces a
-// clearly different silhouette: cones, a drum, a crystal, a rhombic ball.
-const LARGE_FAMILIES = [
-  n => trapezohedron(n, 1.45), // rounded cones
-  antiprism,                   // straight-sided drum
-  elongated,                   // faceted crystal
-  squat,                       // ball of facets
-];
-
 // Choose the shape from the number's own arithmetic, so it is stable across
 // rolls but varies across dice. The smallest prime factor picks the family and
 // the digit sum nudges the facet count, which spreads neighbours like d100 and
@@ -572,48 +475,79 @@ function drumWithRemainder(total, profile) {
   // Split that many cap triangles in two by adding a midpoint on their outer
   // edge. Each split adds exactly one face and keeps every face planar, since a
   // triangle's parts are triangles.
+  //
+  // Spread around the caps rather than taken from wherever a scan finds first.
+  // The previous version called findIndex for a triangle and spliced the two
+  // halves back in at that same index, so the next scan found one of the halves
+  // it had just made: every extra facet subdivided the same wedge again, and a
+  // die needing six of them grew one shredded sliver instead of six even ones.
   const verts = base.verts.map(v => v.slice());
-  const faces = base.faces.map(f => f.slice());
-  for (let n = 0; n < shortfall; n++) {
-    const idx = faces.findIndex(f => f.length === 3);
-    if (idx === -1) break;
-    const [apex, a, b] = faces[idx];
+  const quads = base.faces.filter(f => f.length > 3);
+  const tris = base.faces.filter(f => f.length === 3).map(f => f.slice());
+
+  let at = 0;
+  for (let n = 0; n < shortfall && tris.length; n++) {
+    at %= tris.length;
+    const [apex, a, b] = tris[at];
     const mid = verts.push([
       (verts[a][0] + verts[b][0]) / 2,
       (verts[a][1] + verts[b][1]) / 2,
       (verts[a][2] + verts[b][2]) / 2,
     ]) - 1;
-    faces.splice(idx, 1, [apex, a, mid], [apex, mid, b]);
+    tris.splice(at, 1, [apex, a, mid], [apex, mid, b]);
+    // Past both halves, so the next split lands on the next wedge round.
+    at += 2;
   }
-  return { verts, faces };
+  return { verts, faces: [...quads, ...tris] };
 }
 
 function largeSolid(sides, budget = MAX_FACETS) {
-  let smallestFactor = sides;
-  for (let f = 2; f * f <= sides; f++) {
-    if (sides % f === 0) { smallestFactor = f; break; }
-  }
   const digitSum = String(sides).split('').reduce((a, c) => a + Number(c), 0);
 
-  // Past what the pointed families can carry, only the drum stays countable, so
-  // high dice all use it and take their variety from proportions instead. A d100
-  // then reads as genuinely many-sided rather than as a twelve-sided fake.
-  if (sides > POINTED_LIMIT) {
-    const target = Math.min(budget, Math.round(sides * 0.8));
-    // Rounder dice get more rings; the digit sum varies the ring/column split so
-    // neighbours differ without either dimension getting too fine to read.
-    const bands = 2 + (digitSum % 3);
-    const around = Math.max(6, Math.min(22, Math.round(target / (bands + 1))));
-    return drum(around, bands);
+  // Detail still grows with the die, so a d900 reads as denser than a d130,
+  // and stops growing at the budget the render size can carry.
+  const target = Math.min(budget, Math.round(sides * 0.8));
+
+  // Every ring/column split that lands inside the budget, rather than one
+  // divisor guess.
+  //
+  // This used to compute `around = round(target / (bands + 1))` and clamp it to
+  // 22. A drum's face count is `around * (bands + 2)` — the two caps contribute
+  // a ring of triangles each — so the estimate was wrong in both directions: it
+  // overshot the budget at four bands (132 facets against 120) and, because the
+  // clamp bit for every die above about d150, it collapsed the entire range on
+  // to three shapes. 875 of the 880 dice from d121 to d1000 drew as one of
+  // three drums.
+  const all = [];
+  for (let bands = 2; bands <= 6; bands++) {
+    for (let around = 5; around <= 30; around++) {
+      all.push({ around, bands, faces: around * (bands + 2) });
+    }
   }
 
-  const family = LARGE_FAMILIES[(smallestFactor + digitSum) % LARGE_FAMILIES.length];
+  // A floor as well as a ceiling: a shape well under budget looks coarse next
+  // to its neighbours for no reason.
+  let fits = all.filter(f => f.faces <= target && f.faces >= target * 0.7);
 
-  // Facets grow with the die so a d70 visibly carries more than a d41, while
-  // the digit sum keeps neighbours from collapsing onto one shape.
-  const fromSize = Math.round(Math.sqrt(sides) * 1.5);
-  const facets = Math.max(6, Math.min(Math.floor(budget / 2), fromSize + (digitSum % 4)));
-  return family(facets);
+  // The smallest drum there is has five columns and two bands, so twenty
+  // facets, and the budget at the smallest render size is eighteen. Nothing can
+  // satisfy it. Take the coarsest shapes available and still vary among them,
+  // because collapsing every large die on to one 20-facet drum is the failure
+  // this function is being fixed for.
+  if (!fits.length) {
+    const floor = Math.min(...all.map(f => f.faces));
+    fits = all.filter(f => f.faces <= floor * 1.6);
+  }
+
+  // Chosen by the die's own arithmetic, so a d47 is always the same d47 and
+  // neighbours land on different splits.
+  const { around, bands } = fits[(sides * 7 + digitSum) % fits.length];
+
+  // The silhouette parameter drum() has always taken and this never passed.
+  // Same derivation drumWithFaces uses, so the two ranges agree about what a
+  // die of a given number looks like: below 1 barrels outward, above 1 pinches.
+  const profile = 0.62 + ((sides % 7) / 6) * 0.76;
+  return drum(around, bands, profile);
 }
 
 // Detail is capped by how large the die is actually drawn, not just by its side

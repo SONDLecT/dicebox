@@ -234,18 +234,99 @@ ok('negative sides rejected', solidFor(-5) === null);
 ok('non-numeric sides rejected', solidFor(NaN) === null);
 
 // --- large dice look different from each other ---
-// Everything past the facet cap used to collapse onto one silhouette, so a d30,
-// a d57 and a d100 were indistinguishable. The family and facet count now come
-// from the number's own arithmetic: stable per die, varied across dice.
+//
+// Everything past the facet cap used to collapse on to one silhouette. The
+// check that replaced it compared `faces.length/verts.length` for twelve probe
+// dice and asked for six distinct signatures, which is a bar that a badly
+// collapsed range clears easily: at the time it passed, 875 of the 880 dice
+// from d121 to d1000 were drawing as one of three meshes.
+//
+// So this hashes the actual geometry across the whole range instead.
 {
-  const probe = [30, 41, 50, 57, 60, 66, 75, 100, 127, 200, 360, 1000];
-  const shapes = new Set(probe.map(s => {
-    const solid = solidFor(s);
-    return `${solid.faces.length}/${solid.verts.length}`;
-  }));
-  ok('large dice have varied silhouettes', shapes.size >= 6,
-     `only ${shapes.size} distinct among ${probe.length}`);
+  const meshKey = s => JSON.stringify([
+    s.verts.map(v => v.map(x => +x.toFixed(6))),
+    s.faces,
+  ]);
 
+  const groups = new Map();
+  for (let sides = 121; sides <= 1000; sides++) {
+    const k = meshKey(solidFor(sides, 96));
+    groups.set(k, (groups.get(k) || 0) + 1);
+  }
+  const total = 880;
+  const biggest = Math.max(...groups.values());
+  const topThree = [...groups.values()].sort((a, b) => b - a).slice(0, 3)
+    .reduce((a, b) => a + b, 0);
+
+  ok('large dice are not all the same shape', groups.size >= 100,
+     `${groups.size} distinct meshes across ${total} dice`);
+  // The failure being guarded against is a handful of meshes serving everything.
+  ok('no single shape serves a large share of the range', biggest <= total * 0.05,
+     `one mesh covers ${biggest}/${total}`);
+  ok('the three most reused shapes do not dominate', topThree <= total * 0.15,
+     `top three cover ${topThree}/${total}`);
+}
+
+// --- the facet budget means something ---
+//
+// A drum's face count is `around * (bands + 2)`: the two cap fans contribute a
+// ring of triangles each. largeSolid used to size it with `bands + 1`, which
+// overshot at four bands and — because it then clamped the column count — threw
+// away almost all of the available variety as well.
+{
+  // facetBudget(size): >= 60 -> 120, >= 40 -> 60, >= 26 -> 36, else 18.
+  for (const [size, budget] of [[96, 120], [48, 60], [30, 36]]) {
+    let over = 0, worst = 0, worstDie = 0;
+    for (let sides = 23; sides <= 1000; sides++) {
+      const faces = solidFor(sides, size).faces.length;
+      if (faces > budget) { over++; if (faces > worst) { worst = faces; worstDie = sides; } }
+    }
+    ok(`the ${budget}-facet budget holds for drum-family dice`, over === 0,
+       `${over} over, worst d${worstDie} at ${worst}`);
+  }
+
+  // Known and deliberate: the pointed families below d23 size themselves from
+  // the die rather than the budget, and prismBarrel draws three faces per side,
+  // so a d21 is 63 facets at any render size. Recorded rather than asserted
+  // away, because the fix for it is edge selection rather than a smaller mesh.
+  ok('the pointed range is the known exception',
+     solidFor(21, 20).faces.length === 63,
+     `d21 is ${solidFor(21, 20).faces.length} faces`);
+}
+
+// --- remainder facets are spread, not stacked ---
+//
+// A die whose face count does not factor cleanly gets the shortfall by halving
+// cap triangles. The previous implementation found the first triangle, spliced
+// both halves back in at that index, and so found one of its own halves next
+// time round: the extra facets recursively shredded a single wedge instead of
+// going round the cap. Nine dice between d23 and d120 carried a 4x area spread
+// because of it.
+{
+  const area = (s, f) => {
+    const [a, b, c] = f.map(i => s.verts[i]);
+    const u = [b[0]-a[0], b[1]-a[1], b[2]-a[2]];
+    const v = [c[0]-a[0], c[1]-a[1], c[2]-a[2]];
+    return 0.5 * Math.hypot(
+      u[1]*v[2] - u[2]*v[1], u[2]*v[0] - u[0]*v[2], u[0]*v[1] - u[1]*v[0]);
+  };
+
+  let worst = 0, worstDie = 0;
+  for (let sides = 23; sides <= 120; sides++) {
+    const s = solidFor(sides, 96);
+    const tris = s.faces.filter(f => f.length === 3).map(f => area(s, f));
+    if (tris.length < 2) continue;
+    const spread = Math.max(...tris) / Math.min(...tris);
+    if (spread > worst) { worst = spread; worstDie = sides; }
+  }
+  // One round of halving gives exactly 2x. Anything beyond means a triangle was
+  // split that had already been split.
+  ok('no cap triangle is split twice', worst <= 2.01,
+     `worst spread ${worst.toFixed(1)}x at d${worstDie}`);
+}
+
+// --- a shape is stable, and reads as a solid ---
+{
   // Same die, same shape every time — the variety must not be random.
   const first = solidFor(57);
   ok('shape is stable per side count', solidFor(57) === first);
