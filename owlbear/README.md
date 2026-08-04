@@ -10,6 +10,10 @@ in, the install-to-home-screen parts come out, and the headers permit exactly
 one site to frame the panel. A fix anywhere in Dicebox reaches the panel by
 rebuilding it.
 
+The action icon is copied from the project's canonical `brand/d20.svg` mark.
+PWA, dashboard and Owlbear artwork therefore share the same deconstructed-d20
+geometry rather than maintaining separate identities.
+
 ## What it is and is not
 
 **It is a peer.** Everyone who wants the shared log needs the passphrase and

@@ -1,5 +1,9 @@
 # Dicebox
 
+<p align="center">
+  <img src="brand/d20.svg" alt="Dicebox deconstructed d20 mark" width="112">
+</p>
+
 An offline dice roller for tabletop RPGs. No build step, no dependencies, no
 network.
 

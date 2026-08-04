@@ -43,6 +43,16 @@ for (const file of ['index.html', 'app.js', 'dice.js', 'render.js', 'room.js',
   ok(`${file} is built`, present.has(file));
 }
 
+// Branding has one source of truth. The Owlbear action must be byte-for-byte the
+// same d20 mark used to generate the PWA and dashboard icons, or the project
+// quietly drifts back to two identities.
+const brandIcon = join(ROOT, 'brand', 'd20.svg');
+ok('the canonical d20 brand mark exists', existsSync(brandIcon));
+if (existsSync(brandIcon) && present.has('icon.svg')) {
+  ok('the Owlbear action uses the canonical d20 brand mark',
+     readFileSync(join(OUT, 'icon.svg')).equals(readFileSync(brandIcon)));
+}
+
 // Nothing the page names may be missing, because the panel has no fallback for
 // a 404 and a missing module means the entry module never evaluates at all.
 // This is also what catches the PWA-stripping regexes removing one line too
@@ -156,6 +166,7 @@ ok('a preflight is answered', /OPTIONS/.test(worker));
 // --- the manifest ---
 
 ok('the manifest targets a known manifest version', manifest.manifest_version === 1);
+ok('the unified-branding release bumps the extension version', manifest.version === '1.0.2', manifest.version);
 ok('the manifest has an action', !!manifest.action && typeof manifest.action.popover === 'string');
 // Silently truncated by Owlbear rather than rejected, so it has to be caught here.
 ok('the name is within Owlbear\'s 45 characters', manifest.name.length <= 45, `${manifest.name.length}`);

@@ -1,4 +1,4 @@
-// Generates the PWA icons: a d20 silhouette in line work, matching the app.
+// Generates rounded PWA tiles from the canonical deconstructed-d20 brand mark.
 // Writes real PNGs with zlib-compressed scanlines — no image library needed.
 
 const fs = require('fs');
@@ -46,41 +46,47 @@ function png(width, height, rgba) {
   ]);
 }
 
-// A d20 seen face-on is a hexagon outline with an inscribed triangle and the
-// three spokes joining them — the minimum line set that reads as an icosahedron.
 function draw(size, maskable) {
   const buf = Buffer.alloc(size * size * 4);
   const bg = [0xFC, 0xFC, 0xFA];
   const fg = [0x1A, 0x1A, 0x18];
 
-  for (let i = 0; i < size * size; i++) {
-    buf[i*4] = bg[0]; buf[i*4+1] = bg[1]; buf[i*4+2] = bg[2]; buf[i*4+3] = 255;
-  }
-
   const cx = size / 2, cy = size / 2;
-  const r = size * (maskable ? 0.30 : 0.37);
-  const lw = Math.max(2, size * 0.022);
+  const tileRadius = size * (104 / 512);
 
-  // A d20 face-on: hexagonal outline, an inner triangle rotated 60° against it,
-  // and spokes joining the two. The rotation matters — align the triangle with
-  // the hexagon's corners and the three spokes become radial, which is the
-  // standard 2D drawing of a cube, not an icosahedron.
-  const hex = [], tri = [], inner = r * 0.52;
-  for (let i = 0; i < 6; i++) {
-    const a = -Math.PI / 2 + i * Math.PI / 3;
-    hex.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]);
-  }
-  for (let i = 0; i < 3; i++) {
-    const a = Math.PI / 2 + i * (2 * Math.PI / 3);
-    tri.push([cx + Math.cos(a) * inner, cy + Math.sin(a) * inner]);
+  // The ordinary icons are rounded tiles with transparent corners. A maskable
+  // icon keeps the whole canvas because the launcher supplies its own crop.
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const dx = Math.abs(x + 0.5 - cx) - (size / 2 - tileRadius);
+      const dy = Math.abs(y + 0.5 - cy) - (size / 2 - tileRadius);
+      const signed = Math.hypot(Math.max(dx, 0), Math.max(dy, 0))
+        + Math.min(Math.max(dx, dy), 0) - tileRadius;
+      const alpha = maskable ? 255 : Math.round(255 * Math.max(0, Math.min(1, 0.5 - signed)));
+      const i = (y * size + x) * 4;
+      buf[i] = bg[0]; buf[i+1] = bg[1]; buf[i+2] = bg[2]; buf[i+3] = alpha;
+    }
   }
 
-  const lines = [];
-  for (let i = 0; i < 6; i++) lines.push([hex[i], hex[(i+1) % 6]]);
-  for (let i = 0; i < 3; i++) lines.push([tri[i], tri[(i+1) % 3]]);
-  // Each triangle corner reaches to the hexagon vertex two steps around, so the
-  // spokes cross the field at an angle instead of pointing straight out.
-  for (let i = 0; i < 3; i++) lines.push([tri[i], hex[(i * 2) % 6]]);
+  // These are the visible segments of brand/d20.svg, expressed in its 24×24
+  // coordinate system. Keeping the coordinates together makes visual drift
+  // between the SVG action mark and generated PNG tiles obvious in review.
+  const p = (x, y) => {
+    const scale = size * (maskable ? 0.62 : 0.72) / 24;
+    return [cx + (x - 12) * scale, cy + (y - 12) * scale];
+  };
+  const v = {
+    top: p(12, 2.4), ur: p(20.3, 7), lr: p(20.3, 17),
+    bottom: p(12, 21.6), ll: p(3.7, 17), ul: p(3.7, 7),
+    faceR: p(16.4, 9.6), center: p(12, 12.2), faceL: p(7.6, 9.6),
+  };
+  const lines = [
+    [v.top, v.ur], [v.ur, v.lr], [v.lr, v.bottom],
+    [v.bottom, v.ll], [v.ll, v.ul], [v.ul, v.top],
+    [v.top, v.faceR], [v.faceR, v.center], [v.center, v.faceL], [v.faceL, v.top],
+    [v.center, v.bottom], [v.faceL, v.ul], [v.faceR, v.ur],
+  ];
+  const lw = Math.max(2, size * (1.5 / 24) * (maskable ? 0.62 : 0.72));
 
   const px = (x, y, a) => {
     if (x < 0 || y < 0 || x >= size || y >= size) return;
