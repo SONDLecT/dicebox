@@ -259,126 +259,6 @@ function prismBarrel(n) {
   return normalize({ verts, faces });
 }
 
-// Antiprism: two rings offset by half a step, joined by a band of triangles and
-// closed with a shallow pyramid at each end. Reads as a straight-sided drum
-// rather than the cones a trapezohedron gives.
-//
-// The ends are pyramids rather than flat n-gon caps on purpose. A flat cap is
-// many times the area of a band triangle, and the resting-orientation search
-// scores by visible area — so a capped antiprism landed on one of its two lids
-// almost every roll, which looked like the die had only two outcomes.
-function antiprism(n) {
-  const verts = [];
-  const half = 0.52;
-  for (let i = 0; i < n; i++) {
-    const a = (i / n) * TAU;
-    verts.push([Math.cos(a), half, Math.sin(a)]);
-  }
-  for (let i = 0; i < n; i++) {
-    const a = ((i + 0.5) / n) * TAU;
-    verts.push([Math.cos(a), -half, Math.sin(a)]);
-  }
-  const apexTop = verts.push([0, half + 0.40, 0]) - 1;
-  const apexBot = verts.push([0, -half - 0.40, 0]) - 1;
-
-  const top = i => i % n;
-  const bot = i => n + (i % n);
-  const faces = [];
-  for (let i = 0; i < n; i++) {
-    faces.push([top(i), top(i + 1), bot(i)]);
-    faces.push([bot(i), top(i + 1), bot(i + 1)]);
-    faces.push([apexTop, top(i + 1), top(i)]);
-    faces.push([apexBot, bot(i), bot(i + 1)]);
-  }
-  return normalize({ verts, faces });
-}
-
-// A squat trapezohedron. Same construction as the tall one — the planar apex
-// height is not negotiable — but flattened harder, which reads as a ball of
-// facets rather than a pair of cones.
-//
-// (An actual rhombic solid was tried here and cut: pulling one ring inward to
-// turn the kites into rhombi makes every face non-planar, the same way guessing
-// the apex height did.)
-// `flatten` scales the pole height directly, so smaller values are squatter —
-// 1.0 puts the poles level with the equator, giving a ball of facets rather
-// than the pair of cones a larger value produces.
-function squat(n) {
-  return trapezohedron(n, 0.85);
-}
-
-// Elongated bipyramid: a prism band with a pyramid on each end. Reads as a
-// crystal rather than a drum or a pair of cones.
-function elongated(n) {
-  const verts = [];
-  const half = 0.62;
-  for (let i = 0; i < n; i++) {
-    const a = (i / n) * TAU;
-    verts.push([Math.cos(a), half, Math.sin(a)]);
-  }
-  for (let i = 0; i < n; i++) {
-    const a = (i / n) * TAU;
-    verts.push([Math.cos(a), -half, Math.sin(a)]);
-  }
-  const apexTop = verts.push([0, half + 0.42, 0]) - 1;
-  const apexBot = verts.push([0, -half - 0.42, 0]) - 1;
-
-  const faces = [];
-  for (let i = 0; i < n; i++) {
-    const j = (i + 1) % n;
-    faces.push([i, j, n + j, n + i]);
-    faces.push([apexTop, j, i]);
-    faces.push([apexBot, n + i, n + j]);
-  }
-  return normalize({ verts, faces });
-}
-
-// Banded drum: rings of quads stacked up a sphere, closed with a small cap at
-// each pole. This is the family that scales — vertices spread evenly over the
-// surface instead of converging on two apexes, so a drum stays countable at 120
-// faces where a trapezohedron is an unreadable blob by 40.
-//
-// That is what makes a legible d100 possible: not fewer facets, but facets that
-// do not all run to a point.
-function drum(around, bands, profile = 1) {
-  const verts = [];
-  const rows = [];
-
-  // `profile` shapes the silhouette so drums of similar density stay tellable
-  // apart: below 1 it barrels outward, above 1 it pinches toward the poles.
-  for (let k = 0; k <= bands; k++) {
-    const y = 0.62 - (1.24 * k) / bands;
-    const r = Math.pow(Math.max(0.05, 1 - (y * 1.05) ** 2), 0.5 * profile);
-    const row = [];
-    for (let i = 0; i < around; i++) {
-      const a = (i / around) * TAU;
-      row.push(verts.push([Math.cos(a) * r, y, Math.sin(a) * r]) - 1);
-    }
-    rows.push(row);
-  }
-
-  const apexTop = verts.push([0, 0.86, 0]) - 1;
-  const apexBot = verts.push([0, -0.86, 0]) - 1;
-
-  // Rings are aligned rather than staggered, and the band faces are trapezoids
-  // whose four corners share a plane. Staggering the rows looked more like a
-  // real many-sided die but made every quad non-planar, and the front/back edge
-  // test then misclassified edges — which drew as holes in the mesh.
-  const faces = [];
-  for (let k = 0; k < bands; k++) {
-    for (let i = 0; i < around; i++) {
-      const j = (i + 1) % around;
-      faces.push([rows[k][i], rows[k][j], rows[k + 1][j], rows[k + 1][i]]);
-    }
-  }
-  for (let i = 0; i < around; i++) {
-    const j = (i + 1) % around;
-    faces.push([apexTop, rows[0][j], rows[0][i]]);
-    faces.push([apexBot, rows[bands][i], rows[bands][j]]);
-  }
-  return normalize({ verts, faces });
-}
-
 function normalize(solid) {
   const scale = Math.max(...solid.verts.map(v => Math.hypot(...v)));
   return { verts: solid.verts.map(v => v.map(x => x / scale)), faces: solid.faces };
@@ -501,125 +381,115 @@ function claimSearchBudget() {
   return true;
 }
 
-// Every die gets a real, fair solid — no flat tokens.
+// A die with a given number of facets, spread evenly over a sphere.
 //
-//   - Coin for d2, since no two-faced polyhedron exists
-//   - Platonic solids where one exists (d4, d6, d8, d12, d20)
-//   - Trapezohedron for even counts: 2n kite faces. This is how physical d10s
-//     are made, and it extends to d14, d16, d24, d30 and beyond.
-//   - Prism barrel for odd counts: n numbered faces around the equator with a
-//     pointed cap at each pole. This is how physical d5s and d7s are made, and
-//     it gives an exact face count for any n — a d17 gets seventeen faces, not
-//     an eighteen-faced solid pretending.
+// Spread N points over the sphere, take their convex hull, then the polar dual.
+// The hull has one vertex per point, so its dual has exactly one face per
+// point: N facets, however awkward N is. No factorising, no remainder wedges.
 //
-// Every face of a given solid is equivalent under its rotational symmetry, so
-// the shape is honest about the die. (The roll itself is decided by crypto RNG
-// regardless; this is about the geometry not lying.)
-// Families used for dice too large to draw facet-per-face. Each produces a
-// clearly different silhouette: cones, a drum, a crystal, a rhombic ball.
-const LARGE_FAMILIES = [
-  n => trapezohedron(n, 1.45), // rounded cones
-  antiprism,                   // straight-sided drum
-  elongated,                   // faceted crystal
-  squat,                       // ball of facets
-];
-
-// Choose the shape from the number's own arithmetic, so it is stable across
-// rolls but varies across dice. The smallest prime factor picks the family and
-// the digit sum nudges the facet count, which spreads neighbours like d100 and
-// d102 apart instead of collapsing them onto one shape.
-// A drum with exactly `total` faces. Faces are around*bands quads plus 2*around
-// cap triangles, so total = around * (bands + 2). Picking the divisor pair
-// closest to square keeps rings and columns similar in size, which reads better
-// than a few tall bands or one very fine ring.
-function drumWithFaces(total) {
-  // Silhouette varies with the die so two drums of similar density do not read
-  // as the same object: below 1 barrels outward, above 1 pinches toward the poles.
-  const profile = 0.62 + ((total % 7) / 6) * 0.76;
-
-  // total = around * bands + 2 * around, so any divisor of `total` that leaves
-  // a workable ring count gives an exact face count. Prefer the split closest to
-  // square: a few tall bands or one very fine ring both read worse.
-  let best = null;
-  for (let bands = 1; bands <= 10; bands++) {
-    const around = total / (bands + 2);
-    if (!Number.isInteger(around) || around < 5 || around > 30) continue;
-    const squareness = Math.abs(Math.log(around / (bands + 2)));
-    if (!best || squareness < best.squareness) best = { around, bands, squareness };
+// This replaced a banded drum, and the reason is what a drum looks like rather
+// than what it is. A drum's facets sit in rows and columns, and rows and
+// columns read as a barrel — the eye finds the structure before it finds the
+// count. Points on a Fibonacci spiral have no rows, so the facets read as a
+// many-sided die does: evenly sized, evenly spread, and countable in principle
+// rather than arranged in a grid.
+//
+// Every face is exactly planar by construction. The face belonging to point p
+// lies in the plane p·x = 1, which is what polar duality means; there is no
+// tolerance involved and nothing to check.
+function fibonacciPoints(n) {
+  const pts = [];
+  // The golden angle. Nothing shorter spreads points on a sphere this evenly.
+  const golden = Math.PI * (3 - Math.sqrt(5));
+  for (let i = 0; i < n; i++) {
+    const y = 1 - (2 * i + 1) / n;
+    const r = Math.sqrt(Math.max(0, 1 - y * y));
+    const a = golden * i;
+    pts.push(norm([Math.cos(a) * r, y, Math.sin(a) * r]));
   }
-  if (best) return drum(best.around, best.bands, profile);
-
-  // No clean factorisation — 26 and 58 are the awkward cases. Rather than accept
-  // a wrong face count, take the exact ring count and put the remainder in a
-  // single ring of extra facets at one pole.
-  return drumWithRemainder(total, profile);
+  return pts;
 }
 
-// Exact face count when `total` does not factor: build the largest drum that
-// fits, then split one cap's triangles to make up the difference.
-function drumWithRemainder(total, profile) {
-  let around = 0, bands = 0;
-  for (let a = 30; a >= 5; a--) {
-    for (let b = 1; b <= 10; b++) {
-      const faces = a * (b + 2);
-      if (faces <= total && faces > around * (bands + 2)) { around = a; bands = b; }
+// Incremental convex hull. Every point is on the sphere and so every one is a
+// hull vertex; this is really their Delaunay triangulation. hullFaces above
+// cannot do this job — it compares every triple against every vertex, which is
+// fine for the twenty-vertex Platonics it was written for and far too slow at a
+// hundred and twenty.
+function convexHull(points) {
+  const faces = [];
+  const add = (a, b, c) => {
+    const n = cross(sub(points[b], points[a]), sub(points[c], points[a]));
+    faces.push({ v: [a, b, c], n, d: dot(n, points[a]) });
+  };
+  // Seed with a degenerate two-sided triangle; the first insertion inflates it.
+  add(0, 1, 2);
+  add(0, 2, 1);
+
+  for (let i = 3; i < points.length; i++) {
+    const p = points[i];
+    const visible = new Set();
+    faces.forEach((f, k) => { if (dot(f.n, p) - f.d > 1e-12) visible.add(k); });
+    if (!visible.size) continue;
+
+    // The horizon is the edges of the visible region that the region does not
+    // share with itself — every other edge is interior and disappears.
+    const seen = new Map();
+    for (const k of visible) {
+      const [a, b, c] = faces[k].v;
+      for (const [x, y] of [[a, b], [b, c], [c, a]]) {
+        const key = x < y ? `${x}:${y}` : `${y}:${x}`;
+        seen.set(key, (seen.get(key) || 0) + 1);
+      }
     }
-  }
-  const base = drum(around, bands, profile);
-  const shortfall = total - around * (bands + 2);
-  if (shortfall <= 0) return base;
+    const horizon = [];
+    for (const k of visible) {
+      const [a, b, c] = faces[k].v;
+      for (const [x, y] of [[a, b], [b, c], [c, a]]) {
+        const key = x < y ? `${x}:${y}` : `${y}:${x}`;
+        if (seen.get(key) === 1) horizon.push([x, y]);
+      }
+    }
 
-  // Split that many cap triangles in two by adding a midpoint on their outer
-  // edge. Each split adds exactly one face and keeps every face planar, since a
-  // triangle's parts are triangles.
-  const verts = base.verts.map(v => v.slice());
-  const faces = base.faces.map(f => f.slice());
-  for (let n = 0; n < shortfall; n++) {
-    const idx = faces.findIndex(f => f.length === 3);
-    if (idx === -1) break;
-    const [apex, a, b] = faces[idx];
-    const mid = verts.push([
-      (verts[a][0] + verts[b][0]) / 2,
-      (verts[a][1] + verts[b][1]) / 2,
-      (verts[a][2] + verts[b][2]) / 2,
-    ]) - 1;
-    faces.splice(idx, 1, [apex, a, mid], [apex, mid, b]);
+    const kept = faces.filter((_, k) => !visible.has(k));
+    faces.length = 0;
+    faces.push(...kept);
+    for (const [x, y] of horizon) add(x, y, i);
   }
-  return { verts, faces };
+  return faces;
 }
 
-function largeSolid(sides, budget = MAX_FACETS) {
-  let smallestFactor = sides;
-  for (let f = 2; f * f <= sides; f++) {
-    if (sides % f === 0) { smallestFactor = f; break; }
-  }
-  const digitSum = String(sides).split('').reduce((a, c) => a + Number(c), 0);
+function facetedSphere(n) {
+  const points = fibonacciPoints(n);
+  const hull = convexHull(points);
 
-  // Past what the pointed families can carry, only the drum stays countable, so
-  // high dice all use it and take their variety from proportions instead. A d100
-  // then reads as genuinely many-sided rather than as a twelve-sided fake.
-  if (sides > POINTED_LIMIT) {
-    const target = Math.min(budget, Math.round(sides * 0.8));
-    // Rounder dice get more rings; the digit sum varies the ring/column split so
-    // neighbours differ without either dimension getting too fine to read.
-    const bands = 2 + (digitSum % 3);
-    const around = Math.max(6, Math.min(22, Math.round(target / (bands + 1))));
-    return drum(around, bands);
-  }
+  // One dual vertex per hull face: the plane of that face, as a point.
+  const verts = hull.map(f => {
+    const s = f.d || 1e-9;
+    return [f.n[0] / s, f.n[1] / s, f.n[2] / s];
+  });
 
-  const family = LARGE_FAMILIES[(smallestFactor + digitSum) % LARGE_FAMILIES.length];
+  // One dual face per point, wound around that point so the polygon does not
+  // cross itself.
+  const touching = points.map(() => []);
+  hull.forEach((f, i) => f.v.forEach(v => touching[v].push(i)));
 
-  // Facets grow with the die so a d70 visibly carries more than a d41, while
-  // the digit sum keeps neighbours from collapsing onto one shape.
-  const fromSize = Math.round(Math.sqrt(sides) * 1.5);
-  const facets = Math.max(6, Math.min(Math.floor(budget / 2), fromSize + (digitSum % 4)));
-  return family(facets);
+  const faces = [];
+  points.forEach((p, i) => {
+    const ring = touching[i];
+    if (ring.length < 3) return;
+    const first = verts[ring[0]];
+    const u = norm(sub(first, p.map(x => x * dot(p, first))));
+    const w = cross(p, u);
+    faces.push(ring.slice().sort((a, b) => {
+      const va = sub(verts[a], p), vb = sub(verts[b], p);
+      return Math.atan2(dot(va, w), dot(va, u)) - Math.atan2(dot(vb, w), dot(vb, u));
+    }));
+  });
+
+  return normalize({ verts, faces });
 }
 
-// Detail is capped by how large the die is actually drawn, not just by its side
-// count. A die 12px across cannot show 80 facets — the edges land closer than a
-// pixel apart — and paying for geometry nobody can resolve is what pushed a
-// hundred-dice roll past the frame budget. Big single rolls keep full detail.
+
 function facetBudget(size) {
   if (!size || size >= 60) return MAX_FACETS;
   if (size >= 40) return 60;
@@ -648,14 +518,17 @@ export function solidFor(sides, size = null) {
       ? trapezohedron(sides / 2)
       : prismBarrel(sides);
   } else if (sides <= budget) {
-    // Still one face per side, but as a drum — a pointed solid with this many
-    // facets converges into an unreadable blob, while a drum stays countable.
-    solid = drumWithFaces(sides);
+    // Exactly one facet per side, spread evenly over a sphere.
+    solid = facetedSphere(sides);
   } else {
-    // Too many faces to draw one per side, so the shape becomes representative:
-    // a family and a facet count derived from the number itself, so a d70 still
-    // carries visibly more detail than a d41 and each die keeps one shape.
-    solid = largeSolid(sides, budget);
+    // More facets than can be told apart at this size, so the die shows as
+    // many as it can carry. A d1000 drawn honestly would be a circle; drawn
+    // like this it is the densest sphere that still reads as a solid.
+    // Detail still climbs with the die until the budget stops it, so a d130
+    // carries visibly more than a d121 and everything past about d150 shows the
+    // same maximum. That last part is not a limitation to work around: a die
+    // with more facets than the eye can separate has no more to show.
+    solid = facetedSphere(Math.min(budget, Math.round(sides * 0.8)))
   }
 
   solidCache.set(key, solid);

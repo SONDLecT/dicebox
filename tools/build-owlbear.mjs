@@ -27,6 +27,7 @@ import { dirname, join } from 'node:path';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = join(ROOT, 'owlbear');
+const BRAND_ICON = join(ROOT, 'brand', 'd20.svg');
 
 // Owlbear serves rooms from here, and this is the only origin permitted to
 // frame the panel. Not a variable: widening it is the one edit that would
@@ -106,7 +107,7 @@ rmSync(OUT, { recursive: true, force: true });
 mkdirSync(OUT, { recursive: true });
 
 for (const file of APP_FILES) copyFileSync(join(ROOT, file), join(OUT, file));
-copyFileSync(join(SRC, 'icon.svg'), join(OUT, 'icon.svg'));
+copyFileSync(BRAND_ICON, join(OUT, 'icon.svg'));
 
 // --- the page ---
 

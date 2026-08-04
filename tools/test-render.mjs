@@ -233,19 +233,79 @@ ok('d0 has no solid', solidFor(0) === null);
 ok('negative sides rejected', solidFor(-5) === null);
 ok('non-numeric sides rejected', solidFor(NaN) === null);
 
-// --- large dice look different from each other ---
-// Everything past the facet cap used to collapse onto one silhouette, so a d30,
-// a d57 and a d100 were indistinguishable. The family and facet count now come
-// from the number's own arithmetic: stable per die, varied across dice.
+// --- a die shows the number of facets it is supposed to have ---
+//
+// The point of the shape is the count. A d47 that draws 47 facets is telling
+// the truth about itself; a barrel of roughly that density is not, however
+// varied the barrels are. Faceted spheres give an exact count for any number,
+// which no factorisation of a drum could.
 {
-  const probe = [30, 41, 50, 57, 60, 66, 75, 100, 127, 200, 360, 1000];
-  const shapes = new Set(probe.map(s => {
-    const solid = solidFor(s);
-    return `${solid.faces.length}/${solid.verts.length}`;
-  }));
-  ok('large dice have varied silhouettes', shapes.size >= 6,
-     `only ${shapes.size} distinct among ${probe.length}`);
+  let wrong = [];
+  for (let sides = 23; sides <= 120; sides++) {
+    const faces = solidFor(sides, 96).faces.length;
+    if (faces !== sides) wrong.push(`d${sides}:${faces}`);
+  }
+  ok('every die from d23 to d120 has exactly its own facet count',
+     wrong.length === 0, wrong.slice(0, 6).join(' '));
+}
 
+// --- past the budget, detail climbs and then stops ---
+//
+// A die with more facets than the eye can separate has nothing more to show, so
+// above the budget every die draws the densest sphere that still reads as a
+// solid. They converge, and that is the intended answer rather than a collapse:
+// the earlier failure was hundreds of dice sharing three *barrels* while
+// pretending to differ, not dice honestly showing the same maximum.
+{
+  const at = n => solidFor(n, 96).faces.length;
+  ok('detail still climbs just past the budget', at(121) < at(140) && at(140) < at(150),
+     `${at(121)} / ${at(140)} / ${at(150)}`);
+  ok('detail stops at the budget', at(150) === 120 && at(1000) === 120,
+     `${at(150)} / ${at(1000)}`);
+  // The budget is a real ceiling, which it was not: at 60 facets, 937 of 1000
+  // dice used to exceed it, some by a third.
+  for (const [size, budget] of [[96, 120], [48, 60], [30, 36]]) {
+    let over = 0, worst = 0;
+    for (let sides = 23; sides <= 1000; sides++) {
+      const f = solidFor(sides, size).faces.length;
+      if (f > budget) { over++; worst = Math.max(worst, f); }
+    }
+    ok(`the ${budget}-facet budget holds`, over === 0, `${over} over, worst ${worst}`);
+  }
+}
+
+// --- the facets are evenly sized ---
+//
+// What makes a many-sided die read as one is that its faces are all about the
+// same size and none of them line up in rows. A Fibonacci spiral gives both;
+// the drum this replaced gave neither, and its remainder wedges could be four
+// times the area of their neighbours.
+{
+  const areaOf = (s, f) => {
+    let a = 0;
+    for (let i = 1; i < f.length - 1; i++) {
+      const p0 = s.verts[f[0]], p1 = s.verts[f[i]], p2 = s.verts[f[i + 1]];
+      const u = [p1[0]-p0[0], p1[1]-p0[1], p1[2]-p0[2]];
+      const v = [p2[0]-p0[0], p2[1]-p0[1], p2[2]-p0[2]];
+      a += 0.5 * Math.hypot(
+        u[1]*v[2]-u[2]*v[1], u[2]*v[0]-u[0]*v[2], u[0]*v[1]-u[1]*v[0]);
+    }
+    return a;
+  };
+
+  let worst = 0, worstDie = 0;
+  for (let sides = 23; sides <= 120; sides++) {
+    const s = solidFor(sides, 96);
+    const areas = s.faces.map(f => areaOf(s, f));
+    const spread = Math.max(...areas) / Math.min(...areas);
+    if (spread > worst) { worst = spread; worstDie = sides; }
+  }
+  ok('no facet is much larger than any other', worst < 1.5,
+     `worst ${worst.toFixed(2)}x at d${worstDie}`);
+}
+
+// --- a shape is stable, and reads as a solid ---
+{
   // Same die, same shape every time — the variety must not be random.
   const first = solidFor(57);
   ok('shape is stable per side count', solidFor(57) === first);

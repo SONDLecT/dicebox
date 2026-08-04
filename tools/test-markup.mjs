@@ -3,6 +3,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { inflateSync } from 'node:zlib';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const html = readFileSync(join(root, 'index.html'), 'utf8');
@@ -261,6 +262,45 @@ for (const icon of manifest.icons) {
 }
 ok('has a maskable icon', manifest.icons.some(i => (i.purpose || '').includes('maskable')));
 ok('has a 512px icon', manifest.icons.some(i => i.sizes === '512x512'));
+
+// Standalone launchers and dashboards should see a rounded tile, not the opaque
+// square that looked poor in Homarr. The maskable icon is intentionally the
+// exception: Android supplies its own crop and requires the full canvas.
+function pngPixels(file) {
+  const data = readFileSync(file);
+  const width = data.readUInt32BE(16), height = data.readUInt32BE(20);
+  const idat = [];
+  for (let p = 8; p < data.length;) {
+    const n = data.readUInt32BE(p);
+    const type = data.toString('ascii', p + 4, p + 8);
+    if (type === 'IDAT') idat.push(data.subarray(p + 8, p + 8 + n));
+    p += n + 12;
+  }
+  const raw = inflateSync(Buffer.concat(idat));
+  const stride = width * 4 + 1;
+  ok(`${file} uses directly readable PNG scanlines`,
+     [...Array(height).keys()].every(y => raw[y * stride] === 0));
+  const alpha = (x, y) => raw[y * stride + 1 + x * 4 + 3];
+  return { width, height, alpha };
+}
+
+for (const name of ['icon-180.png', 'icon-192.png', 'icon-512.png']) {
+  const icon = pngPixels(join(root, 'icons', name));
+  ok(`${name} has transparent rounded corners`,
+     [[0, 0], [icon.width - 1, 0], [0, icon.height - 1],
+      [icon.width - 1, icon.height - 1]].every(([x, y]) => icon.alpha(x, y) === 0));
+  ok(`${name} keeps the middle of every edge opaque`,
+     [[icon.width >> 1, 0], [icon.width >> 1, icon.height - 1],
+      [0, icon.height >> 1], [icon.width - 1, icon.height >> 1]]
+       .every(([x, y]) => icon.alpha(x, y) === 255));
+}
+
+{
+  const icon = pngPixels(join(root, 'icons', 'icon-maskable-512.png'));
+  ok('the maskable icon keeps its full safe-zone canvas',
+     [[0, 0], [icon.width - 1, 0], [0, icon.height - 1],
+      [icon.width - 1, icon.height - 1]].every(([x, y]) => icon.alpha(x, y) === 255));
+}
 
 // Replaying a redirected response from cache re-triggers the redirect, which
 // browsers reject for navigations.
