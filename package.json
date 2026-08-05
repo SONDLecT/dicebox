@@ -7,9 +7,10 @@
   "scripts": {
     "bundle": "node tools/bundle.mjs",
     "build:owlbear": "node tools/build-owlbear.mjs",
-    "test": "node tools/test.mjs && node tools/test-render.mjs && node tools/test-crypto.mjs && node tools/test-room.mjs && node tools/test-pool.mjs && node tools/test-history.mjs && node tools/test-markup.mjs && node tools/test-load.mjs && node tools/test-link.mjs && node tools/test-remote.mjs && node tools/test-relay.mjs && node tools/bundle.mjs && node tools/test-bundle.mjs && node tools/build-owlbear.mjs --relay=wss://relay.example.invalid/ws --out=owlbear/.test-build && node tools/test-owlbear.mjs --out=owlbear/.test-build",
+    "test": "node tools/test.mjs && node tools/test-render.mjs && node tools/test-dcc-shape-study.mjs && node tools/test-crypto.mjs && node tools/test-room.mjs && node tools/test-pool.mjs && node tools/test-history.mjs && node tools/test-markup.mjs && node tools/test-load.mjs && node tools/test-link.mjs && node tools/test-remote.mjs && node tools/test-relay.mjs && node tools/bundle.mjs && node tools/test-bundle.mjs && node tools/build-owlbear.mjs --relay=wss://relay.example.invalid/ws --out=owlbear/.test-build && node tools/test-owlbear.mjs --out=owlbear/.test-build",
     "icons": "node tools/make-icons.cjs",
     "preview": "node tools/preview.cjs",
+    "preview:dcc": "node tools/dcc-shape-study.mjs",
     "serve": "python3 -m http.server 8080",
     "dev": "wrangler dev",
     "deploy": "npm test && node tools/deploy.mjs",

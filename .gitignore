@@ -1,6 +1,8 @@
 node_modules/
 tools/preview.png
 tools/preview.svg
+tools/dcc-shape-study.png
+tools/dcc-shape-study.svg
 
 # The Owlbear panel is built, not written: every file in it is a copy of one at
 # the repo root, with the relay origin baked in. Committing it would mean two
