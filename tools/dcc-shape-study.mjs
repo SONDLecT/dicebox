@@ -34,7 +34,12 @@ function wrapWords(text, maxLength = 25) {
 
 function normalize(solid) {
   const scale = Math.max(...solid.verts.map(mag)) || 1;
-  return { verts: solid.verts.map(v => mul(v, 1 / scale)), faces: solid.faces.map(f => [...f]) };
+  return {
+    ...solid,
+    verts: solid.verts.map(v => mul(v, 1 / scale)),
+    faces: solid.faces.map(f => [...f]),
+    faceKinds: solid.faceKinds ? [...solid.faceKinds] : undefined,
+  };
 }
 
 function rotate(v, rx, ry, rz) {
@@ -110,6 +115,123 @@ function regularPrism(n, halfHeight = 0.72) {
     faces.push([i, j, n + j, n + i]);
   }
   return normalize({ verts, faces });
+}
+
+function subdividedIcosphere(levels = 3) {
+  let { verts, faces } = normalize(solidFor(20));
+  for (let level = 0; level < levels; level++) {
+    const midpoints = new Map();
+    const midpoint = (a, b) => {
+      const key = a < b ? `${a}:${b}` : `${b}:${a}`;
+      if (midpoints.has(key)) return midpoints.get(key);
+      const id = verts.length;
+      verts.push(norm(add(verts[a], verts[b])));
+      midpoints.set(key, id);
+      return id;
+    };
+    const next = [];
+    for (const [a, b, c] of faces) {
+      const ab = midpoint(a, b), bc = midpoint(b, c), ca = midpoint(c, a);
+      next.push([a, ab, ca], [b, bc, ab], [c, ca, bc], [ab, bc, ca]);
+    }
+    faces = next;
+  }
+  return { verts, faces };
+}
+
+function cleanLoop(points, epsilon = 1e-9) {
+  const loop = [];
+  for (const p of points) {
+    if (!loop.length || mag(sub(p, loop.at(-1))) > epsilon) loop.push(p);
+  }
+  if (loop.length > 1 && mag(sub(loop[0], loop.at(-1))) <= epsilon) loop.pop();
+  return loop;
+}
+
+function clipPolygon(points, planeNormal, offset, cuts, epsilon = 1e-10) {
+  const out = [];
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i], q = points[(i + 1) % points.length];
+    const dp = dot(planeNormal, p) - offset;
+    const dq = dot(planeNormal, q) - offset;
+    const pInside = dp <= epsilon, qInside = dq <= epsilon;
+    if (pInside) out.push(p);
+    if (pInside !== qInside) {
+      const t = dp / (dp - dq);
+      const hit = add(p, mul(sub(q, p), t));
+      out.push(hit);
+      cuts.push(hit);
+    }
+  }
+  return cleanLoop(out);
+}
+
+function c3vD7Normals() {
+  // Proven-optimal N=7 spherical code, rotated into its C3v 1+3+3 form.
+  const c = 0.2101383127306031;
+  const lowerZ = -Math.sqrt((1 + 2 * c) / 3);
+  const upperR = Math.sqrt(1 - c * c);
+  const lowerR = Math.sqrt(1 - lowerZ * lowerZ);
+  const normals = [[0, 0, 1]];
+  for (let k = 0; k < 3; k++) {
+    const a = k * TAU / 3;
+    normals.push([upperR * Math.cos(a), upperR * Math.sin(a), c]);
+  }
+  for (let k = 0; k < 3; k++) {
+    const a = Math.PI / 3 + k * TAU / 3;
+    normals.push([lowerR * Math.cos(a), lowerR * Math.sin(a), lowerZ]);
+  }
+  return normals;
+}
+
+function clippedSphereD7(levels = 3) {
+  const normals = c3vD7Normals();
+  const c = 0.2101383127306031;
+  const offset = Math.sqrt((1 + c) / 2);
+  const sphere = subdividedIcosphere(levels);
+  let polygons = sphere.faces.map(face => ({ points: face.map(i => sphere.verts[i]), kind: 'sphere' }));
+
+  for (const planeNormal of normals) {
+    const cuts = [];
+    const clipped = [];
+    for (const polygon of polygons) {
+      const points = clipPolygon(polygon.points, planeNormal, offset, cuts);
+      if (points.length >= 3) clipped.push({ points, kind: polygon.kind });
+    }
+    const unique = new Map();
+    for (const p of cuts) unique.set(p.map(x => Math.round(x * 1e9)).join(':'), p);
+    const ring = [...unique.values()];
+    if (ring.length < 3) throw new Error('d7 clipping failed to produce a landing-flat boundary');
+    const axis = planeNormal;
+    const basisA = norm(Math.abs(axis[2]) < 0.9 ? cross(axis, [0, 0, 1]) : cross(axis, [0, 1, 0]));
+    const basisB = cross(axis, basisA);
+    const center = mul(axis, offset);
+    ring.sort((a, b) => {
+      const pa = sub(a, center), pb = sub(b, center);
+      return Math.atan2(dot(pa, basisB), dot(pa, basisA)) - Math.atan2(dot(pb, basisB), dot(pb, basisA));
+    });
+    if (dot(faceNormal(ring), axis) < 0) ring.reverse();
+    clipped.push({ points: ring, kind: 'cap' });
+    polygons = clipped;
+  }
+
+  const verts = [], byPosition = new Map(), faces = [], faceKinds = [];
+  const vertex = p => {
+    const key = p.map(x => Math.round(x * 1e8)).join(':');
+    if (byPosition.has(key)) return byPosition.get(key);
+    const id = verts.length;
+    verts.push(p);
+    byPosition.set(key, id);
+    return id;
+  };
+  for (const polygon of polygons) {
+    const face = cleanLoop(polygon.points).map(vertex);
+    const clean = face.filter((id, i) => id !== face[(i + face.length - 1) % face.length]);
+    if (clean.length < 3) continue;
+    faces.push(clean);
+    faceKinds.push(polygon.kind);
+  }
+  return normalize({ verts, faces, faceKinds, hideSmoothEdges: true, d7Normals: normals, planeOffset: offset });
 }
 
 function trapezohedron(n, flatten = 1.0) {
@@ -337,8 +459,7 @@ const candidates = {
   cubeD3: current(6),
   d5Prism: regularPrism(3, 0.72),
   d5Soft: bevelSolid(regularPrism(3, 0.72), 0.19),
-  d7Prism: regularPrism(5, 0.78),
-  d7Soft: bevelSolid(regularPrism(5, 0.78), 0.18),
+  d7C3vSphere: clippedSphereD7(3),
   d14Rounder: trapezohedron(7, 0.95),
   d16Bipyramid: bipyramid(8, 1.06),
   d24Deltoidal: deltoidalIcositetrahedron(),
@@ -348,7 +469,6 @@ const candidates = {
 
 const expected = {
   cubeD3: [8, 12, 6], d5Prism: [6, 9, 5], d5Soft: [18, 36, 20],
-  d7Prism: [10, 15, 7], d7Soft: [30, 60, 32],
   d14Rounder: [16, 28, 14], d16Bipyramid: [10, 24, 16],
   d24Deltoidal: [26, 48, 24], d24Tetrakis: [14, 36, 24],
   d30Rhombic: [32, 60, 30],
@@ -363,18 +483,33 @@ for (const [name, counts] of Object.entries(expected)) {
   if (problems.length) throw new Error(`${name}: invalid geometry: ${problems.slice(0, 4).join('; ')}`);
 }
 
+const d7Study = candidates.d7C3vSphere;
+const d7Stats = edgeStats(d7Study);
+const d7Caps = d7Study.faceKinds.filter(kind => kind === 'cap').length;
+const d7Problems = geometryProblems(d7Study);
+const d7C = 0.2101383127306031;
+let d7Contacts = 0;
+for (let i = 0; i < d7Study.d7Normals.length; i++) {
+  if (Math.abs(mag(d7Study.d7Normals[i]) - 1) > 1e-12) throw new Error('d7 spherical-code normal is not a unit vector');
+  for (let j = i + 1; j < d7Study.d7Normals.length; j++) {
+    if (Math.abs(dot(d7Study.d7Normals[i], d7Study.d7Normals[j]) - d7C) < 1e-10) d7Contacts++;
+  }
+}
+if (!d7Stats.manifold || d7Stats.V - d7Stats.E + d7Stats.F !== 2 || d7Caps !== 7 || d7Contacts !== 12 || d7Problems.length) {
+  throw new Error(`d7C3vSphere: invalid clipped sphere; V/E/F=${d7Stats.V}/${d7Stats.E}/${d7Stats.F}; caps=${d7Caps}; contacts=${d7Contacts}; ${d7Problems.slice(0, 3).join('; ')}`);
+}
+
 const controls = [4, 6, 8, 10, 12, 20].map(n => ({ name: `d${n}`, solid: current(n) }));
 const studies = [
   { die: 'd3', finding: 'Replace pointed barrel', current: current(3), options: [
     { label: 'Cube d3 · recommended', note: 'I–III repeated twice', solid: candidates.cubeD3, tone: '#C66B32' },
   ] },
-  { die: 'd5', finding: 'Choose physical edge-read family', current: current(5), options: [
-    { label: 'A · triangular prism', note: 'GameScience-style landmark', solid: candidates.d5Prism, tone: '#C66B32' },
-    { label: 'B · softened prism', note: 'Impact-like silhouette study', solid: candidates.d5Soft, tone: '#397A86' },
+  { die: 'd5', finding: 'Selected: softened edge-read form', current: current(5), options: [
+    { label: 'A · triangular prism', note: 'comparison retained', solid: candidates.d5Prism, tone: '#73776F' },
+    { label: 'B · softened prism · selected', note: 'separate logical outcomes', solid: candidates.d5Soft, tone: '#397A86' },
   ] },
-  { die: 'd7', finding: 'Choose physical edge-read family', current: current(7), options: [
-    { label: 'A · pentagonal prism', note: 'Seven planar regions', solid: candidates.d7Prism, tone: '#C66B32' },
-    { label: 'B · softened prism', note: 'Rounder Impact-like study', solid: candidates.d7Soft, tone: '#397A86' },
+  { die: 'd7', finding: 'Revised from spherical-code research', current: current(7), options: [
+    { label: 'C3v truncated sphere · revised', note: '1+3+3 spherical packing · canonical h/R · unfilleted', solid: candidates.d7C3vSphere, tone: '#397A86' },
   ] },
   { die: 'd14', finding: 'Retain topology; tune proportion', current: current(14), options: [
     { label: 'Rounder trapezohedron', note: 'Same 14 kite faces', solid: candidates.d14Rounder, tone: '#C66B32' },
@@ -382,9 +517,9 @@ const studies = [
   { die: 'd16', finding: 'Replace kite-faced form', current: current(16), options: [
     { label: 'Octagonal bipyramid', note: '16 triangular faces', solid: candidates.d16Bipyramid, tone: '#C66B32' },
   ] },
-  { die: 'd24', finding: 'Choose commercial family', current: current(24), options: [
-    { label: 'A · deltoidal icositetrahedron', note: '24 kite faces · recommended', solid: candidates.d24Deltoidal, tone: '#C66B32' },
-    { label: 'B · tetrakis hexahedron', note: '24 triangular faces', solid: candidates.d24Tetrakis, tone: '#397A86' },
+  { die: 'd24', finding: 'Selected: deltoidal family', current: current(24), options: [
+    { label: 'A · deltoidal icositetrahedron · selected', note: '24 kite faces', solid: candidates.d24Deltoidal, tone: '#C66B32' },
+    { label: 'B · tetrakis hexahedron', note: 'comparison retained', solid: candidates.d24Tetrakis, tone: '#73776F' },
   ] },
   { die: 'd30', finding: 'Replace irregular 5/6/7-gons', current: current(30), options: [
     { label: 'Rhombic triacontahedron', note: '30 golden-rhombus faces', solid: candidates.d30Rhombic, tone: '#C66B32' },
@@ -433,18 +568,37 @@ function drawModel(solid, x, y, width, tone, label, note) {
     const cx = x + 14 + viewW * (vi + 0.5), cy = y + 126, scale = Math.min(65, viewW * 0.38);
     const pts = solid.verts.map(v => rotate(v, ...angles));
     const proj = pts.map(p => { const d = 4 / (4 - p[2]); return [cx + p[0] * scale * d, cy + p[1] * scale * d]; });
+    const frontFaces = solid.faces.map((face, fi) => ({
+      face, fi, front: faceNormal(face.map(i => pts[i]))[2] > 0,
+      depth: face.reduce((sum, i) => sum + pts[i][2], 0) / face.length,
+    })).filter(item => item.front).sort((a, b) => a.depth - b.depth);
+    const sphereFill = [], capFill = [];
+    for (const { face, fi } of frontFaces) {
+      const d = `${face.map((id, i) => `${i ? 'L' : 'M'}${proj[id][0].toFixed(2)},${proj[id][1].toFixed(2)}`).join('')}Z`;
+      (solid.faceKinds?.[fi] === 'cap' ? capFill : sphereFill).push(d);
+    }
+    if (sphereFill.length) out.push(`<path d="${sphereFill.join('')}" fill="${tone}" fill-opacity="${solid.hideSmoothEdges ? 0.10 : 0.055}" stroke="none"/>`);
+    if (capFill.length) out.push(`<path d="${capFill.join('')}" fill="${tone}" fill-opacity="0.20" stroke="none"/>`);
+
     const edges = new Map();
-    for (const face of solid.faces) {
+    solid.faces.forEach((face, fi) => {
       const front = faceNormal(face.map(i => pts[i]))[2] > 0;
+      const kind = solid.faceKinds?.[fi] || 'flat';
       for (let i = 0; i < face.length; i++) {
         const a = face[i], b = face[(i + 1) % face.length], key = a < b ? `${a}:${b}` : `${b}:${a}`;
-        edges.set(key, (edges.get(key) || false) || front);
+        if (!edges.has(key)) edges.set(key, { front: false, back: false, kinds: new Set() });
+        const edge = edges.get(key);
+        edge[front ? 'front' : 'back'] = true;
+        edge.kinds.add(kind);
       }
-    }
+    });
     for (const pass of [false, true]) {
       const d = [];
-      for (const [key, front] of edges) {
-        if (front !== pass) continue;
+      for (const [key, edge] of edges) {
+        const sphereOnly = edge.kinds.size === 1 && edge.kinds.has('sphere');
+        if (solid.hideSmoothEdges && sphereOnly) {
+          if (pass !== true || !edge.front || !edge.back) continue;
+        } else if (edge.front !== pass) continue;
         const [a, b] = key.split(':').map(Number);
         d.push(`M${proj[a][0].toFixed(2)},${proj[a][1].toFixed(2)}L${proj[b][0].toFixed(2)},${proj[b][1].toFixed(2)}`);
       }
@@ -469,7 +623,7 @@ studies.forEach((study, ri) => {
   study.options.forEach((option, oi) => drawModel(option.solid, 770 + oi * 540, y + 13, 520, option.tone, option.label, option.note));
 });
 
-out.push(`<text x="54" y="${H - 30}" class="muted" font-size="14">Decision gate: select d5 A/B, d7 A/B, and d24 A/B; confirm d3, d14, d16 and d30 direction. No Worker deployment is part of this artifact.</text>`);
+out.push(`<text x="54" y="${H - 30}" class="muted" font-size="14">Decision gate: confirm the revised C3v truncated-sphere d7. Other proposed shapes were accepted 2026-08-05. No Worker deployment is part of this artifact.</text>`);
 out.push('</svg>');
 fs.mkdirSync(path.dirname(outPath), { recursive: true });
 fs.writeFileSync(outPath, out.join('\n'));
@@ -477,5 +631,8 @@ console.log(`wrote ${outPath}`);
 for (const [name, solid] of Object.entries(candidates)) {
   const s = edgeStats(solid);
   const valid = geometryProblems(solid).length === 0;
-  console.log(`${name.padEnd(15)} V${s.V} E${s.E} F${s.F} manifold=${s.manifold} valid=${valid}`);
+  const details = name === 'd7C3vSphere'
+    ? ` caps=${solid.faceKinds.filter(kind => kind === 'cap').length} contacts=${d7Contacts} h=${solid.planeOffset.toFixed(12)}`
+    : '';
+  console.log(`${name.padEnd(15)} V${s.V} E${s.E} F${s.F} manifold=${s.manifold} valid=${valid}${details}`);
 }

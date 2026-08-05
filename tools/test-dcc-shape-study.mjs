@@ -36,10 +36,11 @@ try {
   ok('gallery covers all target rows', ['d3','d5','d7','d14','d16','d24','d30'].every(d => first.svg.includes(`>${d}<`)));
   ok('gallery includes retained controls', ['d4','d6','d8','d10','d12','d20'].every(d => first.svg.includes(`>${d}<`)));
   ok('d5 alternatives are present', first.svg.includes('A · triangular prism') && first.svg.includes('B · softened prism'));
-  ok('d7 alternatives are present', first.svg.includes('A · pentagonal prism') && first.svg.includes('Rounder Impact-like study'));
+  ok('d7 researched candidate is present', first.svg.includes('C3v truncated sphere') && first.svg.includes('1+3+3 spherical packing') && first.stdout.includes('d7C3vSphere'));
+  ok('d7 C3v invariants are reported', first.stdout.includes('caps=7 contacts=12 h=0.777861913430'));
   ok('d24 alternatives are present', first.svg.includes('deltoidal icositetrahedron') && first.svg.includes('tetrakis hexahedron'));
   ok('d30 landmark is present', first.svg.includes('Rhombic triacontahedron') && first.stdout.includes('d30Rhombic'));
-  ok('candidate topology checks ran', ['cubeD3','d5Prism','d5Soft','d7Prism','d7Soft','d14Rounder','d16Bipyramid','d24Deltoidal','d24Tetrakis','d30Rhombic'].every(n => first.stdout.includes(`${n}`)));
+  ok('candidate topology checks ran', ['cubeD3','d5Prism','d5Soft','d7C3vSphere','d14Rounder','d16Bipyramid','d24Deltoidal','d24Tetrakis','d30Rhombic'].every(n => first.stdout.includes(`${n}`)));
   ok('every checked candidate is manifold', !first.stdout.includes('manifold=false'));
   ok('every checked candidate is planar and convex', !first.stdout.includes('valid=false') && first.stdout.includes('valid=true'));
 
