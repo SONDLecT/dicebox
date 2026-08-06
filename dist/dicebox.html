@@ -6240,17 +6240,21 @@ function hideHint() {
 let prev = performance.now();
 let loopFaults = 0;
 
-// Settled-tray cache: once every die has settled (and its reveal has played and
-// the tray is visible with no bursts left), the final frame is copied to an
-// offscreen canvas and blitted back every tick. The rAF loop never stops, so
-// there is no "missed wake" freeze — a new roll simply makes trayIdle() false
-// and the cache is discarded. This is what makes an exact d1000 stop costing a
-// 3k-edge redraw per frame the moment it rests.
+// Settled-tray cache: once a *completed roll* has settled (and its reveal has
+// played and the tray is visible with no bursts left), the final frame is copied
+// to an offscreen canvas and blitted back every tick. The rAF loop never stops,
+// so there is no "missed wake" freeze — a new roll makes trayIdle() false and the
+// cache is discarded. This is what makes an exact d1000 stop costing a 3k-edge
+// redraw per frame the moment it rests.
+//
+// Staging dice (added by tapping d2/d3 without rolling) carry value null, so
+// they make trayIdle() false: a tray being *built* is never frozen, and every
+// newly added die draws immediately. Only a thrown, settled, valued tray idles.
 let idleCanvas = null, idleSize = null, idleSince = null;
 const REVEAL_MS = 450;
 function trayIdle() {
   return state.dice.length > 0
-    && state.dice.every(d => d.settled)
+    && state.dice.every(d => d.settled && d.value !== null)
     && state.surface.bursts.length === 0
     && !trayCovered();
 }
