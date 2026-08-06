@@ -15,6 +15,16 @@ const ok = (name, cond, extra = '') => {
 const sub = (a, b) => [a[0]-b[0], a[1]-b[1], a[2]-b[2]];
 const cross = (a, b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
 const dot = (a, b) => a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+const faceNormal = points => {
+  const n = [0, 0, 0];
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i], b = points[(i + 1) % points.length];
+    n[0] += (a[1] - b[1]) * (a[2] + b[2]);
+    n[1] += (a[2] - b[2]) * (a[0] + b[0]);
+    n[2] += (a[0] - b[0]) * (a[1] + b[1]);
+  }
+  return n;
+};
 
 // Largest distance any face vertex sits off the plane of that face's first three
 // vertices. Deriving the plane from the centroid direction instead would be
@@ -114,11 +124,127 @@ ok('d2-d120 all faces coplanar', worstPlanar < 1e-9, `worst ${worstPlanar.toExpo
 ok('d2-d120 face counts match', badFaces.length === 0, badFaces.slice(0, 6).join(' '));
 ok('d2-d120 stay near-spherical', worstAspect < 3, `worst aspect ${worstAspect.toFixed(1)}:1`);
 
+// The approved DCC d3 is a cube with I–III repeated across opposite face pairs.
+// Geometry therefore has six square landing faces even though the logical die has
+// three outcomes; the value renderer remains independent of physical face count.
+{
+  const d3 = solidFor(3);
+  ok('d3 uses a cube body', d3.verts.length === 8 && d3.faces.length === 6);
+  ok('d3 cube faces are square', d3.faces.every(face => face.length === 4));
+}
+
+// The accepted d5 is the softened triangular prism from the comparison gallery.
+// Its bevel polygons are visual geometry, not extra logical outcomes.
+{
+  const d5 = solidFor(5);
+  const edges = new Set();
+  for (const face of d5.faces) for (let i = 0; i < face.length; i++) {
+    const a = face[i], b = face[(i + 1) % face.length];
+    edges.add(a < b ? `${a}:${b}` : `${b}:${a}`);
+  }
+  ok('d5 uses the approved softened triangular prism topology',
+     d5.verts.length === 18 && edges.size === 36 && d5.faces.length === 20,
+     `V${d5.verts.length} E${edges.size} F${d5.faces.length}`);
+  ok('d5 keeps exactly five logical landing faces',
+     d5.landingFaces?.length === 5,
+     `${d5.landingFaces?.length ?? 0}`);
+  ok('d5 does not always favor its larger rectangular faces', d5.equalLandingPresentation === true);
+}
+
+// The accepted Impact!/DCC d7 is a C3v clipped sphere, not a prism. The seven
+// planar caps are outcomes; the spherical triangles are only the rounded shell.
+{
+  const d7 = solidFor(7);
+  const edges = new Set();
+  for (const face of d7.faces) for (let i = 0; i < face.length; i++) {
+    const a = face[i], b = face[(i + 1) % face.length];
+    edges.add(a < b ? `${a}:${b}` : `${b}:${a}`);
+  }
+  ok('d7 uses a bounded runtime C3v clipped-sphere mesh',
+     d7.faces.length < 200 && d7.verts.length < 250 && edges.size < 450,
+     `V${d7.verts.length} E${edges.size} F${d7.faces.length}`);
+  ok('d7 has seven landing caps and a spherical remainder',
+     d7.landingFaces?.length === 7 &&
+     d7.faceKinds?.filter(kind => kind === 'cap').length === 7 &&
+     d7.faceKinds?.filter(kind => kind === 'sphere').length === d7.faces.length - 7);
+  ok('d7 separates seven curved numeral anchors from landing caps',
+     d7.valueAnchors?.length === 7 && d7.hideSmoothEdges === true);
+  const anchorClearance = 0.019;
+  const anchorsValid = d7.valueAnchors?.every((anchor, i) =>
+    Math.abs(Math.hypot(...anchor.point) - 1) < 1e-10 &&
+    Math.hypot(...anchor.point.map((x, j) => x - anchor.normal[j])) < 1e-10 &&
+    dot(anchor.point, d7.landingNormals[i].map(x => -x)) > 0.95 &&
+    d7.landingNormals.every(n => dot(n, anchor.point) <= d7.planeOffset - anchorClearance));
+  ok('every d7 numeral anchor lies on retained curved shell with cap clearance', anchorsValid === true);
+  ok('d7 precomputes immutable-style render topology',
+     d7.faceNormals?.length === d7.faces.length &&
+     d7.wireEdges?.length === edges.size &&
+     d7.wireEdges.every(edge => edge.faces.length === 2));
+  const normals = d7.landingNormals || [];
+  let contacts = 0;
+  for (let i = 0; i < normals.length; i++) for (let j = i + 1; j < normals.length; j++) {
+    if (Math.abs(dot(normals[i], normals[j]) - 0.2101383127306031) < 1e-10) contacts++;
+  }
+  ok('d7 preserves the twelve-contact C3v spherical code', normals.length === 7 && contacts === 12,
+     `${normals.length} normals, ${contacts} contacts`);
+  const compact = solidFor(7, 20);
+  const medium = solidFor(7, 30);
+  ok('small d7s reduce only hidden shell detail for large-roll performance',
+     compact.faces.length < d7.faces.length &&
+     medium.faces.length === compact.faces.length &&
+     compact.landingFaces?.length === 7,
+     `compact F${compact.faces.length}, medium F${medium.faces.length}, full F${d7.faces.length}`);
+}
+
 // A real d10 is a ten-faced trapezohedron, matching the physical die.
 ok('d10 has ten faces', solidFor(10).faces.length === 10);
 ok('d14 has fourteen faces', solidFor(14).faces.length === 14);
+{
+  const d14 = solidFor(14);
+  const height = Math.max(...d14.verts.map(v => Math.abs(v[1])));
+  const radius = Math.max(...d14.verts.map(v => Math.hypot(v[0], v[2])));
+  ok('d14 uses the approved rounder trapezohedron proportion',
+     Math.abs(height / radius - 0.95) < 1e-9,
+     `${(height / radius).toFixed(3)}`);
+}
+ok('d16 uses an octagonal bipyramid',
+   solidFor(16).verts.length === 10 && solidFor(16).faces.length === 16 &&
+   solidFor(16).faces.every(face => face.length === 3),
+   `V${solidFor(16).verts.length} F${solidFor(16).faces.length}`);
 ok('d24 has twenty-four faces', solidFor(24).faces.length === 24);
+ok('d24 uses a deltoidal icositetrahedron',
+   solidFor(24).verts.length === 26 && solidFor(24).faces.every(face => face.length === 4),
+   `V${solidFor(24).verts.length}`);
 ok('d30 has thirty faces', solidFor(30).faces.length === 30);
+ok('d30 uses a rhombic triacontahedron',
+   solidFor(30).verts.length === 32 && solidFor(30).faces.every(face => face.length === 4),
+   `V${solidFor(30).verts.length}`);
+
+// Every approved runtime body is a consistently wound closed shell. Rendering
+// uses the winding to distinguish visible faces and to choose numeral surfaces.
+{
+  const bad = [];
+  for (const sides of [3, 5, 7, 14, 16, 24, 30]) {
+    const solid = solidFor(sides), uses = new Map();
+    solid.faces.forEach(face => {
+      const points = face.map(i => solid.verts[i]);
+      const normal = faceNormal(points);
+      const center = points.reduce((sum, p) => sum.map((x, i) => x + p[i] / points.length), [0, 0, 0]);
+      if (dot(normal, center) <= 1e-10) bad.push(`d${sides}: inward face`);
+      for (let i = 0; i < face.length; i++) {
+        const a = face[i], b = face[(i + 1) % face.length];
+        const key = a < b ? `${a}:${b}` : `${b}:${a}`;
+        if (!uses.has(key)) uses.set(key, []);
+        uses.get(key).push(`${a}:${b}`);
+      }
+    });
+    for (const edge of uses.values()) {
+      if (edge.length !== 2 || edge[0] === edge[1]) bad.push(`d${sides}: inconsistent edge`);
+    }
+  }
+  ok('approved solids are closed and consistently outward-wound', bad.length === 0,
+     [...new Set(bad)].join(', '));
+}
 
 // d1 is the shape people actually print for a one-sided die: a short cylinder
 // with a notch cut from each side, so it topples onto the same face whichever
@@ -225,6 +351,34 @@ ok('zero-velocity die settles', still.settled, `after ${n} steps`);
     }
   }
   ok('d1-d120 draw without throwing', broken.length === 0, broken.slice(0, 3).join('; '));
+}
+
+// The d7's hundreds of shell triangles approximate curvature and must not appear
+// as a geodesic grid. Its numeral is engraved on an upper curved region rather
+// than centered on a nonexistent parallel opposing cap.
+{
+  const calls = { lineTo: 0, translations: [] };
+  const noop = () => {};
+  const ctx = new Proxy({}, {
+    get: (_t, k) => {
+      if (k === 'canvas') return { width: 300, height: 200 };
+      if (k === 'lineTo') return () => { calls.lineTo++; };
+      if (k === 'translate') return (x, y) => { calls.translations.push([x, y]); };
+      return noop;
+    },
+    set: () => true,
+  });
+  const d7 = new Die(7, 4, 0, 0, 96);
+  d7.rot = [0, 0, 0];
+  d7.settled = true;
+  d7.numeralIn = 1;
+  d7.draw(ctx, { line: '#000', muted: '#999', paper: '#fff', accent: '#0a0' });
+  ok('d7 hides internal spherical tessellation edges', calls.lineTo < 300,
+     `${calls.lineTo} line segments`);
+  const labelAt = calls.translations[1] || [0, 0];
+  ok('d7 numeral sits on a curved antipodal region, not a cap centre',
+     Math.hypot(...labelAt) > 12,
+     `label at ${labelAt.map(v => v.toFixed(1)).join(',')}`);
 }
 
 // d1 is a real rung on the DCC chain, so it must have geometry to draw.

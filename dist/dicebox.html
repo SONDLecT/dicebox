@@ -1905,6 +1905,111 @@ function icosa() {
   return { verts: v, faces: hullFaces(v, 3) };
 }
 
+function orderedHullPoints(points) {
+  let i0 = 0, i1 = 1, i2 = 2, i3 = 3;
+  for (let i = 1; i < points.length; i++) if (points[i][0] < points[i0][0]) i0 = i;
+  let best = -1;
+  for (let i = 0; i < points.length; i++) {
+    const d = Math.hypot(...sub(points[i], points[i0]));
+    if (i !== i0 && d > best) { best = d; i1 = i; }
+  }
+  best = -1;
+  const line = sub(points[i1], points[i0]);
+  for (let i = 0; i < points.length; i++) {
+    const area = Math.hypot(...cross(line, sub(points[i], points[i0])));
+    if (i !== i0 && i !== i1 && area > best) { best = area; i2 = i; }
+  }
+  best = -1;
+  const plane = norm(cross(sub(points[i1], points[i0]), sub(points[i2], points[i0])));
+  for (let i = 0; i < points.length; i++) {
+    const distance = Math.abs(dot(plane, sub(points[i], points[i0])));
+    if (![i0, i1, i2].includes(i) && distance > best) { best = distance; i3 = i; }
+  }
+  const seeds = [i0, i1, i2, i3];
+  return [...seeds.map(i => points[i]), ...points.filter((_, i) => !seeds.includes(i))];
+}
+
+function polarDual(rawPoints) {
+  const points = orderedHullPoints(rawPoints.map(norm));
+  const hull = [];
+  const addFace = (a, b, c) => {
+    const n = norm(cross(sub(points[b], points[a]), sub(points[c], points[a])));
+    hull.push({ v: [a, b, c], n, d: dot(n, points[a]) });
+  };
+  addFace(0, 1, 2); addFace(0, 2, 1);
+  for (let p = 3; p < points.length; p++) {
+    const visible = hull.map(face => dot(face.n, points[p]) > face.d + 1e-7);
+    if (!visible.some(Boolean)) continue;
+    const horizon = new Map();
+    hull.forEach((face, fi) => {
+      if (!visible[fi]) return;
+      for (let i = 0; i < 3; i++) {
+        const a = face.v[i], b = face.v[(i + 1) % 3];
+        const key = a < b ? `${a}:${b}` : `${b}:${a}`;
+        if (horizon.has(key)) horizon.delete(key); else horizon.set(key, [a, b]);
+      }
+    });
+    const kept = hull.filter((_, i) => !visible[i]);
+    hull.length = 0; hull.push(...kept);
+    for (const [a, b] of horizon.values()) addFace(a, b, p);
+  }
+
+  const verts = [], dualByPlane = new Map(), dualForHull = [];
+  for (const face of hull) {
+    const v = face.n.map(x => x / (face.d || 1e-9));
+    const key = v.map(x => Math.round(x * 1e7)).join(':');
+    let id = dualByPlane.get(key);
+    if (id === undefined) { id = verts.length; verts.push(v); dualByPlane.set(key, id); }
+    dualForHull.push(id);
+  }
+  const touching = points.map(() => []);
+  hull.forEach((face, fi) => face.v.forEach(v => touching[v].push(dualForHull[fi])));
+  const faces = [];
+  points.forEach((p, i) => {
+    const ring = [...new Set(touching[i])];
+    if (ring.length < 3) return;
+    const axis = norm(p);
+    const first = verts[ring[0]];
+    const ref = norm(sub(first, axis.map(x => x * dot(axis, first))));
+    const side = cross(axis, ref);
+    ring.sort((a, b) => {
+      const pa = sub(verts[a], p), pb = sub(verts[b], p);
+      return Math.atan2(dot(pa, side), dot(pa, ref)) - Math.atan2(dot(pb, side), dot(pb, ref));
+    });
+    faces.push(ring);
+  });
+  return normalize({ verts, faces });
+}
+
+// Catalan 24-face solid used by recognizable commercial d24s: the polar dual
+// of a small rhombicuboctahedron, with 24 congruent kite faces.
+function deltoidalIcositetrahedron() {
+  const a = 1 + Math.sqrt(2), points = [];
+  for (let axis = 0; axis < 3; axis++) {
+    for (const x of [-1, 1]) for (const y of [-1, 1]) for (const z of [-1, 1]) {
+      const p = [x, y, z]; p[axis] *= a; points.push(p);
+    }
+  }
+  return polarDual(points);
+}
+
+function rhombicTriacontahedron() {
+  const ico = icosa();
+  const seen = new Set(), points = [];
+  for (const face of ico.faces) for (let i = 0; i < face.length; i++) {
+    const a = face[i], b = face[(i + 1) % face.length];
+    const key = a < b ? `${a}:${b}` : `${b}:${a}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    points.push(norm([
+      ico.verts[a][0] + ico.verts[b][0],
+      ico.verts[a][1] + ico.verts[b][1],
+      ico.verts[a][2] + ico.verts[b][2],
+    ]));
+  }
+  return polarDual(points);
+}
+
 function norm(v) {
   const m = Math.hypot(v[0], v[1], v[2]);
   return [v[0]/m, v[1]/m, v[2]/m];
@@ -1970,8 +2075,8 @@ const cross = (a,b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]
 
 // Bipyramid: two apexes over a regular n-gon equator gives 2n triangular faces.
 // Triangles are planar by construction, so the only tuning is apex height.
-function bipyramid(n) {
-  const H = 1.15;
+function bipyramid(n, height = 1.15) {
+  const H = height;
   const verts = [[0, H, 0], [0, -H, 0]];
   for (let i = 0; i < n; i++) {
     const a = (i / n) * TAU;
@@ -2094,6 +2199,275 @@ function coin(segments = 20) {
   return normalize({ verts, faces });
 }
 
+// A conventional prism with n rectangular sides and two polygonal ends. For n=3
+// this is the five-outcome body used by the approved DCC d5 study.
+function regularPrism(n, half = 0.72) {
+  const verts = [];
+  for (let i = 0; i < n; i++) {
+    const a = i * TAU / n;
+    verts.push([Math.cos(a), Math.sin(a), half]);
+  }
+  for (let i = 0; i < n; i++) {
+    const a = i * TAU / n;
+    verts.push([Math.cos(a), Math.sin(a), -half]);
+  }
+  const faces = [
+    Array.from({ length: n }, (_, i) => n - 1 - i),
+    Array.from({ length: n }, (_, i) => n + i),
+  ];
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    faces.push([i, j, n + j, n + i]);
+  }
+  return normalize({ verts, faces });
+}
+
+// Chamfer a convex solid while retaining one inset landing face for every face
+// of the source solid. New edge and vertex polygons are styling surfaces only.
+function bevelSolid(solid, amount = 0.19) {
+  const verts = [], inset = solid.faces.map(() => []);
+  solid.faces.forEach((face, fi) => {
+    const center = face.reduce((sum, vi) => [
+      sum[0] + solid.verts[vi][0], sum[1] + solid.verts[vi][1], sum[2] + solid.verts[vi][2],
+    ], [0, 0, 0]).map(x => x / face.length);
+    face.forEach(vi => {
+      const v = solid.verts[vi];
+      inset[fi].push(verts.push([
+        v[0] * (1 - amount) + center[0] * amount,
+        v[1] * (1 - amount) + center[1] * amount,
+        v[2] * (1 - amount) + center[2] * amount,
+      ]) - 1);
+    });
+  });
+
+  const faces = inset.map(face => [...face]);
+  const edgeUses = new Map();
+  solid.faces.forEach((face, fi) => face.forEach((vi, ci) => {
+    const vj = face[(ci + 1) % face.length];
+    const key = vi < vj ? `${vi}:${vj}` : `${vj}:${vi}`;
+    if (!edgeUses.has(key)) edgeUses.set(key, []);
+    edgeUses.get(key).push({ vi, vj, fi, ci });
+  }));
+  for (const uses of edgeUses.values()) {
+    if (uses.length !== 2) continue;
+    const [a, b] = uses;
+    const a0 = inset[a.fi][a.ci], a1 = inset[a.fi][(a.ci + 1) % inset[a.fi].length];
+    const b0 = inset[b.fi][b.ci], b1 = inset[b.fi][(b.ci + 1) % inset[b.fi].length];
+    faces.push(a.vi === b.vi ? [a0, a1, b1, b0] : [a0, a1, b0, b1]);
+  }
+
+  const corners = solid.verts.map(() => []);
+  solid.faces.forEach((face, fi) => face.forEach((vi, ci) => corners[vi].push(inset[fi][ci])));
+  corners.forEach((ids, vi) => {
+    if (ids.length < 3) return;
+    const axis = norm(solid.verts[vi]);
+    const u = norm(sub(verts[ids[0]], solid.verts[vi]));
+    const w = cross(axis, u);
+    faces.push(ids.slice().sort((a, b) => {
+      const va = sub(verts[a], solid.verts[vi]), vb = sub(verts[b], solid.verts[vi]);
+      return Math.atan2(dot(va, w), dot(va, u)) - Math.atan2(dot(vb, w), dot(vb, u));
+    }));
+  });
+
+  return normalize({
+    verts,
+    faces,
+    landingFaces: Array.from({ length: solid.faces.length }, (_, i) => i),
+    faceKinds: faces.map((_, i) => i < solid.faces.length ? 'landing' : 'bevel'),
+  });
+}
+
+function subdividedIcosphere(levels = 3) {
+  let { verts, faces } = icosa();
+  verts = verts.map(v => [...v]);
+  faces = faces.map(face => [...face]);
+  for (let level = 0; level < levels; level++) {
+    const midpoints = new Map();
+    const midpoint = (a, b) => {
+      const key = a < b ? `${a}:${b}` : `${b}:${a}`;
+      if (midpoints.has(key)) return midpoints.get(key);
+      const id = verts.length;
+      verts.push(norm([
+        verts[a][0] + verts[b][0],
+        verts[a][1] + verts[b][1],
+        verts[a][2] + verts[b][2],
+      ]));
+      midpoints.set(key, id);
+      return id;
+    };
+    const next = [];
+    for (const [a, b, c] of faces) {
+      const ab = midpoint(a, b), bc = midpoint(b, c), ca = midpoint(c, a);
+      next.push([a, ab, ca], [b, bc, ab], [c, ca, bc], [ab, bc, ca]);
+    }
+    faces = next;
+  }
+  return { verts, faces };
+}
+
+function cleanLoop(points, epsilon = 1e-9) {
+  const loop = [];
+  for (const p of points) {
+    if (!loop.length || Math.hypot(...sub(p, loop.at(-1))) > epsilon) loop.push(p);
+  }
+  if (loop.length > 1 && Math.hypot(...sub(loop[0], loop.at(-1))) <= epsilon) loop.pop();
+  return loop;
+}
+
+function clipPolygon(points, planeNormal, offset, cuts, epsilon = 1e-10) {
+  const out = [];
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i], q = points[(i + 1) % points.length];
+    const dp = dot(planeNormal, p) - offset;
+    const dq = dot(planeNormal, q) - offset;
+    const pInside = dp <= epsilon, qInside = dq <= epsilon;
+    if (pInside) out.push(p);
+    if (pInside !== qInside) {
+      const t = dp / (dp - dq);
+      const hit = [
+        p[0] + (q[0] - p[0]) * t,
+        p[1] + (q[1] - p[1]) * t,
+        p[2] + (q[2] - p[2]) * t,
+      ];
+      out.push(hit);
+      cuts.push(hit);
+    }
+  }
+  return cleanLoop(out);
+}
+
+function c3vD7Normals() {
+  const c = 0.2101383127306031;
+  const lowerZ = -Math.sqrt((1 + 2 * c) / 3);
+  const upperR = Math.sqrt(1 - c * c);
+  const lowerR = Math.sqrt(1 - lowerZ * lowerZ);
+  const normals = [[0, 0, 1]];
+  for (let k = 0; k < 3; k++) {
+    const a = k * TAU / 3;
+    normals.push([upperR * Math.cos(a), upperR * Math.sin(a), c]);
+  }
+  for (let k = 0; k < 3; k++) {
+    const a = Math.PI / 3 + k * TAU / 3;
+    normals.push([lowerR * Math.cos(a), lowerR * Math.sin(a), lowerZ]);
+  }
+  return normals;
+}
+
+// Find the nearest point to a desired antipode that is still on the retained
+// unit-sphere shell. On a two-dimensional sphere the constrained optimum is the
+// target itself, one active cap boundary, or the intersection of two boundaries;
+// enumerate those cases exactly instead of placing text on sphere regions removed
+// by clipping.
+function closestCurvedAnchor(target, landingNormals, limit) {
+  const candidates = [norm(target)];
+  const boundaryRadius = Math.sqrt(Math.max(0, 1 - limit * limit));
+
+  for (const planeNormal of landingNormals) {
+    const tangent = sub(target, planeNormal.map(x => x * dot(target, planeNormal)));
+    if (dot(tangent, tangent) > 1e-18) {
+      const direction = norm(tangent);
+      candidates.push(planeNormal.map((x, i) => x * limit + direction[i] * boundaryRadius));
+    }
+  }
+
+  for (let i = 0; i < landingNormals.length; i++) {
+    for (let j = i + 1; j < landingNormals.length; j++) {
+      const a = landingNormals[i], b = landingNormals[j];
+      const denominator = 1 + dot(a, b);
+      if (denominator < 1e-12) continue;
+      const base = a.map((x, axis) => (x + b[axis]) * limit / denominator);
+      const remaining = 1 - dot(base, base);
+      if (remaining < -1e-12) continue;
+      const direction = norm(cross(a, b));
+      const radius = Math.sqrt(Math.max(0, remaining));
+      candidates.push(
+        base.map((x, axis) => x + direction[axis] * radius),
+        base.map((x, axis) => x - direction[axis] * radius),
+      );
+    }
+  }
+
+  const feasible = candidates.filter(point =>
+    landingNormals.every(n => dot(n, point) <= limit + 1e-10));
+  if (!feasible.length) throw new Error('d7 has no curved numeral anchor');
+  return feasible.reduce((best, point) => dot(target, point) > dot(target, best) ? point : best);
+}
+
+const rotateAroundZ = (point, angle) => [
+  point[0] * Math.cos(angle) - point[1] * Math.sin(angle),
+  point[0] * Math.sin(angle) + point[1] * Math.cos(angle),
+  point[2],
+];
+
+// Impact!/Vincent Greco d7: an otherwise round body clipped by seven planes at
+// the proven-optimal N=7 Tammes directions. The caps are the physical rests;
+// numerals live near their antipodes on the curved shell because no face pair is
+// parallel. Sphere tessellation is rendering geometry, not 480 extra outcomes.
+function clippedSphereD7(levels = 3) {
+  const landingNormals = c3vD7Normals();
+  const c = 0.2101383127306031;
+  const planeOffset = Math.sqrt((1 + c) / 2);
+  const sphere = subdividedIcosphere(levels);
+  let polygons = sphere.faces.map(face => ({ points: face.map(i => sphere.verts[i]), kind: 'sphere' }));
+
+  for (const planeNormal of landingNormals) {
+    const cuts = [], clipped = [];
+    for (const polygon of polygons) {
+      const points = clipPolygon(polygon.points, planeNormal, planeOffset, cuts);
+      if (points.length >= 3) clipped.push({ points, kind: polygon.kind });
+    }
+    const unique = new Map();
+    for (const p of cuts) unique.set(p.map(x => Math.round(x * 1e9)).join(':'), p);
+    const ring = [...unique.values()];
+    if (ring.length < 3) throw new Error('d7 clipping failed to produce a landing cap');
+    const basisA = norm(Math.abs(planeNormal[2]) < 0.9
+      ? cross(planeNormal, [0, 0, 1])
+      : cross(planeNormal, [0, 1, 0]));
+    const basisB = cross(planeNormal, basisA);
+    const center = planeNormal.map(x => x * planeOffset);
+    ring.sort((a, b) => {
+      const pa = sub(a, center), pb = sub(b, center);
+      return Math.atan2(dot(pa, basisB), dot(pa, basisA)) -
+             Math.atan2(dot(pb, basisB), dot(pb, basisA));
+    });
+    if (dot(faceNormal(ring), planeNormal) < 0) ring.reverse();
+    clipped.push({ points: ring, kind: 'cap' });
+    polygons = clipped;
+  }
+
+  const verts = [], byPosition = new Map(), faces = [], faceKinds = [];
+  const vertex = p => {
+    const key = p.map(x => Math.round(x * 1e8)).join(':');
+    if (byPosition.has(key)) return byPosition.get(key);
+    const id = verts.length;
+    verts.push(p);
+    byPosition.set(key, id);
+    return id;
+  };
+  for (const polygon of polygons) {
+    const face = cleanLoop(polygon.points).map(vertex);
+    const clean = face.filter((id, i) => id !== face[(i + face.length - 1) % face.length]);
+    if (clean.length < 3) continue;
+    faces.push(clean);
+    faceKinds.push(polygon.kind);
+  }
+  const landingFaces = faceKinds.map((kind, i) => kind === 'cap' ? i : -1).filter(i => i >= 0);
+  const anchorLimit = planeOffset - 0.02;
+  const poleAnchor = closestCurvedAnchor(landingNormals[0].map(x => -x), landingNormals, anchorLimit);
+  const upperAnchor = closestCurvedAnchor(landingNormals[1].map(x => -x), landingNormals, anchorLimit);
+  const lowerAnchor = closestCurvedAnchor(landingNormals[4].map(x => -x), landingNormals, anchorLimit);
+  const anchorPoints = [
+    poleAnchor,
+    ...[0, 1, 2].map(k => rotateAroundZ(upperAnchor, k * TAU / 3)),
+    ...[0, 1, 2].map(k => rotateAroundZ(lowerAnchor, k * TAU / 3)),
+  ];
+  const valueAnchors = anchorPoints.map(point => ({ point, normal: [...point] }));
+  return normalize({
+    verts, faces, faceKinds, landingFaces, landingNormals, valueAnchors,
+    planeOffset, hideSmoothEdges: true,
+  });
+}
+
 // Prism barrel: n rectangular faces around the equator, with a pointed cap at
 // each pole that is never landed on. This is how physical d5s and d7s are made,
 // and unlike a bipyramid it gives an exact face count for any n — odd or even.
@@ -2130,10 +2504,71 @@ function prismBarrel(n) {
 
 function normalize(solid) {
   const scale = Math.max(...solid.verts.map(v => Math.hypot(...v)));
-  return { verts: solid.verts.map(v => v.map(x => x / scale)), faces: solid.faces };
+  const verts = solid.verts.map(v => v.map(x => x / scale));
+  const faces = solid.faces.map(source => {
+    const face = [...source];
+    const points = face.map(i => verts[i]);
+    const center = points.reduce((sum, p) => [
+      sum[0] + p[0] / points.length,
+      sum[1] + p[1] / points.length,
+      sum[2] + p[2] / points.length,
+    ], [0, 0, 0]);
+    const windingNormal = cross(sub(points[1], points[0]), sub(points[2], points[0]));
+    return dot(windingNormal, center) < 0 ? face.reverse() : face;
+  });
+  const faceNormals = faces.map(face => {
+    const n = [0, 0, 0];
+    for (let i = 0; i < face.length; i++) {
+      const a = verts[face[i]], b = verts[face[(i + 1) % face.length]];
+      n[0] += (a[1] - b[1]) * (a[2] + b[2]);
+      n[1] += (a[2] - b[2]) * (a[0] + b[0]);
+      n[2] += (a[0] - b[0]) * (a[1] + b[1]);
+    }
+    return n;
+  });
+  const edgeMap = new Map();
+  faces.forEach((face, fi) => {
+    for (let i = 0; i < face.length; i++) {
+      const a = face[i], b = face[(i + 1) % face.length];
+      const key = a < b ? `${a}:${b}` : `${b}:${a}`;
+      if (!edgeMap.has(key)) edgeMap.set(key, { a: Math.min(a, b), b: Math.max(a, b), faces: [] });
+      edgeMap.get(key).faces.push(fi);
+    }
+  });
+  const wireEdges = [...edgeMap.values()].map(edge => ({
+    ...edge,
+    sphereOnly: edge.faces.every(fi => solid.faceKinds?.[fi] === 'sphere'),
+  }));
+  return {
+    ...solid,
+    verts,
+    faces,
+    faceNormals,
+    wireEdges,
+    landingFaces: solid.landingFaces ? [...solid.landingFaces] : undefined,
+    faceKinds: solid.faceKinds ? [...solid.faceKinds] : undefined,
+  };
 }
 
-const SOLIDS = { 4: tetra, 6: cube, 8: octa, 12: dodeca, 20: icosa };
+const SOLIDS = {
+  3: cube,
+  4: tetra,
+  5: () => ({
+    ...bevelSolid(regularPrism(3, 0.72), 0.19),
+    // Do not let the three larger rectangular sides monopolize every settled
+    // presentation; the two triangular ends are equally valid d5 outcomes.
+    equalLandingPresentation: true,
+  }),
+  6: cube,
+  7: (_size, budget) => clippedSphereD7(budget <= 36 ? 1 : 2),
+  8: octa,
+  12: dodeca,
+  14: () => trapezohedron(7, 0.95),
+  16: () => bipyramid(8, 1.06),
+  20: icosa,
+  24: deltoidalIcositetrahedron,
+  30: rhombicTriacontahedron,
+};
 
 // Cache: the hull recovery in dodeca/icosa is O(v^3), and barrels get rebuilt
 // on every roll otherwise.
@@ -2379,7 +2814,7 @@ function solidFor(sides, size = null) {
   } else if (sides === 2) {
     solid = coin();
   } else if (SOLIDS[sides]) {
-    solid = SOLIDS[sides]();
+    solid = SOLIDS[sides](size, budget);
   } else if (sides <= POINTED_LIMIT) {
     // Few enough facets that a pointed solid still reads: exactly one face per
     // side, in the shape a physical die of that size actually takes.
@@ -2400,6 +2835,7 @@ function solidFor(sides, size = null) {
     solid = facetedSphere(Math.min(budget, Math.round(sides * 0.8)))
   }
 
+  if (!solid.faceNormals || !solid.wireEdges) solid = normalize(solid);
   solidCache.set(key, solid);
   return solid;
 }
@@ -2654,22 +3090,33 @@ class Die {
         this.rot[1] + (Math.random() - 0.5) * spread,
         this.rot[2] + (Math.random() - 0.5) * spread,
       ];
-      const pts = this.solid.verts.map(v => rotate(v, cand[0], cand[1], cand[2]));
-
-      // Score by projected screen area, not facing angle alone. Facing alone
-      // lets a sliver of rim beat a broad face that is only slightly turned —
-      // which is why the coin landed on its edge nearly every flip.
       let visible = 0;
-      for (const face of this.solid.faces) {
-        const fp = face.map(i2 => pts[i2]);
-        const n = faceNormal(fp);
-        const len = Math.hypot(...n);
-        if (!len) continue;
-        const facing = n[2] / len;
-        if (facing <= 0) continue;
-        visible = Math.max(visible, facing * polygonArea(fp) * facing);
+      if (this.solid.valueAnchors?.length) {
+        // Odd clipped-sphere dice have no parallel top face. Present one of the
+        // curved antipodal numeral sites instead of pretending a landing cap is
+        // also the result face.
+        for (const anchor of this.solid.valueAnchors) {
+          const n = rotate(anchor.normal, cand[0], cand[1], cand[2]);
+          if (n[2] > 0) visible = Math.max(visible, n[2]);
+        }
+      } else {
+        // Score by projected screen area, not facing angle alone. Facing alone
+        // lets a sliver of rim beat a broad face turned slightly away.
+        const pts = this.solid.verts.map(v => rotate(v, cand[0], cand[1], cand[2]));
+        const faceIndices = this.solid.landingFaces || this.solid.faces.map((_, i) => i);
+        for (const fi of faceIndices) {
+          const face = this.solid.faces[fi];
+          const fp = face.map(i2 => pts[i2]);
+          const n = faceNormal(fp);
+          const len = Math.hypot(...n);
+          if (!len) continue;
+          const facing = n[2] / len;
+          if (facing <= 0) continue;
+          const area = this.solid.equalLandingPresentation ? 1 : polygonArea(fp);
+          visible = Math.max(visible, facing * area * facing);
+        }
       }
-      // Prefer a big square-on face, but stay near the pose it actually landed in.
+      // Prefer a square-on outcome surface while staying near the pose it landed in.
       const drift = Math.abs(cand[0] - this.rot[0]) + Math.abs(cand[1] - this.rot[1]);
       const score = visible - drift * 0.02;
       if (score > bestScore) { bestScore = score; best = cand; }
@@ -2703,27 +3150,27 @@ class Die {
       return [p[0] * s * d, p[1] * s * d, p[2]];
     });
 
-    // Back edges first, faint; front edges over them at full strength.
-    const edges = new Map();
-    for (const face of this.solid.faces) {
-      const n = faceNormal(face.map(i => pts[i]));
-      const front = n[2] > 0;
-      for (let i = 0; i < face.length; i++) {
-        const a = face[i], b = face[(i+1) % face.length];
-        const key = a < b ? `${a}:${b}` : `${b}:${a}`;
-        edges.set(key, (edges.get(key) || false) || front);
-      }
-    }
+    // Face normals and edge adjacency are invariant, so normalize() computes
+    // them once per cached solid rather than rebuilding Maps and Sets per frame.
+    const frontFaces = this.solid.faceNormals.map(n => rotate(n, rx, ry, rz)[2] > 0);
 
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
     for (const pass of [false, true]) {
       ctx.beginPath();
-      for (const [key, front] of edges) {
-        if (front !== pass) continue;
-        const [a, b] = key.split(':').map(Number);
-        ctx.moveTo(proj[a][0], proj[a][1]);
-        ctx.lineTo(proj[b][0], proj[b][1]);
+      for (const edge of this.solid.wireEdges) {
+        const front = edge.faces.some(fi => frontFaces[fi]);
+        const back = edge.faces.some(fi => !frontFaces[fi]);
+        // The d7 shell is opaque rather than a transparent geodesic cage: cap
+        // boundaries on its far side must not show through the rounded body.
+        if (this.solid.hideSmoothEdges && pass === false) continue;
+        if (this.solid.hideSmoothEdges && edge.sphereOnly) {
+          // Keep only the projected silhouette of the rounded shell. Interior
+          // triangulation approximates curvature and is not visible geometry.
+          if (pass !== true || !front || !back) continue;
+        } else if (front !== pass) continue;
+        ctx.moveTo(proj[edge.a][0], proj[edge.a][1]);
+        ctx.lineTo(proj[edge.b][0], proj[edge.b][1]);
       }
       ctx.strokeStyle = theme.line;
       // Scaled rather than set, so a dropped die's fade survives this pass.
@@ -2815,12 +3262,48 @@ class Die {
     // method off every frame of a hundred-dice tumble.
     const alpha = this.numeralAlpha();
     if (alpha <= 0) return;
+    // A staged die has no value yet: it is waiting on the tray to be thrown.
+    if (this.value === null || this.value === undefined) return;
+
+    if (this.solid.valueAnchors?.length) {
+      let best = null, bestFacing = 0;
+      for (const anchor of this.solid.valueAnchors) {
+        const normal = rotate(anchor.normal, ...this.rot);
+        if (normal[2] > bestFacing) { bestFacing = normal[2]; best = anchor; }
+      }
+      if (!best || bestFacing <= 0.2) return;
+      const point = rotate(best.point, ...this.rot);
+      const perspective = 4 / (4 - point[2]);
+      const at = [point[0] * s * perspective, point[1] * s * perspective];
+      const label = String(this.value);
+      const fit = label.length > 2 ? 0.28 : label.length > 1 ? 0.35 : 0.44;
+      const size = Math.max(7, s * fit * (0.72 + 0.28 * bestFacing));
+      const grown = size * (0.88 + 0.12 * alpha);
+      ctx.save();
+      ctx.translate(at[0], at[1]);
+      // A tangent-plane approximation to engraving on the curved shell. The
+      // anchor itself follows the sphere; this squash gives the glyph the same
+      // foreshortening as the surface under it.
+      ctx.transform(1, 0, 0, bestFacing, 0, 0);
+      ctx.font = `600 ${grown}px "Iosevka Etoile", ui-monospace, monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = theme.line;
+      ctx.globalAlpha = alpha;
+      ctx.fillText(label, 0, 0);
+      this.drawFaceMark(ctx, theme, size);
+      ctx.restore();
+      ctx.globalAlpha = 1;
+      return;
+    }
 
     // Pick the face by visible screen area, matching findFaceUpRotation. Going
     // by facing angle alone paints the numeral on whatever sliver happens to
     // point at the camera — on a coin, that meant a digit on the rim.
     let best = null, bestFacing = 0, bestScore = 0;
-    for (const face of this.solid.faces) {
+    const faceIndices = this.solid.landingFaces || this.solid.faces.map((_, i) => i);
+    for (const fi of faceIndices) {
+      const face = this.solid.faces[fi];
       const fp = face.map(i => pts[i]);
       const n = faceNormal(fp);
       const len = Math.hypot(...n);
@@ -2864,9 +3347,6 @@ class Die {
       }
     }
 
-    // A staged die has no value yet: it is waiting on the tray to be thrown, so
-    // it shows as an empty shape rather than a number it does not have.
-    if (this.value === null || this.value === undefined) return;
     const label = String(this.value);
     // Long labels (d100 can show 3 digits) need to shrink to stay on the face.
     const fit = label.length > 2 ? 0.34 : label.length > 1 ? 0.42 : 0.52;
