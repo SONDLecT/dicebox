@@ -463,28 +463,25 @@ ok('non-numeric sides rejected', solidFor(NaN) === null);
      wrong.length === 0, wrong.slice(0, 6).join(' '));
 }
 
-// --- past the budget, detail climbs and then stops ---
+// --- exact facets: geometry is independent of the draw budget ---
 //
-// A die with more facets than the eye can separate has nothing more to show, so
-// above the budget every die draws the densest sphere that still reads as a
-// solid. They converge, and that is the intended answer rather than a collapse:
-// the earlier failure was hundreds of dice sharing three *barrels* while
-// pretending to differ, not dice honestly showing the same maximum.
+// Every die from d23 to d1000 carries its exact face count; the draw budget is
+// now a *display* concern (edge-ink LOD at small sizes), not a geometry cap.
+// Above d1000 the notation tops out at a thousand real faces.
 {
-  const at = n => solidFor(n, 96).faces.length;
-  ok('detail still climbs just past the budget', at(121) < at(140) && at(140) < at(150),
-     `${at(121)} / ${at(140)} / ${at(150)}`);
-  ok('detail stops at the budget', at(150) === 120 && at(1000) === 120,
-     `${at(150)} / ${at(1000)}`);
-  // The budget is a real ceiling, which it was not: at 60 facets, 937 of 1000
-  // dice used to exceed it, some by a third.
-  for (const [size, budget] of [[96, 120], [48, 60], [30, 36]]) {
-    let over = 0, worst = 0;
-    for (let sides = 23; sides <= 1000; sides++) {
-      const f = solidFor(sides, size).faces.length;
-      if (f > budget) { over++; worst = Math.max(worst, f); }
-    }
-    ok(`the ${budget}-facet budget holds`, over === 0, `${over} over, worst ${worst}`);
+  const at = (n, size = 96) => solidFor(n, size).faces.length;
+  ok('detail climbs with the die up to d1000 (exact facets)',
+     at(121) < at(300) && at(300) < at(700) && at(700) < at(1000),
+     `${at(121)} / ${at(300)} / ${at(700)} / ${at(1000)}`);
+  ok('a d1000 has 1000 faces', at(1000) === 1000, `${at(1000)}`);
+  ok('d300 has 300 faces', at(300) === 300, `${at(300)}`);
+  ok('above d1000 tops out at 1000', at(1200) === 1000 && at(5000) === 1000,
+     `${at(1200)} / ${at(5000)}`);
+  // Geometry is exact at every draw size: the budget no longer caps faces.
+  for (const size of [96, 48, 30]) {
+    let bad = false;
+    for (let sides = 23; sides <= 1000; sides++) if (solidFor(sides, size).faces.length !== sides) { bad = true; break; }
+    ok(`exact facets hold even at draw-size ${size}`, !bad);
   }
 }
 
@@ -572,10 +569,11 @@ ok('non-numeric sides rejected', solidFor(NaN) === null);
        `${solidFor(sides, 80).faces.length}`);
   }
 
-  // Detail follows drawn size: a die a few pixels across cannot show 100 facets,
-  // and paying for geometry nobody can resolve is what blew the frame budget.
-  ok('small dice carry less detail',
-     solidFor(100, 12).faces.length < solidFor(100, 80).faces.length);
+  // Detail/thinning is now a draw-time concern (edge-ink LOD), not geometry: a
+  // die keeps its exact face count at every drawn size, and the frame budget is
+  // protected in the renderer rather than by stripping faces.
+  ok('small dice keep their exact facets (LOD is a draw concern)',
+     solidFor(100, 12).faces.length === solidFor(100, 80).faces.length);
 }
 
 // Every side count the custom picker offers must produce a drawable solid.

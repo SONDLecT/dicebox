@@ -707,6 +707,16 @@ const POINTED_LIMIT = 22;
 // Ceiling on facets for any die. Measured, not guessed: at a die's drawn size a
 // banded drum is still readable here, while anything pointed is long gone.
 const MAX_FACETS = 120;
+// Dice up to d1000 get their exact face count; the draw budget (MAX_FACETS) is
+// reserved for *display* thinning (edge-ink LOD), not geometry. Above d1000 the
+// notation blows the picker, so it tops out at a thousand real faces.
+const EXACT_FACE_LIMIT = 1000;
+// Dice with more faces than this are "spherical" for display: their landing
+// scan would cost candidates x vertices x faces for a face the eye can't even
+// isolate, so they keep the tumble pose they landed in and read the result off
+// a centered numeral overlay instead. This is what keeps an exact d1000's roll
+// smooth (a 40-pose scan over 1996 verts x 1000 faces would cost ~20ms).
+const SPHERICAL_AT = 100;
 
 // How fast a die tumbles when thrown, in radians per frame before decay.
 //
@@ -924,7 +934,11 @@ export function solidFor(sides, size = null) {
   if (!Number.isFinite(sides) || sides < 1) return null;
 
   const budget = facetBudget(size);
-  const key = `${sides}:${budget}`;
+  // Exact-facet solids (d23-d1000) are geometric, so they don't depend on the
+  // draw budget: one cache entry per side, not one per draw-size. Otherwise the
+  // same facetedSphere(1000) gets regenerated per budget and wasted.
+  const exact = sides > POINTED_LIMIT && sides <= EXACT_FACE_LIMIT && !UNDER_30_GAP[sides] && !SOLIDS[sides];
+  const key = `${sides}:${exact ? 'x' : budget}`;
   if (solidCache.has(key)) return solidCache.get(key);
 
   let solid;
@@ -944,18 +958,15 @@ export function solidFor(sides, size = null) {
     solid = sides % 2 === 0 && sides / 2 >= 3
       ? trapezohedron(sides / 2)
       : prismBarrel(sides);
-  } else if (sides <= budget) {
-    // Exactly one facet per side, spread evenly over a sphere.
+  } else if (sides <= EXACT_FACE_LIMIT) {
+    // Exactly one facet per side, spread evenly over a sphere — right down to
+    // d1000, so a d300 has 300 faces and a d1000 has 1000. Display thinning is
+    // the draw pass's job (edge-ink LOD), not geometry's.
     solid = facetedSphere(sides);
   } else {
-    // More facets than can be told apart at this size, so the die shows as
-    // many as it can carry. A d1000 drawn honestly would be a circle; drawn
-    // like this it is the densest sphere that still reads as a solid.
-    // Detail still climbs with the die until the budget stops it, so a d130
-    // carries visibly more than a d121 and everything past about d150 shows the
-    // same maximum. That last part is not a limitation to work around: a die
-    // with more facets than the eye can separate has no more to show.
-    solid = facetedSphere(Math.min(budget, Math.round(sides * 0.8)))
+    // d1001+ (above the picker): a thousand true faces — as many as the eye
+    // can separate, and more than any notation a player will type.
+    solid = facetedSphere(EXACT_FACE_LIMIT);
   }
 
   if (!solid.faceNormals || !solid.wireEdges) solid = normalize(solid);
@@ -1192,6 +1203,12 @@ export class Die {
   // a closed form would need per-family special cases, and this runs once.
   findFaceUpRotation() {
     if (!this.solid) return this.rot.slice();
+    // High face counts are spherical: scanning candidates x faces x vertices for
+    // a face no eye can isolate is pure cost (a d1000 scan would be ~20ms). Keep
+    // the pose it tumbled to — the numeral overlay reads the result regardless.
+    // Opaque-shell dice (e.g. the d7's hideSmoothEdges clip) are not spherical
+    // faceted dice and keep their anchor-driven settling.
+    if (this.solid.faces.length > SPHERICAL_AT && !this.solid.hideSmoothEdges) return this.rot.slice();
     let best = this.rot.slice(), bestScore = -Infinity;
 
     // Cost is candidates x faces x vertices, so a fixed candidate count makes
@@ -1266,8 +1283,8 @@ export class Die {
       return;
     }
 
-    const [rx, ry, rz] = this.rot;
-    const pts = this.solid.verts.map(v => rotate(v, rx, ry, rz));
+    const M = rotMatrix(this.rot[0], this.rot[1], this.rot[2]);
+    const pts = this.solid.verts.map(v => applyRot(M, v));
     const proj = pts.map(p => {
       const d = 4 / (4 - p[2]);
       return [p[0] * s * d, p[1] * s * d, p[2]];
@@ -1275,10 +1292,41 @@ export class Die {
 
     // Face normals and edge adjacency are invariant, so normalize() computes
     // them once per cached solid rather than rebuilding Maps and Sets per frame.
-    const frontFaces = this.solid.faceNormals.map(n => rotate(n, rx, ry, rz)[2] > 0);
+    const frontFaces = this.solid.faceNormals.map(n => applyRot(M, n)[2] > 0);
 
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
+    // High-facet dice (d101+, exact geometry) are drawn as a dense polyhedron:
+    // the projected silhouette at full ink, interior edges thinned by the
+    // microAlpha law so the body reads as faceted rather than a solid grey disc.
+    // Opaque-shell dice (d7) are excluded — they draw silhouette-only already.
+    const micro = !this.solid.hideSmoothEdges && this.solid.faces.length > SPHERICAL_AT
+      ? Math.min(0.55, Math.max(0.08, 0.55 * Math.sqrt(100 / this.solid.faces.length)))
+      : null;
+    const emit = (edges, alpha, width) => {
+      ctx.beginPath();
+      for (const edge of edges) {
+        ctx.moveTo(proj[edge.a][0], proj[edge.a][1]);
+        ctx.lineTo(proj[edge.b][0], proj[edge.b][1]);
+      }
+      ctx.strokeStyle = theme.line;
+      ctx.globalAlpha = fade * alpha;
+      ctx.lineWidth = width;
+      ctx.stroke();
+    };
+    if (micro) {
+      const sil = [], fr = [], bk = [];
+      for (const edge of this.solid.wireEdges) {
+        const front = edge.faces.some(fi => frontFaces[fi]);
+        const back = edge.faces.some(fi => !frontFaces[fi]);
+        if (front && back) sil.push(edge);
+        else if (front) fr.push(edge);
+        else if (back) bk.push(edge);
+      }
+      emit(sil, 1, 1.6);
+      emit(fr, micro, 1.1);
+      emit(bk, micro * 0.22, 1.0);
+    } else {
     for (const pass of [false, true]) {
       ctx.beginPath();
       for (const edge of this.solid.wireEdges) {
@@ -1300,6 +1348,7 @@ export class Die {
       ctx.globalAlpha = fade * (pass ? 1 : 0.22);
       ctx.lineWidth = pass ? 1.6 : 1.1;
       ctx.stroke();
+    }
     }
     ctx.globalAlpha = fade;
 
@@ -1387,6 +1436,32 @@ export class Die {
     if (alpha <= 0) return;
     // A staged die has no value yet: it is waiting on the tray to be thrown.
     if (this.value === null || this.value === undefined) return;
+
+    // Spherical high dice (d101+, exact facets): no microface can legibly hold a
+    // three- or four-digit result, so it floats at the die's centre over a small
+    // paper knockout that clears the surrounding micro-edges. Opaque-shell dice
+    // (d7, which use valueAnchors) keep their engraved-silhouette placement.
+    if (!this.solid.hideSmoothEdges && !this.solid.valueAnchors?.length && this.solid.faces.length > SPHERICAL_AT) {
+      const label = String(this.value);
+      const fit = label.length >= 4 ? 0.34 : label.length >= 3 ? 0.42 : label.length >= 2 ? 0.5 : 0.6;
+      const size = Math.max(8, s * fit);
+      ctx.save();
+      ctx.fillStyle = theme.paper;
+      ctx.globalAlpha = alpha * 0.92;
+      ctx.beginPath();
+      ctx.arc(0, 0, size * 0.98, 0, TAU);
+      ctx.fill();
+      ctx.font = `700 ${size}px "Iosevka Etoile", ui-monospace, monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = theme.line;
+      ctx.globalAlpha = alpha;
+      ctx.fillText(label, 0, 0);
+      this.drawFaceMark(ctx, theme, size * 1.2);
+      ctx.restore();
+      ctx.globalAlpha = 1;
+      return;
+    }
 
     if (this.solid.valueAnchors?.length) {
       let best = null, bestFacing = 0;
@@ -1518,6 +1593,29 @@ function rotate(v, rx, ry, rz) {
   c = Math.cos(rz); s = Math.sin(rz);
   [x, y] = [x*c - y*s, x*s + y*c];
   return [x, y, z];
+}
+
+// Precompute the rigid rotation for (rx, ry, rz) once, then apply it to many
+// points with nine multiply-adds each. Same result as rotate() but without
+// recomputing six trig values per vertex — the draw hot path, where a d1000
+// transforms ~1996 verts + face normals every frame.
+function rotMatrix(rx, ry, rz) {
+  const cx = Math.cos(rx), sx = Math.sin(rx);
+  const cy = Math.cos(ry), sy = Math.sin(ry);
+  const cz = Math.cos(rz), sz = Math.sin(rz);
+  // R = Rz * Ry * Rx, matching rotate()'s X-then-Y-then-Z order.
+  return [
+    cz*cy,              cz*sy*sx - sz*cx, cz*sy*cx + sz*sx,
+    sz*cy,              sz*sy*sx + cz*cx, sz*sy*cx - cz*sx,
+    -sy,                cy*sx,            cy*cx,
+  ];
+}
+function applyRot(m, v) {
+  return [
+    m[0]*v[0] + m[1]*v[1] + m[2]*v[2],
+    m[3]*v[0] + m[4]*v[1] + m[5]*v[2],
+    m[6]*v[0] + m[7]*v[1] + m[8]*v[2],
+  ];
 }
 
 // Area of a planar polygon in 3D, via the magnitude of its summed cross products.

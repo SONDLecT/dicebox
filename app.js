@@ -1484,6 +1484,21 @@ function hideHint() {
 let prev = performance.now();
 let loopFaults = 0;
 
+// Settled-tray cache: once every die has settled (and its reveal has played and
+// the tray is visible with no bursts left), the final frame is copied to an
+// offscreen canvas and blitted back every tick. The rAF loop never stops, so
+// there is no "missed wake" freeze — a new roll simply makes trayIdle() false
+// and the cache is discarded. This is what makes an exact d1000 stop costing a
+// 3k-edge redraw per frame the moment it rests.
+let idleCanvas = null, idleSize = null, idleSince = null;
+const REVEAL_MS = 450;
+function trayIdle() {
+  return state.dice.length > 0
+    && state.dice.every(d => d.settled)
+    && state.surface.bursts.length === 0
+    && !trayCovered();
+}
+
 // True while a panel covers the tray. The dice keep simulating underneath, but
 // drawing them wastes a frame on something nobody can see — and any translucency
 // in the panel would let them ghost through.
@@ -1495,6 +1510,16 @@ function trayCovered() {
 function drawFrame(dt) {
   const t = theme();
   const r = canvas.getBoundingClientRect();
+
+  // Fully-settled tray: blit the cached frame instead of re-stepping and
+  // re-drawing every die. Skipping the mesh redraw is what keeps an exact d1000
+  // idle cost ~0 instead of a 3k-edge frame.
+  if (idleCanvas && idleSize && trayIdle() && idleSize[0] === Math.round(r.width) && idleSize[1] === Math.round(r.height)) {
+    ctx.clearRect(0, 0, r.width, r.height);
+    ctx.drawImage(idleCanvas, 0, 0, r.width, r.height);
+    return;
+  }
+
   ctx.clearRect(0, 0, r.width, r.height);
 
   state.surface.step(dt);
@@ -1541,6 +1566,21 @@ function drawFrame(dt) {
   // Bursts go over the dice: an explosion happens in front of the thing that
   // exploded, not behind it.
   state.surface.drawBursts(ctx, t);
+
+  // Maintain the settled-tray cache. Only snap once the reveal has played, so a
+  // die mid-fade is never frozen half-drawn.
+  if (trayIdle()) {
+    const w = Math.max(1, Math.round(r.width)), h = Math.max(1, Math.round(r.height));
+    if (idleSince === null) idleSince = performance.now();
+    if (performance.now() - idleSince >= REVEAL_MS && (!idleCanvas || !idleSize || idleSize[0] !== w || idleSize[1] !== h)) {
+      if (!idleCanvas) idleCanvas = document.createElement('canvas');
+      idleCanvas.width = w; idleCanvas.height = h;
+      idleCanvas.getContext('2d').drawImage(canvas, 0, 0, w, h);
+      idleSize = [w, h];
+    }
+  } else {
+    idleCanvas = null; idleSize = null; idleSince = null;
+  }
 }
 
 function frame(now) {
