@@ -124,6 +124,35 @@ ok('d2-d120 all faces coplanar', worstPlanar < 1e-9, `worst ${worstPlanar.toExpo
 ok('d2-d120 face counts match', badFaces.length === 0, badFaces.slice(0, 6).join(' '));
 ok('d2-d120 stay near-spherical', worstAspect < 3, `worst aspect ${worstAspect.toFixed(1)}:1`);
 
+// The under-30 gap dice (d9-d29) use ChatGPT's controlled-landmark-truncation
+// meshes, embedded in under30-gap.js exactly as approved. Each must keep its
+// exact topology: F=sides, matching V/E from the source JSON.
+{
+  const exp = { 9: [9, 16], 11: [16, 25], 13: [22, 33], 15: [22, 35], 17: [13, 28], 18: [16, 32], 19: [19, 36], 21: [16, 35], 22: [20, 40], 23: [24, 45], 25: [28, 51], 26: [30, 54], 27: [32, 57], 28: [34, 60], 29: [36, 63] };
+  for (const [snd, [V, E]] of Object.entries(exp)) {
+    const g = solidFor(Number(snd), 80);
+    const Es = g.faces.reduce((a, f) => a + f.length, 0) / 2;
+    ok(`d${snd} under-30 gap keeps its approved mesh (V${V}·E${E}·F${snd})`,
+       g.verts.length === V && Es === E && g.faces.length === Number(snd),
+       `V${g.verts.length} E${Es} F${g.faces.length}`);
+  }
+  // manifold: every undirected edge in exactly 2 faces, opposite winding.
+  for (const snd of [9, 17, 23, 29]) {
+    const g = solidFor(snd, 80);
+    const uses = new Map();
+    for (const f of g.faces) for (let i = 0; i < f.length; i++) {
+      const a = f[i], b = f[(i + 1) % f.length], k = a < b ? `${a}:${b}` : `${b}:${a}`;
+      uses.set(k, (uses.get(k) || 0) + 1);
+    }
+    ok(`d${snd} under-30 gap is a closed manifold`, [...uses.values()].every(c => c === 2));
+  }
+  // deterministic: repeated generation is byte-stable.
+  ok('under-30 gaps are deterministic', (() => {
+    const a = solidFor(19, 80), b = solidFor(19, 80);
+    return JSON.stringify(a.verts) === JSON.stringify(b.verts) && JSON.stringify(a.faces) === JSON.stringify(b.faces);
+  })());
+}
+
 // The approved DCC d3 is a cube with I–III repeated across opposite face pairs.
 // Geometry therefore has six square landing faces even though the logical die has
 // three outcomes; the value renderer remains independent of physical face count.
@@ -479,7 +508,12 @@ ok('non-numeric sides rejected', solidFor(NaN) === null);
   };
 
   let worst = 0, worstDie = 0;
+  // under-30 gap dice (d9-d29) are deliberately non-uniform truncation shapes
+  // (controlled-landmark-truncation), so they're exempt from this evenness rule,
+  // which describes faceted-sphere dice above the cap.
+  const GAP = new Set([9, 11, 13, 15, 17, 18, 19, 21, 22, 23, 25, 26, 27, 28, 29]);
   for (let sides = 23; sides <= 120; sides++) {
+    if (GAP.has(sides)) continue;
     const s = solidFor(sides, 96);
     const areas = s.faces.map(f => areaOf(s, f));
     const spread = Math.max(...areas) / Math.min(...areas);

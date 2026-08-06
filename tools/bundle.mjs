@@ -42,7 +42,7 @@ function moduleScope(name, exportsFrom = []) {
 }
 
 const DICE_EXPORTS = ['roll', 'describe'];
-const RENDER_EXPORTS = ['Die', 'Surface', 'separate', 'beginFrame', 'solidFor'];
+const RENDER_EXPORTS = ['Die', 'Surface', 'separate', 'beginFrame', 'solidFor', 'UNDER_30_GAP'];
 const ROOM_CRYPTO_EXPORTS = [
   'deriveRoom', 'newSender', 'encryptMessage', 'decryptMessage',
   'normalizePassphrase', 'generatePassphrase', 'PROTOCOL_VERSION',
@@ -56,7 +56,8 @@ const ROOM_EXPORTS = ['createRoom', 'parsePassphraseFromHash'];
 const script = [
   'const __dicebox = {};',
   moduleScope('dice.js'),
-  moduleScope('render.js'),
+  moduleScope('under30-gap.js'),
+  moduleScope('render.js', ['UNDER_30_GAP']),
   moduleScope('room-crypto.js'),
   moduleScope('room.js', ROOM_CRYPTO_EXPORTS),
   moduleScope('app.js', [

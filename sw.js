@@ -19,6 +19,7 @@ const ASSETS = [
   './app.js',
   './dice.js',
   './render.js',
+  './under30-gap.js',
   './room.js',
   './room-crypto.js',
   './manifest.webmanifest',

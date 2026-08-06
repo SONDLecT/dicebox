@@ -3,6 +3,8 @@
 // Dice are drawn as pure line work: no fill, no shadow. Depth comes only from
 // drawing back-facing edges at reduced opacity. The "table" is one hairline rule.
 
+import { UNDER_30_GAP } from './under30-gap.js';
+
 const TAU = Math.PI * 2;
 
 // Unit-radius polyhedra. Faces are index loops into verts; each face carries the
@@ -932,6 +934,10 @@ export function solidFor(sides, size = null) {
     solid = coin();
   } else if (SOLIDS[sides]) {
     solid = SOLIDS[sides](size, budget);
+  } else if (UNDER_30_GAP[sides]) {
+    // under-30 gap dice (d9-d29): ChatGPT's controlled-landmark-truncation meshes,
+    // embedded in under30-gap.js. Kept exact so the approved silhouettes hold.
+    solid = UNDER_30_GAP[sides];
   } else if (sides <= POINTED_LIMIT) {
     // Few enough facets that a pointed solid still reads: exactly one face per
     // side, in the shape a physical die of that size actually takes.
