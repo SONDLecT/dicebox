@@ -2130,48 +2130,34 @@ function trapezohedron(n, flatten = null) {
   return normalize({ verts, faces });
 }
 
-// d1 is the shape people actually print for a one-sided die: a short cylinder
-// with two wedges cut out of it, so whichever way it rolls it topples onto the
-// same flat face. Every other rest position is unstable by construction.
-//
-// A Möbius strip was tried first — one surface, one edge, cute — but it reads as
-// hatching at die size, and a real d1 is the better joke: an object whose whole
-// design is that it cannot land any other way.
-function oneSided(segments = 32) {
-  const verts = [];
-  const half = 0.42;
-
-  // Two notches taken out of the rim. They have to be narrow enough that the
-  // cylinder still reads as round — cutting deep leaves a flat slab, which
-  // looks like a domino rather than a die that cannot help landing face up.
-  const gap = 0.07;   // fraction of the circle removed per wedge
-  const kept = [];
-  for (let i = 0; i < segments; i++) {
-    const f = i / segments;
-    const inWedge = (f > 0.25 - gap && f < 0.25 + gap) || (f > 0.75 - gap && f < 0.75 + gap);
-    if (inWedge) continue;
-    kept.push(f);
+// d1 is the approved obliquely terminated circular cylinder (2026-08-06). An
+// infinite circular cylinder running diagonally through the x-z plane, axis
+// d=(-1,0,1)/sqrt2, radius R, is clipped by the two perpendicular planes x>=-a
+// and z>=-a. The result is two congruent planar end caps and n lateral quads.
+// Both caps return 1; they are the only legal result surfaces (landingFaces),
+// so a settle always rests and reads on an end cap, never balanced on a lateral
+// face. This is the analytic primitive in the same spirit as the d7's clipping.
+function obliqueCylinderD1(R = 1, a = 2.187, n = 12) {
+  const s2 = Math.SQRT2, verts = [], faces = [];
+  const A = [], B = [];
+  for (let k = 0; k < n; k++) {
+    const th = TAU * k / n, c = Math.cos(th), s = Math.sin(th);
+    A.push(verts.push([a * R + s2 * R * c, R * s, -a * R]) - 1); // z=-a cap
+    B.push(verts.push([-a * R, R * s, a * R + s2 * R * c]) - 1); // x=-a cap
   }
-
-  const top = [], bottom = [];
-  for (const f of kept) {
-    const a = f * TAU;
-    top.push(verts.push([Math.cos(a), half, Math.sin(a)]) - 1);
-    bottom.push(verts.push([Math.cos(a), -half, Math.sin(a)]) - 1);
+  // Cap at z=-a (outward (0,0,-1)) faces down; cap at x=-a (outward (-1,0,0)).
+  faces.push([...A].reverse());
+  faces.push([...B]);
+  // Lateral quads between adjacent parallel cylinder generators.
+  for (let k = 0; k < n; k++) {
+    const j = (k + 1) % n;
+    faces.push([A[k], A[j], B[j], B[k]]);
   }
-
-  const faces = [];
-  // The face it always lands on, and its opposite.
-  faces.push(top.slice());
-  faces.push(bottom.slice().reverse());
-
-  // Rim panels between consecutive kept segments. Where a wedge was cut the
-  // panel spans the gap, which is the flat that makes the die tip over.
-  for (let i = 0; i < kept.length; i++) {
-    const j = (i + 1) % kept.length;
-    faces.push([top[i], top[j], bottom[j], bottom[i]]);
-  }
-  return normalize({ verts, faces });
+  return normalize({
+    verts, faces,
+    landingFaces: [0, 1],
+    faceKinds: faces.map((_, i) => (i < 2 ? 'cap' : 'lateral')),
+  });
 }
 
 // d2 is a coin, not a polyhedron: a short cylinder with two large faces. Any
@@ -2810,7 +2796,7 @@ function solidFor(sides, size = null) {
 
   let solid;
   if (sides === 1) {
-    solid = oneSided();
+    solid = obliqueCylinderD1();
   } else if (sides === 2) {
     solid = coin();
   } else if (SOLIDS[sides]) {

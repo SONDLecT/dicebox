@@ -224,7 +224,7 @@ ok('d30 uses a rhombic triacontahedron',
 // uses the winding to distinguish visible faces and to choose numeral surfaces.
 {
   const bad = [];
-  for (const sides of [3, 5, 7, 14, 16, 24, 30]) {
+  for (const sides of [1, 3, 5, 7, 14, 16, 24, 30]) {
     const solid = solidFor(sides), uses = new Map();
     solid.faces.forEach(face => {
       const points = face.map(i => solid.verts[i]);
@@ -246,28 +246,59 @@ ok('d30 uses a rhombic triacontahedron',
      [...new Set(bad)].join(', '));
 }
 
-// d1 is the shape people actually print for a one-sided die: a short cylinder
-// with a notch cut from each side, so it topples onto the same face whichever
-// way it rolls. A bipyramid implied a choice of face that a d1 does not have.
+// d1 is the approved obliquely terminated circular cylinder: a diagonal-axis
+// infinite cylinder clipped by two perpendicular planes, giving two congruent
+// planar end caps (the two landing faces) and 12 lateral quads. Both caps
+// return 1, and the caps are the only legal result surfaces.
 {
   const d1 = solidFor(1, 80);
-  ok('d1 has a broad face to land on', d1.faces.some(f => f.length > 4));
-  ok('d1 keeps a rounded rim', d1.faces.filter(f => f.length === 4).length >= 8);
+  const edges = new Map();
+  d1.faces.forEach(face => {
+    for (let i = 0; i < face.length; i++) {
+      const a = face[i], b = face[(i + 1) % face.length];
+      edges.set(a < b ? `${a}:${b}` : `${b}:${a}`, (edges.get(a < b ? `${a}:${b}` : `${b}:${a}`) || 0) + 1);
+    }
+  });
+  ok('d1 is the oblique cylinder: 24 verts, 36 edges, 14 faces',
+     d1.verts.length === 24 && edges.size === 36 && d1.faces.length === 14,
+     `V${d1.verts.length} E${edges.size} F${d1.faces.length}`);
+  ok('d1 has exactly two planar end caps as its landing faces',
+     d1.landingFaces?.length === 2, `landing ${d1.landingFaces?.length}`);
+  ok('d1 caps are dodecagons and laterals are 12 quads',
+     d1.faces[0].length === 12 && d1.faces[1].length === 12 &&
+     d1.faces.slice(2).length === 12 && d1.faces.slice(2).every(f => f.length === 4));
+  const capPlanes = d1.landingFaces.map(fi => {
+    const n = faceNormal(d1.faces[fi].map(i => d1.verts[i]));
+    return n.map(x => x / Math.hypot(...n));
+  });
+  // cap at the z=-a cut (dominant z), cap at the x=-a cut (dominant x).
+  ok('d1 caps are perpendicular planar cuts',
+     Math.abs(capPlanes[0][2]) > 0.9 && Math.abs(capPlanes[1][0]) > 0.9,
+     capPlanes.map(p => p.map(x => x.toFixed(2)).join(',')).join(' | '));
+  ok('d1 has only cap/lateral faces (no rim-notch approach)',
+     d1.faces.every(f => f.length === 12 || f.length === 4));
 
-  const ys = d1.verts.map(v => v[1]);
-  const radii = d1.verts.map(v => Math.hypot(v[0], v[2]));
-  const aspect = (Math.max(...ys) - Math.min(...ys)) / (2 * Math.max(...radii));
-  ok('d1 is a squat cylinder, not a slab', aspect > 0.2 && aspect < 0.8,
-     `aspect ${aspect.toFixed(2)}`);
-
-  // The notches: two rim panels span a wider arc than the rest.
-  const rimWidths = d1.faces
-    .filter(f => f.length === 4)
-    .map(f => Math.hypot(...sub(d1.verts[f[0]], d1.verts[f[1]])));
-  const widest = Math.max(...rimWidths);
-  const typical = rimWidths.slice().sort((a, b) => a - b)[Math.floor(rimWidths.length / 2)];
-  ok('d1 has notches cut into its rim', widest > typical * 1.8,
-     `widest ${widest.toFixed(2)} vs typical ${typical.toFixed(2)}`);
+  // The approved d1 must always settle on an end cap (one of the two landing
+  // faces), never balanced on a lateral quad, so the `1` reads on a cap.
+  const rotate3 = (v, [rx, ry, rz]) => {
+    let [x, y, z] = v;
+    let c = Math.cos(rx), s = Math.sin(rx); [y, z] = [y * c - z * s, y * s + z * c];
+    c = Math.cos(ry); s = Math.sin(ry); [x, z] = [x * c + z * s, -x * s + z * c];
+    c = Math.cos(rz); s = Math.sin(rz); [x, y] = [x * c - y * s, x * s + y * c];
+    return [x, y, z];
+  };
+  let capUpFail = 0;
+  for (let r = 0; r < 25; r++) {
+    const die = new Die(1, 1, 0, 0, 80);
+    const rot = die.findFaceUpRotation();
+    const solid = die.solid;
+    const isUp = solid.landingFaces.some(fi => {
+      const n = faceNormal(solid.faces[fi].map(i => solid.verts[i]));
+      return rotate3(n, rot)[2] > 0;
+    });
+    if (!isUp) capUpFail++;
+  }
+  ok('d1 always settles with an end cap facing up', capUpFail === 0, `${capUpFail} failures / 25 throws`);
 }
 
 // d2 is a coin: two broad faces plus a rim, and visibly flatter than it is wide.
