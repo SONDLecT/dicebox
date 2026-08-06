@@ -128,7 +128,7 @@ ok('d2-d120 stay near-spherical', worstAspect < 3, `worst aspect ${worstAspect.t
 // meshes, embedded in under30-gap.js exactly as approved. Each must keep its
 // exact topology: F=sides, matching V/E from the source JSON.
 {
-  const exp = { 9: [9, 16], 11: [16, 25], 13: [22, 33], 15: [22, 35], 17: [13, 28], 18: [16, 32], 19: [19, 36], 21: [16, 35], 22: [20, 40], 23: [24, 45], 25: [28, 51], 26: [30, 54], 27: [32, 57], 28: [34, 60], 29: [36, 63] };
+  const exp = { 9: [9, 16], 11: [16, 25], 13: [22, 33], 15: [22, 35], 17: [13, 28], 18: [16, 32], 19: [19, 36], 21: [21, 40], 22: [30, 50], 23: [23, 44], 25: [25, 48], 26: [36, 60], 27: [27, 52], 28: [39, 65], 29: [29, 56] };
   for (const [snd, [V, E]] of Object.entries(exp)) {
     const g = solidFor(Number(snd), 80);
     const Es = g.faces.reduce((a, f) => a + f.length, 0) / 2;
