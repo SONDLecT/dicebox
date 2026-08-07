@@ -1437,6 +1437,10 @@ export class Die {
     // A staged die has no value yet: it is waiting on the tray to be thrown.
     if (this.value === null || this.value === undefined) return;
 
+    // V5 hunger (blood) dice read their numeral in the accent colour so they are
+    // visually distinct from the ordinary d10s in the same pool.
+    const ink = this.hunger ? theme.accent : theme.line;
+
     // Spherical high dice (d101+, exact facets): no microface can legibly hold a
     // three- or four-digit result, so it floats at the die's centre over a small
     // paper knockout that clears the surrounding micro-edges. Opaque-shell dice
@@ -1454,7 +1458,7 @@ export class Die {
       ctx.font = `700 ${size}px "Iosevka Etoile", ui-monospace, monospace`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillStyle = theme.line;
+      ctx.fillStyle = ink;
       ctx.globalAlpha = alpha;
       ctx.fillText(label, 0, 0);
       this.drawFaceMark(ctx, theme, size * 1.2);
@@ -1486,7 +1490,7 @@ export class Die {
       ctx.font = `600 ${grown}px "Iosevka Etoile", ui-monospace, monospace`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillStyle = theme.line;
+      ctx.fillStyle = ink;
       ctx.globalAlpha = alpha;
       ctx.fillText(label, 0, 0);
       this.drawFaceMark(ctx, theme, size);
@@ -1564,7 +1568,7 @@ export class Die {
     ctx.font = `600 ${grown}px "Iosevka Etoile", ui-monospace, monospace`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillStyle = theme.line;
+    ctx.fillStyle = ink;
     ctx.globalAlpha = alpha;
     ctx.fillText(label, 0, 0);
     // Drawn here so it shares the face's skew: the ring sits in the surface with

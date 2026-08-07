@@ -2,6 +2,7 @@ import { roll, describe } from './dice.js';
 import { Die, Surface, separate, beginFrame } from './render.js';
 import { createRoom, parsePassphraseFromHash } from './room.js';
 import { generatePassphrase, normalizePassphrase } from './room-crypto.js';
+import { rollV5, describeV5, detectSystem } from './system-dice.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('tray');
@@ -116,6 +117,27 @@ function theme() {
   };
 }
 
+// Per-system palettes override the CSS custom properties the canvas and panels
+// read, so switching systems visibly recolours the whole app. Every system ships
+// a dark and a light pair (the approved design doc: each system = a different
+// background/text/line, each with a light-dark pair).
+const SYSTEM_THEMES = {
+  // Vampire the Masquerade — blood crimson on near-black / aged paper.
+  v5: {
+    dark:  { '--paper': '#0b0809', '--line': '#c9b3ad', '--muted': '#7a6a63', '--accent': '#c3212e' },
+    light: { '--paper': '#efe6de', '--line': '#3b2326', '--muted': '#8a7070', '--accent': '#a31621' },
+  },
+};
+function applySystemTheme(system) {
+  const root = document.documentElement;
+  const scheme = SYSTEM_THEMES[system];
+  const mode = root.dataset.theme === 'dark' ? 'dark' : 'light';
+  root.dataset.systemTheme = scheme ? system : '';
+  for (const k of ['--paper', '--line', '--muted', '--accent']) root.style.removeProperty(k);
+  if (scheme) for (const [k, v] of Object.entries(scheme[mode])) root.style.setProperty(k, v);
+  updateThemeColor();
+}
+
 // ---- canvas sizing ----
 
 function resize() {
@@ -209,12 +231,18 @@ function placeGrid(dice) {
 function doRoll(notation) {
   let result;
   try {
-    result = roll(notation);
+    // An explicit system token ("v5:…") routes to that system's roller; anything
+    // else stays on the numeric engine untouched.
+    result = detectSystem(notation) === 'v5' ? rollV5(notation) : roll(notation);
   } catch (err) {
     showError(err.message);
     return;
   }
   clearError();
+
+  // Switching to a system roll recolours the app to that system's palette; a
+  // numeric roll restores the default theme.
+  applySystemTheme(result.system);
 
   state.last = result;
   $('notation').value = result.notation;
@@ -224,13 +252,16 @@ function doRoll(notation) {
     if (g.kind !== 'dice') continue;
     for (const d of g.dice) {
       flat.push({
-        sides: g.sides,
+        // V5 groups are d10s and carry no numeric `sides`; fall back to 10.
+        sides: g.sides ?? 10,
         value: d.value,
         // Carried onto the tray so a die can show what happened to it: dropped
-        // dice fade, exploded and rerolled ones get a mark.
+        // dice fade, exploded and rerolled ones get a mark. Hunger dice (V5)
+        // keep their flag so they paint as blood dice.
         kept: d.kept,
         exploded: d.exploded,
         rerolled: d.rerolled,
+        hunger: d.hunger,
       });
     }
   }
@@ -245,6 +276,7 @@ function doRoll(notation) {
     die.kept = f.kept;
     die.exploded = f.exploded;
     die.rerolled = f.rerolled;
+    if (f.hunger) die.hunger = true;
     return die;
   });
   placeGrid(state.dice);
@@ -291,16 +323,35 @@ function rerollDelay(flat) {
   return flat.some(f => f.rerolled) ? 700 : 0;
 }
 
+// Per-system result presentation. System rolls have no numeric `total`; their
+// headline/detail come from their own formatter, while the numeric engine's
+// formatters produce exactly what Dicebox has always shown.
+function resultHeadline(result) {
+  return result.system === 'v5' ? describeV5(result) : String(result.total);
+}
+function resultDetail(result) {
+  if (result.system === 'v5') {
+    const vals = result.groups.flatMap(g => g.dice).map(d => `${d.value}${d.hunger ? '⬥' : ''}`).join(', ');
+    return `${result.notation} — ${vals}`;
+  }
+  return describe(result.groups);
+}
+
 function finish(result) {
   delete $('total').dataset.rolling;
   delete $('total').dataset.idle;
-  $('total').textContent = String(result.total);
-  $('breakdown').textContent = describe(result.groups);
+  $('total').textContent = resultHeadline(result);
+  $('breakdown').textContent = resultDetail(result);
   addHistory(result, selfName(), true);
   // After addHistory, so a throw in room code could not cost the local roll its
   // place in the log. share() is synchronous and a no-op when there is no room,
   // which is what keeps this line off the critical path.
-  roomLink.share(result);
+  if (result.system === 'v5') {
+    // V5 rolls are not shared to rooms yet (needs the k:'roll2' schema); nothing
+    // is sent rather than sending a half-valid numeric payload.
+  } else {
+    roomLink.share(result);
+  }
   // The name has done its job by the first roll; let the tray have the page.
   $('wordmark').dataset.faded = '1';
 }
@@ -335,16 +386,20 @@ function recordRoll(result, who = null, mine = false) {
     who,
     mine,
     notation: result.notation,
-    total: result.total,
-    detail: describe(result.groups),
+    // Numeric rolls keep their scalar `total`; system rolls carry a formatted
+    // headline instead of a bogus scalar.
+    total: result.system === 'v5' ? null : result.total,
+    headline: resultHeadline(result),
+    detail: resultDetail(result),
     dice: result.groups
       .filter(g => g.kind === 'dice')
       .flatMap(g => g.dice.map(d => ({
-        sides: g.sides,
+        sides: g.sides ?? 10,
         value: d.value,
         kept: d.kept,
         exploded: d.exploded,
         rerolled: d.rerolled,
+        hunger: d.hunger,
       }))),
   });
   if (history.length > HISTORY_LIMIT) history.shift();
@@ -378,7 +433,7 @@ function addHistory(result, who = null, mine = false) {
   label.append(result.notation);
 
   const val = document.createElement('b');
-  val.textContent = String(result.total);
+  val.textContent = resultHeadline(result);
 
   top.append(label, val);
   li.append(top);
@@ -386,7 +441,7 @@ function addHistory(result, who = null, mine = false) {
   // What each die actually landed on, not just the total. The breakdown was
   // already computed for the readout and then discarded, so a past roll could
   // not be checked — "17" tells you nothing about which die produced it.
-  const detail = describe(result.groups);
+  const detail = resultDetail(result);
   if (detail && detail !== result.notation) {
     const rolls = document.createElement('span');
     rolls.className = 'log-detail';
@@ -856,7 +911,7 @@ function openHistory() {
     notation.append(entry.notation);
 
     const total = document.createElement('b');
-    total.textContent = String(entry.total);
+    total.textContent = entry.headline ?? String(entry.total);
 
     line.append(when, notation, total);
     li.append(line);
@@ -891,7 +946,7 @@ function historyCsv() {
   for (const entry of history) {
     entry.dice.forEach((d, i) => {
       rows.push([
-        entry.at, entry.who || 'you', entry.notation, entry.total, i + 1,
+        entry.at, entry.who || 'you', entry.notation, entry.headline ?? entry.total, i + 1,
         d.sides, d.value, d.kept ? 1 : 0, d.exploded ? 1 : 0, d.rerolled ? 1 : 0,
       ]);
     });
@@ -906,7 +961,7 @@ function historyCsv() {
 
 function historyText() {
   return history
-    .map(e => `${new Date(e.at).toLocaleTimeString()}  ${e.who ? e.who + '  ' : ''}${e.notation} = ${e.total}\n    ${e.detail}`)
+    .map(e => `${new Date(e.at).toLocaleTimeString()}  ${e.who ? e.who + '  ' : ''}${e.notation} = ${e.headline ?? e.total}\n    ${e.detail}`)
     .join('\n');
 }
 

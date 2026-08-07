@@ -101,7 +101,7 @@ try {
 // Everything app.js reaches for at runtime. Kept as an explicit list rather than
 // a directory copy so that a new file at the repo root cannot silently end up
 // published on the extension origin.
-const APP_FILES = ['app.js', 'dice.js', 'render.js', 'room.js', 'room-crypto.js', 'style.css'];
+const APP_FILES = ['app.js', 'dice.js', 'render.js', 'system-dice.js', 'room.js', 'room-crypto.js', 'style.css'];
 
 rmSync(OUT, { recursive: true, force: true });
 mkdirSync(OUT, { recursive: true });

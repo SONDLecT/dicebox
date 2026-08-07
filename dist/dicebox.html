@@ -1894,6 +1894,158 @@ const UNDER_30_GAP = {
 Object.assign(__dicebox, { UNDER_30_GAP });
 })();
 
+// system-dice.js
+(() => {
+// system-dice.js — non-numeric / special-outcome dice systems.
+//
+// Per the vetted design doc (Projects/Code/Dicebox System Dice Proposal):
+//   * generic at the die level, explicit at the system level;
+//   * a die type is { geometrySides, faces:[faceId...], outcomes }, rolled by
+//     LOGICAL FACE INDEX, not by glyph;
+//   * each system has a small explicit reducer/formatter — no universal total.
+//
+// V1 implements Vampire the Masquerade V5 (a d10 pool + Hunger dice). Fate /
+// Genesys / Star Wars / The One Ring slot in behind the same registry later.
+
+// ---- V5 ----
+
+// v5:POOL[hHUNGER][@DIFFICULTY]   e.g. "v5:8h3" or "v5:8h3@3"
+//   pool      total dice rolled (fixed size)
+//   hunger    how many of those are Hunger/blood dice (they REPLACE pool dice,
+//             they are not added — total pool size stays constant)
+//   difficulty (optional) number of successes needed to win
+const V5_REGEX = /^v5:(\d+)(?:h(\d+))?(?:@(\d+))?$/;
+
+// A strong uniform integer in [1, sides]. Mirrors dice.js randInt (rejection
+// sampling avoids the modulo bias of a naive `% sides`).
+function randInt(sides) {
+  if (sides <= 1) return 1;
+  const limit = Math.floor(0x100000000 / sides) * sides;
+  const buf = new Uint32Array(1);
+  let v;
+  do { crypto.getRandomValues(buf); v = buf[0]; } while (v >= limit);
+  return (v % sides) + 1;
+}
+
+function detectSystem(src) {
+  return /^v5:/.test(String(src || '').trim().toLowerCase()) ? 'v5' : 'numeric';
+}
+
+function parseV5(src) {
+  const m = V5_REGEX.exec(String(src || '').trim().toLowerCase());
+  if (!m) throw new Error('Expected V5 pool like "v5:8h3" or "v5:8h3@3"');
+  const pool = Number(m[1]);
+  const hunger = m[2] === undefined ? 0 : Number(m[2]);
+  const difficulty = m[3] === undefined ? null : Number(m[3]);
+  if (pool < 1 || pool > 100) throw new Error('V5 pool must be 1-100');
+  if (hunger < 0 || hunger > pool) throw new Error('Hunger must be 0 to pool');
+  if (difficulty !== null && (difficulty < 1 || difficulty > 10)) {
+    throw new Error('Difficulty must be 1-10');
+  }
+  return { pool, hunger, difficulty };
+}
+
+function rollV5(src) {
+  const { pool, hunger, difficulty } = parseV5(src);
+  // Hunger dice replace pool dice: the first `hunger` dice are blood dice, the
+  // rest are ordinary d10s. `pool` is the fixed total, never pool+hunger.
+  const dice = [];
+  for (let i = 0; i < pool; i++) {
+    dice.push({
+      value: randInt(10),
+      hunger: i < hunger,
+      kept: true, rerolled: false, exploded: false, crit: null,
+    });
+  }
+  return {
+    schema: 2,
+    system: 'v5',
+    notation: String(src),
+    groups: [{ kind: 'dice', dieType: 'v5', count: pool, dice, subtotal: 0 }],
+    summary: summarizeV5(dice, difficulty, pool, hunger),
+  };
+}
+
+// V5 outcome rules
+//   * a die is a success on 6-9 (1 success); 10 counts as TWO successes
+//   * two dice showing 10 => a critical win
+//   * Messy Critical  = critical win where at least one Hunger die shows 10
+//   * Bestial Failure = the test fails AND at least one Hunger die shows 1
+// Difficulty is needed to resolve win/loss truthfully; when omitted (null) the
+// reducer reports successes + intrinsic critical + hunger events but does not
+// assert Bestial Failure (it cannot know whether the roll lost).
+function summarizeV5(dice, difficulty, pool = dice.length, hunger = dice.filter(d => d.hunger).length) {
+  let successes = 0, tenCount = 0, hungerTen = 0, hungerOne = 0;
+  for (const d of dice) {
+    const v = d.value;
+    if (v >= 6) successes += v === 10 ? 2 : 1;
+    if (v === 10) { tenCount++; if (d.hunger) hungerTen++; }
+    if (v === 1 && d.hunger) hungerOne++;
+  }
+  const critTwo = tenCount >= 2;
+  const margin = difficulty === null ? null : successes - difficulty;
+
+  let outcome = null;
+  if (critTwo && hungerTen > 0) outcome = 'messy-critical';
+  else if (critTwo) outcome = 'critical';
+  else if (difficulty !== null && margin >= 0) outcome = 'success';
+  else if (difficulty !== null && hungerOne > 0) outcome = 'bestial-failure';
+  else if (difficulty !== null) outcome = 'failure';
+
+  return {
+    kind: 'v5', pool, hunger, difficulty,
+    successes, outcome, margin,
+    critTwo, hungerTen, hungerOne, tenCount,
+  };
+}
+
+const OUTCOME_LABEL = {
+  'messy-critical': 'Messy Critical',
+  critical: 'Critical',
+  success: 'Success',
+  'bestial-failure': 'Bestial Failure',
+  failure: 'Failure',
+};
+
+function describeV5(result) {
+  const s = result.summary;
+  const parts = [`${s.successes} success${s.successes === 1 ? '' : 'es'}`];
+  if (s.outcome && OUTCOME_LABEL[s.outcome]) parts.push(OUTCOME_LABEL[s.outcome]);
+  if (s.outcome === 'success' && s.margin !== null) parts.push(`margin +${s.margin}`);
+  if (s.critTwo) parts.push('two 10s');
+  if (s.hungerTen) parts.push(`Hunger ${s.hungerTen > 1 ? `10 ×${s.hungerTen}` : '10'}`);
+  if (s.hungerOne) parts.push(`Hunger ${s.hungerOne > 1 ? `1 ×${s.hungerOne}` : '1'}`);
+  return parts.join(' · ');
+}
+
+// Dispatcher: an explicit system token in the notation wins; otherwise defer to
+// the numeric engine (returned as {system:'numeric', deferred:true}).
+function rollAny(src, uiSystem = 'numeric') {
+  const sys = detectSystem(src);
+  if (sys === 'v5') return rollV5(src);
+  return { system: 'numeric', deferred: true, notation: String(src) };
+}
+
+// V5 dice are still uniform d10s (value 1-10); the official dice merely *render*
+// each numeric face as a symbol so the outcome is readable without "≥6" math.
+// This maps a numeric face back to the symbol that should be drawn on it.
+// Regular: 1-5 blank, 6-9 success, 10 critical.
+// Hunger:  1 skull, 2-5 blank, 6-9 hunger-success, 10 hunger-critical.
+function v5Face(value, hunger) {
+  if (hunger) {
+    if (value === 1) return 'skull';
+    if (value <= 5) return 'blank';
+    if (value < 10) return 'hunger-success';
+    return 'hunger-critical';
+  }
+  if (value <= 5) return 'blank';
+  if (value < 10) return 'success';
+  return 'critical';
+}
+
+Object.assign(__dicebox, { detectSystem, parseV5, rollV5, summarizeV5, describeV5, rollAny, v5Face });
+})();
+
 // render.js
 (() => {
 const { UNDER_30_GAP } = __dicebox;
@@ -3334,6 +3486,10 @@ class Die {
     // A staged die has no value yet: it is waiting on the tray to be thrown.
     if (this.value === null || this.value === undefined) return;
 
+    // V5 hunger (blood) dice read their numeral in the accent colour so they are
+    // visually distinct from the ordinary d10s in the same pool.
+    const ink = this.hunger ? theme.accent : theme.line;
+
     // Spherical high dice (d101+, exact facets): no microface can legibly hold a
     // three- or four-digit result, so it floats at the die's centre over a small
     // paper knockout that clears the surrounding micro-edges. Opaque-shell dice
@@ -3351,7 +3507,7 @@ class Die {
       ctx.font = `700 ${size}px "Iosevka Etoile", ui-monospace, monospace`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillStyle = theme.line;
+      ctx.fillStyle = ink;
       ctx.globalAlpha = alpha;
       ctx.fillText(label, 0, 0);
       this.drawFaceMark(ctx, theme, size * 1.2);
@@ -3383,7 +3539,7 @@ class Die {
       ctx.font = `600 ${grown}px "Iosevka Etoile", ui-monospace, monospace`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillStyle = theme.line;
+      ctx.fillStyle = ink;
       ctx.globalAlpha = alpha;
       ctx.fillText(label, 0, 0);
       this.drawFaceMark(ctx, theme, size);
@@ -3461,7 +3617,7 @@ class Die {
     ctx.font = `600 ${grown}px "Iosevka Etoile", ui-monospace, monospace`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillStyle = theme.line;
+    ctx.fillStyle = ink;
     ctx.globalAlpha = alpha;
     ctx.fillText(label, 0, 0);
     // Drawn here so it shares the face's skew: the ring sits in the surface with
@@ -4754,7 +4910,8 @@ Object.assign(__dicebox, { ROOM_STATES, backoffDelay, parsePassphraseFromHash, v
 
 // app.js
 (() => {
-const { roll, describe, Die, Surface, separate, beginFrame, solidFor, UNDER_30_GAP, deriveRoom, newSender, encryptMessage, decryptMessage, normalizePassphrase, generatePassphrase, PROTOCOL_VERSION, createRoom, parsePassphraseFromHash } = __dicebox;
+const { roll, describe, rollV5, describeV5, detectSystem, Die, Surface, separate, beginFrame, solidFor, UNDER_30_GAP, deriveRoom, newSender, encryptMessage, decryptMessage, normalizePassphrase, generatePassphrase, PROTOCOL_VERSION, createRoom, parsePassphraseFromHash } = __dicebox;
+
 
 
 
@@ -4872,6 +5029,27 @@ function theme() {
   };
 }
 
+// Per-system palettes override the CSS custom properties the canvas and panels
+// read, so switching systems visibly recolours the whole app. Every system ships
+// a dark and a light pair (the approved design doc: each system = a different
+// background/text/line, each with a light-dark pair).
+const SYSTEM_THEMES = {
+  // Vampire the Masquerade — blood crimson on near-black / aged paper.
+  v5: {
+    dark:  { '--paper': '#0b0809', '--line': '#c9b3ad', '--muted': '#7a6a63', '--accent': '#c3212e' },
+    light: { '--paper': '#efe6de', '--line': '#3b2326', '--muted': '#8a7070', '--accent': '#a31621' },
+  },
+};
+function applySystemTheme(system) {
+  const root = document.documentElement;
+  const scheme = SYSTEM_THEMES[system];
+  const mode = root.dataset.theme === 'dark' ? 'dark' : 'light';
+  root.dataset.systemTheme = scheme ? system : '';
+  for (const k of ['--paper', '--line', '--muted', '--accent']) root.style.removeProperty(k);
+  if (scheme) for (const [k, v] of Object.entries(scheme[mode])) root.style.setProperty(k, v);
+  updateThemeColor();
+}
+
 // ---- canvas sizing ----
 
 function resize() {
@@ -4965,12 +5143,18 @@ function placeGrid(dice) {
 function doRoll(notation) {
   let result;
   try {
-    result = roll(notation);
+    // An explicit system token ("v5:…") routes to that system's roller; anything
+    // else stays on the numeric engine untouched.
+    result = detectSystem(notation) === 'v5' ? rollV5(notation) : roll(notation);
   } catch (err) {
     showError(err.message);
     return;
   }
   clearError();
+
+  // Switching to a system roll recolours the app to that system's palette; a
+  // numeric roll restores the default theme.
+  applySystemTheme(result.system);
 
   state.last = result;
   $('notation').value = result.notation;
@@ -4980,13 +5164,16 @@ function doRoll(notation) {
     if (g.kind !== 'dice') continue;
     for (const d of g.dice) {
       flat.push({
-        sides: g.sides,
+        // V5 groups are d10s and carry no numeric `sides`; fall back to 10.
+        sides: g.sides ?? 10,
         value: d.value,
         // Carried onto the tray so a die can show what happened to it: dropped
-        // dice fade, exploded and rerolled ones get a mark.
+        // dice fade, exploded and rerolled ones get a mark. Hunger dice (V5)
+        // keep their flag so they paint as blood dice.
         kept: d.kept,
         exploded: d.exploded,
         rerolled: d.rerolled,
+        hunger: d.hunger,
       });
     }
   }
@@ -5001,6 +5188,7 @@ function doRoll(notation) {
     die.kept = f.kept;
     die.exploded = f.exploded;
     die.rerolled = f.rerolled;
+    if (f.hunger) die.hunger = true;
     return die;
   });
   placeGrid(state.dice);
@@ -5047,16 +5235,35 @@ function rerollDelay(flat) {
   return flat.some(f => f.rerolled) ? 700 : 0;
 }
 
+// Per-system result presentation. System rolls have no numeric `total`; their
+// headline/detail come from their own formatter, while the numeric engine's
+// formatters produce exactly what Dicebox has always shown.
+function resultHeadline(result) {
+  return result.system === 'v5' ? describeV5(result) : String(result.total);
+}
+function resultDetail(result) {
+  if (result.system === 'v5') {
+    const vals = result.groups.flatMap(g => g.dice).map(d => `${d.value}${d.hunger ? '⬥' : ''}`).join(', ');
+    return `${result.notation} — ${vals}`;
+  }
+  return describe(result.groups);
+}
+
 function finish(result) {
   delete $('total').dataset.rolling;
   delete $('total').dataset.idle;
-  $('total').textContent = String(result.total);
-  $('breakdown').textContent = describe(result.groups);
+  $('total').textContent = resultHeadline(result);
+  $('breakdown').textContent = resultDetail(result);
   addHistory(result, selfName(), true);
   // After addHistory, so a throw in room code could not cost the local roll its
   // place in the log. share() is synchronous and a no-op when there is no room,
   // which is what keeps this line off the critical path.
-  roomLink.share(result);
+  if (result.system === 'v5') {
+    // V5 rolls are not shared to rooms yet (needs the k:'roll2' schema); nothing
+    // is sent rather than sending a half-valid numeric payload.
+  } else {
+    roomLink.share(result);
+  }
   // The name has done its job by the first roll; let the tray have the page.
   $('wordmark').dataset.faded = '1';
 }
@@ -5091,16 +5298,20 @@ function recordRoll(result, who = null, mine = false) {
     who,
     mine,
     notation: result.notation,
-    total: result.total,
-    detail: describe(result.groups),
+    // Numeric rolls keep their scalar `total`; system rolls carry a formatted
+    // headline instead of a bogus scalar.
+    total: result.system === 'v5' ? null : result.total,
+    headline: resultHeadline(result),
+    detail: resultDetail(result),
     dice: result.groups
       .filter(g => g.kind === 'dice')
       .flatMap(g => g.dice.map(d => ({
-        sides: g.sides,
+        sides: g.sides ?? 10,
         value: d.value,
         kept: d.kept,
         exploded: d.exploded,
         rerolled: d.rerolled,
+        hunger: d.hunger,
       }))),
   });
   if (history.length > HISTORY_LIMIT) history.shift();
@@ -5134,7 +5345,7 @@ function addHistory(result, who = null, mine = false) {
   label.append(result.notation);
 
   const val = document.createElement('b');
-  val.textContent = String(result.total);
+  val.textContent = resultHeadline(result);
 
   top.append(label, val);
   li.append(top);
@@ -5142,7 +5353,7 @@ function addHistory(result, who = null, mine = false) {
   // What each die actually landed on, not just the total. The breakdown was
   // already computed for the readout and then discarded, so a past roll could
   // not be checked — "17" tells you nothing about which die produced it.
-  const detail = describe(result.groups);
+  const detail = resultDetail(result);
   if (detail && detail !== result.notation) {
     const rolls = document.createElement('span');
     rolls.className = 'log-detail';
@@ -5612,7 +5823,7 @@ function openHistory() {
     notation.append(entry.notation);
 
     const total = document.createElement('b');
-    total.textContent = String(entry.total);
+    total.textContent = entry.headline ?? String(entry.total);
 
     line.append(when, notation, total);
     li.append(line);
@@ -5647,7 +5858,7 @@ function historyCsv() {
   for (const entry of history) {
     entry.dice.forEach((d, i) => {
       rows.push([
-        entry.at, entry.who || 'you', entry.notation, entry.total, i + 1,
+        entry.at, entry.who || 'you', entry.notation, entry.headline ?? entry.total, i + 1,
         d.sides, d.value, d.kept ? 1 : 0, d.exploded ? 1 : 0, d.rerolled ? 1 : 0,
       ]);
     });
@@ -5662,7 +5873,7 @@ function historyCsv() {
 
 function historyText() {
   return history
-    .map(e => `${new Date(e.at).toLocaleTimeString()}  ${e.who ? e.who + '  ' : ''}${e.notation} = ${e.total}\n    ${e.detail}`)
+    .map(e => `${new Date(e.at).toLocaleTimeString()}  ${e.who ? e.who + '  ' : ''}${e.notation} = ${e.headline ?? e.total}\n    ${e.detail}`)
     .join('\n');
 }
 
