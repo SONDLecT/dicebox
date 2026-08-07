@@ -1309,7 +1309,9 @@ export class Die {
         ctx.moveTo(proj[edge.a][0], proj[edge.a][1]);
         ctx.lineTo(proj[edge.b][0], proj[edge.b][1]);
       }
-      ctx.strokeStyle = theme.line;
+      // Hunger (blood) dice draw their whole wireframe in the accent colour so
+      // they read as a distinct class on the tray, not only by their glyph.
+      ctx.strokeStyle = this.hunger ? theme.accent : theme.line;
       ctx.globalAlpha = fade * alpha;
       ctx.lineWidth = width;
       ctx.stroke();
@@ -1343,7 +1345,7 @@ export class Die {
         ctx.moveTo(proj[edge.a][0], proj[edge.a][1]);
         ctx.lineTo(proj[edge.b][0], proj[edge.b][1]);
       }
-      ctx.strokeStyle = theme.line;
+      ctx.strokeStyle = this.hunger ? theme.accent : theme.line;
       // Scaled rather than set, so a dropped die's fade survives this pass.
       ctx.globalAlpha = fade * (pass ? 1 : 0.22);
       ctx.lineWidth = pass ? 1.6 : 1.1;
@@ -1572,8 +1574,9 @@ export class Die {
     ctx.globalAlpha = alpha;
     if (this.v5Face) {
       // V5 symbol dice paint their glyph — same settle/pop, same ink rules
-      // (hunger dice draw in the blood accent) — instead of a numeral.
-      drawV5Glyph(ctx, this.v5Face, grown, ink);
+      // (hunger dice draw in the blood accent) — but scaled down a touch so the
+      // mark sits inside the face instead of reaching its edges.
+      drawV5Glyph(ctx, this.v5Face, grown * 0.8, ink);
     } else {
       ctx.fillText(label, 0, 0);
     }
@@ -1585,51 +1588,53 @@ export class Die {
   }
 }
 
-// Original line-art glyphs for the V5 symbol dice (skull / blank / success /
-// fanged). Deliberately NOT copied from the official dice artwork — a minimal
-// wireframe vocabulary that reads at 30-60px. Each draws centered at the origin,
-// scaled by `s`, using the same stroke ink as the numerals they replace.
+// Original line-art glyphs for the V5 symbol dice. NOT copied from the official
+// dice — a minimal wireframe vocabulary that reads at 30-60px. Each glyph is
+// sized to sit inside the die face (kept within ~±0.42·s so nothing bleeds past
+// the edge, even at the settle-pop scale).
 function drawV5Glyph(ctx, face, s, color) {
   ctx.strokeStyle = color;
   ctx.fillStyle = color;
-  ctx.lineWidth = Math.max(1, s * 0.09);
+  ctx.lineWidth = Math.max(0.8, s * 0.085);
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   const L = s;
-  // A minimal ankh: the canonical "success" mark. Circle on a stem with a
-  // crossbar, drawn loose enough to read as a glyph rather than a numeral.
-  function ankh() {
-    ctx.beginPath(); ctx.arc(0, -L * 0.45, L * 0.27, 0, TAU); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(0, -L * 0.16); ctx.lineTo(0, L * 0.92); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(-L * 0.40, 0); ctx.lineTo(L * 0.40, 0); ctx.stroke();
-  }
+  const ring = (cx, cy, r) => { ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.stroke(); };
   switch (face) {
     case 'success':
-    case 'hunger-success':
-      ankh();
+    case 'hunger-success': {
+      // A compact ankh. Loop on top, one clean stem, a short crossbar — reads as
+      // the canonical success mark without shouting.
+      ring(0, -L * 0.20, L * 0.17);
+      ctx.beginPath(); ctx.moveTo(0, -L * 0.03); ctx.lineTo(0, L * 0.42); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-L * 0.24, L * 0.02); ctx.lineTo(L * 0.24, L * 0.02); ctx.stroke();
       break;
+    }
     case 'critical':
     case 'hunger-critical': {
-      // The same ankh with short radiating ticks around its ring: reads as the
-      // "starred/embellished" critical mark.
-      ankh();
+      // The success mark with short ticks radiating off the loop — the "starred"
+      // critical variant.
+      ring(0, -L * 0.20, L * 0.17);
+      ctx.beginPath(); ctx.moveTo(0, -L * 0.03); ctx.lineTo(0, L * 0.42); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-L * 0.24, L * 0.02); ctx.lineTo(L * 0.24, L * 0.02); ctx.stroke();
       ctx.beginPath();
-      for (let i = 0; i < 8; i++) {
-        const a = i * Math.PI / 4;
-        const r0 = L * 0.58, r1 = L * 0.74;
-        ctx.moveTo(Math.cos(a) * r0, -L * 0.45 + Math.sin(a) * r0);
-        ctx.lineTo(Math.cos(a) * r1, -L * 0.45 + Math.sin(a) * r1);
+      for (let i = 0; i < 6; i++) {
+        const a = i * Math.PI / 3 + Math.PI / 6;
+        const r0 = L * 0.24, r1 = L * 0.33;
+        ctx.moveTo(Math.cos(a) * r0, -L * 0.20 + Math.sin(a) * r0);
+        ctx.lineTo(Math.cos(a) * r1, -L * 0.20 + Math.sin(a) * r1);
       }
       ctx.stroke();
       break;
     }
     case 'skull': {
-      // A plain skull: cranium, jaw, two eyes, a small nose. All strokes.
-      ctx.beginPath(); ctx.arc(0, -L * 0.08, L * 0.6, 0, TAU); ctx.stroke();
-      ctx.beginPath(); ctx.arc(0, L * 0.3, L * 0.45, Math.PI * 0.15, Math.PI * 0.85); ctx.stroke();
-      ctx.beginPath(); ctx.arc(-L * 0.20, -L * 0.1, L * 0.10, 0, TAU); ctx.fill();
-      ctx.beginPath(); ctx.arc( L * 0.20, -L * 0.1, L * 0.10, 0, TAU); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(0, -L * 0.02); ctx.lineTo(-L * 0.05, L * 0.14); ctx.lineTo(L * 0.05, L * 0.14); ctx.closePath(); ctx.fill();
+      // A plain skull: cranium, jaw, two eyes, a nose — kept open and neat so it
+      // reads as a 1 at hunting distance, not a blob.
+      ring(0, -L * 0.06, L * 0.34);
+      ctx.beginPath(); ctx.arc(0, L * 0.26, L * 0.24, Math.PI * 0.16, Math.PI * 0.84); ctx.stroke();
+      ctx.beginPath(); ctx.arc(-L * 0.13, -L * 0.08, L * 0.075, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.arc( L * 0.13, -L * 0.08, L * 0.075, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(0, -L * 0.02); ctx.lineTo(-L * 0.045, L * 0.10); ctx.lineTo(L * 0.045, L * 0.10); ctx.closePath(); ctx.fill();
       break;
     }
     case 'blank':

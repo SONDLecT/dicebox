@@ -2,7 +2,7 @@ import { roll, describe } from './dice.js';
 import { Die, Surface, separate, beginFrame } from './render.js';
 import { createRoom, parsePassphraseFromHash } from './room.js';
 import { generatePassphrase, normalizePassphrase } from './room-crypto.js';
-import { rollV5, describeV5, detectSystem, v5Face } from './system-dice.js';
+import { rollV5, describeV5, v5Headline, detectSystem, v5Face } from './system-dice.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('tray');
@@ -85,6 +85,9 @@ $('themeToggle').addEventListener('click', () => {
   store.set('dicebox:theme', document.documentElement.dataset.theme);
   syncThemeLabel();
   updateThemeColor();
+  // Re-apply the active system's palette so its dark/light pair follows the
+  // toggle instead of being frozen at whichever mode was active on roll.
+  applySystemTheme(activeSystem);
 });
 
 systemDark.addEventListener('change', () => {
@@ -128,6 +131,8 @@ const SYSTEM_THEMES = {
     light: { '--paper': '#efe6de', '--line': '#3b2326', '--muted': '#8a7070', '--accent': '#a31621' },
   },
 };
+// The active dice system; drives the palette and, later, the switcher/slug.
+let activeSystem = 'numeric';
 function applySystemTheme(system) {
   const root = document.documentElement;
   const scheme = SYSTEM_THEMES[system];
@@ -242,7 +247,8 @@ function doRoll(notation) {
 
   // Switching to a system roll recolours the app to that system's palette; a
   // numeric roll restores the default theme.
-  applySystemTheme(result.system);
+  activeSystem = result.system;
+  applySystemTheme(activeSystem);
 
   state.last = result;
   $('notation').value = result.notation;
@@ -330,12 +336,12 @@ function rerollDelay(flat) {
 // headline/detail come from their own formatter, while the numeric engine's
 // formatters produce exactly what Dicebox has always shown.
 function resultHeadline(result) {
-  return result.system === 'v5' ? describeV5(result) : String(result.total);
+  return result.system === 'v5' ? v5Headline(result) : String(result.total);
 }
 function resultDetail(result) {
   if (result.system === 'v5') {
     const vals = result.groups.flatMap(g => g.dice).map(d => `${d.value}${d.hunger ? '⬥' : ''}`).join(', ');
-    return `${result.notation} — ${vals}`;
+    return `${describeV5(result)} — dice ${vals}`;
   }
   return describe(result.groups);
 }

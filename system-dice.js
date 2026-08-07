@@ -120,6 +120,17 @@ export function describeV5(result) {
   return parts.join(' · ');
 }
 
+// A compact headline for the big readout: the resolved outcome (or the success
+// count when difficulty is unknown), short enough not to overflow the total.
+export function v5Headline(result) {
+  const s = result.summary;
+  if (s.outcome) {
+    if (s.outcome === 'success' && s.margin !== null) return `Success (+${s.margin})`;
+    return OUTCOME_LABEL[s.outcome] || 'Roll';
+  }
+  return `${s.successes} success${s.successes === 1 ? '' : 'es'}`;
+}
+
 // Dispatcher: an explicit system token in the notation wins; otherwise defer to
 // the numeric engine (returned as {system:'numeric', deferred:true}).
 export function rollAny(src, uiSystem = 'numeric') {

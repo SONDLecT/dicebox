@@ -4,7 +4,7 @@
 import { webcrypto } from 'node:crypto';
 if (!globalThis.crypto) globalThis.crypto = webcrypto;
 
-import { parseV5, rollV5, summarizeV5, detectSystem, describeV5, rollAny, v5Face } from '../system-dice.js';
+import { parseV5, rollV5, summarizeV5, detectSystem, describeV5, rollAny, v5Face, v5Headline } from '../system-dice.js';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, extra = '') => {
@@ -123,6 +123,16 @@ ok('rollAny defers numeric', rollAny('4d6').deferred === true && rollAny('4d6').
   for (const [v, h, want] of cases) {
     ok(`v5Face(${v},${h}) = ${want}`, v5Face(v, h) === want);
   }
+}
+
+// ---- compact headline (short enough not to overflow the readout) ----
+{
+  const r = { summary: summarizeV5([d(10, true), d(10, false), d(5, false), d(2, false)], 3, 4, 1) };
+  ok('headline messy-critical', v5Headline(r) === 'Messy Critical');
+  const s2 = { summary: summarizeV5([d(8, false), d(8, false), d(8, false), d(10, false)], 3, 4, 0) };
+  ok('headline success +margin', v5Headline(s2) === 'Success (+2)');
+  const s3 = { summary: summarizeV5([d(3, false), d(1, true)], null, 2, 1) };
+  ok('headline unresolved successes', v5Headline(s3) === '0 successes');
 }
 
 console.log(`\nsystem-dice: ${pass} passed, ${fail} failed`);

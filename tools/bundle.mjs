@@ -42,7 +42,7 @@ function moduleScope(name, exportsFrom = []) {
 }
 
 const DICE_EXPORTS = ['roll', 'describe'];
-const SYSTEM_EXPORTS = ['rollV5', 'describeV5', 'detectSystem'];
+const SYSTEM_EXPORTS = ['rollV5', 'describeV5', 'v5Headline', 'detectSystem'];
 const RENDER_EXPORTS = ['Die', 'Surface', 'separate', 'beginFrame', 'solidFor', 'UNDER_30_GAP'];
 const ROOM_CRYPTO_EXPORTS = [
   'deriveRoom', 'newSender', 'encryptMessage', 'decryptMessage',
