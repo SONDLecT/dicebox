@@ -2,7 +2,7 @@ import { roll, describe } from './dice.js';
 import { Die, Surface, separate, beginFrame } from './render.js';
 import { createRoom, parsePassphraseFromHash } from './room.js';
 import { generatePassphrase, normalizePassphrase } from './room-crypto.js';
-import { rollV5, describeV5, detectSystem } from './system-dice.js';
+import { rollV5, describeV5, detectSystem, v5Face } from './system-dice.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('tray');
@@ -277,6 +277,9 @@ function doRoll(notation) {
     die.exploded = f.exploded;
     die.rerolled = f.rerolled;
     if (f.hunger) die.hunger = true;
+    // V5 symbol dice: stamp the face the die should draw when it settles so the
+    // renderer needs no system knowledge — it just paints a glyph.
+    if (result.system === 'v5') die.v5Face = v5Face(f.value, f.hunger);
     return die;
   });
   placeGrid(state.dice);

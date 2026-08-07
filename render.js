@@ -1570,12 +1570,72 @@ export class Die {
     ctx.textBaseline = 'middle';
     ctx.fillStyle = ink;
     ctx.globalAlpha = alpha;
-    ctx.fillText(label, 0, 0);
+    if (this.v5Face) {
+      // V5 symbol dice paint their glyph — same settle/pop, same ink rules
+      // (hunger dice draw in the blood accent) — instead of a numeral.
+      drawV5Glyph(ctx, this.v5Face, grown, ink);
+    } else {
+      ctx.fillText(label, 0, 0);
+    }
     // Drawn here so it shares the face's skew: the ring sits in the surface with
     // the numeral rather than floating flat over the die.
     this.drawFaceMark(ctx, theme, size);
     ctx.restore();
     ctx.globalAlpha = 1;
+  }
+}
+
+// Original line-art glyphs for the V5 symbol dice (skull / blank / success /
+// fanged). Deliberately NOT copied from the official dice artwork — a minimal
+// wireframe vocabulary that reads at 30-60px. Each draws centered at the origin,
+// scaled by `s`, using the same stroke ink as the numerals they replace.
+function drawV5Glyph(ctx, face, s, color) {
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = Math.max(1, s * 0.09);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  const L = s;
+  // A minimal ankh: the canonical "success" mark. Circle on a stem with a
+  // crossbar, drawn loose enough to read as a glyph rather than a numeral.
+  function ankh() {
+    ctx.beginPath(); ctx.arc(0, -L * 0.45, L * 0.27, 0, TAU); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, -L * 0.16); ctx.lineTo(0, L * 0.92); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-L * 0.40, 0); ctx.lineTo(L * 0.40, 0); ctx.stroke();
+  }
+  switch (face) {
+    case 'success':
+    case 'hunger-success':
+      ankh();
+      break;
+    case 'critical':
+    case 'hunger-critical': {
+      // The same ankh with short radiating ticks around its ring: reads as the
+      // "starred/embellished" critical mark.
+      ankh();
+      ctx.beginPath();
+      for (let i = 0; i < 8; i++) {
+        const a = i * Math.PI / 4;
+        const r0 = L * 0.58, r1 = L * 0.74;
+        ctx.moveTo(Math.cos(a) * r0, -L * 0.45 + Math.sin(a) * r0);
+        ctx.lineTo(Math.cos(a) * r1, -L * 0.45 + Math.sin(a) * r1);
+      }
+      ctx.stroke();
+      break;
+    }
+    case 'skull': {
+      // A plain skull: cranium, jaw, two eyes, a small nose. All strokes.
+      ctx.beginPath(); ctx.arc(0, -L * 0.08, L * 0.6, 0, TAU); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, L * 0.3, L * 0.45, Math.PI * 0.15, Math.PI * 0.85); ctx.stroke();
+      ctx.beginPath(); ctx.arc(-L * 0.20, -L * 0.1, L * 0.10, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.arc( L * 0.20, -L * 0.1, L * 0.10, 0, TAU); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(0, -L * 0.02); ctx.lineTo(-L * 0.05, L * 0.14); ctx.lineTo(L * 0.05, L * 0.14); ctx.closePath(); ctx.fill();
+      break;
+    }
+    case 'blank':
+    default:
+      // Blank faces are empty, exactly like the real die — nothing to draw.
+      break;
   }
 }
 
