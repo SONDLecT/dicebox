@@ -30,7 +30,17 @@ function randInt(sides) {
 }
 
 export function detectSystem(src) {
-  return /^v5:/.test(String(src || '').trim().toLowerCase()) ? 'v5' : 'numeric';
+  const s = String(src || '').trim().toLowerCase();
+  if (/^v5:/.test(s)) return 'v5';
+  if (/^gen:/.test(s)) return 'genesys';
+  if (/^dh:/.test(s)) return 'daggerheart';
+  if (/^ct:/.test(s)) return 'cthulhutech';
+  if (/^sw:/.test(s)) return 'starwars';
+  if (/^tor:/.test(s)) return 'onering';
+  if (/^pbta:/.test(s)) return 'pbta';
+  if (/^mist:/.test(s)) return 'mist';
+  if (FATE_REGEX.test(s)) return 'fate';
+  return 'numeric';
 }
 
 export function parseV5(src) {
@@ -69,35 +79,51 @@ export function rollV5(src) {
 }
 
 // V5 outcome rules
-//   * a die is a success on 6-9 (1 success); 10 counts as TWO successes
-//   * two dice showing 10 => a critical win
-//   * Messy Critical  = critical win where at least one Hunger die shows 10
+//   * every die showing 6+ is one success — a 10 is NOT worth two on its own
+//   * each PAIR of 10s is a critical: the pair adds two further successes, so
+//     two 10s together are worth four. An odd 10 left over is just its own
+//     single success. (Counting every 10 as two, as this once did, inflated any
+//     pool containing a lone 10 and quietly changed win/lose at the margin.)
+//   * a critical only *wins* if the roll also meets the difficulty; two 10s in
+//     a roll that falls short is still a failure, not a Critical
+//   * Messy Critical  = a winning critical where at least one Hunger die shows 10
 //   * Bestial Failure = the test fails AND at least one Hunger die shows 1
-// Difficulty is needed to resolve win/loss truthfully; when omitted (null) the
-// reducer reports successes + intrinsic critical + hunger events but does not
-// assert Bestial Failure (it cannot know whether the roll lost).
+//
+// Difficulty is what makes any of the resolved states truthful, so with it
+// omitted (null) the reducer reports the raw facts — successes, the crit pair,
+// the Hunger events — and asserts no outcome at all rather than guessing.
 export function summarizeV5(dice, difficulty, pool = dice.length, hunger = dice.filter(d => d.hunger).length) {
-  let successes = 0, tenCount = 0, hungerTen = 0, hungerOne = 0;
+  let base = 0, tenCount = 0, hungerTen = 0, hungerOne = 0;
   for (const d of dice) {
     const v = d.value;
-    if (v >= 6) successes += v === 10 ? 2 : 1;
+    if (v >= 6) base++;
     if (v === 10) { tenCount++; if (d.hunger) hungerTen++; }
     if (v === 1 && d.hunger) hungerOne++;
   }
-  const critTwo = tenCount >= 2;
+  const critPairs = Math.floor(tenCount / 2);
+  const successes = base + critPairs * 2;
+  const critTwo = critPairs > 0;
   const margin = difficulty === null ? null : successes - difficulty;
+  const won = difficulty !== null && successes >= difficulty;
 
   let outcome = null;
-  if (critTwo && hungerTen > 0) outcome = 'messy-critical';
-  else if (critTwo) outcome = 'critical';
-  else if (difficulty !== null && margin >= 0) outcome = 'success';
-  else if (difficulty !== null && hungerOne > 0) outcome = 'bestial-failure';
-  else if (difficulty !== null) outcome = 'failure';
+  // Zero successes resolves without a difficulty: every difficulty is at least
+  // 1, so a roll with nothing on it has lost whatever the Storyteller had in
+  // mind — including, with a Hunger 1 among the dice, as a Bestial Failure.
+  if (difficulty === null && successes === 0) outcome = hungerOne > 0 ? 'bestial-failure' : 'failure';
+  else if (difficulty === null) outcome = null;
+  else if (won && critTwo) outcome = hungerTen > 0 ? 'messy-critical' : 'critical';
+  else if (won) outcome = 'success';
+  else if (hungerOne > 0) outcome = 'bestial-failure';
+  else outcome = 'failure';
 
   return {
     kind: 'v5', pool, hunger, difficulty,
     successes, outcome, margin,
-    critTwo, hungerTen, hungerOne, tenCount,
+    // A total failure — no successes at all — is its own thing at the table,
+    // and it is worth saying out loud whether or not a difficulty was set.
+    totalFailure: successes === 0,
+    critTwo, critPairs, hungerTen, hungerOne, tenCount,
   };
 }
 
@@ -109,26 +135,58 @@ const OUTCOME_LABEL = {
   failure: 'Failure',
 };
 
-export function describeV5(result) {
-  const s = result.summary;
-  const parts = [`${s.successes} success${s.successes === 1 ? '' : 'es'}`];
-  if (s.outcome && OUTCOME_LABEL[s.outcome]) parts.push(OUTCOME_LABEL[s.outcome]);
-  if (s.outcome === 'success' && s.margin !== null) parts.push(`margin +${s.margin}`);
-  if (s.critTwo) parts.push('two 10s');
-  if (s.hungerTen) parts.push(`Hunger ${s.hungerTen > 1 ? `10 ×${s.hungerTen}` : '10'}`);
-  if (s.hungerOne) parts.push(`Hunger ${s.hungerOne > 1 ? `1 ×${s.hungerOne}` : '1'}`);
+// The raw dice, split into the two pools and labelled in words. The symbols on
+// the tray are the fun part, but the readout and the log spell out the actual
+// d10 values so a roll can be checked — and "Hunger 9, 7" reads as what it is
+// where "9⬥, 7⬥" needs a legend nobody has.
+export function v5Dice(result) {
+  const regular = [], hunger = [];
+  for (const g of result.groups || []) {
+    for (const d of g.dice || []) (d.hunger ? hunger : regular).push(d.value);
+  }
+  const parts = [];
+  if (regular.length) parts.push(`Regular ${regular.join(', ')}`);
+  if (hunger.length) parts.push(`Hunger ${hunger.join(', ')}`);
   return parts.join(' · ');
 }
 
-// A compact headline for the big readout: the resolved outcome (or the success
-// count when difficulty is unknown), short enough not to overflow the total.
+// The line under the headline, in reading order: what happened, then the
+// arithmetic behind it, then a short "why" for the outcomes a bare count does
+// not explain, then the dice themselves.
+export function describeV5(result) {
+  const s = result.summary;
+  const parts = [];
+  if (s.outcome && OUTCOME_LABEL[s.outcome]) parts.push(OUTCOME_LABEL[s.outcome]);
+  parts.push(`${s.successes} success${s.successes === 1 ? '' : 'es'}`
+    + (s.difficulty !== null ? ` vs difficulty ${s.difficulty}` : ''));
+  // Only the outcomes that a "successes ≥ difficulty" tally does not explain on
+  // its own get a reason, so the line stays short.
+  if (s.outcome === 'messy-critical') parts.push('a pair of 10s, one on a Hunger die');
+  else if (s.outcome === 'critical') parts.push(s.critPairs > 1 ? `${s.critPairs} pairs of 10s` : 'a pair of 10s');
+  else if (s.outcome === 'bestial-failure') parts.push('a Hunger die rolled 1');
+  else if (s.critTwo) parts.push(s.critPairs > 1 ? `${s.critPairs} pairs of 10s` : 'a pair of 10s');
+  const dice = v5Dice(result);
+  if (dice) parts.push(dice);
+  return parts.join(' · ');
+}
+
+// The big readout. Two shapes, because V5 has two different answers depending
+// on what the roll knows:
+//
+//   * with a difficulty, the answer is the resolved outcome — a phrase, set at
+//     the readout's text size so "Bestial Failure" does not run off the edge
+//     and overlap itself at 104px;
+//   * without one, nothing is resolved and the answer is simply how many
+//     successes came up — a number, which keeps the roller looking like itself.
 export function v5Headline(result) {
   const s = result.summary;
   if (s.outcome) {
-    if (s.outcome === 'success' && s.margin !== null) return `Success (+${s.margin})`;
-    return OUTCOME_LABEL[s.outcome] || 'Roll';
+    const text = s.outcome === 'success' && s.margin !== null
+      ? `Success +${s.margin}`
+      : (OUTCOME_LABEL[s.outcome] || 'Roll');
+    return { kind: 'text', text };
   }
-  return `${s.successes} success${s.successes === 1 ? '' : 'es'}`;
+  return { kind: 'number', text: String(s.successes) };
 }
 
 // Dispatcher: an explicit system token in the notation wins; otherwise defer to
@@ -136,7 +194,711 @@ export function v5Headline(result) {
 export function rollAny(src, uiSystem = 'numeric') {
   const sys = detectSystem(src);
   if (sys === 'v5') return rollV5(src);
+  if (sys === 'fate') return rollFate(src);
+  if (sys === 'genesys') return rollGenesys(src);
+  if (sys === 'daggerheart') return rollDaggerheart(src);
+  if (sys === 'cthulhutech') return rollCthulhuTech(src);
+  if (sys === 'starwars') return rollStarWars(src);
+  if (sys === 'onering') return rollOneRing(src);
+  if (sys === 'pbta') return rollPbta(src);
+  if (sys === 'mist') return rollMist(src);
   return { system: 'numeric', deferred: true, notation: String(src) };
+}
+
+// ---- 2d6 systems: Powered by the Apocalypse + the Mist Engine ----
+//
+// One mechanic, two names. Roll 2d6, add a modifier, read the band: 10+ is a
+// full hit, 7-9 a partial (a hit with a cost), 6 or under a miss. PbtA calls
+// them Strong/Weak Hit and Miss; the Mist Engine (City of Mist, Legend in the
+// Mist, :Otherscape) calls them Success/Consequence/Failure and sources the
+// modifier from power tags minus weakness tags.
+const PBTA_REGEX = /^pbta:([+-]\d+)?$/;
+const MIST_REGEX = /^mist:([+-]\d+)?$/;
+
+const BAND_LABELS = {
+  pbta: { hit: 'Strong Hit', partial: 'Weak Hit', miss: 'Miss' },
+  mist: { hit: 'Success', partial: 'Consequence', miss: 'Failure' },
+};
+
+function parse2d6(src, regex, label) {
+  const m = regex.exec(String(src || '').trim().toLowerCase());
+  if (!m) throw new Error(`Expected a ${label} roll like "${label === 'PbtA' ? 'pbta' : 'mist'}:" or ":+2"`);
+  const modifier = m[1] ? Number(m[1]) : 0;
+  if (Math.abs(modifier) > 100) throw new Error('Modifier must be -100 to 100');
+  return { modifier };
+}
+export function parsePbta(src) { return parse2d6(src, PBTA_REGEX, 'PbtA'); }
+export function parseMist(src) { return parse2d6(src, MIST_REGEX, 'Mist'); }
+
+function roll2d6(src, system, parse) {
+  const { modifier } = parse(src);
+  const a = randInt(6), b = randInt(6);
+  const dice = [
+    { value: a, sides: 6, kept: true, rerolled: false, exploded: false },
+    { value: b, sides: 6, kept: true, rerolled: false, exploded: false },
+  ];
+  return {
+    schema: 2,
+    system,
+    notation: String(src),
+    groups: [{ kind: 'dice', dieType: system, sides: 6, count: 2, dice, subtotal: a + b }],
+    summary: summarize2d6(a, b, modifier, system),
+  };
+}
+export function rollPbta(src) { return roll2d6(src, 'pbta', parsePbta); }
+export function rollMist(src) { return roll2d6(src, 'mist', parseMist); }
+
+export function summarize2d6(a, b, modifier, system) {
+  const sum = a + b;
+  const total = sum + modifier;
+  const band = total >= 10 ? 'hit' : total >= 7 ? 'partial' : 'miss';
+  return { kind: system, a, b, sum, modifier, total, band };
+}
+
+// Total as the big number, tinted by the band (green hit / amber partial /
+// muted miss). Shared by both 2d6 systems.
+export function twod6Headline(result) {
+  return { kind: 'number', text: String(result.summary.total), variant: `band-${result.summary.band}` };
+}
+
+export function describe2d6(result) {
+  const s = result.summary;
+  const parts = [BAND_LABELS[s.kind][s.band]];
+  let math = `${s.a} + ${s.b}`;
+  if (s.modifier) math += ` ${s.modifier > 0 ? '+' : '−'} ${Math.abs(s.modifier)}`;
+  parts.push(math, `total ${s.total}`);
+  return parts.join(' · ');
+}
+
+// ---- Star Wars (FFG / Edge Studio) — Genesys narrative dice + the Force die ----
+//
+// The six narrative dice resolve exactly as Genesys does; Star Wars adds a
+// seventh: the white Force die (d12), whose Light- and Dark-side pips are a
+// separate output used to power Force abilities. They do not cancel the
+// success/advantage axes. Force die faces: six single Dark, one double Dark,
+// three double Light, two single Light (8 pips each side, dark on more faces).
+const LIGHT = 'lightside', DARK = 'darkside';
+const FORCE_DIE = {
+  color: 'force', sides: 12,
+  faces: [
+    [DARK], [DARK], [DARK], [DARK], [DARK], [DARK],
+    [DARK, DARK],
+    [LIGHT, LIGHT], [LIGHT, LIGHT], [LIGHT, LIGHT],
+    [LIGHT], [LIGHT],
+  ],
+};
+const SW_LETTERS = { a: 'ability', p: 'proficiency', b: 'boost', s: 'setback', d: 'difficulty', c: 'challenge', f: 'force' };
+// Resolved at call time, not module load: GENESYS_DICE is declared further down.
+const swDie = type => (type === 'force' ? FORCE_DIE : GENESYS_DICE[type]);
+
+export function parseStarWars(src) {
+  const raw = String(src || '').trim().toLowerCase();
+  const m = /^sw:(.+)$/.exec(raw);
+  if (!m) throw new Error('Expected a Star Wars pool like "sw:2A+2D+1F"');
+  const body = m[1].replace(/[\s+]/g, '');
+  if (!/^(\d*[apbsdcf])+$/.test(body)) {
+    throw new Error('Star Wars dice are A P B S D C F (the six narrative dice plus the Force die)');
+  }
+  const pool = [];
+  let total = 0;
+  for (const t of body.matchAll(/(\d*)([apbsdcf])/g)) {
+    const count = t[1] === '' ? 1 : Number(t[1]);
+    if (count < 1) throw new Error('Each die count must be at least 1');
+    total += count;
+    pool.push({ type: SW_LETTERS[t[2]], count });
+  }
+  if (total < 1 || total > 100) throw new Error('Star Wars pool must be 1-100 dice');
+  return pool;
+}
+
+export function rollStarWars(src) {
+  const pool = parseStarWars(src);
+  const dice = [];
+  for (const { type, count } of pool) {
+    const def = swDie(type);
+    for (let i = 0; i < count; i++) {
+      const faceIndex = randInt(def.sides) - 1;
+      dice.push({
+        type, sides: def.sides, color: def.color,
+        faceIndex, symbols: def.faces[faceIndex],
+        value: faceIndex + 1, kept: true, rerolled: false, exploded: false,
+      });
+    }
+  }
+  return {
+    schema: 2,
+    system: 'starwars',
+    notation: String(src),
+    groups: [{ kind: 'dice', dieType: 'starwars', count: dice.length, dice, subtotal: 0 }],
+    summary: summarizeStarWars(dice),
+  };
+}
+
+export function summarizeStarWars(dice) {
+  const narrative = dice.filter(d => d.type !== 'force');
+  const g = summarizeGenesys(narrative);
+  let lightside = 0, darkside = 0;
+  for (const d of dice) {
+    if (d.type !== 'force') continue;
+    for (const sym of d.symbols) { if (sym === LIGHT) lightside++; else darkside++; }
+  }
+  return {
+    ...g, kind: 'starwars',
+    lightside, darkside,
+    hasNarrative: narrative.length > 0,
+    hasForce: lightside + darkside > 0,
+  };
+}
+
+export function starWarsHeadline(result) {
+  const s = result.summary;
+  // A Force-only roll (a Force-power check) leads with the pips; otherwise the
+  // narrative outcome leads and the pips ride along in the detail.
+  if (!s.hasNarrative && s.hasForce) {
+    const parts = [];
+    if (s.lightside) parts.push(`${s.lightside} Light`);
+    if (s.darkside) parts.push(`${s.darkside} Dark`);
+    return { kind: 'text', text: parts.join(' · ') || 'No Force' };
+  }
+  return genesysHeadline(result);
+}
+
+export function describeStarWars(result) {
+  const s = result.summary;
+  let text = s.hasNarrative ? describeGenesys(result) : '';
+  if (s.hasForce) {
+    const force = [];
+    if (s.lightside) force.push(`${s.lightside} Light`);
+    if (s.darkside) force.push(`${s.darkside} Dark`);
+    const clause = `Force ${force.join(', ')}`;
+    text = text ? `${text} · ${clause}` : clause;
+  }
+  return text;
+}
+
+// ---- The One Ring 2e ----
+//
+// One Feat die (d12: 1-10, plus the Eye of Sauron = 0 and the Gandalf rune =
+// automatic success) rolled with a pool of Success dice (d6, where each 6 bears
+// a Tengwar rune). Total the dice and meet the Target Number. Each rune is a
+// mark of quality: one is a Great success, two or more Extraordinary. Favoured /
+// ill-favoured rolls two Feat dice and keeps the better / worse; when Weary,
+// Success dice of 1-3 count as nothing.
+//
+//   tor:3           a Feat die + three Success dice
+//   tor:3@16        the same, against Target Number 16
+//   tor:3fav@16     favoured (roll two Feat dice, keep the best)
+//   tor:2illw@18    ill-favoured and weary
+const TOR_REGEX = /^tor:(\d+)(fav|ill)?(w)?(?:@(\d+))?$/;
+
+export function parseOneRing(src) {
+  const m = TOR_REGEX.exec(String(src || '').trim().toLowerCase());
+  if (!m) throw new Error('Expected an One Ring roll like "tor:3" or "tor:3fav@16"');
+  const success = Number(m[1]);
+  const favour = m[2] || null; // 'fav' | 'ill' | null
+  const weary = Boolean(m[3]);
+  const tn = m[4] === undefined ? null : Number(m[4]);
+  if (success < 0 || success > 20) throw new Error('Success dice must be 0-20');
+  if (tn !== null && (tn < 1 || tn > 100)) throw new Error('Target Number must be 1-100');
+  return { success, favour, weary, tn };
+}
+
+// A Feat die roll → {face, value, rank}. rank orders them for keeping the best
+// or worst: Gandalf beats every number beats the Eye.
+function rollFeatDie() {
+  const r = randInt(12);
+  if (r === 11) return { face: 'eye', value: 0, rank: -1 };       // Eye of Sauron = 0
+  if (r === 12) return { face: 'gandalf', value: 0, rank: 99 };   // Gandalf = automatic success
+  return { face: 'number', value: r, rank: r };                   // 1-10
+}
+
+export function rollOneRing(src) {
+  const { success, favour, weary, tn } = parseOneRing(src);
+  // Favoured/ill-favoured rolls two Feat dice; the kept one resolves, the other
+  // is shown faded like a dropped die.
+  const feats = [rollFeatDie()];
+  if (favour) feats.push(rollFeatDie());
+  const kept = favour === 'ill'
+    ? feats.reduce((a, b) => (b.rank < a.rank ? b : a))
+    : feats.reduce((a, b) => (b.rank > a.rank ? b : a));
+
+  const dice = feats.map(f => ({
+    role: 'feat', face: f.face, value: f.value, sides: 12,
+    kept: f === kept, rerolled: false, exploded: false,
+  }));
+  for (let i = 0; i < success; i++) {
+    const value = randInt(6);
+    dice.push({ role: 'success', value, sides: 6, rune: value === 6, kept: true, rerolled: false, exploded: false });
+  }
+
+  return {
+    schema: 2,
+    system: 'onering',
+    notation: String(src),
+    groups: [{ kind: 'dice', dieType: 'onering', count: dice.length, dice, subtotal: 0 }],
+    summary: summarizeOneRing({ kept, dice, weary, tn }),
+  };
+}
+
+export function summarizeOneRing({ kept, dice, weary = false, tn = null }) {
+  const successDice = dice.filter(d => d.role === 'success');
+  // Weary drops the botches: Success dice showing 1-3 count as zero.
+  let successSum = 0;
+  for (const d of successDice) {
+    d.counts = !(weary && d.value <= 3);
+    if (d.counts) successSum += d.value;
+  }
+  const runes = successDice.filter(d => d.value === 6).length;
+  const gandalf = kept.face === 'gandalf';
+  const eye = kept.face === 'eye';
+  const total = kept.value + successSum;
+  const success = tn === null ? null : (gandalf || total >= tn);
+  const degree = runes >= 2 ? 'extraordinary' : runes === 1 ? 'great' : 'ordinary';
+  return {
+    kind: 'onering',
+    feat: kept.face, featValue: kept.value, gandalf, eye,
+    successSum, runes, total, tn, weary, success, degree,
+  };
+}
+
+const TOR_DEGREE_LABEL = { great: 'Great Success', extraordinary: 'Extraordinary Success' };
+
+// The big readout is the total, tinted by the outcome (gold for a Gandalf
+// auto-success, green for success, muted for failure).
+export function oneRingHeadline(result) {
+  const s = result.summary;
+  let variant;
+  if (s.gandalf) variant = 'tor-gandalf';
+  else if (s.success === true) variant = 'tor-success';
+  else if (s.success === false) variant = 'tor-failure';
+  return { kind: 'number', text: String(s.total), variant };
+}
+
+export function describeOneRing(result) {
+  const s = result.summary;
+  const parts = [];
+  if (s.gandalf) parts.push('Automatic Success');
+  else if (s.success === true) parts.push('Success');
+  else if (s.success === false) parts.push('Failure');
+  if (s.success !== false && s.degree !== 'ordinary') parts.push(TOR_DEGREE_LABEL[s.degree]);
+  if (s.eye) parts.push('Eye of Sauron');
+  const feat = s.gandalf ? 'Gandalf' : s.eye ? 'Eye' : s.featValue;
+  parts.push(`Feat ${feat}`);
+  const successVals = result.groups[0].dice
+    .filter(d => d.role === 'success')
+    .map(d => (d.value === 6 ? 'ᚱ' : String(d.value)));
+  if (successVals.length) parts.push(`Success ${successVals.join(', ')}`);
+  parts.push(`total ${s.total}` + (s.tn !== null ? ` vs ${s.tn}` : ''));
+  return parts.join(' · ');
+}
+
+// ---- CthulhuTech 2e (the even/odd d10 pool) ----
+//
+// 2e dropped 1e's poker "Framewerk" for a pool of coin-flips: roll d10 equal to
+// your Attribute + Skill, and every EVEN die is a Hit (odd is a miss). Count the
+// hits and meet the Difficulty (about 3 for a simple task up to 6-7 for a near
+// impossible one). A pool that meets or beats the Difficulty succeeds.
+//
+//   ct:8       roll eight d10, report the hits
+//   ct:8@4     the same, resolved against Difficulty 4
+const CT_REGEX = /^ct:(\d+)(?:@(\d+))?$/;
+
+export function parseCthulhuTech(src) {
+  const m = CT_REGEX.exec(String(src || '').trim().toLowerCase());
+  if (!m) throw new Error('Expected a CthulhuTech pool like "ct:8" or "ct:8@4"');
+  const dice = Number(m[1]);
+  const difficulty = m[2] === undefined ? null : Number(m[2]);
+  if (dice < 1 || dice > 100) throw new Error('Pool must be 1-100 dice');
+  if (difficulty !== null && (difficulty < 1 || difficulty > 20)) {
+    throw new Error('Difficulty must be 1-20');
+  }
+  return { dice, difficulty };
+}
+
+export function rollCthulhuTech(src) {
+  const { dice: count, difficulty } = parseCthulhuTech(src);
+  const dice = [];
+  for (let i = 0; i < count; i++) {
+    const value = randInt(10);
+    dice.push({ value, hit: value % 2 === 0, kept: true, rerolled: false, exploded: false });
+  }
+  return {
+    schema: 2,
+    system: 'cthulhutech',
+    notation: String(src),
+    groups: [{ kind: 'dice', dieType: 'cthulhutech', sides: 10, count, dice, subtotal: 0 }],
+    summary: summarizeCthulhuTech(dice, difficulty, count),
+  };
+}
+
+export function summarizeCthulhuTech(dice, difficulty = null, count = dice.length) {
+  let hits = 0;
+  for (const d of dice) if (d.value % 2 === 0) hits++;
+  const success = difficulty === null ? null : hits >= difficulty;
+  const margin = difficulty === null ? null : hits - difficulty;
+  return { kind: 'cthulhutech', count, hits, misses: count - hits, difficulty, success, margin };
+}
+
+// The big readout is the hit count, tinted by whether it met the Difficulty.
+export function cthulhutechHeadline(result) {
+  const s = result.summary;
+  const variant = s.success === null ? undefined : s.success ? 'ct-success' : 'ct-failure';
+  return { kind: 'number', text: String(s.hits), variant };
+}
+
+export function describeCthulhuTech(result) {
+  const s = result.summary;
+  const parts = [`${s.hits} hit${s.hits === 1 ? '' : 's'}`
+    + (s.difficulty !== null ? ` vs difficulty ${s.difficulty}` : '')];
+  if (s.success !== null) {
+    parts.push(s.success ? (s.margin > 0 ? `Success +${s.margin}` : 'Success') : 'Failure');
+  }
+  const dice = result.groups[0].dice;
+  const hitVals = dice.filter(d => d.value % 2 === 0).map(d => d.value);
+  const missVals = dice.filter(d => d.value % 2 !== 0).map(d => d.value);
+  parts.push(`hits ${hitVals.length ? hitVals.join(', ') : 'none'}`);
+  if (missVals.length) parts.push(`missed ${missVals.join(', ')}`);
+  return parts.join(' · ');
+}
+
+// ---- Daggerheart (Duality Dice) ----
+//
+// The core roll is two d12s — a Hope die and a Fear die — summed with an
+// optional modifier and compared to a Difficulty. Which die is higher decides
+// the tone: Hope high hands the player a Hope, Fear high hands the GM a Fear.
+// Matching dice are a Critical Success (a success regardless of the total, and
+// it comes with Hope). Advantage/disadvantage add or subtract a d6.
+//
+// `advantage` is a signed count of d6 the pool carries: positive = that many
+// advantage dice (each added), negative = that many disadvantage dice (each
+// subtracted), 0 = none. Advantage and disadvantage cancel one-for-one, so a
+// pool never holds both; multiple of one kind stack (e.g. an ally's Help).
+//
+//   dh:            just the duality
+//   dh:+2          with a flat +2 (modifiers can be negative — dh:-1)
+//   dh:@15         against difficulty 15
+//   dh:adv         with one advantage d6
+//   dh:adv2        with two advantage d6 (added)
+//   dh:dis+1@15    with a disadvantage d6, +1, vs 15
+const DH_REGEX = /^dh:(?:(adv|dis)(\d*))?([+-]\d+)?(?:@(\d+))?$/;
+
+export function parseDaggerheart(src) {
+  const m = DH_REGEX.exec(String(src || '').trim().toLowerCase());
+  if (!m) throw new Error('Expected a Daggerheart roll like "dh:", "dh:+2", or "dh:adv@15"');
+  let advantage = 0;
+  if (m[1]) {
+    const count = m[2] === '' || m[2] === undefined ? 1 : Number(m[2]);
+    if (count < 1 || count > 20) throw new Error('Advantage/disadvantage dice must be 1-20');
+    advantage = m[1] === 'adv' ? count : -count;
+  }
+  const modifier = m[3] ? Number(m[3]) : 0;
+  const difficulty = m[4] === undefined ? null : Number(m[4]);
+  if (Math.abs(modifier) > 100) throw new Error('Modifier must be -100 to 100');
+  if (difficulty !== null && (difficulty < 1 || difficulty > 100)) {
+    throw new Error('Difficulty must be 1-100');
+  }
+  return { advantage, modifier, difficulty };
+}
+
+export function rollDaggerheart(src) {
+  const { advantage, modifier, difficulty } = parseDaggerheart(src);
+  const hope = randInt(12), fear = randInt(12);
+  const dice = [
+    { value: hope, role: 'hope', sides: 12, kept: true, rerolled: false, exploded: false },
+    { value: fear, role: 'fear', sides: 12, kept: true, rerolled: false, exploded: false },
+  ];
+  // One d6 per advantage (or disadvantage) source, each added (or subtracted).
+  let mod = modifier;
+  const n = Math.abs(advantage);
+  const role = advantage > 0 ? 'advantage' : 'disadvantage';
+  for (let i = 0; i < n; i++) {
+    const v = randInt(6);
+    dice.push({ value: v, role, sides: 6, kept: true, rerolled: false, exploded: false });
+    mod += advantage > 0 ? v : -v;
+  }
+  const total = hope + fear + mod;
+  return {
+    schema: 2,
+    system: 'daggerheart',
+    notation: String(src),
+    groups: [{ kind: 'dice', dieType: 'daggerheart', count: dice.length, dice, subtotal: total }],
+    summary: summarizeDaggerheart({ hope, fear, total, modifier, advantage, difficulty }),
+  };
+}
+
+export function summarizeDaggerheart({ hope, fear, total, modifier = 0, advantage = 0, difficulty = null }) {
+  const critical = hope === fear;
+  const withHope = hope > fear;
+  // A Critical always succeeds, whatever the total. Otherwise the total is
+  // measured against the difficulty when one was set.
+  const success = difficulty === null ? null : (critical || total >= difficulty);
+  let outcome;
+  if (critical) outcome = 'critical';
+  else if (difficulty !== null) outcome = (success ? 'success-' : 'failure-') + (withHope ? 'hope' : 'fear');
+  else outcome = withHope ? 'hope' : 'fear';
+  return { kind: 'daggerheart', hope, fear, total, modifier, advantage, difficulty, critical, withHope, success, outcome };
+}
+
+const DH_OUTCOME_LABEL = {
+  critical: 'Critical Success',
+  'success-hope': 'Success with Hope',
+  'success-fear': 'Success with Fear',
+  'failure-hope': 'Failure with Hope',
+  'failure-fear': 'Failure with Fear',
+  hope: 'with Hope',
+  fear: 'with Fear',
+};
+
+// The big readout is the total, tinted by the tone: gold for Hope, violet for
+// Fear, a brighter gold for a Critical. `variant` carries that to the DOM.
+export function daggerheartHeadline(result) {
+  const s = result.summary;
+  const variant = s.critical ? 'critical' : s.withHope ? 'hope' : 'fear';
+  return { kind: 'number', text: String(s.total), variant };
+}
+
+export function describeDaggerheart(result) {
+  const s = result.summary;
+  const parts = [DH_OUTCOME_LABEL[s.outcome], `Hope ${s.hope}, Fear ${s.fear}`];
+  const dice = result.groups[0].dice;
+  const adv = dice.filter(d => d.role === 'advantage').map(d => d.value);
+  const dis = dice.filter(d => d.role === 'disadvantage').map(d => d.value);
+  if (adv.length) parts.push(`advantage +${adv.join(', +')}`);
+  if (dis.length) parts.push(`disadvantage −${dis.join(', −')}`);
+  if (s.modifier) parts.push(`${s.modifier > 0 ? '+' : '−'}${Math.abs(s.modifier)} modifier`);
+  parts.push(s.difficulty !== null ? `total ${s.total} vs ${s.difficulty}` : `total ${s.total}`);
+  return parts.join(' · ');
+}
+
+// ---- Genesys (narrative dice) ----
+//
+// The six FFG/Genesys narrative dice, by exact face table. A face carries a
+// multiset of symbols (0-2 of them); the pool is reduced on two independent
+// axes — Success cancels Failure, Advantage cancels Threat — while Triumph and
+// Despair persist uncancelled (a Triumph also counts as a Success, a Despair
+// also as a Failure). Star Wars is the same set plus a Force die, added later.
+//
+// s=success a=advantage t=triumph  f=failure h=threat d=despair
+const S = 'success', A = 'advantage', TRI = 'triumph';
+const F = 'failure', H = 'threat', DES = 'despair';
+
+export const GENESYS_DICE = {
+  // Boost — light blue d6.
+  boost: { color: 'boost', sides: 6, faces: [[], [], [S], [A], [S, A], [A, A]] },
+  // Setback — black d6.
+  setback: { color: 'setback', sides: 6, faces: [[], [], [F], [F], [H], [H]] },
+  // Ability — green d8.
+  ability: { color: 'ability', sides: 8, faces: [[], [S], [S], [S, S], [A], [A], [S, A], [A, A]] },
+  // Difficulty — purple d8.
+  difficulty: { color: 'difficulty', sides: 8, faces: [[], [F], [F, F], [H], [H], [H], [H, H], [F, H]] },
+  // Proficiency — yellow d12 (carries the Triumph).
+  proficiency: {
+    color: 'proficiency', sides: 12,
+    faces: [[], [S], [S], [S, S], [S, S], [A], [S, A], [S, A], [S, A], [A, A], [A, A], [TRI]],
+  },
+  // Challenge — red d12 (carries the Despair).
+  challenge: {
+    color: 'challenge', sides: 12,
+    faces: [[], [F], [F], [F, F], [F, F], [H], [H], [F, H], [F, H], [H, H], [H, H], [DES]],
+  },
+};
+
+// Pool shorthand: gen:2A+1P+2D+1S — Ability, Proficiency, Boost, Setback,
+// Difficulty, Challenge by their initials. The + separators are optional.
+const GENESYS_LETTERS = { a: 'ability', p: 'proficiency', b: 'boost', s: 'setback', d: 'difficulty', c: 'challenge' };
+
+export function parseGenesys(src) {
+  const raw = String(src || '').trim().toLowerCase();
+  const m = /^gen:(.+)$/.exec(raw);
+  if (!m) throw new Error('Expected a Genesys pool like "gen:2A+1P+2D"');
+  const body = m[1].replace(/[\s+]/g, '');
+  if (!/^(\d*[apbsdc])+$/.test(body)) {
+    throw new Error('Genesys dice are A P B S D C (Ability, Proficiency, Boost, Setback, Difficulty, Challenge)');
+  }
+  const pool = [];
+  let total = 0;
+  for (const t of body.matchAll(/(\d*)([apbsdc])/g)) {
+    const count = t[1] === '' ? 1 : Number(t[1]);
+    if (count < 1) throw new Error('Each die count must be at least 1');
+    total += count;
+    pool.push({ type: GENESYS_LETTERS[t[2]], count });
+  }
+  if (total < 1 || total > 100) throw new Error('Genesys pool must be 1-100 dice');
+  return pool;
+}
+
+export function rollGenesys(src) {
+  const pool = parseGenesys(src);
+  const dice = [];
+  for (const { type, count } of pool) {
+    const def = GENESYS_DICE[type];
+    for (let i = 0; i < count; i++) {
+      const faceIndex = randInt(def.sides) - 1;
+      dice.push({
+        type, sides: def.sides, color: def.color,
+        faceIndex, symbols: def.faces[faceIndex],
+        value: faceIndex + 1, kept: true, rerolled: false, exploded: false,
+      });
+    }
+  }
+  return {
+    schema: 2,
+    system: 'genesys',
+    notation: String(src),
+    groups: [{ kind: 'dice', dieType: 'genesys', count: dice.length, dice, subtotal: 0 }],
+    summary: summarizeGenesys(dice),
+  };
+}
+
+export function summarizeGenesys(dice) {
+  const raw = { success: 0, advantage: 0, triumph: 0, failure: 0, threat: 0, despair: 0 };
+  for (const d of dice) {
+    for (const sym of d.symbols || []) raw[sym]++;
+  }
+  // Triumph counts as a Success and Despair as a Failure for the pass/fail axis,
+  // but both are also reported on their own since they never cancel.
+  const netSuccess = (raw.success + raw.triumph) - (raw.failure + raw.despair);
+  const netAdvantage = raw.advantage - raw.threat;
+  return {
+    kind: 'genesys',
+    ...raw,
+    netSuccess,
+    netAdvantage,
+    success: netSuccess > 0 ? netSuccess : 0,
+    failure: netSuccess < 0 ? -netSuccess : 0,
+    advantage: netAdvantage > 0 ? netAdvantage : 0,
+    threat: netAdvantage < 0 ? -netAdvantage : 0,
+    raw,
+  };
+}
+
+// The success/failure axis is the outcome; it leads. A wash (net 0) is a
+// failure, since Genesys needs at least one net success to pass.
+export function genesysHeadline(result) {
+  const s = result.summary;
+  const parts = [];
+  if (s.netSuccess > 0) parts.push(`${s.netSuccess} Success`);
+  else parts.push('Failure');
+  if (s.netAdvantage > 0) parts.push(`${s.netAdvantage} Advantage`);
+  else if (s.netAdvantage < 0) parts.push(`${-s.netAdvantage} Threat`);
+  if (s.raw.triumph) parts.push(s.raw.triumph > 1 ? `${s.raw.triumph} Triumph` : 'Triumph');
+  if (s.raw.despair) parts.push(s.raw.despair > 1 ? `${s.raw.despair} Despair` : 'Despair');
+  return { kind: 'text', text: parts.join(' · ') };
+}
+
+export function describeGenesys(result) {
+  const s = result.summary;
+  // The net result, spelled out, then the raw tally so the cancellation is
+  // auditable ("2 success, 3 failure → net 1 failure").
+  const net = genesysHeadline(result).text;
+  const r = s.raw;
+  const rawParts = [];
+  const pushRaw = (n, one, many) => { if (n) rawParts.push(`${n} ${n === 1 ? one : many}`); };
+  pushRaw(r.success, 'success', 'success');
+  pushRaw(r.advantage, 'advantage', 'advantage');
+  pushRaw(r.triumph, 'Triumph', 'Triumph');
+  pushRaw(r.failure, 'failure', 'failure');
+  pushRaw(r.threat, 'threat', 'threat');
+  pushRaw(r.despair, 'Despair', 'Despair');
+  const rolled = rawParts.length ? `rolled ${rawParts.join(', ')}` : 'all blank';
+  return `${net} · ${rolled}`;
+}
+
+// The symbols a face shows, for the renderer.
+export function genesysFace(type, faceIndex) {
+  return GENESYS_DICE[type]?.faces[faceIndex] ?? [];
+}
+
+// ---- Fate / Fudge ----
+//
+// NdF[+/-M]: N Fudge dice, each a d6 with two + faces, two − faces and two
+// blanks, so a die reads +1 / −1 / 0. The result is the net sum plus an optional
+// skill modifier. N defaults to 4 (the standard 4dF, net −4…+4).
+const FATE_REGEX = /^(\d+)?df([+-]\d+)?$/;
+
+export function parseFate(src) {
+  const m = FATE_REGEX.exec(String(src || '').trim().toLowerCase());
+  if (!m) throw new Error('Expected a Fate pool like "4dF" or "4dF+2"');
+  const count = m[1] === undefined ? 4 : Number(m[1]);
+  const modifier = m[2] === undefined ? 0 : Number(m[2]);
+  if (count < 1 || count > 100) throw new Error('Fate dice must be 1-100');
+  if (Math.abs(modifier) > 100) throw new Error('Modifier must be -100 to 100');
+  return { count, modifier };
+}
+
+export function rollFate(src) {
+  const { count, modifier } = parseFate(src);
+  // Each die is a uniform d6; two faces each map to +1, −1 and 0. Rolling the
+  // d6 and mapping keeps the die an honest cube with an exact face distribution.
+  const dice = [];
+  for (let i = 0; i < count; i++) {
+    const face = randInt(6);
+    const value = face <= 2 ? 1 : face <= 4 ? -1 : 0;
+    dice.push({ value, kept: true, rerolled: false, exploded: false });
+  }
+  return {
+    schema: 2,
+    system: 'fate',
+    notation: String(src),
+    groups: [{ kind: 'dice', dieType: 'fate', sides: 6, count, dice, subtotal: 0 }],
+    summary: summarizeFate(dice, modifier, count),
+  };
+}
+
+export function summarizeFate(dice, modifier = 0, count = dice.length) {
+  let plus = 0, minus = 0, blank = 0, sum = 0;
+  for (const d of dice) {
+    if (d.value > 0) plus++;
+    else if (d.value < 0) minus++;
+    else blank++;
+    sum += d.value;
+  }
+  return { kind: 'fate', count, modifier, sum, total: sum + modifier, plus, minus, blank };
+}
+
+// The Fate ladder: every total has an adjective, which is half the fun of the
+// system. Clamped at the ends rather than left blank.
+const FATE_LADDER = [
+  'Mediocre', 'Average', 'Fair', 'Good', 'Great',
+  'Superb', 'Fantastic', 'Epic', 'Legendary',
+];
+export function fateLadder(n) {
+  if (n >= 8) return 'Legendary';
+  if (n <= -2) return 'Terrible';
+  if (n === -1) return 'Poor';
+  return FATE_LADDER[n];
+}
+
+// A signed total, using a real minus sign so "−2" lines up with the glyphs.
+function fateSigned(n) {
+  return n > 0 ? `+${n}` : n < 0 ? `−${Math.abs(n)}` : '0';
+}
+
+// The glyph a die shows: a plus, a minus, or a blank face.
+export function fateFace(value) {
+  return value > 0 ? 'plus' : value < 0 ? 'minus' : 'blank';
+}
+
+const FATE_SYMBOL = { 1: '+', 0: '▢', '-1': '−' };
+
+export function describeFate(result) {
+  const s = result.summary;
+  const syms = result.groups
+    .flatMap(g => g.dice)
+    .map(d => FATE_SYMBOL[d.value] ?? '▢')
+    .join(' ');
+  const parts = [fateLadder(s.total), syms];
+  // Only spell out the arithmetic when a modifier makes the total differ from
+  // the dice; otherwise the glyphs already are the sum.
+  if (s.modifier) {
+    parts.push(`dice ${fateSigned(s.sum)}`, `${fateSigned(s.modifier)} modifier`);
+  }
+  return parts.join(' · ');
+}
+
+// The big readout: the signed total, at the numeral size (it is short).
+export function fateHeadline(result) {
+  return { kind: 'number', text: fateSigned(result.summary.total) };
 }
 
 // V5 dice are still uniform d10s (value 1-10); the official dice merely *render*

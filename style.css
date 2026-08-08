@@ -92,6 +92,27 @@ body {
 }
 .wordmark[data-faded="1"] { opacity: 0.28; }
 
+/* The active system, beside the name. It sits in the accent because the accent
+   is the thing that changed, so the badge names the colour the app is wearing.
+   `margin-right: auto` keeps it next to the wordmark instead of being pushed to
+   the middle by the bar's space-between. */
+.system-badge {
+  appearance: none;
+  margin: 0 0 0 10px;
+  margin-right: auto;
+  border: 1px solid var(--accent);
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .wordmark { transition-duration: 1ms; }
 }
@@ -310,6 +331,10 @@ body {
   align-items: center;
   gap: 2px;
   flex: 0 0 auto;
+  /* So a headline made of words has an edge to wrap against rather than the
+     width of its own longest line. */
+  width: 100%;
+  min-width: 0;
 }
 
 .total {
@@ -320,6 +345,21 @@ body {
   font-variant-numeric: tabular-nums;
   color: var(--accent);
   transition: opacity 160ms ease;
+}
+
+/* Some systems answer with a phrase rather than a number, and a phrase at the
+   numeral's size runs past both edges of a phone and then wraps — onto a second
+   line set at 0.92 line-height, which is what put "Bestial Failure" on top of
+   itself. Words get their own size and their own leading. */
+.total[data-kind="text"] {
+  font-family: inherit;
+  font-size: clamp(28px, 9vw, 46px);
+  font-weight: 600;
+  line-height: 1.08;
+  letter-spacing: -0.01em;
+  text-align: center;
+  max-width: 100%;
+  text-wrap: balance;
 }
 .total[data-idle="1"] { color: var(--muted); }
 .total[data-rolling="1"] { opacity: 0.35; }
@@ -341,6 +381,485 @@ body {
   gap: 8px;
   flex: 0 0 auto;
 }
+
+/* The mode button shows only the active system's mark. */
+.mode-ico { display: none; }
+#modeToggle[data-system="numeric"] .mode-ico[data-for="numeric"] { display: block; }
+#modeToggle[data-system="v5"] .mode-ico[data-for="v5"] { display: block; }
+#modeToggle[data-system="fate"] .mode-ico[data-for="fate"] { display: block; }
+#modeToggle[data-system="genesys"] .mode-ico[data-for="genesys"] { display: block; }
+#modeToggle[data-system="daggerheart"] .mode-ico[data-for="daggerheart"] { display: block; }
+#modeToggle[data-system="cthulhutech"] .mode-ico[data-for="cthulhutech"] { display: block; }
+#modeToggle[data-system="starwars"] .mode-ico[data-for="starwars"] { display: block; }
+#modeToggle[data-system="onering"] .mode-ico[data-for="onering"] { display: block; }
+#modeToggle[data-system="pbta"] .mode-ico[data-for="pbta"] { display: block; }
+#modeToggle[data-system="mist"] .mode-ico[data-for="mist"] { display: block; }
+/* A named system's mark carries its own accent so the header reads as that mode
+   at a glance; the numeric default stays with the quiet chrome colour. */
+#modeToggle[data-system="v5"],
+#modeToggle[data-system="fate"],
+#modeToggle[data-system="genesys"],
+#modeToggle[data-system="daggerheart"],
+#modeToggle[data-system="cthulhutech"],
+#modeToggle[data-system="starwars"],
+#modeToggle[data-system="onering"],
+#modeToggle[data-system="pbta"],
+#modeToggle[data-system="mist"] { color: var(--accent); }
+
+/* ---- Vampire dice tray ---- */
+
+/* The dice to tap, then a Difficulty chip beneath. */
+.v5-picker {
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.v5-dice-row {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+/* Each die type is a tap-to-add button carrying the ankh — regular in the ink
+   colour, Hunger in blood red — with a count badge and a loaded state. */
+.v5-die-btn {
+  --dc: var(--line);
+  flex: 1 1 0;
+  min-width: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 12px 8px 9px;
+  border: 1px solid var(--hair);
+  border-radius: 12px;
+  background: none;
+  color: var(--dc);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: border-color 140ms ease, background 140ms ease, transform 120ms ease;
+}
+.v5-die-hunger { --dc: var(--accent); }
+.v5-die-name {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.v5-die-btn[data-count] { border-color: var(--dc); background: color-mix(in srgb, var(--dc) 12%, transparent); }
+.v5-die-btn[data-count] .v5-die-name { color: var(--line); }
+.v5-die-btn[data-count]::after {
+  content: attr(data-count);
+  position: absolute;
+  top: -6px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--dc);
+  color: var(--paper);
+  font: 700 10px system-ui;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.v5-die-btn:active { transform: scale(0.95); }
+
+/* ---- Fate dice ---- */
+
+/* Fate is fixed at 4dF, so the picker is just the modifier chip, centred. */
+.fate-picker { justify-content: center; }
+
+/* ---- Genesys dice ---- */
+
+.genesys-picker { padding: 0; }
+/* One row of buttons shaped like the real dice — tap to add, hold to remove. */
+.gen-chips {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+}
+.gen-chip {
+  --dc: var(--muted);
+  flex: 1 1 0;
+  min-width: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 9px 2px 6px;
+  border: 1px solid var(--hair);
+  border-radius: 12px;
+  background: none;
+  color: var(--dc);
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: border-color 140ms ease, background 140ms ease, transform 120ms ease;
+}
+/* The die silhouette: a faint fill of its colour under a solid outline. */
+.die-ico { width: 27px; height: 27px; display: block; }
+.die-ico path, .die-ico rect {
+  fill: currentColor;
+  fill-opacity: 0.16;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.gen-chip-label {
+  white-space: nowrap;
+  font-size: 10.5px;
+  color: var(--muted);
+  letter-spacing: 0.01em;
+}
+/* A loaded chip lights up in its die's colour, its silhouette fills, and a count
+   badge rides the corner. */
+.gen-chip[data-count] { border-color: var(--dc); background: color-mix(in srgb, var(--dc) 12%, transparent); }
+.gen-chip[data-count] .gen-chip-label { color: var(--line); }
+.gen-chip[data-count] .die-ico path, .gen-chip[data-count] .die-ico rect { fill-opacity: 0.34; }
+.gen-chip[data-count]::after {
+  content: attr(data-count);
+  position: absolute;
+  top: -6px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--dc);
+  color: var(--paper);
+  font: 700 10px system-ui;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.gen-chip:active { transform: scale(0.94); }
+
+/* The die-type hues, constant across light and dark (matched to the on-tray
+   dice in app.js GEN_COLORS). */
+.gen-chip[data-type="ability"]     { --dc: #4E9E60; }
+.gen-chip[data-type="proficiency"] { --dc: #C39A2E; }
+.gen-chip[data-type="boost"]       { --dc: #4C86C6; }
+.gen-chip[data-type="difficulty"]  { --dc: #8A5CC0; }
+.gen-chip[data-type="challenge"]   { --dc: #C24046; }
+.gen-chip[data-type="setback"]     { --dc: #7C828A; }
+.gen-chip[data-type="force"]       { --dc: #AEB4BC; }
+
+/* The Force chip belongs to Star Wars only — hidden until that mode adds it. */
+.genesys-picker:not(.with-force) .gen-chip-force { display: none; }
+
+/* A standalone die-add button — the Genesys rack's look, sized to sit inline
+   rather than fill a row. Used where a pool is one die type (CthulhuTech d10,
+   Fate dF, the Vampire pair, a One Ring Success die). */
+.die-btn {
+  --dc: var(--muted);
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 18px 7px;
+  border: 1px solid var(--hair);
+  border-radius: 12px;
+  background: none;
+  color: var(--dc);
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: border-color 140ms ease, background 140ms ease, transform 120ms ease;
+}
+.die-btn .die-ico { width: 30px; height: 30px; }
+.die-btn-label { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.die-btn[data-count] { border-color: var(--dc); background: color-mix(in srgb, var(--dc) 12%, transparent); }
+.die-btn[data-count] .die-btn-label { color: var(--line); }
+.die-btn[data-count] .die-ico path, .die-btn[data-count] .die-ico rect { fill-opacity: 0.34; }
+.die-btn[data-count]::after {
+  content: attr(data-count);
+  position: absolute;
+  top: -6px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--dc);
+  color: var(--paper);
+  font: 700 10px system-ui;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.die-btn:active { transform: scale(0.94); }
+
+/* Tap-to-cycle chip for a single number (Difficulty, Power, Target): tap to
+   raise, hold to lower — the die buttons' gesture, for the non-dice controls. */
+.spin-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 1px solid var(--hair);
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: border-color 140ms ease, transform 120ms ease;
+}
+.spin-chip-label { color: var(--muted); letter-spacing: 0.01em; }
+.spin-chip-val { color: var(--line); font-size: 16px; font-variant-numeric: tabular-nums; }
+.spin-chip-val[data-unset="1"] { color: var(--muted); font-size: 12.5px; }
+.spin-chip.is-set { border-color: color-mix(in srgb, var(--accent) 55%, var(--hair)); }
+.spin-chip:active { transform: scale(0.96); }
+
+/* CthulhuTech: one d10 to build the pool, Difficulty as a subordinate chip. */
+.ct-picker { display: flex; gap: 14px; justify-content: center; align-items: center; }
+.ct-picker .die-btn { --dc: #57B591; }
+
+/* PbtA / Mist: nothing to build (the 2d6 sit in the tray), so just the one chip. */
+.twod6-picker { display: flex; justify-content: center; }
+
+/* ---- Daggerheart ---- */
+
+.dh-picker {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+/* Three column buttons: the Advantage and Disadvantage d6 adders flank the
+   Duality roll — a split gold/violet d12, accent-filled so it reads as the
+   action rather than another adder. */
+.dh-adv-row { display: flex; align-items: stretch; gap: 8px; }
+.dh-adv-btn, .dh-roll {
+  flex: 1 1 0;
+  min-width: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 9px 4px 6px;
+  border: 1px solid var(--hair);
+  border-radius: 12px;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: border-color 140ms ease, background 140ms ease, transform 120ms ease;
+}
+.dh-adv-btn { --dc: var(--muted); color: var(--dc); }
+.dh-adv-btn[data-adv="adv"] { --dc: #4E9E60; }
+.dh-adv-btn[data-adv="dis"] { --dc: #C24046; }
+.dh-adv-label, .dh-roll-label { font-size: 10.5px; color: var(--muted); white-space: nowrap; }
+/* The adder die with its direction chevrons — up adds a d6, down subtracts. */
+.dh-adv-ico { width: 30px; height: 30px; display: block; }
+.dh-adv-ico .die { fill: currentColor; fill-opacity: 0.16; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; }
+.dh-adv-ico .chev { fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.dh-adv-btn[data-count] { border-color: var(--dc); background: color-mix(in srgb, var(--dc) 12%, transparent); }
+.dh-adv-btn[data-count] .dh-adv-label { color: var(--line); }
+.dh-adv-btn[data-count] .dh-adv-ico .die { fill-opacity: 0.34; }
+.dh-adv-btn[data-count]::after {
+  content: attr(data-count);
+  position: absolute;
+  top: -6px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--dc);
+  color: var(--paper);
+  font: 700 10px system-ui;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* The Duality roll is the primary action, so it wears the accent. */
+.dh-roll { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.dh-roll .dh-roll-label { color: var(--accent); }
+.dh-adv-btn:active, .dh-roll:active { transform: scale(0.95); }
+
+/* The modifier and difficulty chips, centred beneath the dice. */
+.dh-fields-row { display: flex; justify-content: center; gap: 12px; }
+
+/* Daggerheart's strip carries only the standard dice — hide the DCC oddities,
+   keep the custom-die picker and any dice the player made themselves. */
+.dice-buttons.standard-only .dbtn:not([data-std]):not(.custom):not([data-custom]) { display: none; }
+
+/* The total tinted by the duality tone. */
+.total[data-variant="hope"] { color: #C9A227; }
+.total[data-variant="fear"] { color: #8577C0; }
+.total[data-variant="critical"] { color: #E7C24C; }
+
+/* CthulhuTech: the hit count glows green when it meets the Difficulty, greys
+   out when it falls short. */
+.total[data-variant="ct-success"] { color: #57B591; }
+.total[data-variant="ct-failure"] { color: var(--muted); }
+
+/* CthulhuTech's difficulty can be unset — just count the hits. */
+.ct-picker .count[data-unset="1"] { color: var(--muted); }
+
+/* The One Ring: gold for a Gandalf auto-success, green for a success, muted for
+   a failure. */
+.total[data-variant="tor-gandalf"] { color: #E8C24E; }
+.total[data-variant="tor-success"] { color: #8FB77A; }
+.total[data-variant="tor-failure"] { color: var(--muted); }
+
+/* PbtA / Mist Engine share the Daggerheart picker chrome; their lone modifier
+   stepper just sits centred. */
+.twod6-picker { justify-content: center; }
+
+/* PbtA / Mist Engine 2d6 outcome: a hit reads green, a partial amber, a miss
+   muted — the same bands the dice take. */
+.total[data-variant="band-hit"] { color: #57B591; }
+.total[data-variant="band-partial"] { color: #C99A3C; }
+.total[data-variant="band-miss"] { color: var(--muted); }
+
+/* ---- The One Ring picker ---- */
+/* One Ring: a Success-d6 button + Target chip, then the condition toggles. */
+.tor-picker { flex-direction: column; align-items: center; gap: 10px; }
+.tor-controls-row { display: flex; gap: 12px; align-items: center; }
+.tor-success-btn { --dc: #B5893C; }
+.tor-flags-row { display: flex; gap: 8px; width: 100%; }
+/* Each condition is an icon toggle: favoured/ill show the two Feat dice with the
+   kept one on top (high for favoured, low for ill); Weary a struck Success die. */
+.tor-flag {
+  flex: 1 1 0;
+  min-width: 0;
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px 7px;
+  border: 1px solid var(--hair);
+  border-radius: 12px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: border-color 140ms ease, color 140ms ease, background 140ms ease, transform 120ms ease;
+}
+.tor-flag-ico { width: 30px; height: 30px; display: block; }
+.tor-flag-label { font-size: 10.5px; letter-spacing: 0.01em; white-space: nowrap; }
+/* Two Feat dice: the dropped one outlined grey, the kept one bronze and opaque so
+   it sits clearly on top; chevrons point to which was kept. */
+.tor-flag-ico .drop { fill: none; stroke: #6f6857; stroke-width: 2; stroke-linejoin: round; }
+.tor-flag-ico .keep { fill: color-mix(in srgb, #B5893C 18%, var(--paper)); stroke: #B5893C; stroke-width: 2.3; stroke-linejoin: round; }
+.tor-flag-ico .chev { fill: none; stroke: #B5893C; stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; }
+/* Weary: a Success die with its low faces struck through. */
+.tor-flag-ico .weary-die { fill: none; stroke: var(--muted); stroke-width: 2.2; }
+.tor-flag-ico .weary-pip { fill: var(--muted); }
+.tor-flag-ico .weary-strike { fill: none; stroke: var(--danger); stroke-width: 2.4; stroke-linecap: round; }
+.tor-flag[aria-pressed="true"] {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.tor-flag[aria-pressed="true"] .tor-flag-label { color: var(--line); }
+.tor-flag:active { transform: scale(0.96); }
+
+/* ---- mode sheet ---- */
+
+/* The mode sheet is a touch narrower than the modifier sheet: two cards want a
+   compact shelf, not the full width. */
+.modes-sheet .sheet-panel { max-width: 360px; }
+
+/* The fang on the Vampire card — filled from the card's own crimson, which the
+   inline currentColor already carries; this only pins the join style. */
+.mode-fang { stroke-linejoin: round; }
+
+.mode-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.mode-card {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 12px;
+  border: 1px solid var(--hair);
+  border-radius: 12px;
+  background: none;
+  color: var(--line);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.mode-card .mode-glyph { color: var(--muted); transition: color 160ms ease; }
+.mode-card[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.mode-card[aria-pressed="true"] .mode-glyph { color: var(--accent); }
+
+/* The Vampire card carries its own crimson so it reads as blood on the shelf,
+   before it is ever chosen — the glyph and rule stay red in either theme. */
+.mode-v5 .mode-glyph { color: #b21e2b; }
+.mode-v5[aria-pressed="true"] { border-color: #b21e2b; background: color-mix(in srgb, #b21e2b 10%, transparent); }
+.mode-v5[aria-pressed="true"] .mode-glyph { color: #b21e2b; }
+
+/* The Fate card carries its own slate, the same way. */
+.mode-fate .mode-glyph { color: #4f79a3; }
+.mode-fate[aria-pressed="true"] { border-color: #4f79a3; background: color-mix(in srgb, #4f79a3 12%, transparent); }
+.mode-fate[aria-pressed="true"] .mode-glyph { color: #4f79a3; }
+
+/* The Genesys card's glyph is already multicolour (its own die hues); pressed,
+   it takes the narrative-gold accent border like the others. */
+.mode-genesys[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+
+/* Daggerheart's card is gold + violet; pressed, it takes its gold. */
+.mode-daggerheart[aria-pressed="true"] { border-color: #C9A227; background: color-mix(in srgb, #C9A227 12%, transparent); }
+
+/* CthulhuTech's card carries its eldritch green. */
+.mode-cthulhutech .mode-glyph { color: #57B591; }
+.mode-cthulhutech[aria-pressed="true"] { border-color: #57B591; background: color-mix(in srgb, #57B591 12%, transparent); }
+
+/* Star Wars' card is multicolour (its own die hues); pressed, it takes the
+   starfield blue. */
+.mode-starwars[aria-pressed="true"] { border-color: #5B9BD5; background: color-mix(in srgb, #5B9BD5 12%, transparent); }
+
+/* The One Ring's card is bronze. */
+.mode-onering[aria-pressed="true"] { border-color: #B5893C; background: color-mix(in srgb, #B5893C 12%, transparent); }
+
+/* PbtA runs ember-orange, Mist Engine misty teal. */
+.mode-pbta[aria-pressed="true"] { border-color: #D97A3C; background: color-mix(in srgb, #D97A3C 12%, transparent); }
+.mode-mist[aria-pressed="true"] { border-color: #3F9FA0; background: color-mix(in srgb, #3F9FA0 12%, transparent); }
+
+.mode-name {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.mode-sub {
+  font-size: 11px;
+  color: var(--muted);
+}
+.mode-note { margin-top: 12px; }
 
 /* How many dice each tap adds. Typing a number here and tapping d6 is how you
    get 100d6 without tapping a hundred times. */

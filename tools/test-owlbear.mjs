@@ -58,7 +58,8 @@ if (existsSync(brandIcon) && present.has('icon.svg')) {
 // This is also what catches the PWA-stripping regexes removing one line too
 // many, or a future asset being referenced but not added to the copy list.
 const refs = [...html.matchAll(/(?:src|href)="(?!https?:|data:|#)([^"]+)"/g)].map(m => m[1]);
-const dangling = refs.filter(r => !present.has(r.replace(/^\.\//, '')));
+// <base href="/"> names the site root, not a built file.
+const dangling = refs.filter(r => r !== '/' && !present.has(r.replace(/^\.\//, '')));
 ok('every file the page references was built', dangling.length === 0, dangling.join(', '));
 
 // app.js imports its modules directly; index.html never mentions them.

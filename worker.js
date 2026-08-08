@@ -50,6 +50,12 @@ const securityHeaders = hostname => {
 // the shell it installs must always be revalidated.
 const ALWAYS_REVALIDATE = new Set(['/sw.js', '/', '/index.html', '/manifest.webmanifest']);
 
+// Branded system slugs. Each opens the app shell, which reads location.pathname
+// and starts in that system. Assets under the shell resolve to the root because
+// index.html carries <base href="/">, so a slug never breaks a relative link.
+// Anything not listed still 404s — a slug map, not a catch-all SPA rewrite.
+const SYSTEM_SLUGS = new Set(['/vtm', '/fate', '/genesys', '/daggerheart', '/cthulhutech', '/starwars', '/onering', '/pbta', '/mist']);
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -65,6 +71,18 @@ export default {
       headers.set('Content-Type', 'text/html; charset=utf-8');
       headers.set('Content-Disposition', 'attachment; filename="dicebox.html"');
       headers.set('Cache-Control', 'no-cache');
+      return new Response(res.body, { status: res.status, headers });
+    }
+
+    // A system slug serves the app shell (index.html) rather than 404ing. The
+    // shell is revalidated like the root, since it is the same document.
+    if (SYSTEM_SLUGS.has(url.pathname.replace(/\/+$/, ''))) {
+      const res = await env.ASSETS.fetch(new URL('/', url));
+      const headers = new Headers(res.headers);
+      for (const [k, v] of Object.entries(securityHeaders(url.hostname))) headers.set(k, v);
+      headers.set('Content-Type', 'text/html; charset=utf-8');
+      headers.set('Cache-Control', 'no-cache');
+      if (url.hostname.startsWith('dev.')) headers.set('X-Robots-Tag', 'noindex, nofollow');
       return new Response(res.body, { status: res.status, headers });
     }
 

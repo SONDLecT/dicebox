@@ -2,7 +2,14 @@ import { roll, describe } from './dice.js';
 import { Die, Surface, separate, beginFrame } from './render.js';
 import { createRoom, parsePassphraseFromHash } from './room.js';
 import { generatePassphrase, normalizePassphrase } from './room-crypto.js';
-import { rollV5, describeV5, v5Headline, detectSystem, v5Face } from './system-dice.js';
+import { rollV5, describeV5, v5Headline, detectSystem, v5Face, parseV5 } from './system-dice.js';
+import { rollFate, describeFate, fateHeadline, fateFace, parseFate } from './system-dice.js';
+import { rollGenesys, describeGenesys, genesysHeadline, parseGenesys } from './system-dice.js';
+import { rollDaggerheart, describeDaggerheart, daggerheartHeadline, parseDaggerheart } from './system-dice.js';
+import { rollCthulhuTech, describeCthulhuTech, cthulhutechHeadline, parseCthulhuTech } from './system-dice.js';
+import { rollStarWars, describeStarWars, starWarsHeadline, parseStarWars } from './system-dice.js';
+import { rollOneRing, describeOneRing, oneRingHeadline, parseOneRing } from './system-dice.js';
+import { rollPbta, rollMist, twod6Headline, describe2d6, parsePbta, parseMist } from './system-dice.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('tray');
@@ -25,6 +32,10 @@ const embedded = (() => {
 // Crawl Classics chain rung, plus d100. Gaps like d9 and d11 are deliberate —
 // no published system uses them, and the notation field covers anything here.
 const QUICK = [1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 30, 100];
+
+// The standard polyhedral set. Daggerheart (and most systems) only ever roll
+// these, so its dice strip hides the rest of the DCC oddities.
+const STANDARD_DICE = new Set([4, 6, 8, 10, 12, 20]);
 
 // Above this many dice, throwing them across the tray stops being legible and
 // the pairwise separation gets expensive. Larger rolls spin in place instead.
@@ -87,13 +98,16 @@ $('themeToggle').addEventListener('click', () => {
   updateThemeColor();
   // Re-apply the active system's palette so its dark/light pair follows the
   // toggle instead of being frozen at whichever mode was active on roll.
-  applySystemTheme(activeSystem);
+  applySystemTheme(uiSystem);
 });
 
 systemDark.addEventListener('change', () => {
   if (document.documentElement.dataset.theme) return; // pinned by choice
   syncThemeLabel();
   updateThemeColor();
+  // A system palette is written as inline custom properties, so it overrides the
+  // stylesheet's own dark rules and cannot follow the OS on its own.
+  applySystemTheme(uiSystem);
 });
 
 // The button shows the theme you are in and switches to the other one, so the
@@ -124,24 +138,183 @@ function theme() {
 // read, so switching systems visibly recolours the whole app. Every system ships
 // a dark and a light pair (the approved design doc: each system = a different
 // background/text/line, each with a light-dark pair).
+// Every variable the stylesheet themes, so a system palette replaces the whole
+// scheme rather than recolouring four of seven and leaving panel fills and hair
+// lines behind from the default one.
+const THEMED_VARS = ['--paper', '--face', '--line', '--muted', '--hair', '--accent', '--danger'];
+
 const SYSTEM_THEMES = {
-  // Vampire the Masquerade — blood crimson on near-black / aged paper.
+  // Vampire the Masquerade — blood crimson on near-black / aged paper. The
+  // crimson is the constant: only the neutrals flip, so the mode stays
+  // recognisable as V5 in either theme.
   v5: {
-    dark:  { '--paper': '#0b0809', '--line': '#c9b3ad', '--muted': '#7a6a63', '--accent': '#c3212e' },
-    light: { '--paper': '#efe6de', '--line': '#3b2326', '--muted': '#8a7070', '--accent': '#a31621' },
+    dark: {
+      '--paper': '#0B0809', '--face': '#151011', '--line': '#E4D3CE', '--muted': '#7A6A63',
+      '--hair': '#2A1C1E', '--accent': '#C3212E', '--danger': '#E0685F',
+    },
+    light: {
+      '--paper': '#EFE6DE', '--face': '#F8F2EC', '--line': '#241417', '--muted': '#8A7070',
+      '--hair': '#D8C9BE', '--accent': '#A31621', '--danger': '#8C3A2E',
+    },
+  },
+  // Fate / Fudge — a calm steel-slate blue, matching the system's unadorned
+  // feel. The slate is the constant; the neutrals cool slightly and flip.
+  fate: {
+    dark: {
+      '--paper': '#0E1114', '--face': '#171B20', '--line': '#D6DCE3', '--muted': '#6B7580',
+      '--hair': '#252C33', '--accent': '#6E96BE', '--danger': '#CB7E70',
+    },
+    light: {
+      '--paper': '#ECEFF3', '--face': '#F7F9FB', '--line': '#1B2530', '--muted': '#78828D',
+      '--hair': '#D2D8DF', '--accent': '#3C6489', '--danger': '#8C3A2E',
+    },
+  },
+  // Genesys — the dice carry the colour here (a per-type map, below), so the
+  // chrome stays neutral with a warm narrative-gold accent for the readout.
+  genesys: {
+    dark: {
+      '--paper': '#0F1012', '--face': '#191A1D', '--line': '#DCDDE1', '--muted': '#6D6F75',
+      '--hair': '#26282C', '--accent': '#BFA766', '--danger': '#C97A6E',
+    },
+    light: {
+      '--paper': '#EDEEF0', '--face': '#F8F8FA', '--line': '#1C1D20', '--muted': '#74767C',
+      '--hair': '#D6D7DB', '--accent': '#8A7327', '--danger': '#8C3A2E',
+    },
+  },
+  // Daggerheart — gold and deep violet, its Hope/Fear duality. Gold accent; the
+  // Hope/Fear dice carry their own colours (below).
+  daggerheart: {
+    dark: {
+      '--paper': '#12101A', '--face': '#1C1826', '--line': '#E7E1EE', '--muted': '#726C82',
+      '--hair': '#2A2536', '--accent': '#D4A93C', '--danger': '#C97A6E',
+    },
+    light: {
+      '--paper': '#F0ECF2', '--face': '#FAF7FB', '--line': '#211B2A', '--muted': '#7C7488',
+      '--hair': '#DBD4E1', '--accent': '#976C1B', '--danger': '#8C3A2E',
+    },
+  },
+  // CthulhuTech — a sickly eldritch sea-green on near-black. Even dice (hits)
+  // glow green; odd ones stay grey (below).
+  cthulhutech: {
+    dark: {
+      '--paper': '#0B0F0D', '--face': '#131A16', '--line': '#DBE3DD', '--muted': '#647069',
+      '--hair': '#1E2822', '--accent': '#57A98A', '--danger': '#C77A6E',
+    },
+    light: {
+      '--paper': '#E9EEEB', '--face': '#F5F8F6', '--line': '#141D18', '--muted': '#6C7871',
+      '--hair': '#D0DAD3', '--accent': '#2E7358', '--danger': '#8C3A2E',
+    },
+  },
+  // Star Wars — like Genesys, the dice carry the colour; the chrome is a calm
+  // starfield blue.
+  starwars: {
+    dark: {
+      '--paper': '#0C0F14', '--face': '#141922', '--line': '#DCE1E8', '--muted': '#69707B',
+      '--hair': '#212833', '--accent': '#5B9BD5', '--danger': '#C77A6E',
+    },
+    light: {
+      '--paper': '#ECEEF2', '--face': '#F7F8FB', '--line': '#161B22', '--muted': '#727984',
+      '--hair': '#D4D9E0', '--accent': '#2F6FB0', '--danger': '#8C3A2E',
+    },
+  },
+  // The One Ring — bronze and gold on dark wood-and-stone; aged parchment for
+  // light.
+  onering: {
+    dark: {
+      '--paper': '#14110B', '--face': '#1E1911', '--line': '#E6DCC6', '--muted': '#7A6F5A',
+      '--hair': '#2A2317', '--accent': '#B5893C', '--danger': '#C0453F',
+    },
+    light: {
+      '--paper': '#EEE7D8', '--face': '#F8F3E8', '--line': '#211B11', '--muted': '#7E6E56',
+      '--hair': '#DBD0BB', '--accent': '#7A5A22', '--danger': '#8C3A2E',
+    },
+  },
+  // Powered by the Apocalypse — warm ember: rust and amber over charred paper,
+  // a lit-hearth cream for light.
+  pbta: {
+    dark: {
+      '--paper': '#181210', '--face': '#241A16', '--line': '#F0E3D6', '--muted': '#8A7566',
+      '--hair': '#33241D', '--accent': '#D97A3C', '--danger': '#C0453F',
+    },
+    light: {
+      '--paper': '#F3E9DF', '--face': '#FBF4EC', '--line': '#241812', '--muted': '#836E5E',
+      '--hair': '#E4D5C6', '--accent': '#B75A22', '--danger': '#9A3A2E',
+    },
+  },
+  // Mist Engine — moody teal and dim gold, fog over deep water; a pale seafoam
+  // for light.
+  mist: {
+    dark: {
+      '--paper': '#0E1618', '--face': '#152123', '--line': '#DCEAEA', '--muted': '#5F8385',
+      '--hair': '#1E2E30', '--accent': '#3F9FA0', '--danger': '#C25B54',
+    },
+    light: {
+      '--paper': '#E3EEED', '--face': '#F0F7F6', '--line': '#0F1E1F', '--muted': '#557072',
+      '--hair': '#CBDDDC', '--accent': '#227E7F', '--danger': '#9A443C',
+    },
   },
 };
-// The active dice system; drives the palette and, later, the switcher/slug.
-let activeSystem = 'numeric';
+
+// PbtA / Mist Engine 2d6 outcome bands, applied to both dice: a strong result
+// glows, a partial is cautionary amber, a miss goes muted. Legible on both trays.
+const BAND_COLORS = { hit: '#57B591', partial: '#C99A3C', miss: '#9A7070' };
+
+// The Force die's pips: Light side pale, Dark side a mystic violet (the pips are
+// black/white on the real die, but black is invisible on the dark tray).
+const FORCE_COLORS = { lightside: '#DEE4EC', darkside: '#8267AE' };
+
+// One Ring dice colours: the bronze Feat die, a bright gold for the Gandalf
+// rune, Sauron-red for the Eye; Success dice in parchment, their Tengwar 6 in
+// gold, and Weary-nullified (1-3) faded.
+const TOR_COLORS = {
+  feat: '#B5893C', gandalf: '#E8C24E', eye: '#C0453F',
+  success: '#CBBF9F', rune: '#D8AE45', weary: '#5E5A4E',
+};
+
+// CthulhuTech dice are d10s read even/odd: every even is a Hit and glows green,
+// every odd is a miss and stays grey. Constant hues, legible on both trays.
+const CT_COLORS = { hit: '#57B591', miss: '#6B7378' };
+
+// Daggerheart dice colour by role — Hope gold, Fear violet, and a green/red d6
+// for advantage/disadvantage. Constant hues, legible on both trays.
+const DH_COLORS = {
+  hope: '#C9A227',
+  fear: '#7E6BB5',
+  advantage: '#4E9E60',
+  disadvantage: '#C24046',
+};
+
+// Genesys dice are colour-coded by type — the one place a system paints its own
+// dice rather than using the chrome accent. Medium tones chosen to read on both
+// the light and dark tray.
+const GEN_COLORS = {
+  ability: '#4E9E60',      // green
+  proficiency: '#C39A2E',  // yellow
+  boost: '#4C86C6',        // blue
+  difficulty: '#8A5CC0',   // purple
+  challenge: '#C24046',    // red
+  setback: '#7C828A',      // black die → a legible smoke grey
+};
+
 function applySystemTheme(system) {
   const root = document.documentElement;
   const scheme = SYSTEM_THEMES[system];
-  const mode = root.dataset.theme === 'dark' ? 'dark' : 'light';
+  // isDark(), not the pinned attribute: with no theme chosen the attribute is
+  // absent and the OS decides, and reading the attribute alone put every
+  // system-dice user on a dark machine into the light palette — which is what
+  // "there is no dark mode" looked like from the outside.
+  const mode = isDark() ? 'dark' : 'light';
   root.dataset.systemTheme = scheme ? system : '';
-  for (const k of ['--paper', '--line', '--muted', '--accent']) root.style.removeProperty(k);
+  for (const k of THEMED_VARS) root.style.removeProperty(k);
   if (scheme) for (const [k, v] of Object.entries(scheme[mode])) root.style.setProperty(k, v);
   updateThemeColor();
 }
+
+// The selected dice system — the UI preset chosen in the mode sheet. It drives
+// the palette, the badge, and which dice row is shown, and it persists across
+// rolls: a numeric roll typed while V5 is selected stays V5-coloured, because
+// notation carries the roll's identity while the mode is the room you are in.
+let uiSystem = 'numeric';
 
 // ---- canvas sizing ----
 
@@ -233,33 +406,19 @@ function placeGrid(dice) {
 
 // ---- rolling ----
 
-function doRoll(notation) {
-  let result;
-  try {
-    // An explicit system token ("v5:…") routes to that system's roller; anything
-    // else stays on the numeric engine untouched.
-    result = detectSystem(notation) === 'v5' ? rollV5(notation) : roll(notation);
-  } catch (err) {
-    showError(err.message);
-    return;
-  }
-  clearError();
-
-  // Switching to a system roll recolours the app to that system's palette; a
-  // numeric roll restores the default theme.
-  activeSystem = result.system;
-  applySystemTheme(activeSystem);
-
-  state.last = result;
-  $('notation').value = result.notation;
-
+// Flatten a roll's dice groups into a paint list, carrying every field a system
+// die needs to draw itself — the symbols on its face, its role, its Feat face,
+// its colour key. Shared by a local roll and by one arriving from a room, so a
+// peer's dice look exactly like your own.
+function flattenRollDice(result) {
   const flat = [];
   for (const g of result.groups) {
     if (g.kind !== 'dice') continue;
     for (const d of g.dice) {
       flat.push({
-        // V5 groups are d10s and carry no numeric `sides`; fall back to 10.
-        sides: g.sides ?? 10,
+        // Genesys dice carry their own `sides` per type; V5 groups are d10s and
+        // carry no numeric `sides`; fall back to 10.
+        sides: d.sides ?? g.sides ?? 10,
         value: d.value,
         // Carried onto the tray so a die can show what happened to it: dropped
         // dice fade, exploded and rerolled ones get a mark. Hunger dice (V5)
@@ -268,26 +427,101 @@ function doRoll(notation) {
         exploded: d.exploded,
         rerolled: d.rerolled,
         hunger: d.hunger,
+        // Genesys: the symbols the face shows and the die-type colour key.
+        symbols: d.symbols,
+        genColorKey: d.color,
+        // Daggerheart/One Ring: the die's role, and (One Ring) its Feat face.
+        role: d.role,
+        torFaceKind: d.face,
       });
     }
   }
+  return flat;
+}
+
+// Turn the paint list into tray dice, stamping each with its system's face and
+// colour so the renderer stays system-agnostic. `remote` marks a peer's dice so
+// haptics fire only on your own throws; they look identical either way.
+function buildTrayDice(flat, result, { remote = false } = {}) {
+  return flat.map(f => {
+    const die = new Die(f.sides, f.value, 0, 0, 40);
+    die.kept = f.kept;
+    die.exploded = f.exploded;
+    die.rerolled = f.rerolled;
+    if (f.hunger) die.hunger = true;
+    if (remote) die.remote = true;
+    // Symbol dice stamp the face the die should draw when it settles, so the
+    // renderer needs no system knowledge — it just paints a glyph.
+    if (result.system === 'v5') die.v5Face = v5Face(f.value, f.hunger);
+    else if (result.system === 'fate') die.fateFace = fateFace(f.value);
+    else if (result.system === 'genesys' || result.system === 'starwars') {
+      die.genFace = f.symbols;
+      // The Force die is coloured by the pips it rolled (light or dark); every
+      // other narrative die by its type.
+      die.genColor = f.genColorKey === 'force'
+        ? FORCE_COLORS[f.symbols[0]] || CT_COLORS.miss
+        : GEN_COLORS[f.genColorKey];
+    }
+    // Daggerheart dice are numbered d12s/d6s tinted by their role — no glyph,
+    // just the value drawn in the Hope/Fear colour.
+    else if (result.system === 'daggerheart') die.genColor = DH_COLORS[f.role];
+    // CthulhuTech d10s glow green when even (a Hit), grey when odd (a miss).
+    else if (result.system === 'cthulhutech') die.genColor = f.value % 2 === 0 ? CT_COLORS.hit : CT_COLORS.miss;
+    // One Ring: the Feat die shows a numeral, the Eye, or the Gandalf rune;
+    // Success dice show their value, tinted (Tengwar 6 gold, Weary 1-3 faded).
+    else if (result.system === 'onering') {
+      if (f.role === 'feat') {
+        if (f.torFaceKind === 'eye' || f.torFaceKind === 'gandalf') die.torFace = f.torFaceKind;
+        die.genColor = f.torFaceKind === 'gandalf' ? TOR_COLORS.gandalf
+          : f.torFaceKind === 'eye' ? TOR_COLORS.eye : TOR_COLORS.feat;
+      } else {
+        const dropped = result.summary?.weary && f.value <= 3;
+        die.genColor = dropped ? TOR_COLORS.weary : f.value === 6 ? TOR_COLORS.rune : TOR_COLORS.success;
+      }
+    }
+    // PbtA / Mist: both d6s take the outcome-band colour of the whole roll.
+    else if (result.system === 'pbta' || result.system === 'mist') die.genColor = BAND_COLORS[result.summary?.band];
+    return die;
+  });
+}
+
+function doRoll(notation) {
+  let result;
+  try {
+    // An explicit system token ("v5:…", "4dF") routes to that system's roller;
+    // anything else stays on the numeric engine untouched.
+    const sys = detectSystem(notation);
+    result = sys === 'v5' ? rollV5(notation)
+      : sys === 'fate' ? rollFate(notation)
+      : sys === 'genesys' ? rollGenesys(notation)
+      : sys === 'daggerheart' ? rollDaggerheart(notation)
+      : sys === 'cthulhutech' ? rollCthulhuTech(notation)
+      : sys === 'starwars' ? rollStarWars(notation)
+      : sys === 'onering' ? rollOneRing(notation)
+      : sys === 'pbta' ? rollPbta(notation)
+      : sys === 'mist' ? rollMist(notation)
+      : roll(notation);
+  } catch (err) {
+    showError(err.message);
+    return;
+  }
+  clearError();
+
+  // The palette follows the selected mode, not this roll's system: a numeric
+  // roll typed in V5 mode stays V5-coloured. applySystemTheme runs at mode
+  // selection, so nothing to do here.
+
+  state.last = result;
+  $('notation').value = result.notation;
+
+  const flat = flattenRollDice(result);
 
   // Your throw takes the tray outright. Dropping the claim stops a remote
   // roll still in the air from writing its total over yours when its timer
   // fires.
   state.remoteClaim = null;
 
-  state.dice = flat.map(f => {
-    const die = new Die(f.sides, f.value, 0, 0, 40);
-    die.kept = f.kept;
-    die.exploded = f.exploded;
-    die.rerolled = f.rerolled;
-    if (f.hunger) die.hunger = true;
-    // V5 symbol dice: stamp the face the die should draw when it settles so the
-    // renderer needs no system knowledge — it just paints a glyph.
-    if (result.system === 'v5') die.v5Face = v5Face(f.value, f.hunger);
-    return die;
-  });
+  state.dice = buildTrayDice(flat, result);
   placeGrid(state.dice);
 
   // Small rolls get thrown across the tray. Large ones spin in place: the dice
@@ -335,32 +569,56 @@ function rerollDelay(flat) {
 // Per-system result presentation. System rolls have no numeric `total`; their
 // headline/detail come from their own formatter, while the numeric engine's
 // formatters produce exactly what Dicebox has always shown.
+//
+// A headline is `{kind, text}`: numeric rolls and V5 success counts are a
+// `number`, set at the big numeral size; a resolved V5 outcome is `text`, a
+// phrase set smaller so "Bestial Failure" does not overrun the readout. The
+// `kind` reaches the DOM as a data attribute the stylesheet keys off.
 function resultHeadline(result) {
-  return result.system === 'v5' ? v5Headline(result) : String(result.total);
+  if (result.system === 'v5') return v5Headline(result);
+  if (result.system === 'fate') return fateHeadline(result);
+  if (result.system === 'genesys') return genesysHeadline(result);
+  if (result.system === 'daggerheart') return daggerheartHeadline(result);
+  if (result.system === 'cthulhutech') return cthulhutechHeadline(result);
+  if (result.system === 'starwars') return starWarsHeadline(result);
+  if (result.system === 'onering') return oneRingHeadline(result);
+  if (result.system === 'pbta' || result.system === 'mist') return twod6Headline(result);
+  return { kind: 'number', text: String(result.total) };
 }
 function resultDetail(result) {
-  if (result.system === 'v5') {
-    const vals = result.groups.flatMap(g => g.dice).map(d => `${d.value}${d.hunger ? '⬥' : ''}`).join(', ');
-    return `${describeV5(result)} — dice ${vals}`;
-  }
+  if (result.system === 'v5') return describeV5(result);
+  if (result.system === 'fate') return describeFate(result);
+  if (result.system === 'genesys') return describeGenesys(result);
+  if (result.system === 'daggerheart') return describeDaggerheart(result);
+  if (result.system === 'cthulhutech') return describeCthulhuTech(result);
+  if (result.system === 'starwars') return describeStarWars(result);
+  if (result.system === 'onering') return describeOneRing(result);
+  if (result.system === 'pbta' || result.system === 'mist') return describe2d6(result);
   return describe(result.groups);
+}
+
+// Write a headline to the big readout, carrying its kind so words and numbers
+// get their own type sizes, and an optional variant (Daggerheart's Hope/Fear
+// tint) that colours the total.
+function setTotal(headline) {
+  const total = $('total');
+  total.textContent = headline.text;
+  total.dataset.kind = headline.kind;
+  if (headline.variant) total.dataset.variant = headline.variant;
+  else delete total.dataset.variant;
 }
 
 function finish(result) {
   delete $('total').dataset.rolling;
   delete $('total').dataset.idle;
-  $('total').textContent = resultHeadline(result);
+  setTotal(resultHeadline(result));
   $('breakdown').textContent = resultDetail(result);
   addHistory(result, selfName(), true);
   // After addHistory, so a throw in room code could not cost the local roll its
   // place in the log. share() is synchronous and a no-op when there is no room,
-  // which is what keeps this line off the critical path.
-  if (result.system === 'v5') {
-    // V5 rolls are not shared to rooms yet (needs the k:'roll2' schema); nothing
-    // is sent rather than sending a half-valid numeric payload.
-  } else {
-    roomLink.share(result);
-  }
+  // which is what keeps this line off the critical path. It picks the wire
+  // schema by system: numeric rolls go as `roll`, the system modes as `roll2`.
+  roomLink.share(result);
   // The name has done its job by the first roll; let the tray have the page.
   $('wordmark').dataset.faded = '1';
 }
@@ -397,8 +655,10 @@ function recordRoll(result, who = null, mine = false) {
     notation: result.notation,
     // Numeric rolls keep their scalar `total`; system rolls carry a formatted
     // headline instead of a bogus scalar.
-    total: result.system === 'v5' ? null : result.total,
-    headline: resultHeadline(result),
+    // Only numeric rolls carry a scalar total; system rolls store a formatted
+    // headline instead and leave this null.
+    total: result.total ?? null,
+    headline: resultHeadline(result).text,
     detail: resultDetail(result),
     dice: result.groups
       .filter(g => g.kind === 'dice')
@@ -442,7 +702,7 @@ function addHistory(result, who = null, mine = false) {
   label.append(result.notation);
 
   const val = document.createElement('b');
-  val.textContent = resultHeadline(result);
+  val.textContent = resultHeadline(result).text;
 
   top.append(label, val);
   li.append(top);
@@ -483,6 +743,18 @@ $('entry').addEventListener('submit', e => {
 // Typing is another way of staging dice, so the tray follows the field as it is
 // edited: backspace away "+2d3" and those dice leave the tray immediately.
 $('notation').addEventListener('input', () => {
+  // A system pool typed by hand keeps that system's controls in step instead of
+  // being torn apart by the numeric pool parser, which would read "v5:8h3" as
+  // garbage.
+  const typedSystem = detectSystem($('notation').value);
+  if (typedSystem === 'v5') { syncV5FromField(); return; }
+  if (typedSystem === 'fate') { syncFateFromField(); return; }
+  if (typedSystem === 'genesys' || typedSystem === 'starwars') { syncGenFromField(); return; }
+  if (typedSystem === 'daggerheart') { syncDhFromField(); return; }
+  if (typedSystem === 'cthulhutech') { syncCtFromField(); return; }
+  if (typedSystem === 'onering') { syncTorFromField(); return; }
+  if (typedSystem === 'pbta') { pbtaCtl.fromField(); return; }
+  if (typedSystem === 'mist') { mistCtl.fromField(); return; }
   pool = parsePool($('notation').value);
   // Typing an unusual die earns it a button too, so the row always accounts for
   // everything in the pool.
@@ -498,7 +770,7 @@ const help = $('help');
 const helpToggle = $('helpToggle');
 
 function setHelp(open) {
-  if (open) { closeSheet(); closeDial(); closeHistory(); closeRoom(); }
+  if (open) { closeSheet(); closeDial(); closeHistory(); closeRoom(); closeMode(); }
   help.hidden = !open;
   helpToggle.setAttribute('aria-expanded', String(open));
   helpToggle.setAttribute('aria-label', open ? 'Hide syntax reference' : 'Show syntax reference');
@@ -528,6 +800,647 @@ help.querySelectorAll('.syntax dt').forEach(dt => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); use(); }
   });
 });
+
+// ---- systems ----
+//
+// The mode sheet is a UI preset: it recolours the app, swaps the dice row, and
+// picks how a result reads. It never touches the meaning of typed notation.
+
+const SYSTEMS = {
+  numeric: { badge: '' },
+  v5: { badge: 'Vampire' },
+  fate: { badge: 'Fate' },
+  genesys: { badge: 'Genesys' },
+  daggerheart: { badge: 'Daggerheart' },
+  cthulhutech: { badge: 'CthulhuTech' },
+  starwars: { badge: 'Star Wars' },
+  onering: { badge: 'The One Ring' },
+  pbta: { badge: 'PbtA' },
+  mist: { badge: 'Mist Engine' },
+};
+
+// Empty-tray copy. Most modes build a pool by tapping dice, so the default
+// speaks of dice. PbtA and Mist have no pool — the roll is always 2d6 and the
+// only input is a modifier — so their prompts point at that instead, and Mist
+// calls its modifier "Power" the way the game does.
+const DEFAULT_HINT = { idle: 'Pick dice or type a roll', placeholder: 'Tap dice above, or type 3d6+2' };
+const SYSTEM_HINTS = {
+  pbta: { idle: 'Set a modifier, then roll 2d6', placeholder: 'Set a modifier, or type pbta:+2' },
+  mist: { idle: 'Set your Power, then roll 2d6', placeholder: 'Set your Power, or type mist:+1' },
+};
+function systemHint(system) { return SYSTEM_HINTS[system] || DEFAULT_HINT; }
+
+// Permanent slugs, so a link opens Dicebox already in a system. The Worker
+// rewrites these paths to the app shell; numeric is the bare root. Kept branded
+// (/vtm rather than /v5) since the URL is the shareable name.
+const SLUG_TO_SYSTEM = { vtm: 'v5', fate: 'fate', genesys: 'genesys', daggerheart: 'daggerheart', cthulhutech: 'cthulhutech', starwars: 'starwars', onering: 'onering', pbta: 'pbta', mist: 'mist' };
+const SYSTEM_TO_SLUG = { v5: 'vtm', fate: 'fate', genesys: 'genesys', daggerheart: 'daggerheart', cthulhutech: 'cthulhutech', starwars: 'starwars', onering: 'onering', pbta: 'pbta', mist: 'mist' };
+
+function systemFromPath() {
+  const seg = (location.pathname || '/').replace(/^\/+|\/+$/g, '').toLowerCase();
+  return SLUG_TO_SYSTEM[seg] || 'numeric';
+}
+function pathForSystem(system) {
+  return SYSTEM_TO_SLUG[system] ? `/${SYSTEM_TO_SLUG[system]}` : '/';
+}
+
+const modeSheet = $('modeSheet');
+const modeToggle = $('modeToggle');
+const systemBadge = $('systemBadge');
+const numPicker = $('numPicker');
+const v5Picker = $('v5Picker');
+const fatePicker = $('fatePicker');
+const genesysPicker = $('genesysPicker');
+const dhPicker = $('dhPicker');
+const ctPicker = $('ctPicker');
+const torPicker = $('torPicker');
+// PbtA and Mist Engine share one picker: their only control is a modifier
+// stepper, identical between the two modes.
+const twod6Picker = $('twod6Picker');
+// Numeric's strip lives last in the DOM so that in Daggerheart mode (the only
+// mode that shows two pickers) the duality controls sit above it. In every
+// other mode the other pickers are hidden, so its position is invisible.
+dhPicker.after?.(numPicker);
+
+function setSystem(system, { roll = false, url = true } = {}) {
+  if (!SYSTEMS[system]) system = 'numeric';
+  const changed = system !== uiSystem;
+  uiSystem = system;
+
+  // Reflect the mode into the address so the current view is shareable and the
+  // browser's back button returns to the previous system. Guarded because some
+  // embeddings forbid history writes (the same reason the room code guards it).
+  if (url) {
+    const path = pathForSystem(system);
+    // window.history, not history: app.js binds `history` to the roll log array,
+    // which shadows the global and has no pushState.
+    if (location.pathname !== path) {
+      try { window.history.pushState({ system }, '', path); } catch { /* embedded */ }
+    }
+  }
+
+  // The palette is the loud half of the switch; do it first so the rest of the
+  // repaint happens under the right colours.
+  applySystemTheme(system);
+
+  // The badge names the mode beside the wordmark, and disappears on numeric,
+  // which is the app's own identity and needs no label.
+  const badge = SYSTEMS[system].badge;
+  systemBadge.hidden = !badge;
+  systemBadge.textContent = badge;
+
+  // The mode button wears the active system's mark (d20 / ankh / …).
+  modeToggle.dataset.system = system;
+
+  // Swap the dice row for the active system's controls. Daggerheart keeps the
+  // numeric strip too — its duality is one roll, but weapons and the rest need
+  // ordinary dice — so its own controls sit above the numeric ones. In that mode
+  // the strip is trimmed to the standard polyhedral dice.
+  numPicker.hidden = system !== 'numeric' && system !== 'daggerheart';
+  diceButtons.classList.toggle('standard-only', system === 'daggerheart');
+  v5Picker.hidden = system !== 'v5';
+  fatePicker.hidden = system !== 'fate';
+  // Star Wars reuses the Genesys chip picker; the Force chip only appears there.
+  genesysPicker.hidden = system !== 'genesys' && system !== 'starwars';
+  genesysPicker.classList.toggle('with-force', system === 'starwars');
+  dhPicker.hidden = system !== 'daggerheart';
+  ctPicker.hidden = system !== 'cthulhutech';
+  torPicker.hidden = system !== 'onering';
+  twod6Picker.hidden = system !== 'pbta' && system !== 'mist';
+  // Mist calls the 2d6 modifier "Power"; PbtA just "Modifier". The picker is
+  // shared, so the label follows the active mode.
+  if (system === 'pbta' || system === 'mist') {
+    const term = system === 'mist' ? 'Power' : 'Modifier';
+    $('twod6ModLabel').textContent = term;
+    $('twod6ModChip').setAttribute('aria-label', `${term} — tap to raise, hold to lower`);
+  }
+
+  // The input placeholder and the empty-tray line match what this mode offers —
+  // "tap dice" is wrong where there are no dice to tap.
+  const hint = systemHint(system);
+  $('notation').setAttribute('placeholder', hint.placeholder);
+  if ($('total').dataset.idle === '1') $('breakdown').textContent = hint.idle;
+
+  // Help follows the mode so its syntax examples match the dice on screen.
+  $('helpNumeric').hidden = system !== 'numeric';
+  $('helpV5').hidden = system !== 'v5';
+  $('helpFate').hidden = system !== 'fate';
+  $('helpGenesys').hidden = system !== 'genesys';
+  $('helpStarwars').hidden = system !== 'starwars';
+  $('helpDaggerheart').hidden = system !== 'daggerheart';
+  $('helpCthulhutech').hidden = system !== 'cthulhutech';
+  $('helpOnering').hidden = system !== 'onering';
+  $('helpPbta').hidden = system !== 'pbta';
+  $('helpMist').hidden = system !== 'mist';
+
+  // The sheet's cards reflect the choice.
+  for (const card of modeCards) {
+    card.setAttribute('aria-pressed', String(card.dataset.system === system));
+  }
+
+  // Switching modes clears the tray to a fresh start: the old pool's notation
+  // (`v5:8h3` or `2d20`) is meaningless in the other mode, so carrying it over
+  // would only confuse. A no-op re-selection leaves everything alone.
+  if (changed && !roll) {
+    resetV5();
+    resetFate();
+    resetGenesys();
+    resetDaggerheart();
+    resetCthulhuTech();
+    resetOneRing();
+    pbtaCtl.reset();
+    mistCtl.reset();
+    clearPool();
+    // Daggerheart seeds the field with its duality so a plain Roll or flick
+    // throws the Hope + Fear; tapping numeric dice replaces it with that pool.
+    if (system === 'daggerheart') $('notation').value = dhNotation();
+  }
+}
+
+// ---- mode sheet ----
+
+const modeCards = [...$('modeCards').querySelectorAll('.mode-card')];
+
+function openMode() {
+  setHelp(false);
+  closeSheet();
+  closeDial();
+  closeHistory();
+  closeRoom();
+  modeSheet.hidden = false;
+  modeToggle.setAttribute('aria-expanded', 'true');
+  hideHint();
+}
+function closeMode() {
+  modeSheet.hidden = true;
+  modeToggle.setAttribute('aria-expanded', 'false');
+}
+
+modeToggle.addEventListener('click', () => {
+  if (modeSheet.hidden) openMode(); else closeMode();
+});
+// The badge is the second way in: it names the mode, and tapping it changes it.
+systemBadge.addEventListener('click', openMode);
+$('modeClose').addEventListener('click', closeMode);
+
+for (const card of modeCards) {
+  card.addEventListener('click', () => {
+    setSystem(card.dataset.system);
+    closeMode();
+  });
+}
+
+// ---- Vampire pool ----
+//
+// V5's dice are two counts, not a numeric strip: ordinary dice and Hunger dice,
+// each set directly with its own stepper under the die it is. The state is the
+// source the notation field is written from; typing a `v5:` pool by hand feeds
+// back into it through syncV5FromField.
+
+const v5 = { normal: 0, hunger: 0, difficulty: null };
+const v5NormalFace = $('v5NormalFace');
+const v5HungerFace = $('v5HungerFace');
+const v5DiffChip = $('v5DiffChip');
+const v5DiffVal = $('v5Difficulty');
+
+function resetV5() {
+  v5.normal = 0;
+  v5.hunger = 0;
+  v5.difficulty = null;
+  syncV5({ writeField: false });
+}
+
+// Build the notation the pool represents. An empty pool writes nothing, so the
+// readout stays idle rather than showing a "v5:0".
+function v5Notation() {
+  const total = v5.normal + v5.hunger;
+  if (total < 1) return '';
+  let s = `v5:${total}`;
+  if (v5.hunger > 0) s += `h${v5.hunger}`;
+  if (v5.difficulty !== null) s += `@${v5.difficulty}`;
+  return s;
+}
+
+// Reflect the state onto the controls, and (by default) into the field.
+function syncV5({ writeField = true } = {}) {
+  if (v5.normal > 0) v5NormalFace.dataset.count = String(v5.normal); else delete v5NormalFace.dataset.count;
+  if (v5.hunger > 0) v5HungerFace.dataset.count = String(v5.hunger); else delete v5HungerFace.dataset.count;
+
+  if (v5.difficulty === null) {
+    v5DiffVal.textContent = '—'; v5DiffVal.dataset.unset = '1'; v5DiffChip.classList.remove('is-set');
+  } else {
+    v5DiffVal.textContent = String(v5.difficulty); delete v5DiffVal.dataset.unset; v5DiffChip.classList.add('is-set');
+  }
+
+  if (writeField) $('notation').value = v5Notation();
+  if (uiSystem === 'v5') stageSystemPool();
+}
+
+// Step a die count, keeping the pool inside the parser's limits: 0–100 dice
+// total, and no more Hunger than there are dice.
+function v5Step(kind, by) {
+  const other = kind === 'hunger' ? v5.normal : v5.hunger;
+  const current = kind === 'hunger' ? v5.hunger : v5.normal;
+  const next = Math.max(0, Math.min(current + by, 100 - other));
+  if (kind === 'hunger') v5.hunger = next; else v5.normal = next;
+  syncV5();
+}
+
+// Tap a die to add one, hold (or right-click) to remove — and a die tapped in
+// the tray comes off too. Difficulty cycles unset → 1 … 10; below 1 returns to
+// unset, which the reducer treats differently from a difficulty of 1.
+bindTapHold(v5NormalFace, dir => v5Step('normal', dir));
+bindTapHold(v5HungerFace, dir => v5Step('hunger', dir));
+bindTapHold(v5DiffChip, dir => {
+  if (dir > 0) v5.difficulty = v5.difficulty === null ? 1 : Math.min(10, v5.difficulty + 1);
+  else v5.difficulty = v5.difficulty === null || v5.difficulty <= 1 ? null : v5.difficulty - 1;
+  syncV5();
+});
+
+// A `v5:` pool typed into the field drives the controls, so the two never
+// disagree about what will roll. Invalid part-typed strings are left alone.
+function syncV5FromField() {
+  try {
+    const { pool, hunger, difficulty } = parseV5($('notation').value);
+    v5.normal = pool - hunger;
+    v5.hunger = hunger;
+    v5.difficulty = difficulty;
+    syncV5({ writeField: false });
+  } catch { /* mid-type, not yet valid */ }
+}
+
+// ---- Fate pool ----
+//
+// Fate is two numbers: how many Fudge dice, and a skill modifier. The standard
+// roll is 4dF, so that is the default.
+
+// The die count is fixed at 4dF (the Fate roll); only the modifier varies, so
+// that is the whole picker. Typing NdF still adjusts the count for the rare case.
+const fate = { count: 4, modifier: 0 };
+const fateModField = $('fateMod');
+
+function resetFate() {
+  fate.count = 4;
+  fate.modifier = 0;
+  syncFate({ writeField: false });
+}
+
+function fateNotation() {
+  const mod = fate.modifier > 0 ? `+${fate.modifier}` : fate.modifier < 0 ? String(fate.modifier) : '';
+  return `${fate.count}dF${mod}`;
+}
+
+function syncFate({ writeField = true } = {}) {
+  fateModField.textContent = fate.modifier > 0 ? `+${fate.modifier}` : String(fate.modifier);
+  if (writeField) $('notation').value = fateNotation();
+  if (uiSystem === 'fate') stageSystemPool();
+}
+
+bindTapHold($('fateModChip'), dir => { fate.modifier = Math.max(-100, Math.min(100, fate.modifier + dir)); syncFate(); });
+
+function syncFateFromField() {
+  try {
+    const { count, modifier } = parseFate($('notation').value);
+    fate.count = count;
+    fate.modifier = modifier;
+    syncFate({ writeField: false });
+  } catch { /* mid-type, not yet valid */ }
+}
+
+// ---- Genesys pool ----
+//
+// Six die types, built by tapping their chips (hold, or right-click, to remove).
+// Each type keeps a count; the chips show it and the notation is written from it.
+
+const GEN_TYPES = [
+  { type: 'ability', letter: 'A', label: 'Ability' },
+  { type: 'proficiency', letter: 'P', label: 'Proficiency' },
+  { type: 'boost', letter: 'B', label: 'Boost' },
+  { type: 'difficulty', letter: 'D', label: 'Difficulty' },
+  { type: 'challenge', letter: 'C', label: 'Challenge' },
+  { type: 'setback', letter: 'S', label: 'Setback' },
+  // The Force die — Star Wars only. Its chip is hidden in Genesys mode.
+  { type: 'force', letter: 'F', label: 'Force' },
+];
+const GEN_LETTER = Object.fromEntries(GEN_TYPES.map(t => [t.type, t.letter]));
+const gen = Object.fromEntries(GEN_TYPES.map(t => [t.type, 0]));
+
+function resetGenesys() {
+  for (const t of GEN_TYPES) gen[t.type] = 0;
+  syncGen({ writeField: false });
+}
+
+function genNotation() {
+  const terms = GEN_TYPES.filter(t => gen[t.type] > 0).map(t => `${gen[t.type]}${t.letter}`);
+  if (!terms.length) return '';
+  // Same chips, two systems: Star Wars adds the Force die and uses the sw: prefix.
+  return `${uiSystem === 'starwars' ? 'sw' : 'gen'}:${terms.join('+')}`;
+}
+
+function syncGen({ writeField = true } = {}) {
+  for (const t of GEN_TYPES) {
+    const chip = $(`gen-${t.type}`);
+    const n = gen[t.type];
+    if (n > 0) { chip.dataset.count = String(n); chip.setAttribute('aria-pressed', 'true'); }
+    else { delete chip.dataset.count; chip.setAttribute('aria-pressed', 'false'); }
+  }
+  if (writeField) $('notation').value = genNotation();
+  if (uiSystem === 'genesys' || uiSystem === 'starwars') stageSystemPool();
+}
+
+function genStep(type, by) {
+  const total = GEN_TYPES.reduce((s, t) => s + gen[t.type], 0);
+  const next = Math.max(0, Math.min(gen[type] + by, gen[type] + (100 - total)));
+  gen[type] = next;
+  syncGen();
+}
+
+function syncGenFromField() {
+  try {
+    const field = $('notation').value;
+    const pool = detectSystem(field) === 'starwars' ? parseStarWars(field) : parseGenesys(field);
+    for (const t of GEN_TYPES) gen[t.type] = 0;
+    for (const { type, count } of pool) gen[type] = count;
+    syncGen({ writeField: false });
+  } catch { /* mid-type, not yet valid */ }
+}
+
+// Tap a chip to add that die; hold it (or right-click) to remove one — the same
+// tap/long-press language the numeric row uses for its modifiers.
+for (const t of GEN_TYPES) {
+  bindTapHold($(`gen-${t.type}`), dir => genStep(t.type, dir));
+}
+
+// ---- Daggerheart pool ----
+//
+// The roll is fixed — a Hope d12 and a Fear d12 — so the controls are the things
+// around it: advantage or disadvantage (a ± d6), a flat modifier, and an
+// optional difficulty to resolve success against.
+
+// advantage is a signed count of d6: +N advantage dice, −N disadvantage dice.
+const dhState = { advantage: 0, modifier: 0, difficulty: null };
+const dhModField = $('dhMod');
+const dhDiffField = $('dhDifficulty');
+const dhModChip = $('dhModChip');
+const dhDiffChip = $('dhDiffChip');
+
+function resetDaggerheart() {
+  dhState.advantage = 0;
+  dhState.modifier = 0;
+  dhState.difficulty = null;
+  syncDh({ writeField: false });
+}
+
+function dhNotation() {
+  let s = 'dh:';
+  if (dhState.advantage > 0) s += 'adv' + (dhState.advantage > 1 ? dhState.advantage : '');
+  else if (dhState.advantage < 0) s += 'dis' + (-dhState.advantage > 1 ? -dhState.advantage : '');
+  if (dhState.modifier > 0) s += `+${dhState.modifier}`;
+  else if (dhState.modifier < 0) s += String(dhState.modifier);
+  if (dhState.difficulty !== null) s += `@${dhState.difficulty}`;
+  return s;
+}
+
+function syncDh({ writeField = true } = {}) {
+  for (const btn of dhAdvButtons) {
+    // Each button shows its own kind's count; advantage and disadvantage cancel,
+    // so only one is ever lit.
+    const n = btn.dataset.adv === 'adv' ? Math.max(0, dhState.advantage) : Math.max(0, -dhState.advantage);
+    if (n > 0) { btn.dataset.count = String(n); btn.setAttribute('aria-pressed', 'true'); }
+    else { delete btn.dataset.count; btn.setAttribute('aria-pressed', 'false'); }
+  }
+  dhModField.textContent = dhState.modifier > 0 ? `+${dhState.modifier}` : String(dhState.modifier);
+  if (dhState.difficulty === null) {
+    dhDiffField.textContent = '—'; dhDiffField.dataset.unset = '1'; dhDiffChip.classList.remove('is-set');
+  } else {
+    dhDiffField.textContent = String(dhState.difficulty); delete dhDiffField.dataset.unset; dhDiffChip.classList.add('is-set');
+  }
+  if (writeField) $('notation').value = dhNotation();
+  if (uiSystem === 'daggerheart') stageSystemPool();
+}
+
+const dhAdvButtons = [...document.querySelectorAll('.dh-adv-btn')];
+function setAdvantage(n) {
+  dhState.advantage = Math.max(-20, Math.min(20, n));
+  syncDh();
+}
+// Advantage and Disadvantage are a signed count that cancels. Tapping a die adds
+// one of its kind; holding removes one of that kind only (never crossing zero
+// into the other), so a hold on Advantage can't quietly add Disadvantage.
+bindTapHold(dhAdvButtons.find(b => b.dataset.adv === 'adv'), dir => {
+  if (dir > 0) setAdvantage(dhState.advantage + 1);
+  else if (dhState.advantage > 0) setAdvantage(dhState.advantage - 1);
+});
+bindTapHold(dhAdvButtons.find(b => b.dataset.adv === 'dis'), dir => {
+  if (dir > 0) setAdvantage(dhState.advantage - 1);
+  else if (dhState.advantage < 0) setAdvantage(dhState.advantage + 1);
+});
+
+// The Duality button rolls the Hope + Fear (with the current advantage, modifier
+// and difficulty) straight away — separate from the numeric strip, which builds
+// ordinary rolls for weapons and the rest.
+$('dhRoll').addEventListener('click', () => doRoll(dhNotation()));
+
+bindTapHold(dhModChip, dir => { dhState.modifier = Math.max(-100, Math.min(100, dhState.modifier + dir)); syncDh(); });
+bindTapHold(dhDiffChip, dir => {
+  if (dir > 0) dhState.difficulty = dhState.difficulty === null ? 10 : Math.min(100, dhState.difficulty + 1);
+  else dhState.difficulty = dhState.difficulty === null || dhState.difficulty <= 1 ? null : dhState.difficulty - 1;
+  syncDh();
+});
+
+function syncDhFromField() {
+  try {
+    const { advantage, modifier, difficulty } = parseDaggerheart($('notation').value);
+    dhState.advantage = advantage;
+    dhState.modifier = modifier;
+    dhState.difficulty = difficulty;
+    syncDh({ writeField: false });
+  } catch { /* mid-type, not yet valid */ }
+}
+
+// ---- CthulhuTech pool ----
+//
+// The whole roll is two numbers: how many d10 (your Attribute + Skill), and an
+// optional Difficulty (the hits you need). Evens are hits; the reducer does the
+// counting.
+
+// Tap to step up, hold (or right-click) to step down — the tap/long-press
+// language the Genesys die buttons use, reused for the single die-add buttons and
+// the tap-to-cycle chips. `step(+1|-1)` applies the change and re-syncs.
+function bindTapHold(el, step) {
+  if (!el) return;
+  let held = false, timer = null;
+  const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } };
+  // Remove exactly once per long-press. On touch a long-press fires the hold
+  // timer AND a contextmenu; `held` gates the second so they can't both step.
+  const removeOnce = () => { if (held) return; held = true; step(-1); if (navigator.vibrate) navigator.vibrate(8); };
+  el.addEventListener('pointerdown', () => {
+    held = false;
+    timer = setTimeout(() => { timer = null; removeOnce(); }, 450);
+  });
+  el.addEventListener('pointerup', cancel);
+  el.addEventListener('pointercancel', cancel);
+  el.addEventListener('pointerleave', cancel);
+  el.addEventListener('click', () => { if (held) { held = false; return; } step(1); });
+  el.addEventListener('contextmenu', e => { e.preventDefault(); cancel(); removeOnce(); });
+}
+
+const ct = { dice: 6, difficulty: 3 };
+const ctAddDie = $('ctAddDie');
+const ctDiffChip = $('ctDiffChip');
+const ctDiffVal = $('ctDifficulty');
+
+function resetCthulhuTech() {
+  // CthulhuTech builds a pool, so it opens empty like the numeric tray — tap the
+  // d10 to add. Difficulty is a setting, not a die, so it keeps its default.
+  ct.dice = 0;
+  ct.difficulty = 3;
+  syncCt({ writeField: false });
+}
+
+function ctNotation() {
+  if (ct.dice < 1) return ''; // an empty pool writes nothing, like a bare numeric tray
+  return `ct:${ct.dice}` + (ct.difficulty !== null ? `@${ct.difficulty}` : '');
+}
+
+// The example roll thrown when you flick an empty CthulhuTech tray: a six-die
+// pool at the difficulty currently set.
+function ctExample() {
+  return `ct:6` + (ct.difficulty !== null ? `@${ct.difficulty}` : '');
+}
+
+function syncCt({ writeField = true } = {}) {
+  // The d10 button badges the pool count, and shows none while the pool is empty.
+  if (ct.dice > 0) ctAddDie.dataset.count = String(ct.dice);
+  else delete ctAddDie.dataset.count;
+  if (ct.difficulty === null) {
+    ctDiffVal.textContent = '—'; ctDiffVal.dataset.unset = '1'; ctDiffChip.classList.remove('is-set');
+  } else {
+    ctDiffVal.textContent = String(ct.difficulty); delete ctDiffVal.dataset.unset; ctDiffChip.classList.add('is-set');
+  }
+  if (writeField) $('notation').value = ctNotation();
+  if (uiSystem === 'cthulhutech') stageSystemPool();
+}
+
+// Tap the d10 to add to the pool, hold to remove one (down to empty).
+bindTapHold(ctAddDie, dir => { ct.dice = Math.max(0, Math.min(100, ct.dice + dir)); syncCt(); });
+// Difficulty cycles unset → 1 … 20; holding below 1 returns to unset (report hits).
+bindTapHold(ctDiffChip, dir => {
+  if (dir > 0) ct.difficulty = ct.difficulty === null ? 1 : Math.min(20, ct.difficulty + 1);
+  else ct.difficulty = ct.difficulty === null || ct.difficulty <= 1 ? null : ct.difficulty - 1;
+  syncCt();
+});
+
+function syncCtFromField() {
+  try {
+    const { dice, difficulty } = parseCthulhuTech($('notation').value);
+    ct.dice = dice;
+    ct.difficulty = difficulty;
+    syncCt({ writeField: false });
+  } catch { /* mid-type, not yet valid */ }
+}
+
+// ---- One Ring pool ----
+//
+// A Feat die is always rolled; the controls are how many Success dice, the
+// Target Number, whether the roll is favoured / ill-favoured, and whether the
+// hero is Weary.
+
+// Success starts empty — the Feat die always rolls and shows in the tray, and you
+// build the Success pool on top of it.
+const tor = { success: 0, favour: null, weary: false, tn: 14 };
+const torAddSuccess = $('torAddSuccess');
+const torTnChip = $('torTnChip');
+const torTnVal = $('torTn');
+const torFlagButtons = [...document.querySelectorAll('.tor-flag')];
+
+function resetOneRing() {
+  tor.success = 0;
+  tor.favour = null;
+  tor.weary = false;
+  tor.tn = 14;
+  syncTor({ writeField: false });
+}
+
+function torNotation() {
+  return `tor:${tor.success}` + (tor.favour || '') + (tor.weary ? 'w' : '')
+    + (tor.tn !== null ? `@${tor.tn}` : '');
+}
+
+function syncTor({ writeField = true } = {}) {
+  if (tor.success > 0) torAddSuccess.dataset.count = String(tor.success); else delete torAddSuccess.dataset.count;
+  if (tor.tn === null) { torTnVal.textContent = '—'; torTnVal.dataset.unset = '1'; torTnChip.classList.remove('is-set'); }
+  else { torTnVal.textContent = String(tor.tn); delete torTnVal.dataset.unset; torTnChip.classList.add('is-set'); }
+  for (const btn of torFlagButtons) {
+    const flag = btn.dataset.flag;
+    const on = flag === 'weary' ? tor.weary : tor.favour === flag;
+    btn.setAttribute('aria-pressed', String(on));
+  }
+  if (writeField) $('notation').value = torNotation();
+  if (uiSystem === 'onering') stageSystemPool();
+}
+
+for (const btn of torFlagButtons) {
+  btn.addEventListener('click', () => {
+    const flag = btn.dataset.flag;
+    if (flag === 'weary') tor.weary = !tor.weary;
+    else tor.favour = tor.favour === flag ? null : flag; // fav/ill are exclusive
+    syncTor();
+  });
+}
+// Tap the d6 to add a Success die, hold to remove one.
+bindTapHold(torAddSuccess, dir => { tor.success = Math.max(0, Math.min(20, tor.success + dir)); syncTor(); });
+// Target cycles unset → 10 … 100; holding below 1 returns to unset.
+bindTapHold(torTnChip, dir => {
+  if (dir > 0) tor.tn = tor.tn === null ? 10 : Math.min(100, tor.tn + 1);
+  else tor.tn = tor.tn === null || tor.tn <= 1 ? null : tor.tn - 1;
+  syncTor();
+});
+
+function syncTorFromField() {
+  try {
+    const { success, favour, weary, tn } = parseOneRing($('notation').value);
+    tor.success = success;
+    tor.favour = favour;
+    tor.weary = weary;
+    tor.tn = tn;
+    syncTor({ writeField: false });
+  } catch { /* mid-type, not yet valid */ }
+}
+
+// ---- PbtA / Mist Engine (2d6 + modifier) ----
+// The two systems roll identically — 2d6 plus a modifier — and differ only in
+// how the result reads and in colour, so they share one picker (a single
+// modifier stepper) and one controller. The active mode (uiSystem) decides which
+// prefix the notation carries.
+const twod6 = { modifier: 0 };
+const twod6ModField = $('twod6Mod');
+
+function twod6Notation(system) {
+  const m = twod6.modifier;
+  return `${system}:` + (m ? (m > 0 ? `+${m}` : String(m)) : '');
+}
+function syncTwod6({ writeField = true } = {}) {
+  const m = twod6.modifier;
+  if (twod6ModField) twod6ModField.textContent = m > 0 ? `+${m}` : String(m);
+  if (writeField && (uiSystem === 'pbta' || uiSystem === 'mist')) {
+    $('notation').value = twod6Notation(uiSystem);
+  }
+  if (uiSystem === 'pbta' || uiSystem === 'mist') stageSystemPool();
+}
+function resetTwod6() { twod6.modifier = 0; syncTwod6({ writeField: false }); }
+function syncTwod6FromField() {
+  const src = $('notation').value;
+  const parse = detectSystem(src) === 'mist' ? parseMist : parsePbta;
+  try { twod6.modifier = parse(src).modifier; syncTwod6({ writeField: false }); }
+  catch { /* mid-type, not yet valid */ }
+}
+bindTapHold($('twod6ModChip'), dir => { twod6.modifier = Math.max(-100, Math.min(100, twod6.modifier + dir)); syncTwod6(); });
+
+// Both modes go through the one controller; the picker is shared, so a modifier
+// set in PbtA carries into Mist and vice versa — which is the intuitive result.
+const pbtaCtl = { notation: () => twod6Notation('pbta'), reset: resetTwod6, fromField: syncTwod6FromField };
+const mistCtl = { notation: () => twod6Notation('mist'), reset: resetTwod6, fromField: syncTwod6FromField };
 
 // ---- the pool ----
 //
@@ -668,7 +1581,7 @@ function stageFromPool({ writeField }) {
   $('total').textContent = '—';
   $('breakdown').textContent = staged.length
     ? `${staged.length} ${staged.length === 1 ? 'die' : 'dice'} ready`
-    : 'Pick dice or type a roll';
+    : systemHint(uiSystem).idle;
   markPool();
   hideHint();
 }
@@ -701,6 +1614,128 @@ function markPool() {
   }
 }
 
+// ---- staging the system pools like the numeric one ----
+//
+// The numeric row already does the thing that feels good: tap a die and it lands
+// in the tray as a blank die; tap one in the tray and it leaves; Roll throws the
+// lot. The system modes never drove that — they only wrote notation. These give
+// every system the same behaviour: each maps its pool state to a flat list of
+// blank-die descriptors, the shared stager renders them, and each staged die is
+// tagged so a tap in the tray removes the right one.
+
+// The polyhedral sides each Genesys die uses, so a staged pool draws the true
+// shape (d8 Ability, d12 Proficiency, d6 Boost, …) the way the numeric pool does.
+const GEN_SIDES = { ability: 8, proficiency: 12, boost: 6, difficulty: 8, challenge: 12, setback: 6, force: 12 };
+// A Force die has no side until it is rolled (light or dark), so it stages in a
+// neutral metal grey.
+const FORCE_STAGE_COLOR = '#9AA0A6';
+
+// The pool the active system would roll, as a flat list of blank-die descriptors
+// { sides, genColor?, hunger?, kind }. `kind` is the tag a tap in the tray
+// removes on. Mandatory dice (Hope/Fear, the Feat die, the fixed 2d6) are
+// present but their kind is not removable.
+function systemStageDescriptors() {
+  const out = [];
+  const add = (n, d) => { for (let i = 0; i < Math.max(0, n); i++) out.push(d); };
+  switch (uiSystem) {
+    case 'v5':
+      add(v5.normal, { sides: 10, kind: 'v5-normal' });
+      add(v5.hunger, { sides: 10, hunger: true, kind: 'v5-hunger' });
+      break;
+    case 'fate':
+      add(fate.count, { sides: 6, kind: 'fate' });
+      break;
+    case 'genesys':
+    case 'starwars':
+      for (const t of GEN_TYPES) {
+        if (t.type === 'force' && uiSystem !== 'starwars') continue;
+        add(gen[t.type], {
+          sides: GEN_SIDES[t.type],
+          genColor: t.type === 'force' ? FORCE_STAGE_COLOR : GEN_COLORS[t.type],
+          kind: `gen-${t.type}`,
+        });
+      }
+      break;
+    case 'daggerheart':
+      out.push({ sides: 12, genColor: DH_COLORS.hope, kind: 'dh-hope' });
+      out.push({ sides: 12, genColor: DH_COLORS.fear, kind: 'dh-fear' });
+      add(Math.abs(dhState.advantage), {
+        sides: 6,
+        genColor: dhState.advantage < 0 ? DH_COLORS.disadvantage : DH_COLORS.advantage,
+        kind: 'dh-adv',
+      });
+      break;
+    case 'cthulhutech':
+      add(ct.dice, { sides: 10, genColor: CT_COLORS.miss, kind: 'ct' });
+      break;
+    case 'onering':
+      add(tor.favour ? 2 : 1, { sides: 12, genColor: TOR_COLORS.feat, kind: 'tor-feat' });
+      add(tor.success, { sides: 6, genColor: TOR_COLORS.success, kind: 'tor-success' });
+      break;
+    case 'pbta':
+    case 'mist':
+      add(2, { sides: 6, kind: '2d6' });
+      break;
+  }
+  return out;
+}
+
+// Render the active system's pool as blank tray dice, exactly the way
+// stageFromPool renders the numeric pool. Callers guard on their own system so
+// the mode switch (which resets every system's controls in turn) only paints the
+// tray for the active one. Notation is owned by the caller's sync* (this never
+// writes it).
+function stageSystemPool() {
+  const staged = systemStageDescriptors().slice(0, ANIMATE_LIMIT).map(d => {
+    const die = new Die(d.sides, null, 0, 0, 40);
+    if (d.hunger) die.hunger = true;
+    if (d.genColor) die.genColor = d.genColor;
+    die.stageKind = d.kind;
+    return die;
+  });
+  state.dice = staged;
+  placeGrid(state.dice);
+  for (const die of state.dice) {
+    die.settled = true;
+    die.settling = true;
+    die.settleT = 1;
+    die.rot = [0.5, 0.6, 0.1];
+    die.homeX = die.x;
+    die.homeY = die.y;
+  }
+
+  $('total').dataset.idle = '1';
+  $('total').dataset.kind = 'number';
+  $('total').textContent = '—';
+  $('breakdown').textContent = staged.length
+    ? `${staged.length} ${staged.length === 1 ? 'die' : 'dice'} ready`
+    : systemHint(uiSystem).idle;
+  hideHint();
+}
+
+// Take one staged die of `kind` back off the pool by stepping the owning
+// system's state, then let its sync re-render. Mandatory dice return false so a
+// tap on them is a gentle no-op rather than an error.
+function removeSystemStageKind(kind) {
+  switch (kind) {
+    case 'v5-normal': v5.normal = Math.max(0, v5.normal - 1); syncV5(); return true;
+    case 'v5-hunger': v5.hunger = Math.max(0, v5.hunger - 1); syncV5(); return true;
+    case 'fate': fate.count = Math.max(1, fate.count - 1); syncFate(); return true;
+    case 'ct': ct.dice = Math.max(0, ct.dice - 1); syncCt(); return true;
+    case 'tor-success': tor.success = Math.max(0, tor.success - 1); syncTor(); return true;
+    case 'dh-adv':
+      dhState.advantage -= Math.sign(dhState.advantage);
+      syncDh();
+      return true;
+    default:
+      if (kind && kind.startsWith('gen-')) {
+        const type = kind.slice(4);
+        if (gen[type] > 0) { gen[type] -= 1; syncGen(); return true; }
+      }
+      return false; // Hope/Fear, the Feat die, the fixed 2d6 — not removable.
+  }
+}
+
 // Marks shown on a die button, chosen to say which modifier without a legend:
 // arrows point the way the kept die goes, a burst means exploding, a cycle means
 // reroll. Drop shares the arrow but points at what leaves.
@@ -722,13 +1757,33 @@ function modifierGlyph(mod) {
 
 function clearPool() {
   pool = new Map();
+  clearError();
+
+  // A system keeps its pool in its own state, and clearing returns it to the
+  // standard roll rather than to nothing: 0dF and ct:0 do not parse, so "empty"
+  // is not a valid system pool. Its sync then restages the tray and rewrites the
+  // field. Build-from-scratch systems (V5, Genesys) default to an empty pool, so
+  // they clear to nothing just like numeric.
+  if (uiSystem !== 'numeric') {
+    switch (uiSystem) {
+      case 'v5': resetV5(); syncV5(); break;
+      case 'fate': resetFate(); syncFate(); break;
+      case 'genesys': case 'starwars': resetGenesys(); syncGen(); break;
+      case 'daggerheart': resetDaggerheart(); syncDh(); break;
+      case 'cthulhutech': resetCthulhuTech(); syncCt(); break;
+      case 'onering': resetOneRing(); syncTor(); break;
+      case 'pbta': case 'mist': resetTwod6(); syncTwod6(); break;
+    }
+    return;
+  }
+
   state.dice = [];
   $('notation').value = '';
   $('total').dataset.idle = '1';
+  $('total').dataset.kind = 'number';
   $('total').textContent = '—';
-  $('breakdown').textContent = 'Pick dice or type a roll';
+  $('breakdown').textContent = systemHint(uiSystem).idle;
   markPool();
-  clearError();
 }
 
 $('clear').addEventListener('click', () => {
@@ -765,6 +1820,7 @@ function makeDieButton(sides) {
   b.className = 'dbtn';
   b.type = 'button';
   b.dataset.sides = String(sides);
+  if (STANDARD_DICE.has(sides)) b.dataset.std = '';
 
   // The hold-fill is its own element: ::before carries the modifier glyph and
   // ::after the count, so a pseudo-element here would collide with one of them.
@@ -883,6 +1939,7 @@ function openHistory() {
   closeSheet();
   closeDial();
   closeRoom();
+  closeMode();
 
   const list = $('historyFull');
   list.replaceChildren();
@@ -1101,6 +2158,7 @@ function openDial() {
   closeSheet();
   closeHistory();
   closeRoom();
+  closeMode();
   dial.hidden = false;
   setDial(dialValue());
   hideHint();
@@ -1356,6 +2414,12 @@ document.addEventListener('keydown', e => {
   if (!dial.hidden) closeDial();
   if (!historyPanel.hidden) closeHistory();
   if (!roomPanel.hidden) closeRoom();
+  if (!modeSheet.hidden) closeMode();
+});
+
+// Tapping the empty space around the mode cards closes the sheet, like the rest.
+modeSheet.addEventListener('click', e => {
+  if (e.target === modeSheet) closeMode();
 });
 
 // Long-press on touch, right-click on desktop — long-press has no mouse
@@ -1483,17 +2547,36 @@ canvas.addEventListener('pointerup', e => {
   // die from a handful without clearing everything or editing the text.
   if (speed < 120 && travelled < 10 && removeDieAt(e.clientX, e.clientY)) return;
 
-  // Throw whatever is staged; failing that, re-roll the last notation. The tray
-  // is never a dead surface, so a tap on an empty one rolls the selected die.
-  const target = $('notation').value.trim()
-    || (state.last && state.last.notation)
-    || `d${state.defaultSides}`;
+  // Throw whatever is staged; failing that, roll the mode's default. The tray is
+  // never a dead surface, so a tap on an empty one still rolls — but it must roll
+  // the current system's dice, not a d20 left over from numeric mode.
+  const typed = $('notation').value.trim();
+  const target = typed || emptyTrayRoll();
 
   doRoll(target);
   if (speed > 120) {
     for (const d of state.dice) d.throwWith(vx * 0.5, Math.abs(vy) * 0.5 + 200);
   }
 });
+
+// What a flick or tap on an empty tray rolls. In a system mode it must be that
+// system's own default — a bare d20 makes no sense in Vampire — so V5 throws a
+// starter pool of one ordinary die and one Hunger die. Numeric keeps re-rolling
+// your last roll, or the selected die if there is none yet.
+function emptyTrayRoll() {
+  if (uiSystem === 'v5') return v5Notation() || 'v5:2h1';
+  if (uiSystem === 'fate') return fateNotation();
+  if (uiSystem === 'genesys') return genNotation() || 'gen:1P+1A+2D';
+  if (uiSystem === 'starwars') return genNotation() || 'sw:1A+2D+1F';
+  if (uiSystem === 'onering') return torNotation();
+  if (uiSystem === 'daggerheart') return dhNotation();
+  if (uiSystem === 'cthulhutech') return ctNotation() || ctExample();
+  if (uiSystem === 'pbta') return pbtaCtl.notation();
+  if (uiSystem === 'mist') return mistCtl.notation();
+  const last = state.last;
+  const lastNumeric = last && (last.system === 'numeric' || last.system === undefined);
+  return (lastNumeric && last.notation) || `d${state.defaultSides}`;
+}
 
 // Remove one staged die under the given screen point. Only staged dice can be
 // picked off: once a roll has happened the numbers are a result, not a pool, and
@@ -1511,6 +2594,13 @@ function removeDieAt(clientX, clientY) {
     if (dist < d.size * 0.62 && dist < best) { best = dist; hit = d; }
   }
   if (!hit) return false;
+
+  // A system die knows which pool it belongs to; its sync re-renders the tray.
+  if (uiSystem !== 'numeric') {
+    const removed = removeSystemStageKind(hit.stageKind);
+    if (removed && navigator.vibrate) navigator.vibrate(8);
+    return removed;
+  }
 
   const entry = pool.get(hit.sides);
   if (!entry) return false;
@@ -1849,7 +2939,17 @@ const roomLink = createRoom({
 // The one thing this must not do is interrupt a throw of your own, which the
 // dataset.rolling guard below covers.
 function showRemoteRoll(roll) {
-  addHistory({ notation: roll.notation, groups: roll.groups, total: roll.total }, roll.name);
+  // Rebuild the shape the formatters and the tray expect. A numeric roll travels
+  // as a total; a system roll (V5, Fate, …) travels with its system id and the
+  // summary its headline and detail are rendered from.
+  const result = {
+    system: roll.system || 'numeric',
+    notation: roll.notation,
+    groups: roll.groups,
+    total: roll.total,
+    summary: roll.summary,
+  };
+  addHistory(result, roll.name);
 
   // Yield to a throw of your own, but not to another remote roll. Testing
   // dataset.rolling alone treated both the same, so once remote rolls started
@@ -1860,27 +2960,12 @@ function showRemoteRoll(roll) {
   // table does: the next handful lands and you look at that instead.
   if ($('total').dataset.rolling && !state.remoteClaim) return;
 
-  const flat = [];
-  for (const g of roll.groups) {
-    if (g.kind !== 'dice') continue;
-    for (const d of g.dice) {
-      flat.push({ sides: g.sides, value: d.value, kept: d.kept,
-                  exploded: d.exploded, rerolled: d.rerolled });
-    }
-  }
+  const flat = flattenRollDice(result);
   if (!flat.length || flat.length > ANIMATE_LIMIT) return;
 
-  state.dice = flat.map(f => {
-    const die = new Die(f.sides, f.value, 0, 0, 40);
-    die.kept = f.kept;
-    die.exploded = f.exploded;
-    die.rerolled = f.rerolled;
-    // Someone else's die. Used only to keep the haptics to your own rolls; it
-    // looks identical on the tray, because whose die it is belongs in the
-    // readout rather than in the drawing.
-    die.remote = true;
-    return die;
-  });
+  // Someone else's dice, stamped with their system's faces and colours so they
+  // look exactly like a local roll; `remote` only steers haptics away.
+  state.dice = buildTrayDice(flat, result, { remote: true });
   placeGrid(state.dice);
 
   // The readout updates when the dice land rather than now, so the number
@@ -1896,8 +2981,16 @@ function showRemoteRoll(roll) {
     if (state.remoteClaim !== claim) return;
     delete $('total').dataset.rolling;
     delete $('total').dataset.idle;
-    $('total').textContent = String(roll.total);
-    $('breakdown').textContent = `${roll.name} · ${describe(roll.groups)}`;
+    // Render the peer's result through the same formatters as your own. Guarded
+    // because the summary crossed the wire: a malformed one must not wedge the
+    // tray, so it falls back to a plain line.
+    try {
+      setTotal(resultHeadline(result));
+      $('breakdown').textContent = `${roll.name} · ${resultDetail(result)}`;
+    } catch {
+      setTotal({ kind: 'number', text: result.total != null ? String(result.total) : '—' });
+      $('breakdown').textContent = `${roll.name} · ${result.notation}`;
+    }
   };
 
   // Same thresholds as a local roll: thrown when there are few enough to follow,
@@ -2008,6 +3101,7 @@ function openRoom() {
   closeSheet();
   closeDial();
   closeHistory();
+  closeMode();
   roomPanel.hidden = false;
   roomToggle.setAttribute('aria-expanded', 'true');
   if (!roomNameField.value) roomNameField.value = roomLink.name;
@@ -2156,3 +3250,11 @@ if (fromLink) {
   openRoom();
   enterRoom(fromLink);
 }
+
+// A branded slug (/vtm, /fate, /genesys) opens the app already in that system.
+// url:false because the address is already the slug — we are reading it, not
+// writing it. Runs after every control exists, so setSystem can touch them all.
+setSystem(systemFromPath(), { url: false });
+
+// Back/forward moves between the systems the address has visited.
+window.addEventListener('popstate', () => setSystem(systemFromPath(), { url: false }));

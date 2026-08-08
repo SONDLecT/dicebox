@@ -3,6 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<!-- Every asset lives at the root, so pin the base there. This is what lets a
+     system slug like /vtm load app.js and style.css (a relative path under /vtm
+     would otherwise resolve to /vtm/app.js and 404). Stripped from the
+     single-file build, which loads from file: and inlines everything. -->
+<base href="/">
 <title>Dicebox</title>
 <meta name="description" content="An offline dice roller for tabletop RPGs.">
 <link rel="manifest" href="manifest.webmanifest">
@@ -31,6 +36,12 @@
 
   <header class="bar">
     <h1 class="wordmark" id="wordmark">Dicebox</h1>
+    <!-- Which set of dice is loaded, kept on screen rather than only inside the
+         help panel: the palette changes with the system, and a coloured app with
+         no label on it is a mystery rather than a mode. Tapping it opens the
+         switcher. Hidden entirely on the numeric default, which needs no badge. -->
+    <button type="button" class="system-badge" id="systemBadge" hidden
+            aria-label="Dice system — change it"></button>
     <div class="bar-actions">
       <!-- Lit while a room is live, so the header itself carries the answer to
            "are my rolls going anywhere?". The dot is separate from the button
@@ -50,6 +61,94 @@
             <path d="M2.6 16.2a4.6 4.6 0 0 1 9.2 0"/>
             <path d="M13.4 5.1a2.6 2.6 0 0 1 0 5"/>
             <path d="M14.6 11.9a4.6 4.6 0 0 1 2.8 4.3"/>
+          </g>
+        </svg>
+      </button>
+      <!-- Opens the dice-system picker. The icon is the active system's mark: a
+           wireframe d20 for the numeric default, an ankh for Vampire, and so on
+           as systems are added — so the button itself says which mode you are
+           in. data-system is set by the app; the CSS shows the matching mark. -->
+      <button id="modeToggle" class="ghost icon" data-system="numeric" aria-expanded="false"
+              aria-controls="modeSheet" aria-label="Choose a dice system">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
+          <!-- The Dicebox mark itself (brand/d20.svg): a deconstructed d20. The
+               numeric default is the app's own identity, so its button is the
+               logo. -->
+          <g class="mode-ico" data-for="numeric" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2.4 20.3 7v10L12 21.6 3.7 17V7z"/>
+            <path d="M12 2.4 16.4 9.6 12 12.2 7.6 9.6z"/>
+            <path d="M7.6 9.6 12 12.2v9.4M16.4 9.6 12 12.2M7.6 9.6 3.7 7m12.7 2.6L20.3 7"/>
+          </g>
+          <!-- Ankh: the Vampire mark (our own line-art, not official artwork). -->
+          <g class="mode-ico" data-for="v5" fill="none" stroke="currentColor"
+             stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="7.4" r="3.2"/>
+            <path d="M12 10.6V20M7.6 13.1h8.8"/>
+          </g>
+          <!-- Fate: a Fudge die carrying both a plus and a minus. -->
+          <g class="mode-ico" data-for="fate" fill="none" stroke="currentColor"
+             stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="4" y="4" width="16" height="16" rx="3.4"/>
+            <path d="M9 9V15M6 12H12"/>
+            <path d="M13 12H18"/>
+          </g>
+          <!-- Genesys: a narrative die (hexagon) with a triumph star. -->
+          <g class="mode-ico" data-for="genesys">
+            <path d="M12 2.6 20 7v10l-8 4.4L4 17V7z" fill="none" stroke="currentColor"
+                  stroke-width="1.6" stroke-linejoin="round"/>
+            <path d="M12 8l1.35 2.9 3.15.35-2.35 2.15.65 3.1L12 14.9 9.2 16.5l.65-3.1L7.5 11.25l3.15-.35z"
+                  fill="currentColor"/>
+          </g>
+          <!-- Daggerheart: a d12 split down the middle — the Hope/Fear duality. -->
+          <g class="mode-ico" data-for="daggerheart" fill="none" stroke="currentColor"
+             stroke-width="1.6" stroke-linejoin="round">
+            <path d="M12 2.6 20 7v10l-8 4.4L4 17V7z"/>
+            <path d="M12 2.6v18.8"/>
+          </g>
+          <!-- CthulhuTech: an eldritch eye trailing tentacles. -->
+          <g class="mode-ico" data-for="cthulhutech" fill="none" stroke="currentColor"
+             stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 10 C8 5 16 5 20 10 C16 15 8 15 4 10 Z"/>
+            <path d="M8 14 q-1 3 0 6"/>
+            <path d="M12 15 v6"/>
+            <path d="M16 14 q1 3 0 6"/>
+            <circle cx="12" cy="10" r="1.9" fill="currentColor" stroke="none"/>
+          </g>
+          <!-- Star Wars: a TIE fighter — cockpit between two hexagonal panels. -->
+          <g class="mode-ico" data-for="starwars">
+            <g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
+              <path d="M5 4 L8 7.3 L8 16.7 L5 20 L2 16.7 L2 7.3 Z"/>
+              <path d="M19 4 L22 7.3 L22 16.7 L19 20 L16 16.7 L16 7.3 Z"/>
+            </g>
+            <g fill="currentColor">
+              <rect x="7.6" y="11" width="2.2" height="2"/>
+              <rect x="14.2" y="11" width="2.2" height="2"/>
+              <circle cx="12" cy="12" r="2.7"/>
+            </g>
+          </g>
+          <!-- The One Ring: a plain ring. -->
+          <g class="mode-ico" data-for="onering" fill="none" stroke="currentColor">
+            <circle cx="12" cy="12" r="8.4" stroke-width="1.6"/>
+            <circle cx="12" cy="12" r="4.6" stroke-width="1.4"/>
+          </g>
+          <!-- PbtA: two pipped d6 — the pair you roll. -->
+          <g class="mode-ico" data-for="pbta" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linejoin="round">
+            <rect x="2.5" y="10" width="11" height="11" rx="2.4"/>
+            <rect x="12" y="3" width="11" height="11" rx="2.4"/>
+            <g fill="currentColor" stroke="none">
+              <circle cx="5.3" cy="12.8" r="1"/><circle cx="10.7" cy="12.8" r="1"/>
+              <circle cx="5.3" cy="18.2" r="1"/><circle cx="10.7" cy="18.2" r="1"/>
+              <circle cx="15" cy="6" r="1"/><circle cx="20" cy="11" r="1"/>
+            </g>
+          </g>
+          <!-- Mist Engine: fog drifting over the roll. -->
+          <g class="mode-ico" data-for="mist" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round">
+            <path d="M4 8.5c2-1.6 4-1.6 6 0s4 1.6 6 0"/>
+            <path d="M4 12.5c2-1.6 4-1.6 6 0s4 1.6 6 0"/>
+            <path d="M6 16.5c2-1.6 4-1.6 6 0s3 1.2 4 0.4"/>
           </g>
         </svg>
       </button>
@@ -87,6 +186,7 @@
     </div>
 
     <div class="help" id="help" hidden>
+      <div id="helpNumeric">
       <dl class="syntax">
         <dt>3d6</dt>          <dd>three six-sided dice</dd>
         <dt>1d20+5</dt>       <dd>with a modifier</dd>
@@ -104,6 +204,166 @@
         number of sides works, from d1 to d1000, so a d17 or a d57 is just as
         valid. Rolls stay on your device.
       </p>
+      </div>
+
+      <div id="helpV5" hidden>
+      <dl class="syntax">
+        <dt>v5:5</dt>     <dd>five dice, no Hunger</dd>
+        <dt>v5:8h3</dt>   <dd>eight dice, three of them Hunger</dd>
+        <dt>v5:8h3@3</dt> <dd>the same against difficulty 3</dd>
+        <dt>4d6</dt>      <dd>ordinary dice still roll as ordinary dice</dd>
+      </dl>
+      <p class="note">
+        Hunger dice <b>replace</b> dice in the pool rather than adding to it, so
+        the pool size is whatever you set. Every die showing 6 or more is a
+        success, and each <b>pair of 10s</b> adds two more on top. Set a
+        difficulty and the roll resolves itself — a win with a pair of 10s is a
+        Critical, and a Messy Critical if one of those 10s is on a Hunger die; a
+        loss with a Hunger 1 is a Bestial Failure. Leave the difficulty unset and
+        the roll reports its successes and lets the table call it.
+      </p>
+      <p class="note">
+        The dice show symbols the way the official ones do — a fang for a
+        success, the bite for a 10, a skull for a Hunger 1, and nothing at all
+        below 6. The numbers they landed on are in the line under the result and
+        in the history.
+      </p>
+      </div>
+
+      <div id="helpFate" hidden>
+      <dl class="syntax">
+        <dt>4dF</dt>    <dd>four Fudge dice — the standard roll</dd>
+        <dt>4dF+2</dt>  <dd>with a +2 skill</dd>
+        <dt>6dF-1</dt>  <dd>any number of dice, and a penalty</dd>
+      </dl>
+      <p class="note">
+        Each Fudge die is <b>+</b>, <b>−</b>, or blank — two of each on a d6 — so
+        it reads +1, −1, or 0. The result is the net total (−4 to +4 for four
+        dice) plus your modifier, and it lands on the <b>Fate ladder</b>:
+        Mediocre, Average, Fair, Good, Great, and up.
+      </p>
+      </div>
+
+      <div id="helpGenesys" hidden>
+      <dl class="syntax">
+        <dt>gen:2A+2D</dt>    <dd>two Ability, two Difficulty</dd>
+        <dt>gen:1P+1A+3D</dt> <dd>a Proficiency, an Ability, three Difficulty</dd>
+        <dt>gen:2A+1B+2D+1C</dt> <dd>Boost and Challenge in the mix</dd>
+      </dl>
+      <p class="note">
+        Six narrative dice: <b>Ability</b> (green), <b>Proficiency</b> (yellow),
+        <b>Boost</b> (blue) roll toward success; <b>Difficulty</b> (purple),
+        <b>Challenge</b> (red), <b>Setback</b> (grey) roll against you. Tap a
+        chip to add that die, hold it to remove one.
+      </p>
+      <p class="note">
+        Success (▲) cancels Failure (▼) and Advantage (◆) cancels Threat (✕), so
+        the result is what is left on each axis. A <b>Triumph</b> (★, on the
+        Proficiency die) is a success that also triggers something great; a
+        <b>Despair</b> (its inverted twin, on the Challenge die) is a failure
+        that goes badly wrong. Both survive cancellation.
+      </p>
+      </div>
+
+      <div id="helpStarwars" hidden>
+      <dl class="syntax">
+        <dt>sw:2A+2D</dt>   <dd>two Ability, two Difficulty</dd>
+        <dt>sw:1P+1A+2D</dt> <dd>a trained check</dd>
+        <dt>sw:3F</dt>       <dd>three Force dice (a Force power)</dd>
+      </dl>
+      <p class="note">
+        The same narrative dice as Genesys — success/failure and advantage/threat
+        cancel, with Triumph and Despair on the yellow and red dice — plus the
+        white <b>Force die</b>. Its <b>Light</b> (pale) and <b>Dark</b> (violet)
+        pips are a separate result that powers Force abilities; they don't touch
+        the success/advantage tally. Roll a handful of Force dice on their own for
+        a Force check.
+      </p>
+      </div>
+
+      <div id="helpDaggerheart" hidden>
+      <dl class="syntax">
+        <dt>dh:</dt>       <dd>the Duality Dice — Hope d12 + Fear d12</dd>
+        <dt>dh:+2</dt>     <dd>with a modifier (negatives too: dh:-1)</dd>
+        <dt>dh:@15</dt>    <dd>against difficulty 15</dd>
+        <dt>dh:adv2@15</dt> <dd>with two advantage dice, vs 15</dd>
+      </dl>
+      <p class="note">
+        Roll two d12 — a gold <b>Hope</b> die and a violet <b>Fear</b> die — and
+        add them. The higher die sets the tone: <b>with Hope</b> hands you a
+        Hope, <b>with Fear</b> hands the GM a Fear. <b>Matching</b> dice are a
+        <b>Critical Success</b> — it succeeds no matter the total, and comes with
+        Hope. Set a difficulty and the roll resolves to success or failure.
+      </p>
+      <p class="note">
+        Each <b>advantage</b> adds a d6 and each <b>disadvantage</b> subtracts
+        one; they cancel one-for-one, and stack past one (an ally's Help adds
+        another). Tap the buttons to add them, hold to remove. The
+        <b>Roll Duality</b> button throws the Hope + Fear; the dice below it roll
+        anything else — weapon damage and the rest.
+      </p>
+      </div>
+
+      <div id="helpCthulhutech" hidden>
+      <dl class="syntax">
+        <dt>ct:8</dt>    <dd>eight d10 — count the hits</dd>
+        <dt>ct:8@4</dt>  <dd>the same, against difficulty 4</dd>
+        <dt>ct:5@6</dt>  <dd>a five-die pool at a hard task</dd>
+      </dl>
+      <p class="note">
+        CthulhuTech 2e is a pool of coin-flips. Roll d10 equal to your
+        <b>Attribute + Skill</b>; every <b>even</b> die is a <b>Hit</b> (it glows
+        green), every odd one misses. Count your hits and meet the
+        <b>Difficulty</b> — roughly 3 for a simple task up to 6 or 7 for the
+        near-impossible. Leave the difficulty unset and it just reports the hits.
+      </p>
+      </div>
+
+      <div id="helpOnering" hidden>
+      <dl class="syntax">
+        <dt>tor:3@14</dt>   <dd>a Feat die + 3 Success dice, vs 14</dd>
+        <dt>tor:2fav@16</dt> <dd>favoured — roll two Feat dice, keep the best</dd>
+        <dt>tor:3w@18</dt>  <dd>Weary — Success dice of 1-3 count as 0</dd>
+      </dl>
+      <p class="note">
+        Always roll one <b>Feat die</b> (a d12: 1-10, plus the <b>Gandalf rune</b>
+        = automatic success and the <b>Eye of Sauron</b> = 0) with a pool of
+        <b>Success dice</b> (d6). Total them and meet the <b>Target Number</b>.
+        Each <b>6</b> is a Tengwar rune: one is a <b>Great</b> success, two or
+        more <b>Extraordinary</b>. <b>Favoured</b> / <b>ill-favoured</b> rolls two
+        Feat dice and keeps the best / worst; <b>Weary</b> makes Success dice of
+        1-3 count for nothing.
+      </p>
+      </div>
+
+      <div id="helpPbta" hidden>
+      <dl class="syntax">
+        <dt>pbta:</dt>    <dd>roll 2d6</dd>
+        <dt>pbta:+2</dt>  <dd>2d6 plus your stat</dd>
+        <dt>pbta:-1</dt>  <dd>2d6 with a penalty</dd>
+      </dl>
+      <p class="note">
+        Powered by the Apocalypse: roll <b>2d6</b> and add the relevant stat.
+        <b>10+</b> is a <b>Strong Hit</b>, <b>7-9</b> a <b>Weak Hit</b> (you get
+        it, but with a cost), <b>6 or under</b> a <b>Miss</b>. Set the modifier
+        below, or type it.
+      </p>
+      </div>
+
+      <div id="helpMist" hidden>
+      <dl class="syntax">
+        <dt>mist:</dt>    <dd>roll 2d6</dd>
+        <dt>mist:+1</dt>  <dd>2d6 plus your Power</dd>
+        <dt>mist:-2</dt>  <dd>2d6 with Weakness against you</dd>
+      </dl>
+      <p class="note">
+        The Mist Engine (City of Mist, Legend in the Mist) rolls <b>2d6</b> plus
+        your net <b>Power</b>. <b>10+</b> is a <b>Success</b>, <b>7-9</b> a
+        <b>Consequence</b> (you succeed with a complication), <b>6 or under</b> a
+        <b>Failure</b>. Set the modifier below, or type it.
+      </p>
+      </div>
+
       <p class="note install" id="installNote">
         <button type="button" class="install-button" id="install" hidden>Install as an app</button>
         <span id="installHint">Add this to your home screen and it works offline, with no
@@ -118,6 +378,165 @@
         <a href="dicebox.html" download="dicebox.html">Download as one file</a>
         <span class="build" id="build" hidden></span>
       </p>
+    </div>
+
+    <!-- The dice-system picker. A row of the header, a slide-out on the tray:
+         each card is a mode. Numeric is the default and needs no explanation;
+         the rest are named systems that recolour the app and swap the dice row.
+         Purely a UI preset — nothing here reinterprets notation you type. -->
+    <div class="sheet modes-sheet" id="modeSheet" hidden role="dialog"
+         aria-labelledby="modeTitle">
+      <div class="sheet-panel">
+        <p class="sheet-title">
+          <span id="modeTitle">Dice system</span>
+          <button type="button" class="sheet-close" id="modeClose"
+                  aria-label="Close">✕</button>
+        </p>
+        <div class="mode-cards" id="modeCards" role="group" aria-label="Dice system">
+          <button type="button" class="mode-card" data-system="numeric" aria-pressed="true">
+            <svg class="mode-glyph" viewBox="0 0 24 24" width="44" height="44" aria-hidden="true">
+              <!-- The Dicebox mark (brand/d20.svg), matching the header button. -->
+              <g fill="none" stroke="currentColor" stroke-width="1.5"
+                 stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2.4 20.3 7v10L12 21.6 3.7 17V7z"/>
+                <path d="M12 2.4 16.4 9.6 12 12.2 7.6 9.6z"/>
+                <path d="M7.6 9.6 12 12.2v9.4M16.4 9.6 12 12.2M7.6 9.6 3.7 7m12.7 2.6L20.3 7"/>
+              </g>
+            </svg>
+            <span class="mode-name">Numeric</span>
+            <span class="mode-sub">The classic roller</span>
+          </button>
+          <button type="button" class="mode-card mode-v5" data-system="v5" aria-pressed="false">
+            <svg class="mode-glyph" viewBox="0 0 44 44" width="44" height="44" aria-hidden="true">
+              <!-- A blood die: the d10 silhouette in crimson with an ankh on its
+                   face — the success mark the mode rolls. -->
+              <g fill="none" stroke="currentColor" stroke-width="1.6"
+                 stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 4l13 7.5v10L22 39 9 21.5v-10z"/>
+                <circle class="mode-fang" cx="22" cy="17.5" r="3.1"/>
+                <path class="mode-fang" d="M22 20.4v11.4M17.6 23.2h8.8"/>
+              </g>
+            </svg>
+            <span class="mode-name">Vampire</span>
+            <span class="mode-sub">The Masquerade · V5</span>
+          </button>
+          <button type="button" class="mode-card mode-fate" data-system="fate" aria-pressed="false">
+            <svg class="mode-glyph" viewBox="0 0 44 44" width="44" height="44" aria-hidden="true">
+              <!-- Three tumbling Fudge dice — the plus, blank, and minus faces
+                   that a 4dF roll is built from. -->
+              <g fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3.5" width="13" height="13" rx="3"/>
+                <path d="M9.5 7V13M6.5 10H12.5"/>
+                <rect x="15.5" y="15.5" width="13" height="13" rx="3"/>
+                <rect x="28" y="27.5" width="13" height="13" rx="3"/>
+                <path d="M31.5 34H37.5"/>
+              </g>
+            </svg>
+            <span class="mode-name">Fate</span>
+            <span class="mode-sub">Fudge · 4dF</span>
+          </button>
+          <button type="button" class="mode-card mode-genesys" data-system="genesys" aria-pressed="false">
+            <svg class="mode-glyph" viewBox="0 0 44 44" width="44" height="44" aria-hidden="true">
+              <!-- The multicolour narrative dice, shown as three of their symbols:
+                   a green success, a gold triumph, a purple threat. -->
+              <path d="M14 15l4.2 7.3H9.8z" fill="#4E9E60"/>
+              <path d="M31 9l1.7 3.6 4 .45-2.95 2.7.82 3.9L31 15.7l-3.6 2 .82-3.9-2.95-2.7 4-.45z" fill="#C39A2E"/>
+              <g stroke="#8A5CC0" stroke-width="2.4" stroke-linecap="round">
+                <path d="M25 27l7 7M25 34l7-7"/>
+              </g>
+            </svg>
+            <span class="mode-name">Genesys</span>
+            <span class="mode-sub">Narrative dice</span>
+          </button>
+          <button type="button" class="mode-card mode-daggerheart" data-system="daggerheart" aria-pressed="false">
+            <svg class="mode-glyph" viewBox="0 0 44 44" width="44" height="44" aria-hidden="true">
+              <!-- The Duality Dice: a gold Hope die and a violet Fear die. -->
+              <path d="M15 8 24 13v10l-9 5-9-5V13z" fill="none" stroke="#C9A227" stroke-width="1.9" stroke-linejoin="round"/>
+              <path d="M29 16 38 21v10l-9 5-9-5V21z" fill="none" stroke="#7E6BB5" stroke-width="1.9" stroke-linejoin="round"/>
+            </svg>
+            <span class="mode-name">Daggerheart</span>
+            <span class="mode-sub">Duality Dice</span>
+          </button>
+          <button type="button" class="mode-card mode-cthulhutech" data-system="cthulhutech" aria-pressed="false">
+            <svg class="mode-glyph" viewBox="0 0 44 44" width="44" height="44" aria-hidden="true">
+              <!-- An eldritch eye trailing tentacles — the mythos the mode wears
+                   over its even/odd d10 pool. -->
+              <g fill="none" stroke="#57B591" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8 17 C15 9 29 9 36 17 C29 25 15 25 8 17 Z"/>
+                <path d="M14 23 q-2 4 0 8 q1 2 -1 4"/>
+                <path d="M22 24 q2 3 0 6 q-2 3 0 6"/>
+                <path d="M30 23 q2 4 0 8 q-1 2 1 4"/>
+              </g>
+              <circle cx="22" cy="17" r="3" fill="#57B591"/>
+            </svg>
+            <span class="mode-name">CthulhuTech</span>
+            <span class="mode-sub">Even = hit · 2e</span>
+          </button>
+          <button type="button" class="mode-card mode-starwars" data-system="starwars" aria-pressed="false">
+            <svg class="mode-glyph" viewBox="0 0 44 44" width="44" height="44" aria-hidden="true">
+              <!-- A TIE fighter: a round cockpit between two hexagonal wing
+                   panels — the panels doubling as die facets. -->
+              <g fill="none" stroke="#5B9BD5" stroke-width="2.2" stroke-linejoin="round">
+                <path d="M9 7 L14.5 13 L14.5 31 L9 37 L3.5 31 L3.5 13 Z"/>
+                <path d="M35 7 L40.5 13 L40.5 31 L35 37 L29.5 31 L29.5 13 Z"/>
+              </g>
+              <g fill="#5B9BD5">
+                <rect x="14" y="20.5" width="3.5" height="3"/>
+                <rect x="26.5" y="20.5" width="3.5" height="3"/>
+                <circle cx="22" cy="22" r="5"/>
+              </g>
+            </svg>
+            <span class="mode-name">Star Wars</span>
+            <span class="mode-sub">Narrative + Force</span>
+          </button>
+          <button type="button" class="mode-card mode-onering" data-system="onering" aria-pressed="false">
+            <svg class="mode-glyph" viewBox="0 0 44 44" width="44" height="44" aria-hidden="true">
+              <!-- A ring, in bronze. -->
+              <circle cx="22" cy="22" r="15" fill="none" stroke="#B5893C" stroke-width="2.2"/>
+              <circle cx="22" cy="22" r="8.4" fill="none" stroke="#B5893C" stroke-width="1.8"/>
+            </svg>
+            <span class="mode-name">The One Ring</span>
+            <span class="mode-sub">Feat &amp; Success dice</span>
+          </button>
+          <button type="button" class="mode-card mode-pbta" data-system="pbta" aria-pressed="false">
+            <svg class="mode-glyph" viewBox="0 0 44 44" width="44" height="44" aria-hidden="true">
+              <!-- Two pipped d6 reading 4 and 6 — a total of ten, a Strong Hit. -->
+              <g fill="none" stroke="#D97A3C" stroke-width="2" stroke-linejoin="round">
+                <rect x="3" y="19" width="18" height="18" rx="4"/>
+                <rect x="23" y="5" width="18" height="18" rx="4"/>
+              </g>
+              <g fill="#D97A3C">
+                <circle cx="8" cy="24" r="1.8"/><circle cx="16" cy="24" r="1.8"/>
+                <circle cx="8" cy="32" r="1.8"/><circle cx="16" cy="32" r="1.8"/>
+                <circle cx="28" cy="9" r="1.8"/><circle cx="36" cy="9" r="1.8"/>
+                <circle cx="28" cy="14" r="1.8"/><circle cx="36" cy="14" r="1.8"/>
+                <circle cx="28" cy="19" r="1.8"/><circle cx="36" cy="19" r="1.8"/>
+              </g>
+            </svg>
+            <span class="mode-name">PbtA</span>
+            <span class="mode-sub">2d6 · hit / partial / miss</span>
+          </button>
+          <button type="button" class="mode-card mode-mist" data-system="mist" aria-pressed="false">
+            <svg class="mode-glyph" viewBox="0 0 44 44" width="44" height="44" aria-hidden="true">
+              <!-- Fog rolling in over water. -->
+              <g fill="none" stroke="#3F9FA0" stroke-width="2.2" stroke-linecap="round">
+                <path d="M8 15c3.5-2.8 7-2.8 10.5 0s7 2.8 10.5 0 5-1.4 7-0.4"/>
+                <path d="M8 23c3.5-2.8 7-2.8 10.5 0s7 2.8 10.5 0 5-1.4 7-0.4"/>
+                <path d="M12 31c3.5-2.8 7-2.8 10.5 0s5 2 8 0.8"/>
+              </g>
+            </svg>
+            <span class="mode-name">Mist Engine</span>
+            <span class="mode-sub">2d6 · success / consequence</span>
+          </button>
+        </div>
+        <p class="note mode-note">
+          The system recolours the app and changes the dice you tap. Typed
+          notation still means what it says — <b>4d6</b> is four six-sided dice
+          in any mode.
+        </p>
+      </div>
     </div>
 
     <!-- Opened by holding a die. Sits on the tray like the help panel, so the
@@ -297,7 +716,7 @@
     <span class="breakdown" id="breakdown">Pick dice or type a roll</span>
   </output>
 
-  <section class="picker" aria-label="Dice">
+  <section class="picker" id="numPicker" aria-label="Dice">
     <div class="counter" title="How many dice each tap adds">
       <button class="step" id="countDown" aria-label="One fewer die per tap">−</button>
       <input id="count" class="count" type="text" inputmode="numeric"
@@ -314,6 +733,197 @@
       <button type="button" class="nudge" id="diceRight" aria-label="Show larger dice"
               hidden>›</button>
     </div>
+  </section>
+
+  <!-- The Vampire dice tray. Where numeric mode taps d4…d1000, V5 taps two
+       dice: an ordinary black die and a red Hunger die. Each tap adds however
+       many the counter says, exactly like the numeric row, and builds the pool.
+       Hunger dice REPLACE, so the pool total is normal + Hunger. Difficulty is
+       optional — unset until the Storyteller calls one, because a roller that
+       invented a number would be lying about the outcome. -->
+  <!-- The two die types are tap-to-add buttons (hold to remove), carrying the
+       ankh; Difficulty is a subordinate chip. The pool renders in the tray. -->
+  <section class="picker v5-picker" id="v5Picker" aria-label="Vampire dice" hidden>
+    <div class="v5-dice-row">
+      <button type="button" class="v5-die-btn" id="v5NormalFace" aria-label="Add a regular die; hold to remove">
+        <svg viewBox="0 0 24 26" width="30" height="33" aria-hidden="true">
+          <path d="M12 1.5 21 9.5 12 24.5 3 9.5z" fill="none" stroke="currentColor"
+                stroke-width="1.4" stroke-linejoin="round"/>
+          <circle cx="12" cy="9" r="2.4" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M12 11.4v7.2M8.4 13.4h7.2" fill="none" stroke="currentColor"
+                stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <span class="v5-die-name">Regular</span>
+      </button>
+      <button type="button" class="v5-die-btn v5-die-hunger" id="v5HungerFace" aria-label="Add a Hunger die; hold to remove">
+        <svg viewBox="0 0 24 26" width="30" height="33" aria-hidden="true">
+          <path d="M12 1.5 21 9.5 12 24.5 3 9.5z" fill="none" stroke="currentColor"
+                stroke-width="1.4" stroke-linejoin="round"/>
+          <circle cx="12" cy="9" r="2.4" fill="currentColor" stroke="none"/>
+          <path d="M12 11.4v7.2M8.4 13.4h7.2" fill="none" stroke="currentColor"
+                stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <span class="v5-die-name">Hunger</span>
+      </button>
+    </div>
+    <button type="button" class="spin-chip" id="v5DiffChip" aria-label="Difficulty — tap to raise, hold to lower">
+      <span class="spin-chip-label">Difficulty</span>
+      <span class="spin-chip-val" id="v5Difficulty" data-unset="1">—</span>
+    </button>
+  </section>
+
+  <!-- Fate: how many Fudge dice, and a skill modifier. Standard is 4dF. -->
+  <!-- Fate always rolls 4dF (held in the tray); the only control is the skill
+       modifier, so the picker is a single chip, like PbtA / Mist. -->
+  <section class="picker fate-picker" id="fatePicker" aria-label="Fate dice" hidden>
+    <button type="button" class="spin-chip" id="fateModChip" aria-label="Modifier — tap to raise, hold to lower">
+      <span class="spin-chip-label">Modifier</span>
+      <span class="spin-chip-val" id="fateMod">0</span>
+    </button>
+  </section>
+
+  <!-- Genesys: six coloured die types. Tap a chip to add that die, hold (or
+       right-click) to remove one. -->
+  <section class="picker genesys-picker" id="genesysPicker" aria-label="Genesys dice" hidden>
+    <div class="gen-chips">
+      <button type="button" class="gen-chip" id="gen-ability" data-type="ability" aria-pressed="false" aria-label="Add an Ability die">
+        <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true"><path d="M15 3 27 15 15 27 3 15Z"/></svg>
+        <span class="gen-chip-label">Abil.</span>
+      </button>
+      <button type="button" class="gen-chip" id="gen-proficiency" data-type="proficiency" aria-pressed="false" aria-label="Add a Proficiency die">
+        <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true"><path d="M15 2.6 27.3 11.5 22.6 26 7.4 26 2.7 11.5Z"/></svg>
+        <span class="gen-chip-label">Prof.</span>
+      </button>
+      <button type="button" class="gen-chip" id="gen-boost" data-type="boost" aria-pressed="false" aria-label="Add a Boost die">
+        <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true"><rect x="5" y="5" width="20" height="20" rx="4.5"/></svg>
+        <span class="gen-chip-label">Boost</span>
+      </button>
+      <button type="button" class="gen-chip" id="gen-difficulty" data-type="difficulty" aria-pressed="false" aria-label="Add a Difficulty die">
+        <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true"><path d="M15 3 27 15 15 27 3 15Z"/></svg>
+        <span class="gen-chip-label">Diff.</span>
+      </button>
+      <button type="button" class="gen-chip" id="gen-challenge" data-type="challenge" aria-pressed="false" aria-label="Add a Challenge die">
+        <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true"><path d="M15 2.6 27.3 11.5 22.6 26 7.4 26 2.7 11.5Z"/></svg>
+        <span class="gen-chip-label">Chal.</span>
+      </button>
+      <button type="button" class="gen-chip" id="gen-setback" data-type="setback" aria-pressed="false" aria-label="Add a Setback die">
+        <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true"><rect x="5" y="5" width="20" height="20" rx="4.5"/></svg>
+        <span class="gen-chip-label">Setb.</span>
+      </button>
+      <button type="button" class="gen-chip gen-chip-force" id="gen-force" data-type="force" aria-pressed="false" aria-label="Add a Force die">
+        <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true"><path d="M15 2.6 27.3 11.5 22.6 26 7.4 26 2.7 11.5Z"/></svg>
+        <span class="gen-chip-label">Force</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- Daggerheart: the roll is always a Hope d12 + a Fear d12. The controls are
+       advantage/disadvantage (a ± d6), a flat modifier, and a difficulty. -->
+  <!-- The Hope + Fear pair is fixed (shown in the tray, rolled by Duality). The
+       adders are Advantage / Disadvantage d6; Mod and Diff are chips. The numeric
+       strip stays below for weapons and the rest. -->
+  <section class="picker dh-picker" id="dhPicker" aria-label="Daggerheart roll" hidden>
+    <div class="dh-adv-row">
+      <button type="button" class="dh-adv-btn" data-adv="adv" aria-pressed="false" aria-label="Add an advantage die; hold to remove">
+        <svg class="dh-adv-ico" viewBox="0 0 30 30" aria-hidden="true">
+          <rect class="die" x="5" y="5" width="20" height="20" rx="4.5"/>
+          <g class="chev"><path d="M10 17 15 12 20 17"/><path d="M10 22 15 17 20 22"/></g>
+        </svg>
+        <span class="dh-adv-label">Advantage</span>
+      </button>
+      <button type="button" class="dh-roll" id="dhRoll" aria-label="Roll the Duality Dice">
+        <svg viewBox="0 0 24 24" width="27" height="27" aria-hidden="true">
+          <path d="M12 3.4 5.4 7.5v9L12 20.6Z" fill="#C9A227"/>
+          <path d="M12 3.4 18.6 7.5v9L12 20.6Z" fill="#7E6BB5"/>
+          <path d="M12 2.4 19.4 7v10L12 21.6 4.6 17V7z" fill="none" stroke="currentColor"
+                stroke-width="1.3" stroke-linejoin="round"/>
+          <path d="M12 2.4v19.2" stroke="var(--paper)" stroke-width="1"/>
+        </svg>
+        <span class="dh-roll-label">Duality</span>
+      </button>
+      <button type="button" class="dh-adv-btn" data-adv="dis" aria-pressed="false" aria-label="Add a disadvantage die; hold to remove">
+        <svg class="dh-adv-ico" viewBox="0 0 30 30" aria-hidden="true">
+          <rect class="die" x="5" y="5" width="20" height="20" rx="4.5"/>
+          <g class="chev"><path d="M10 13 15 18 20 13"/><path d="M10 18 15 23 20 18"/></g>
+        </svg>
+        <span class="dh-adv-label">Disadvantage</span>
+      </button>
+    </div>
+    <div class="dh-fields-row">
+      <button type="button" class="spin-chip" id="dhModChip" aria-label="Modifier — tap to raise, hold to lower">
+        <span class="spin-chip-label">Mod</span>
+        <span class="spin-chip-val" id="dhMod">0</span>
+      </button>
+      <button type="button" class="spin-chip" id="dhDiffChip" aria-label="Difficulty — tap to raise, hold to lower">
+        <span class="spin-chip-label">Diff</span>
+        <span class="spin-chip-val" id="dhDifficulty" data-unset="1">—</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- CthulhuTech 2e: how many d10 (Attribute + Skill), and the Difficulty (the
+       number of even-die Hits you need). -->
+  <section class="picker ct-picker" id="ctPicker" aria-label="CthulhuTech pool" hidden>
+    <button type="button" class="die-btn" id="ctAddDie" aria-label="Add a d10 to the pool; hold to remove one">
+      <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true"><path d="M15 3 24 9 V17 L15 27 6 17 V9Z"/></svg>
+      <span class="die-btn-label">d10</span>
+    </button>
+    <button type="button" class="spin-chip" id="ctDiffChip" aria-label="Difficulty — tap to raise, hold to lower">
+      <span class="spin-chip-label">Difficulty</span>
+      <span class="spin-chip-val" id="ctDifficulty">3</span>
+    </button>
+  </section>
+
+  <!-- The One Ring: a Feat die is always rolled. The controls are the Success
+       dice, the Target Number, and the favoured/ill-favoured & Weary states. -->
+  <!-- The Feat die always rolls (shown in the tray); you build the Success pool
+       with the d6 button, set the Target, and toggle the conditions. -->
+  <section class="picker tor-picker" id="torPicker" aria-label="One Ring roll" hidden>
+    <div class="tor-controls-row">
+      <button type="button" class="die-btn tor-success-btn" id="torAddSuccess" aria-label="Add a Success die; hold to remove">
+        <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true"><rect x="5" y="5" width="20" height="20" rx="4.5"/></svg>
+        <span class="die-btn-label">Success</span>
+      </button>
+      <button type="button" class="spin-chip" id="torTnChip" aria-label="Target Number — tap to raise, hold to lower">
+        <span class="spin-chip-label">Target</span>
+        <span class="spin-chip-val" id="torTn">14</span>
+      </button>
+    </div>
+    <div class="tor-flags-row">
+      <button type="button" class="tor-flag" data-flag="fav" aria-pressed="false" aria-label="Favoured — roll two Feat dice, keep the best">
+        <svg class="tor-flag-ico" viewBox="0 0 40 40" aria-hidden="true">
+          <path class="drop" d="M15 15 24.5 21.9 20.9 33.1 9.1 33.1 5.5 21.9Z"/>
+          <path class="keep" d="M24 6 33.5 12.9 29.9 24.1 18.1 24.1 14.5 12.9Z"/>
+          <g class="chev"><path d="M20.5 17 24 13.5 27.5 17"/><path d="M20.5 21 24 17.5 27.5 21"/></g>
+        </svg>
+        <span class="tor-flag-label">Favoured</span>
+      </button>
+      <button type="button" class="tor-flag" data-flag="ill" aria-pressed="false" aria-label="Ill-favoured — roll two Feat dice, keep the worst">
+        <svg class="tor-flag-ico" viewBox="0 0 40 40" aria-hidden="true">
+          <path class="drop" d="M15 6 24.5 12.9 20.9 24.1 9.1 24.1 5.5 12.9Z"/>
+          <path class="keep" d="M24 15 33.5 21.9 29.9 33.1 18.1 33.1 14.5 21.9Z"/>
+          <g class="chev"><path d="M20.5 24 24 27.5 27.5 24"/><path d="M20.5 28 24 31.5 27.5 28"/></g>
+        </svg>
+        <span class="tor-flag-label">Ill-favoured</span>
+      </button>
+      <button type="button" class="tor-flag" data-flag="weary" aria-pressed="false" aria-label="Weary — Success dice of 1 to 3 count as zero">
+        <svg class="tor-flag-ico" viewBox="0 0 40 40" aria-hidden="true">
+          <rect class="weary-die" x="6" y="8" width="28" height="28" rx="6.5"/>
+          <g class="weary-pip"><circle cx="13.5" cy="15.5" r="1.9"/><circle cx="13.5" cy="22" r="1.9"/><circle cx="20" cy="22" r="1.9"/></g>
+          <path class="weary-strike" d="M10 28 30 12"/>
+        </svg>
+        <span class="tor-flag-label">Weary</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- PbtA & Mist Engine: a 2d6 roll with one modifier. Shared between both
+       modes, since only the readout differs. -->
+  <section class="picker twod6-picker" id="twod6Picker" aria-label="2d6 roll" hidden>
+    <button type="button" class="spin-chip" id="twod6ModChip" aria-label="Modifier — tap to raise, hold to lower">
+      <span class="spin-chip-label" id="twod6ModLabel">Modifier</span>
+      <span class="spin-chip-val" id="twod6Mod">0</span>
+    </button>
   </section>
 
   <form class="entry" id="entry">

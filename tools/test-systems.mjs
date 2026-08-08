@@ -5,6 +5,13 @@ import { webcrypto } from 'node:crypto';
 if (!globalThis.crypto) globalThis.crypto = webcrypto;
 
 import { parseV5, rollV5, summarizeV5, detectSystem, describeV5, rollAny, v5Face, v5Headline } from '../system-dice.js';
+import { parseFate, rollFate, summarizeFate, describeFate, fateHeadline, fateFace, fateLadder } from '../system-dice.js';
+import { parseGenesys, rollGenesys, summarizeGenesys, describeGenesys, genesysHeadline, genesysFace, GENESYS_DICE } from '../system-dice.js';
+import { parseDaggerheart, rollDaggerheart, summarizeDaggerheart, describeDaggerheart, daggerheartHeadline } from '../system-dice.js';
+import { parseCthulhuTech, rollCthulhuTech, summarizeCthulhuTech, describeCthulhuTech, cthulhutechHeadline } from '../system-dice.js';
+import { parseStarWars, rollStarWars, summarizeStarWars, describeStarWars, starWarsHeadline } from '../system-dice.js';
+import { parseOneRing, rollOneRing, summarizeOneRing, describeOneRing, oneRingHeadline } from '../system-dice.js';
+import { parsePbta, parseMist, rollPbta, rollMist, summarize2d6, describe2d6, twod6Headline } from '../system-dice.js';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, extra = '') => {
@@ -78,24 +85,47 @@ ok('rollAny defers numeric', rollAny('4d6').deferred === true && rollAny('4d6').
   const s = summarizeV5([d(4, false), d(2, false), d(5, true)], 3, 3, 1);
   ok('plain failure', s.outcome === 'failure');
 }
-// Plain success with margin
+// Plain success with margin. 8,8,8 are three successes; a lone 10 is one more
+// (a single 10 is NOT worth two — only a PAIR of 10s adds the crit bonus).
 {
   const s = summarizeV5([d(8, false), d(8, false), d(8, false), d(10, false)], 3, 4, 0);
   ok('success', s.outcome === 'success');
-  ok('margin=2 (2+2+1... )', s.margin === 2); // 8=1,8=1,8=1,10=2 => 5 successes, diff 3 => +2
+  ok('four successes from a lone 10', s.successes === 4);
+  ok('margin=1', s.margin === 1);
+  ok('lone 10 is not a crit', s.critTwo === false);
 }
-// 10 counts double: two 10s = 4 successes (2+2), plus the 6 adds 1
+// A pair of 10s: two successes for the dice, plus two more for the pair = 4,
+// and the 6 adds one => 5. And with the difficulty met, it is a Critical.
 {
   const s = summarizeV5([d(10, false), d(10, false), d(6, false)], 3, 3, 0);
-  ok('10s double to 2+2=4, 6 adds 1 => 5 successes', s.successes === 5);
+  ok('pair of 10s + a 6 => 5 successes', s.successes === 5);
+  ok('a met pair of 10s is a Critical', s.outcome === 'critical');
+  ok('critPairs=1', s.critPairs === 1);
 }
-// Difficulty omitted -> no bestial/failure assertion, but intrinsic critical resolves
+// A pair of 10s that still misses the difficulty is a failure, not a Critical.
+{
+  const s = summarizeV5([d(10, false), d(10, false)], 6, 2, 0); // 4 successes vs difficulty 6
+  ok('unmet crit is a failure', s.outcome === 'failure');
+  ok('still four successes', s.successes === 4);
+}
+// Difficulty omitted -> the win-contingent outcomes (Critical / Messy Critical /
+// Success) cannot be asserted, because a critical is a critical *win* and there
+// is nothing to win against. The pair is still surfaced through critTwo.
 {
   const s = summarizeV5([d(10, true), d(10, false)], null, 2, 1);
-  ok('no-difficulty messy-critical', s.outcome === 'messy-critical');
+  ok('no-difficulty: crit not asserted', s.outcome === null);
+  ok('no-difficulty: pair still flagged', s.critTwo === true);
+  ok('no-difficulty: still counts successes (4)', s.successes === 4);
+}
+// But zero successes DOES resolve without a difficulty — every difficulty is at
+// least 1, so nothing on the dice has already lost, Bestially if a Hunger 1 is
+// among them.
+{
   const s2 = summarizeV5([d(3, false), d(1, true)], null, 2, 1);
-  ok('no-difficulty bestial unresolved (null)', s2.outcome === null);
-  ok('no-difficulty still counts successes', s2.successes === 0);
+  ok('no-difficulty zero + hunger 1 => bestial', s2.outcome === 'bestial-failure');
+  ok('no-difficulty zero successes', s2.successes === 0);
+  const s3 = summarizeV5([d(3, false), d(4, false)], null, 2, 0);
+  ok('no-difficulty zero, no hunger => failure', s3.outcome === 'failure');
 }
 
 // ---- formatter ----
@@ -105,7 +135,7 @@ ok('rollAny defers numeric', rollAny('4d6').deferred === true && rollAny('4d6').
   const txt = describeV5(r);
   ok('formatter mentions Messy Critical', /Messy Critical/.test(txt));
   ok('formatter mentions successes', /4 successes/.test(txt));
-  ok('formatter mentions two 10s', /two 10s/.test(txt));
+  ok('formatter mentions the pair of 10s', /pair of 10s/.test(txt));
 }
 
 // ---- face mapping (symbols are a rendering of the numeric d10 value) ----
@@ -125,14 +155,444 @@ ok('rollAny defers numeric', rollAny('4d6').deferred === true && rollAny('4d6').
   }
 }
 
-// ---- compact headline (short enough not to overflow the readout) ----
+// ---- headline: a {kind, text} pair so words and numbers get their own size ----
 {
   const r = { summary: summarizeV5([d(10, true), d(10, false), d(5, false), d(2, false)], 3, 4, 1) };
-  ok('headline messy-critical', v5Headline(r) === 'Messy Critical');
+  const h = v5Headline(r);
+  ok('headline messy-critical text', h.text === 'Messy Critical');
+  ok('headline messy-critical kind', h.kind === 'text');
+
   const s2 = { summary: summarizeV5([d(8, false), d(8, false), d(8, false), d(10, false)], 3, 4, 0) };
-  ok('headline success +margin', v5Headline(s2) === 'Success (+2)');
-  const s3 = { summary: summarizeV5([d(3, false), d(1, true)], null, 2, 1) };
-  ok('headline unresolved successes', v5Headline(s3) === '0 successes');
+  const h2 = v5Headline(s2);
+  ok('headline success margin text', h2.text === 'Success +1');
+  ok('headline success kind text', h2.kind === 'text');
+
+  // Unresolved (no difficulty, some successes): a bare number, at numeral size.
+  const s3 = { summary: summarizeV5([d(8, false), d(6, false)], null, 2, 0) };
+  const h3 = v5Headline(s3);
+  ok('headline unresolved is a number', h3.text === '2' && h3.kind === 'number');
+}
+
+// ---- Fate / Fudge ----
+const f = value => ({ value, kept: true });
+
+// parsing / detection
+ok('detect 4dF', detectSystem('4dF') === 'fate');
+ok('detect dF (bare)', detectSystem('dF') === 'fate');
+ok('detect 4dF+2', detectSystem('4dF+2') === 'fate');
+ok('detect lower df', detectSystem('6df-1') === 'fate');
+ok('numeric d6 not fate', detectSystem('4d6') === 'numeric');
+ok('parse 4dF', eq(parseFate('4dF'), { count: 4, modifier: 0 }));
+ok('parse bare dF -> 4', eq(parseFate('dF'), { count: 4, modifier: 0 }));
+ok('parse 4dF+2', eq(parseFate('4dF+2'), { count: 4, modifier: 2 }));
+ok('parse 6dF-3', eq(parseFate('6dF-3'), { count: 6, modifier: -3 }));
+for (const bad of ['0dF', '101dF', '4dF+200', '4d6', 'v5:8', 'dFF']) {
+  ok(`reject fate ${bad}`, (() => { try { parseFate(bad); return false; } catch { return true; } })());
+}
+
+// roll shape
+{
+  const r = rollFate('4dF+1');
+  ok('fate system tag', r.system === 'fate');
+  ok('fate rolls 4 dice', r.groups[0].dice.length === 4);
+  ok('fate dice are cubes', r.groups[0].sides === 6);
+  ok('fate values in -1..1', r.groups[0].dice.every(d => d.value >= -1 && d.value <= 1));
+  ok('rollAny routes fate', rollAny('4dF').system === 'fate');
+}
+
+// summary arithmetic
+{
+  const s = summarizeFate([f(1), f(1), f(-1), f(0)], 0);
+  ok('fate net +1', s.total === 1 && s.sum === 1);
+  ok('fate counts', s.plus === 2 && s.minus === 1 && s.blank === 1);
+  const s2 = summarizeFate([f(1), f(1), f(-1), f(0)], 2);
+  ok('fate modifier adds', s2.total === 3 && s2.sum === 1 && s2.modifier === 2);
+  const s3 = summarizeFate([f(-1), f(-1), f(-1), f(-1)], 0);
+  ok('fate floor -4', s3.total === -4);
+}
+
+// ladder
+ok('ladder 0 Mediocre', fateLadder(0) === 'Mediocre');
+ok('ladder +3 Good', fateLadder(3) === 'Good');
+ok('ladder +4 Great', fateLadder(4) === 'Great');
+ok('ladder -1 Poor', fateLadder(-1) === 'Poor');
+ok('ladder -2 Terrible', fateLadder(-2) === 'Terrible');
+ok('ladder clamps high', fateLadder(12) === 'Legendary');
+ok('ladder clamps low', fateLadder(-9) === 'Terrible');
+
+// faces
+ok('fateFace + ', fateFace(1) === 'plus');
+ok('fateFace -', fateFace(-1) === 'minus');
+ok('fateFace blank', fateFace(0) === 'blank');
+
+// formatter + headline
+{
+  const r = { summary: summarizeFate([f(1), f(1), f(-1), f(0)], 2), groups: [{ dice: [f(1), f(1), f(-1), f(0)] }] };
+  const txt = describeFate(r);
+  ok('describe names the ladder', /Good/.test(txt));
+  ok('describe shows the modifier', /2 modifier/.test(txt));
+  const h = fateHeadline(r);
+  ok('fate headline is +3', h.text === '+3' && h.kind === 'number');
+  const h0 = fateHeadline({ summary: summarizeFate([f(0)], 0) });
+  ok('fate headline 0', h0.text === '0');
+  const hneg = fateHeadline({ summary: summarizeFate([f(-1), f(-1)], 0) });
+  ok('fate headline negative uses minus sign', hneg.text === '−2');
+}
+
+// ---- Genesys ----
+// a die object for the reducer, from a symbol list
+const g = (...symbols) => ({ symbols });
+
+// detection / parsing
+ok('detect gen', detectSystem('gen:2A+1P') === 'genesys');
+ok('gen not fate/numeric', detectSystem('gen:1A') === 'genesys' && detectSystem('4d6') === 'numeric');
+ok('parse gen 2A+1P+2D', eq(parseGenesys('gen:2A+1P+2D'),
+  [{ type: 'ability', count: 2 }, { type: 'proficiency', count: 1 }, { type: 'difficulty', count: 2 }]));
+ok('parse gen no plus', eq(parseGenesys('gen:2a1p'),
+  [{ type: 'ability', count: 2 }, { type: 'proficiency', count: 1 }]));
+ok('parse gen bare letter = 1', eq(parseGenesys('gen:A+C'),
+  [{ type: 'ability', count: 1 }, { type: 'challenge', count: 1 }]));
+for (const bad of ['gen:', 'gen:2X', 'v5:8', '4dF', 'gen:0A']) {
+  ok(`reject gen ${bad}`, (() => { try { parseGenesys(bad); return false; } catch { return true; } })());
+}
+
+// face tables — exact symbol counts per die (verified against the official set)
+{
+  const tally = type => {
+    const c = { success: 0, advantage: 0, triumph: 0, failure: 0, threat: 0, despair: 0, blank: 0 };
+    for (const face of GENESYS_DICE[type].faces) {
+      if (face.length === 0) c.blank++;
+      for (const s of face) c[s]++;
+    }
+    return c;
+  };
+  ok('boost d6', GENESYS_DICE.boost.sides === 6 && eq(tally('boost'), { success: 2, advantage: 4, triumph: 0, failure: 0, threat: 0, despair: 0, blank: 2 }));
+  ok('setback d6', eq(tally('setback'), { success: 0, advantage: 0, triumph: 0, failure: 2, threat: 2, despair: 0, blank: 2 }));
+  ok('ability d8', GENESYS_DICE.ability.sides === 8 && eq(tally('ability'), { success: 5, advantage: 5, triumph: 0, failure: 0, threat: 0, despair: 0, blank: 1 }));
+  ok('difficulty d8', eq(tally('difficulty'), { success: 0, advantage: 0, triumph: 0, failure: 4, threat: 6, despair: 0, blank: 1 }));
+  ok('proficiency d12 (1 triumph)', GENESYS_DICE.proficiency.sides === 12 && eq(tally('proficiency'), { success: 9, advantage: 8, triumph: 1, failure: 0, threat: 0, despair: 0, blank: 1 }));
+  ok('challenge d12 (1 despair)', eq(tally('challenge'), { success: 0, advantage: 0, triumph: 0, failure: 8, threat: 8, despair: 1, blank: 1 }));
+}
+
+// roll shape
+{
+  const r = rollGenesys('gen:2A+1P+1D');
+  ok('gen system tag', r.system === 'genesys');
+  ok('gen rolls 4 dice', r.groups[0].dice.length === 4);
+  ok('gen dice carry type + symbols', r.groups[0].dice.every(d => d.type && Array.isArray(d.symbols)));
+  ok('gen dice sides match type', r.groups[0].dice.every(d => d.sides === GENESYS_DICE[d.type].sides));
+  ok('rollAny routes gen', rollAny('gen:1A').system === 'genesys');
+}
+
+// cancellation on both axes
+{
+  const s = summarizeGenesys([g('success', 'success'), g('advantage'), g('failure'), g('threat', 'threat')]);
+  ok('net 1 success', s.netSuccess === 1 && s.success === 1 && s.failure === 0);
+  ok('net 1 threat', s.netAdvantage === -1 && s.threat === 1 && s.advantage === 0);
+}
+// wash is a failure
+{
+  const s = summarizeGenesys([g('success'), g('failure')]);
+  ok('wash → 0 net success', s.netSuccess === 0);
+  ok('wash reports as failure in headline', genesysHeadline({ summary: s }).text.startsWith('Failure'));
+}
+// triumph counts as a success AND persists; despair likewise
+{
+  const s = summarizeGenesys([g('triumph'), g('failure'), g('failure')]);
+  ok('triumph adds a success (net -1)', s.netSuccess === -1);
+  ok('triumph still reported', s.raw.triumph === 1);
+  const s2 = summarizeGenesys([g('despair'), g('success'), g('success')]);
+  ok('despair adds a failure (net +1)', s2.netSuccess === 1);
+  ok('despair still reported', s2.raw.despair === 1);
+}
+// headline + describe
+{
+  const s = summarizeGenesys([g('success', 'success'), g('advantage'), g('triumph'), g('failure'), g('threat', 'threat', 'threat')]);
+  const h = genesysHeadline({ summary: s });
+  ok('gen headline kind text', h.kind === 'text');
+  // success 2 + triumph 1 = 3, minus failure 1 = net 2 success; adv 1 - threat 3 = -2 threat; triumph 1
+  ok('gen headline nets correctly', h.text === '2 Success · 2 Threat · Triumph', h.text);
+  ok('gen describe shows raw tally', /rolled/.test(describeGenesys({ summary: s })));
+}
+// face lookup
+ok('genesysFace proficiency triumph', eq(genesysFace('proficiency', 11), ['triumph']));
+ok('genesysFace boost blank', eq(genesysFace('boost', 0), []));
+
+// ---- Daggerheart ----
+const dh = (hope, fear, extra = {}) => summarizeDaggerheart({ hope, fear, total: hope + fear + (extra.modifier || 0), ...extra });
+
+// detection / parsing
+ok('detect dh', detectSystem('dh:') === 'daggerheart');
+ok('detect dh mod', detectSystem('dh:+2') === 'daggerheart');
+ok('detect dh full', detectSystem('dh:adv+1@15') === 'daggerheart');
+ok('dh not numeric', detectSystem('2d12') === 'numeric');
+ok('parse dh bare', eq(parseDaggerheart('dh:'), { advantage: 0, modifier: 0, difficulty: null }));
+ok('parse dh +2', eq(parseDaggerheart('dh:+2'), { advantage: 0, modifier: 2, difficulty: null }));
+ok('parse dh negative modifier', eq(parseDaggerheart('dh:-1'), { advantage: 0, modifier: -1, difficulty: null }));
+ok('parse dh @15', eq(parseDaggerheart('dh:@15'), { advantage: 0, modifier: 0, difficulty: 15 }));
+ok('parse dh adv = +1 die', eq(parseDaggerheart('dh:adv+1@15'), { advantage: 1, modifier: 1, difficulty: 15 }));
+ok('parse dh adv2 = +2 dice', eq(parseDaggerheart('dh:adv2'), { advantage: 2, modifier: 0, difficulty: null }));
+ok('parse dh dis = -1 die', eq(parseDaggerheart('dh:dis'), { advantage: -1, modifier: 0, difficulty: null }));
+ok('parse dh dis3 = -3 dice', eq(parseDaggerheart('dh:dis3'), { advantage: -3, modifier: 0, difficulty: null }));
+for (const bad of ['dh', 'dh:xyz', 'dh:@0', 'dh:adv0', 'gen:1A', '4dF']) {
+  ok(`reject dh ${bad}`, (() => { try { parseDaggerheart(bad); return false; } catch { return true; } })());
+}
+
+// roll shape
+{
+  const r = rollDaggerheart('dh:adv2+2@15');
+  ok('dh system tag', r.system === 'daggerheart');
+  ok('dh has hope+fear+2 advantage dice', r.groups[0].dice.length === 4);
+  ok('dh dice have roles', r.groups[0].dice.map(d => d.role).join() === 'hope,fear,advantage,advantage');
+  ok('dh values in range', r.groups[0].dice.every(d => d.value >= 1 && d.value <= d.sides));
+  ok('rollAny routes dh', rollAny('dh:').system === 'daggerheart');
+  const [h, f, a1, a2] = r.groups[0].dice.map(d => d.value);
+  ok('dh total = hope+fear+2 adv+mod', r.summary.total === h + f + a1 + a2 + 2);
+  // disadvantage subtracts each die
+  const rd = rollDaggerheart('dh:dis2');
+  const [dh_, df, x1, x2] = rd.groups[0].dice.map(d => d.value);
+  ok('dh disadvantage subtracts each die', rd.summary.total === dh_ + df - x1 - x2);
+}
+
+// duality tone
+{
+  ok('hope high → with Hope', dh(9, 6).outcome === 'hope' && dh(9, 6).withHope === true);
+  ok('fear high → with Fear', dh(4, 10).outcome === 'fear' && dh(4, 10).withHope === false);
+  ok('match → critical', dh(7, 7).outcome === 'critical' && dh(7, 7).critical === true);
+}
+// difficulty resolution
+{
+  ok('success with hope', dh(10, 8, { difficulty: 15 }).outcome === 'success-hope');
+  ok('failure with fear', dh(5, 7, { difficulty: 15 }).outcome === 'failure-fear');
+  ok('success with fear', dh(8, 10, { difficulty: 15 }).outcome === 'success-fear');
+  ok('failure with hope', dh(6, 4, { difficulty: 15 }).outcome === 'failure-hope');
+  // a critical always succeeds even under the difficulty
+  const c = dh(3, 3, { difficulty: 20 });
+  ok('critical succeeds under difficulty', c.outcome === 'critical' && c.success === true);
+}
+// modifier and adv/dis affect the total
+{
+  ok('modifier adds to total', dh(6, 6, { modifier: 3 }).total === 15);
+  const s = summarizeDaggerheart({ hope: 6, fear: 5, total: 6 + 5 - 4, advantage: 'dis' });
+  ok('disadvantage lowers total', s.total === 7);
+}
+// headline + describe
+{
+  const rHope = { summary: dh(10, 7, { difficulty: 15 }) };
+  const h = daggerheartHeadline(rHope);
+  ok('dh headline is the total', h.text === '17' && h.kind === 'number');
+  ok('dh headline variant hope', h.variant === 'hope');
+  ok('dh headline variant fear', daggerheartHeadline({ summary: dh(4, 10) }).variant === 'fear');
+  ok('dh headline variant critical', daggerheartHeadline({ summary: dh(8, 8) }).variant === 'critical');
+  const rd = { summary: dh(10, 7, { difficulty: 15 }), groups: [{ dice: [{ role: 'hope', value: 10 }, { role: 'fear', value: 7 }] }] };
+  ok('dh describe names the outcome', /Success with Hope/.test(describeDaggerheart(rd)));
+  ok('dh describe shows the dice', /Hope 10, Fear 7/.test(describeDaggerheart(rd)));
+}
+
+// ---- CthulhuTech 2e ----
+const ct = (...values) => summarizeCthulhuTech(values.map(value => ({ value })), null);
+const ctd = (difficulty, ...values) => summarizeCthulhuTech(values.map(value => ({ value })), difficulty);
+
+// detection / parsing
+ok('detect ct', detectSystem('ct:8') === 'cthulhutech');
+ok('detect ct@', detectSystem('ct:8@4') === 'cthulhutech');
+ok('ct not numeric', detectSystem('8d10') === 'numeric');
+ok('parse ct:8', eq(parseCthulhuTech('ct:8'), { dice: 8, difficulty: null }));
+ok('parse ct:8@4', eq(parseCthulhuTech('ct:8@4'), { dice: 8, difficulty: 4 }));
+for (const bad of ['ct:', 'ct:0', 'ct:101', 'ct:8@0', 'dh:', '4dF']) {
+  ok(`reject ct ${bad}`, (() => { try { parseCthulhuTech(bad); return false; } catch { return true; } })());
+}
+
+// even = hit, odd = miss
+{
+  ok('even values are hits', ct(2, 4, 6, 8, 10).hits === 5);
+  ok('odd values are misses', ct(1, 3, 5, 7, 9).hits === 0);
+  const s = ct(2, 7, 4, 9, 10, 3);
+  ok('counts only evens', s.hits === 3 && s.misses === 3);
+}
+// roll shape
+{
+  const r = rollCthulhuTech('ct:12@5');
+  ok('ct system tag', r.system === 'cthulhutech');
+  ok('ct rolls 12 d10', r.groups[0].dice.length === 12 && r.groups[0].sides === 10);
+  ok('ct dice flag hits by parity', r.groups[0].dice.every(d => d.hit === (d.value % 2 === 0)));
+  ok('ct values 1..10', r.groups[0].dice.every(d => d.value >= 1 && d.value <= 10));
+  ok('rollAny routes ct', rollAny('ct:6').system === 'cthulhutech');
+}
+// difficulty resolution
+{
+  ok('meets difficulty → success', ctd(3, 2, 4, 6, 1, 3).success === true);   // 3 hits vs 3
+  ok('under difficulty → failure', ctd(4, 2, 4, 1, 3, 5).success === false);   // 2 hits vs 4
+  ok('margin over difficulty', ctd(2, 2, 4, 6, 8).margin === 2);               // 4 hits vs 2
+  ok('no difficulty → unresolved', ct(2, 4).success === null);
+}
+// headline + describe
+{
+  const rWin = { summary: ctd(3, 2, 4, 6, 8, 1), groups: [{ dice: [2, 4, 6, 8, 1].map(value => ({ value })) }] };
+  const h = cthulhutechHeadline(rWin);
+  ok('ct headline is the hit count', h.text === '4' && h.kind === 'number');
+  ok('ct headline success variant', h.variant === 'ct-success');
+  ok('ct headline failure variant', cthulhutechHeadline({ summary: ctd(5, 2, 1) }).variant === 'ct-failure');
+  ok('ct headline no variant unresolved', cthulhutechHeadline({ summary: ct(2, 4) }).variant === undefined);
+  const txt = describeCthulhuTech(rWin);
+  ok('ct describe shows hits vs difficulty', /4 hits vs difficulty 3/.test(txt));
+  ok('ct describe lists the hit dice', /hits 2, 4, 6, 8/.test(txt));
+  ok('ct describe lists the misses', /missed 1/.test(txt));
+}
+
+// ---- Star Wars (Genesys + Force die) ----
+const swForce = symbols => ({ type: 'force', symbols });
+const swNarr = symbols => ({ type: 'ability', symbols });
+
+ok('detect sw', detectSystem('sw:2A+1F') === 'starwars');
+ok('sw not genesys', detectSystem('sw:1A') === 'starwars' && detectSystem('gen:1A') === 'genesys');
+ok('parse sw with force', eq(parseStarWars('sw:2A+1D+1F'),
+  [{ type: 'ability', count: 2 }, { type: 'difficulty', count: 1 }, { type: 'force', count: 1 }]));
+for (const bad of ['sw:', 'sw:2Z', 'gen:1A']) {
+  ok(`reject sw ${bad}`, (() => { try { parseStarWars(bad); return false; } catch { return true; } })());
+}
+// Force die: 8 light + 8 dark pips across 12 faces (dark on 7, light on 5)
+{
+  const r = rollStarWars('sw:6F');
+  ok('sw system tag', r.system === 'starwars');
+  ok('sw force dice are d12', r.groups[0].dice.every(d => d.sides === 12 && d.type === 'force'));
+  ok('sw force faces only light/dark', r.groups[0].dice.every(d => d.symbols.every(s => s === 'lightside' || s === 'darkside')));
+  ok('rollAny routes sw', rollAny('sw:1A').system === 'starwars');
+}
+// narrative + force in one summary
+{
+  const s = summarizeStarWars([
+    swNarr(['success', 'success']), swNarr(['failure']),
+    swForce(['lightside', 'lightside']), swForce(['darkside']),
+  ]);
+  ok('sw narrative still cancels', s.netSuccess === 1);
+  ok('sw counts light pips', s.lightside === 2);
+  ok('sw counts dark pips', s.darkside === 1);
+  ok('sw flags force + narrative', s.hasNarrative === true && s.hasForce === true);
+}
+// force-only leads with pips
+{
+  const s = summarizeStarWars([swForce(['lightside', 'lightside']), swForce(['darkside'])]);
+  const h = starWarsHeadline({ summary: s });
+  ok('sw force-only headline is pips', h.kind === 'text' && h.text === '2 Light · 1 Dark');
+  ok('sw force-only no narrative', s.hasNarrative === false);
+}
+// describe includes the Force clause
+{
+  const rNarr = summarizeStarWars([swNarr(['success', 'advantage']), swForce(['lightside'])]);
+  const txt = describeStarWars({ summary: rNarr, groups: [{ dice: [swNarr(['success', 'advantage']), swForce(['lightside'])] }] });
+  ok('sw describe has Force clause', /Force 1 Light/.test(txt));
+}
+
+// ---- The One Ring ----
+// build a summary from a kept feat face + success die values
+const tor = (feat, featValue, successVals, opts = {}) => {
+  const kept = { face: feat, value: featValue };
+  const dice = [{ role: 'feat', face: feat, value: featValue }, ...successVals.map(value => ({ role: 'success', value }))];
+  return summarizeOneRing({ kept, dice, weary: opts.weary || false, tn: opts.tn ?? null });
+};
+
+ok('detect tor', detectSystem('tor:3') === 'onering');
+ok('detect tor full', detectSystem('tor:3fav@16') === 'onering');
+ok('parse tor:3', eq(parseOneRing('tor:3'), { success: 3, favour: null, weary: false, tn: null }));
+ok('parse tor:3@16', eq(parseOneRing('tor:3@16'), { success: 3, favour: null, weary: false, tn: 16 }));
+ok('parse tor:3fav@16', eq(parseOneRing('tor:3fav@16'), { success: 3, favour: 'fav', weary: false, tn: 16 }));
+ok('parse tor:2illw@18', eq(parseOneRing('tor:2illw@18'), { success: 2, favour: 'ill', weary: true, tn: 18 }));
+for (const bad of ['tor:', 'tor:3x', 'tor:3@0', 'dh:']) {
+  ok(`reject tor ${bad}`, (() => { try { parseOneRing(bad); return false; } catch { return true; } })());
+}
+
+// totals and target number
+{
+  const s = tor('number', 8, [4, 2], { tn: 14 });
+  ok('tor total = feat + success', s.total === 14);
+  ok('tor meets TN → success', s.success === true);
+  ok('tor under TN → failure', tor('number', 5, [2, 1], { tn: 14 }).success === false);
+}
+// Eye of Sauron = 0
+{
+  const s = tor('eye', 0, [4, 5], { tn: 8 });
+  ok('eye contributes 0', s.total === 9 && s.eye === true);
+}
+// Gandalf = automatic success even below TN
+{
+  const s = tor('gandalf', 0, [1, 1], { tn: 30 });
+  ok('gandalf auto-succeeds', s.success === true && s.gandalf === true);
+}
+// Tengwar runes → degree
+{
+  ok('one 6 → great', tor('number', 7, [6, 3], { tn: 10 }).degree === 'great');
+  ok('two 6s → extraordinary', tor('number', 5, [6, 6], { tn: 10 }).degree === 'extraordinary');
+  ok('no 6 → ordinary', tor('number', 9, [4, 5], { tn: 10 }).degree === 'ordinary');
+  ok('runes counted', tor('number', 5, [6, 6, 2]).runes === 2);
+}
+// Weary: success dice of 1-3 count as 0
+{
+  const s = tor('number', 6, [2, 5, 6], { weary: true, tn: 10 });
+  ok('weary drops 1-3', s.successSum === 11); // 5 + 6 (the 2 is dropped); feat 6 → total 17
+  ok('weary total', s.total === 17);
+}
+// roll shape: favoured rolls two feat dice, one kept
+{
+  const r = rollOneRing('tor:3fav@16');
+  ok('tor system tag', r.system === 'onering');
+  const feats = r.groups[0].dice.filter(d => d.role === 'feat');
+  ok('favoured rolls two feat dice', feats.length === 2);
+  ok('exactly one feat kept', feats.filter(d => d.kept).length === 1);
+  ok('three success dice', r.groups[0].dice.filter(d => d.role === 'success').length === 3);
+  ok('rollAny routes tor', rollAny('tor:2').system === 'onering');
+  const plain = rollOneRing('tor:2');
+  ok('unfavoured rolls one feat die', plain.groups[0].dice.filter(d => d.role === 'feat').length === 1);
+}
+// headline + describe
+{
+  const rWin = { summary: tor('number', 8, [6, 2], { tn: 14 }), groups: [{ dice: [{ role: 'feat', face: 'number', value: 8 }, { role: 'success', value: 6 }, { role: 'success', value: 2 }] }] };
+  const h = oneRingHeadline(rWin);
+  ok('tor headline is total', h.text === '16' && h.kind === 'number');
+  ok('tor headline success variant', h.variant === 'tor-success');
+  ok('tor gandalf variant', oneRingHeadline({ summary: tor('gandalf', 0, [1], { tn: 20 }) }).variant === 'tor-gandalf');
+  const txt = describeOneRing(rWin);
+  ok('tor describe names success + degree', /Success · Great Success/.test(txt));
+  ok('tor describe shows total vs TN', /total 16 vs 14/.test(txt));
+}
+
+// ---- 2d6 (PbtA + Mist Engine) ----
+ok('detect pbta', detectSystem('pbta:+1') === 'pbta');
+ok('detect mist', detectSystem('mist:-1') === 'mist');
+ok('pbta/mist not numeric', detectSystem('2d6') === 'numeric');
+ok('parse pbta bare', eq(parsePbta('pbta:'), { modifier: 0 }));
+ok('parse pbta +2', eq(parsePbta('pbta:+2'), { modifier: 2 }));
+ok('parse mist -1', eq(parseMist('mist:-1'), { modifier: -1 }));
+for (const bad of ['pbta:x', 'pbta', 'mist:++1', 'dh:']) {
+  ok(`reject 2d6 ${bad}`, (() => { try { parsePbta(bad); parseMist(bad); return false; } catch { return true; } })());
+}
+// bands: 10+ hit, 7-9 partial, 6- miss
+ok('10+ = hit', summarize2d6(5, 5, 0, 'pbta').band === 'hit');
+ok('7-9 = partial', summarize2d6(4, 3, 0, 'pbta').band === 'partial');
+ok('6- = miss', summarize2d6(2, 3, 0, 'pbta').band === 'miss');
+ok('modifier bumps the band', summarize2d6(4, 3, 3, 'pbta').band === 'hit'); // 7 + 3 = 10
+ok('negative modifier drops the band', summarize2d6(4, 4, -3, 'pbta').band === 'miss'); // 8 - 3 = 5
+// roll shape
+{
+  const r = rollPbta('pbta:+1');
+  ok('pbta system tag', r.system === 'pbta');
+  ok('pbta rolls two d6', r.groups[0].dice.length === 2 && r.groups[0].sides === 6);
+  ok('pbta total = a+b+mod', r.summary.total === r.groups[0].dice[0].value + r.groups[0].dice[1].value + 1);
+  ok('rollAny routes pbta', rollAny('pbta:').system === 'pbta');
+  ok('rollAny routes mist', rollMist('mist:').system === 'mist');
+}
+// labels differ by system, math shared
+{
+  const p = { summary: summarize2d6(5, 5, 1, 'pbta') };
+  const m = { summary: summarize2d6(5, 5, 1, 'mist') };
+  ok('pbta hit label', describe2d6(p).startsWith('Strong Hit'));
+  ok('mist hit label', describe2d6(m).startsWith('Success'));
+  ok('pbta partial label', describe2d6({ summary: summarize2d6(4, 3, 0, 'pbta') }).startsWith('Weak Hit'));
+  ok('mist partial label', describe2d6({ summary: summarize2d6(4, 3, 0, 'mist') }).startsWith('Consequence'));
+  const h = twod6Headline(p);
+  ok('2d6 headline is total', h.text === '11' && h.kind === 'number');
+  ok('2d6 headline band variant', h.variant === 'band-hit');
+  ok('2d6 describe shows the math', /5 \+ 5 \+ 1 · total 11/.test(describe2d6(p)));
 }
 
 console.log(`\nsystem-dice: ${pass} passed, ${fail} failed`);

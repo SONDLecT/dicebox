@@ -1311,7 +1311,7 @@ export class Die {
       }
       // Hunger (blood) dice draw their whole wireframe in the accent colour so
       // they read as a distinct class on the tray, not only by their glyph.
-      ctx.strokeStyle = this.hunger ? theme.accent : theme.line;
+      ctx.strokeStyle = this.genColor || (this.hunger ? theme.accent : theme.line);
       ctx.globalAlpha = fade * alpha;
       ctx.lineWidth = width;
       ctx.stroke();
@@ -1345,7 +1345,7 @@ export class Die {
         ctx.moveTo(proj[edge.a][0], proj[edge.a][1]);
         ctx.lineTo(proj[edge.b][0], proj[edge.b][1]);
       }
-      ctx.strokeStyle = this.hunger ? theme.accent : theme.line;
+      ctx.strokeStyle = this.genColor || (this.hunger ? theme.accent : theme.line);
       // Scaled rather than set, so a dropped die's fade survives this pass.
       ctx.globalAlpha = fade * (pass ? 1 : 0.22);
       ctx.lineWidth = pass ? 1.6 : 1.1;
@@ -1441,7 +1441,7 @@ export class Die {
 
     // V5 hunger (blood) dice read their numeral in the accent colour so they are
     // visually distinct from the ordinary d10s in the same pool.
-    const ink = this.hunger ? theme.accent : theme.line;
+    const ink = this.genColor || (this.hunger ? theme.accent : theme.line);
 
     // Spherical high dice (d101+, exact facets): no microface can legibly hold a
     // three- or four-digit result, so it floats at the die's centre over a small
@@ -1523,6 +1523,60 @@ export class Die {
     const c2 = best.reduce((a, i) => [a[0] + proj[i][0], a[1] + proj[i][1]], [0, 0])
                    .map(v => v / best.length);
 
+    // V5 symbol dice are drawn here and return early: the glyph sits upright and
+    // centred on the up-face, always the same way round however the die settled,
+    // and is sized to the face's inscribed circle so it fills the face rather
+    // than floating small in the middle. Numerals skew into the face plane to
+    // read as engraved; a symbol reads better flat and consistent, which is what
+    // was asked for.
+    if (this.v5Face) {
+      const r = faceInradiusScreen(best, proj, c2);
+      const box = Math.max(6, r * 1.82 * (0.9 + 0.1 * alpha));
+      // Stand the glyph up along the face's own axis: the loop points at the
+      // kite's apex, the blade toward the equator, so the mark reads as printed
+      // on the die rather than pasted on flat.
+      const [ux, uy] = faceUpAxis(best, proj, c2);
+      const dnx = -ux, dny = -uy;           // local +y (blade) → toward equator
+      ctx.save();
+      ctx.translate(c2[0], c2[1]);
+      ctx.transform(dny, -dnx, dnx, dny, 0, 0); // pure rotation onto the axis
+      ctx.globalAlpha = alpha;
+      drawV5Glyph(ctx, this.v5Face, box, ink, theme.paper);
+      this.drawFaceMark(ctx, theme, box * 0.6);
+      ctx.restore();
+      ctx.globalAlpha = 1;
+      return;
+    }
+
+    // Fate dice: a plus, a minus, or a blank on the cube face. The marks are
+    // symmetric enough to sit screen-upright rather than tracking a square face's
+    // (ambiguous) axis, and centred to the face's inscribed circle.
+    if (this.fateFace) {
+      const r = faceInradiusScreen(best, proj, c2);
+      const box = Math.max(6, r * 1.5 * (0.9 + 0.1 * alpha));
+      ctx.save();
+      ctx.translate(c2[0], c2[1]);
+      ctx.globalAlpha = alpha;
+      drawFateGlyph(ctx, this.fateFace, box, ink);
+      ctx.restore();
+      ctx.globalAlpha = 1;
+      return;
+    }
+
+    // The One Ring's Feat die shows the Eye of Sauron or the Gandalf rune in
+    // place of a number; both sit upright and centred.
+    if (this.torFace) {
+      const r = faceInradiusScreen(best, proj, c2);
+      const box = Math.max(6, r * 1.55 * (0.9 + 0.1 * alpha));
+      ctx.save();
+      ctx.translate(c2[0], c2[1]);
+      ctx.globalAlpha = alpha;
+      drawTorGlyph(ctx, this.torFace, box, ink);
+      ctx.restore();
+      ctx.globalAlpha = 1;
+      return;
+    }
+
     // The transform below maps the glyph's local +x onto (ux, uy), so this is the
     // direction the text reads along. Pick the face's own axis that runs closest
     // to screen-right, which keeps the numeral upright.
@@ -1551,6 +1605,22 @@ export class Die {
       }
     }
 
+    // Genesys narrative dice sit in the face plane like the numerals do —
+    // rotated to a face edge and foreshortened by how far the face is turned —
+    // so the symbols read as printed on the die rather than floating flat over
+    // whatever angle it settled at. Sized to the face's inscribed circle.
+    if (this.genFace) {
+      const r = faceInradiusScreen(best, proj, c2) * 0.92 * (0.9 + 0.1 * alpha);
+      ctx.save();
+      ctx.translate(c2[0], c2[1]);
+      ctx.transform(ux, uy, -uy * bestFacing, ux * bestFacing, 0, 0);
+      ctx.globalAlpha = alpha;
+      drawGenesysSymbols(ctx, this.genFace, r, ink);
+      ctx.restore();
+      ctx.globalAlpha = 1;
+      return;
+    }
+
     const label = String(this.value);
     // Long labels (d100 can show 3 digits) need to shrink to stay on the face.
     const fit = label.length > 2 ? 0.34 : label.length > 1 ? 0.42 : 0.52;
@@ -1572,14 +1642,7 @@ export class Die {
     ctx.textBaseline = 'middle';
     ctx.fillStyle = ink;
     ctx.globalAlpha = alpha;
-    if (this.v5Face) {
-      // V5 symbol dice paint their glyph — same settle/pop, same ink rules
-      // (hunger dice draw in the blood accent) — but scaled down a touch so the
-      // mark sits inside the face instead of reaching its edges.
-      drawV5Glyph(ctx, this.v5Face, grown * 0.8, ink);
-    } else {
-      ctx.fillText(label, 0, 0);
-    }
+    ctx.fillText(label, 0, 0);
     // Drawn here so it shares the face's skew: the ring sits in the surface with
     // the numeral rather than floating flat over the die.
     this.drawFaceMark(ctx, theme, size);
@@ -1588,60 +1651,344 @@ export class Die {
   }
 }
 
-// Original line-art glyphs for the V5 symbol dice. NOT copied from the official
-// dice — a minimal wireframe vocabulary that reads at 30-60px. Each glyph is
-// sized to sit inside the die face (kept within ~±0.42·s so nothing bleeds past
-// the edge, even at the settle-pop scale).
-function drawV5Glyph(ctx, face, s, color) {
+// The radius of the largest circle that fits inside a face, measured where the
+// The screen direction from the face centre toward a d10 kite's apex — the
+// pole vertex the face narrows to. A V5 glyph is stood up along this axis (loop
+// at the apex, blade toward the equator) so it sits on the die the way a symbol
+// is printed on a real die, not merely upright on the screen.
+//
+// A kite has one axis of symmetry, through the two vertices where the adjacent
+// edges are equal; the apex is the one whose adjacent edges are the longer pair
+// (the pointier, pole end). Non-kite faces have no such axis, so they fall back
+// to screen-up.
+function faceUpAxis(face, proj, c2) {
+  if (face.length !== 4) return [0, -1];
+  const P = face.map(i => proj[i]);
+  // edge[i] is the length of the edge from vertex i to i+1.
+  const edge = P.map((p, i) => {
+    const q = P[(i + 1) % 4];
+    return Math.hypot(q[0] - p[0], q[1] - p[1]);
+  });
+  // At vertex i the adjacent edges are edge[i-1] (incoming) and edge[i].
+  const adjDiff = i => Math.abs(edge[(i + 3) % 4] - edge[i]);
+  const adjSum  = i => edge[(i + 3) % 4] + edge[i];
+  // The two vertices whose adjacent edges are most nearly equal are the axis.
+  const axis = [0, 1, 2, 3].sort((a, b) => adjDiff(a) - adjDiff(b)).slice(0, 2);
+  const apex = adjSum(axis[0]) >= adjSum(axis[1]) ? axis[0] : axis[1];
+  const dx = P[apex][0] - c2[0], dy = P[apex][1] - c2[1];
+  const len = Math.hypot(dx, dy) || 1;
+  return [dx / len, dy / len];
+}
+
+// The radius of the largest circle that fits inside the face as it appears on
+// screen — the shortest distance from the face centre to any of its projected
+// edges. The V5 glyph is drawn centred, so this one number is exactly how big
+// the mark can grow before it touches an edge.
+function faceInradiusScreen(face, proj, c2) {
+  let r = Infinity;
+  for (let i = 0; i < face.length; i++) {
+    const a = proj[face[i]], b = proj[face[(i + 1) % face.length]];
+    const ex = b[0] - a[0], ey = b[1] - a[1];
+    const len = Math.hypot(ex, ey);
+    if (len < 1e-6) continue;
+    // Perpendicular distance from c2 to the line through a and b.
+    r = Math.min(r, Math.abs(ex * (a[1] - c2[1]) - ey * (a[0] - c2[0])) / len);
+  }
+  return Number.isFinite(r) ? r : 0;
+}
+
+// Original line-art glyphs for the V5 symbol dice — our own vocabulary in the
+// spirit of the official set, NOT copied from it. The success mark is an ankh
+// drawn as a dagger (a ring pommel over a downward blade); a critical adds an
+// ornament that differs by die class — sparks on an ordinary die, fangs on a
+// Hunger die — and the Hunger 1 is a skull.
+//
+// The ornament, not just the base shape, is what tells a success from a critical
+// across a table at twenty pixels: an ankh and an ankh-with-sparks read apart
+// where an ankh and an ankh-with-a-tick would not.
+//
+// Everything is drawn inside a box of side L centred on the origin, with the
+// furthest ink about 0.47·L out, which is what lets the caller size the mark
+// from the face's inscribed circle.
+function drawV5Glyph(ctx, face, L, color, paper) {
   ctx.strokeStyle = color;
   ctx.fillStyle = color;
-  ctx.lineWidth = Math.max(0.8, s * 0.085);
+  ctx.lineWidth = Math.max(1, L * 0.10);
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  const L = s;
-  const ring = (cx, cy, r) => { ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.stroke(); };
   switch (face) {
-    case 'success':
-    case 'hunger-success': {
-      // A compact ankh. Loop on top, one clean stem, a short crossbar — reads as
-      // the canonical success mark without shouting.
-      ring(0, -L * 0.20, L * 0.17);
-      ctx.beginPath(); ctx.moveTo(0, -L * 0.03); ctx.lineTo(0, L * 0.42); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(-L * 0.24, L * 0.02); ctx.lineTo(L * 0.24, L * 0.02); ctx.stroke();
-      break;
-    }
-    case 'critical':
-    case 'hunger-critical': {
-      // The success mark with short ticks radiating off the loop — the "starred"
-      // critical variant.
-      ring(0, -L * 0.20, L * 0.17);
-      ctx.beginPath(); ctx.moveTo(0, -L * 0.03); ctx.lineTo(0, L * 0.42); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(-L * 0.24, L * 0.02); ctx.lineTo(L * 0.24, L * 0.02); ctx.stroke();
-      ctx.beginPath();
-      for (let i = 0; i < 6; i++) {
-        const a = i * Math.PI / 3 + Math.PI / 6;
-        const r0 = L * 0.24, r1 = L * 0.33;
-        ctx.moveTo(Math.cos(a) * r0, -L * 0.20 + Math.sin(a) * r0);
-        ctx.lineTo(Math.cos(a) * r1, -L * 0.20 + Math.sin(a) * r1);
-      }
-      ctx.stroke();
-      break;
-    }
-    case 'skull': {
-      // A plain skull: cranium, jaw, two eyes, a nose — kept open and neat so it
-      // reads as a 1 at hunting distance, not a blob.
-      ring(0, -L * 0.06, L * 0.34);
-      ctx.beginPath(); ctx.arc(0, L * 0.26, L * 0.24, Math.PI * 0.16, Math.PI * 0.84); ctx.stroke();
-      ctx.beginPath(); ctx.arc(-L * 0.13, -L * 0.08, L * 0.075, 0, TAU); ctx.fill();
-      ctx.beginPath(); ctx.arc( L * 0.13, -L * 0.08, L * 0.075, 0, TAU); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(0, -L * 0.02); ctx.lineTo(-L * 0.045, L * 0.10); ctx.lineTo(L * 0.045, L * 0.10); ctx.closePath(); ctx.fill();
-      break;
-    }
+    // Success is the bare mark; a critical adds an ornament that differs by die
+    // class — sparks for an ordinary die, fangs for a Hunger die — so the two
+    // criticals never read as the same face.
+    case 'success':         drawDaggerAnkh(ctx, L, 'none');  break;
+    case 'hunger-success':  drawDaggerAnkh(ctx, L, 'none');  break;
+    case 'critical':        drawDaggerAnkh(ctx, L, 'stars'); break;
+    case 'hunger-critical': drawDaggerAnkh(ctx, L, 'fangs'); break;
+    case 'skull':           drawSkull(ctx, L, paper);        break;
     case 'blank':
     default:
       // Blank faces are empty, exactly like the real die — nothing to draw.
       break;
   }
+}
+
+// The success mark: an ankh whose stem is a dagger. A ring pommel at the top,
+// a crossguard, and a tapered blade pointing straight down — always upright, so
+// the blade always points at the die's centre. `ornament` decorates the
+// critical: 'stars' (an ordinary die's 10) or 'fangs' (a Hunger die's 10).
+function drawDaggerAnkh(ctx, L, ornament) {
+  const loopCy = -0.34 * L, loopR = 0.14 * L;
+  const guardY = -0.12 * L, guardX = 0.21 * L;
+  const tipY = 0.47 * L, bw = 0.08 * L, bladeTopY = guardY - 0.01 * L;
+  const lw = ctx.lineWidth;
+
+  // Ornament sits behind the ankh so the blade's edges read over it.
+  if (ornament === 'stars') {
+    drawSpark(ctx, -0.30 * L, -0.30 * L, 0.11 * L);
+    drawSpark(ctx, 0.30 * L, -0.30 * L, 0.11 * L);
+    drawSpark(ctx, -0.34 * L, 0.06 * L, 0.075 * L);
+    drawSpark(ctx, 0.34 * L, 0.06 * L, 0.075 * L);
+  } else if (ornament === 'fangs') {
+    drawFang(ctx, -0.30 * L, guardY + 0.02 * L, 0.075 * L, 0.26 * L);
+    drawFang(ctx, 0.30 * L, guardY + 0.02 * L, 0.075 * L, 0.26 * L);
+  }
+
+  // Pommel ring, neck, crossguard.
+  ctx.beginPath();
+  ctx.arc(0, loopCy, loopR, 0, TAU);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(0, loopCy + loopR);
+  ctx.lineTo(0, bladeTopY);
+  ctx.moveTo(-guardX, guardY);
+  ctx.lineTo(guardX, guardY);
+  ctx.stroke();
+
+  // Blade: a filled taper to a point.
+  const mid = bladeTopY + 0.6 * (tipY - bladeTopY);
+  ctx.beginPath();
+  ctx.moveTo(-bw, bladeTopY);
+  ctx.lineTo(bw, bladeTopY);
+  ctx.quadraticCurveTo(bw * 0.5, mid, 0, tipY);
+  ctx.quadraticCurveTo(-bw * 0.5, mid, -bw, bladeTopY);
+  ctx.closePath();
+  ctx.fill();
+}
+
+// Fate / Fudge marks: a bold plus, a bold minus, or nothing. Kept heavy and
+// simple so a + and a − read apart at a glance across a table.
+function drawFateGlyph(ctx, face, L, color) {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(1.4, L * 0.16);
+  ctx.lineCap = 'round';
+  const a = L * 0.42;
+  ctx.beginPath();
+  if (face === 'plus') {
+    ctx.moveTo(-a, 0); ctx.lineTo(a, 0);
+    ctx.moveTo(0, -a); ctx.lineTo(0, a);
+    ctx.stroke();
+  } else if (face === 'minus') {
+    ctx.moveTo(-a, 0); ctx.lineTo(a, 0);
+    ctx.stroke();
+  }
+  // blank: nothing, exactly like the real die.
+}
+
+// The One Ring's two special Feat-die faces — our own line-art. The Eye is a
+// lidded eye with a slit pupil; the Gandalf mark an angular rune. Neither copies
+// the official artwork.
+function drawTorGlyph(ctx, face, L, color) {
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = Math.max(1.1, L * 0.09);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  if (face === 'eye') {
+    // Almond eye: two facing arcs, with a few rays for the flame.
+    ctx.beginPath();
+    ctx.moveTo(-0.46 * L, 0);
+    ctx.quadraticCurveTo(0, -0.34 * L, 0.46 * L, 0);
+    ctx.quadraticCurveTo(0, 0.34 * L, -0.46 * L, 0);
+    ctx.stroke();
+    // Vertical slit pupil.
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 0.07 * L, 0.19 * L, 0, 0, TAU);
+    ctx.fill();
+    // Short flame rays above and below.
+    ctx.beginPath();
+    for (const dy of [-1, 1]) {
+      for (const dx of [-0.22, 0, 0.22]) {
+        ctx.moveTo(dx * L, dy * 0.33 * L);
+        ctx.lineTo(dx * L * 1.05, dy * 0.46 * L);
+      }
+    }
+    ctx.stroke();
+    return;
+  }
+  // Gandalf rune: an angular "G" mark — a squared C with a tongue, the way the
+  // rune reads on the die. Original line-art, not the Tolkien glyph.
+  ctx.beginPath();
+  ctx.moveTo(0.30 * L, -0.40 * L);
+  ctx.lineTo(-0.28 * L, -0.40 * L);
+  ctx.lineTo(-0.28 * L, 0.40 * L);
+  ctx.lineTo(0.30 * L, 0.40 * L);
+  ctx.lineTo(0.30 * L, 0.02 * L);
+  ctx.lineTo(0.00 * L, 0.02 * L);
+  ctx.stroke();
+}
+
+// Genesys symbols — our own line-art, one shape per meaning, chosen to survive
+// tray size and to pair up: triangles for the success axis (up = good, down =
+// bad; a star is its triumphant / despairing form), and a diamond vs an X for
+// the advantage axis. A face shows nought, one, or two of them.
+//
+// `r` is the face's inscribed radius. One symbol fills it; two sit side by side.
+function drawGenesysSymbols(ctx, symbols, r, color) {
+  if (!symbols || symbols.length === 0) return;
+  if (symbols.length === 1) {
+    drawGenSymbol(ctx, symbols[0], 0, 0, r * 1.5, color);
+  } else {
+    drawGenSymbol(ctx, symbols[0], -r * 0.5, 0, r * 0.98, color);
+    drawGenSymbol(ctx, symbols[1], r * 0.5, 0, r * 0.98, color);
+  }
+}
+
+// Draw one symbol centred at (cx,cy), fitting a box of side `s` (ink within
+// ±0.5·s of the centre).
+function drawGenSymbol(ctx, sym, cx, cy, s, color) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.fillStyle = color;
+  ctx.strokeStyle = color;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  const tri = down => {
+    const d = down ? -1 : 1;
+    ctx.beginPath();
+    ctx.moveTo(0, -0.5 * s * d);
+    ctx.lineTo(0.46 * s, 0.4 * s * d);
+    ctx.lineTo(-0.46 * s, 0.4 * s * d);
+    ctx.closePath();
+    ctx.fill();
+  };
+  const star = down => {
+    const d = down ? -1 : 1;
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const a = -Math.PI / 2 + (Math.PI / 5) * i;
+      const rad = (i % 2 === 0 ? 0.5 : 0.21) * s;
+      const x = Math.cos(a) * rad, y = Math.sin(a) * rad * d;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fill();
+  };
+  switch (sym) {
+    case 'success': tri(false); break;
+    case 'failure': tri(true); break;
+    case 'triumph': star(false); break;
+    case 'despair': star(true); break;
+    case 'advantage': {
+      ctx.beginPath();
+      ctx.moveTo(0, -0.5 * s);
+      ctx.lineTo(0.42 * s, 0);
+      ctx.lineTo(0, 0.5 * s);
+      ctx.lineTo(-0.42 * s, 0);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
+    case 'threat': {
+      ctx.lineWidth = Math.max(1.2, s * 0.16);
+      const a = 0.4 * s;
+      ctx.beginPath();
+      ctx.moveTo(-a, -a); ctx.lineTo(a, a);
+      ctx.moveTo(-a, a); ctx.lineTo(a, -a);
+      ctx.stroke();
+      break;
+    }
+    // Star Wars Force pips — a filled circle. The die is already coloured light
+    // or dark, so the pip itself carries no extra distinction.
+    case 'lightside':
+    case 'darkside': {
+      ctx.beginPath();
+      ctx.arc(0, 0, 0.34 * s, 0, TAU);
+      ctx.fill();
+      break;
+    }
+  }
+  ctx.restore();
+}
+
+// A four-point spark: sharp outer points, a pinched waist. Filled.
+function drawSpark(ctx, cx, cy, r) {
+  const ir = r * 0.34;
+  ctx.beginPath();
+  for (let i = 0; i < 8; i++) {
+    const a = (Math.PI / 4) * i - Math.PI / 2;
+    const rad = i % 2 === 0 ? r : ir;
+    const x = cx + Math.cos(a) * rad, y = cy + Math.sin(a) * rad;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.fill();
+}
+
+// A downward fang: rounded crown, curved sides, a sharp point. Filled.
+function drawFang(ctx, cx, topY, w, h) {
+  ctx.beginPath();
+  ctx.moveTo(cx - w, topY);
+  ctx.quadraticCurveTo(cx, topY - 0.35 * h, cx + w, topY);
+  ctx.quadraticCurveTo(cx + 0.4 * w, topY + 0.6 * h, cx, topY + h);
+  ctx.quadraticCurveTo(cx - 0.4 * w, topY + 0.6 * h, cx - w, topY);
+  ctx.closePath();
+  ctx.fill();
+}
+
+// A skull as one filled silhouette — cranium, cheekbones, a rounded jaw drawn
+// in a single path so there is no seam — with the eyes, nose and teeth punched
+// back out in paper. An outlined skull turns to mush at twenty pixels; a solid
+// one with holes in it keeps its shape.
+function drawSkull(ctx, L, paper) {
+  ctx.beginPath();
+  ctx.moveTo(-0.30 * L, -0.02 * L);
+  // Cranium dome.
+  ctx.bezierCurveTo(-0.34 * L, -0.40 * L, 0.34 * L, -0.40 * L, 0.30 * L, -0.02 * L);
+  // Right cheekbone in.
+  ctx.bezierCurveTo(0.28 * L, 0.10 * L, 0.24 * L, 0.12 * L, 0.19 * L, 0.16 * L);
+  // Right jaw down to the chin.
+  ctx.lineTo(0.16 * L, 0.30 * L);
+  ctx.bezierCurveTo(0.16 * L, 0.40 * L, -0.16 * L, 0.40 * L, -0.16 * L, 0.30 * L);
+  // Left jaw up, left cheekbone back to the temple.
+  ctx.lineTo(-0.19 * L, 0.16 * L);
+  ctx.bezierCurveTo(-0.24 * L, 0.12 * L, -0.28 * L, 0.10 * L, -0.30 * L, -0.02 * L);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = paper;
+  // Eyes: large angled sockets that give the skull its glare.
+  for (const dir of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(dir * 0.06 * L, -0.10 * L);
+    ctx.bezierCurveTo(dir * 0.12 * L, -0.14 * L, dir * 0.22 * L, -0.10 * L, dir * 0.21 * L, -0.02 * L);
+    ctx.bezierCurveTo(dir * 0.20 * L, 0.04 * L, dir * 0.10 * L, 0.04 * L, dir * 0.06 * L, -0.10 * L);
+    ctx.closePath();
+    ctx.fill();
+  }
+  // Nose: an inverted heart.
+  ctx.beginPath();
+  ctx.moveTo(0, 0.14 * L);
+  ctx.bezierCurveTo(-0.08 * L, 0.06 * L, -0.06 * L, -0.01 * L, 0, 0.03 * L);
+  ctx.bezierCurveTo(0.06 * L, -0.01 * L, 0.08 * L, 0.06 * L, 0, 0.14 * L);
+  ctx.closePath();
+  ctx.fill();
+  // Teeth: gaps cut across the jaw.
+  ctx.strokeStyle = paper;
+  ctx.lineWidth = Math.max(0.7, L * 0.045);
+  ctx.beginPath();
+  ctx.moveTo(-0.13 * L, 0.24 * L); ctx.lineTo(0.13 * L, 0.24 * L);
+  for (const x of [-0.065, 0.065, 0]) { ctx.moveTo(x * L, 0.24 * L); ctx.lineTo(x * L, 0.36 * L); }
+  ctx.stroke();
 }
 
 function roundRect(ctx, x, y, w, h, r) {

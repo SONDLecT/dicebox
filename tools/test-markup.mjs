@@ -211,6 +211,9 @@ ok('precache list is populated', precache.length > 5, `${precache.length} entrie
 const refs = [...html.matchAll(/(?:src|href)="(?!https?:|#)([^"]+)"/g)].map(m => m[1]);
 const uncached = refs.filter(r => {
   const bare = r.replace(/^\.\//, '');
+  // <base href="/"> names the root, which is the app shell — precached as './',
+  // not a file of its own.
+  if (bare === '/' || bare === '') return false;
   // index.html is served at './' and must not be precached under its own name.
   if (bare === 'index.html') return false;
   // The single-file build is a download, not something the app loads. Caching a

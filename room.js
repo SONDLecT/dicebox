@@ -182,6 +182,55 @@ export function validateRoll(msg) {
   return total === msg.total;
 }
 
+// The system modes (V5, Fate, Genesys, …) don't reduce to a single numeric
+// total, so they travel as `k:'roll2'` carrying the system id, its notation, the
+// dice groups, and the per-system summary the sender already computed. There is
+// nothing to re-derive a total against here; instead we bound every field so a
+// malformed or oversized payload can't crash or wedge the receiver's renderer.
+// Values are deliberately permissive — Fate dice are -1/0/+1, symbol dice carry
+// glyph arrays — but everything is length- and range-capped. The summary is
+// trusted for display only (the room is end-to-end encrypted among people who
+// share the passphrase); the receiver still renders it inside a try/catch.
+const SYSTEM_ROLL_KINDS = new Set([
+  'v5', 'fate', 'genesys', 'daggerheart', 'cthulhutech', 'starwars', 'onering', 'pbta', 'mist',
+]);
+
+export function validateSystemRoll(msg) {
+  if (!msg || typeof msg !== 'object') return false;
+  if (typeof msg.system !== 'string' || !SYSTEM_ROLL_KINDS.has(msg.system)) return false;
+  if (typeof msg.notation !== 'string' || !msg.notation || msg.notation.length > 200) return false;
+  if (!msg.summary || typeof msg.summary !== 'object' || Array.isArray(msg.summary)) return false;
+  if (!Array.isArray(msg.groups) || msg.groups.length === 0 || msg.groups.length > 50) return false;
+
+  for (const g of msg.groups) {
+    if (!g || typeof g !== 'object') return false;
+    if (g.kind === 'const') {
+      if (!Number.isInteger(g.value)) return false;
+      continue;
+    }
+    if (g.kind !== 'dice') return false;
+    if (!Array.isArray(g.dice) || g.dice.length === 0 || g.dice.length > 500) return false;
+    if (g.sides !== undefined && (!Number.isInteger(g.sides) || g.sides < 1 || g.sides > 10000)) return false;
+
+    for (const d of g.dice) {
+      if (!d || typeof d !== 'object') return false;
+      // Fate dice go negative; exploded dice go high. Wide but bounded.
+      if (!Number.isInteger(d.value) || d.value < -100 || d.value > 100000) return false;
+      if (d.sides !== undefined && (!Number.isInteger(d.sides) || d.sides < 1 || d.sides > 10000)) return false;
+      if (d.symbols !== undefined) {
+        if (!Array.isArray(d.symbols) || d.symbols.length > 12) return false;
+        for (const s of d.symbols) if (typeof s !== 'string' || s.length > 24) return false;
+      }
+      // Short string tags the renderer keys off (die-type colour, role, face).
+      for (const key of ['color', 'role', 'face', 'type']) {
+        if (d[key] !== undefined && (typeof d[key] !== 'string' || d[key].length > 24)) return false;
+      }
+    }
+  }
+
+  return true;
+}
+
 export function createRoom(options = {}) {
   const noop = () => {};
   const onStateCb = options.onState || noop;
@@ -372,6 +421,24 @@ export function createRoom(options = {}) {
           notation: msg.notation,
           groups: msg.groups,
           total: msg.total,
+        });
+      } catch { /* see setState */ }
+      return;
+    }
+
+    if (msg.k === 'roll2') {
+      touchMember(msg.from, at);
+      if (!validateSystemRoll(msg)) return;
+      const clean = cleanName(msg.name);
+      try {
+        onRoll({
+          from: msg.from,
+          name: clean || 'Someone',
+          at: Number.isFinite(msg.at) ? msg.at : at,
+          system: msg.system,
+          notation: msg.notation,
+          groups: msg.groups,
+          summary: msg.summary,
         });
       } catch { /* see setState */ }
       return;
@@ -662,6 +729,23 @@ export function createRoom(options = {}) {
     share(result) {
       if (!isOpen() || !room || !sender) return;
       if (!result || typeof result !== 'object') return;
+      // A system roll (V5, Fate, …) has no single total to reduce to, so it goes
+      // out as roll2 carrying its summary. Numeric rolls keep the original roll
+      // schema, so a client still serving the old bundle from cache reads them
+      // unchanged (and silently ignores the roll2 it doesn't know).
+      const sys = result.system;
+      if (sys && sys !== 'numeric') {
+        sendEncrypted({
+          k: 'roll2',
+          at: now(),
+          name,
+          system: sys,
+          notation: result.notation,
+          groups: result.groups,
+          summary: result.summary,
+        });
+        return;
+      }
       sendEncrypted({
         k: 'roll',
         at: now(),

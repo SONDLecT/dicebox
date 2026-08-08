@@ -3,6 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<!-- Every asset lives at the root, so pin the base there. This is what lets a
+     system slug like /vtm load app.js and style.css (a relative path under /vtm
+     would otherwise resolve to /vtm/app.js and 404). Stripped from the
+     single-file build, which loads from file: and inlines everything. -->
+
 <title>Dicebox</title>
 <meta name="description" content="An offline dice roller for tabletop RPGs.">
 
@@ -118,6 +123,27 @@ body {
   transition: opacity 1200ms ease;
 }
 .wordmark[data-faded="1"] { opacity: 0.28; }
+
+/* The active system, beside the name. It sits in the accent because the accent
+   is the thing that changed, so the badge names the colour the app is wearing.
+   `margin-right: auto` keeps it next to the wordmark instead of being pushed to
+   the middle by the bar's space-between. */
+.system-badge {
+  appearance: none;
+  margin: 0 0 0 10px;
+  margin-right: auto;
+  border: 1px solid var(--accent);
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 999px;
+  cursor: pointer;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .wordmark { transition-duration: 1ms; }
@@ -337,6 +363,10 @@ body {
   align-items: center;
   gap: 2px;
   flex: 0 0 auto;
+  /* So a headline made of words has an edge to wrap against rather than the
+     width of its own longest line. */
+  width: 100%;
+  min-width: 0;
 }
 
 .total {
@@ -347,6 +377,21 @@ body {
   font-variant-numeric: tabular-nums;
   color: var(--accent);
   transition: opacity 160ms ease;
+}
+
+/* Some systems answer with a phrase rather than a number, and a phrase at the
+   numeral's size runs past both edges of a phone and then wraps — onto a second
+   line set at 0.92 line-height, which is what put "Bestial Failure" on top of
+   itself. Words get their own size and their own leading. */
+.total[data-kind="text"] {
+  font-family: inherit;
+  font-size: clamp(28px, 9vw, 46px);
+  font-weight: 600;
+  line-height: 1.08;
+  letter-spacing: -0.01em;
+  text-align: center;
+  max-width: 100%;
+  text-wrap: balance;
 }
 .total[data-idle="1"] { color: var(--muted); }
 .total[data-rolling="1"] { opacity: 0.35; }
@@ -368,6 +413,485 @@ body {
   gap: 8px;
   flex: 0 0 auto;
 }
+
+/* The mode button shows only the active system's mark. */
+.mode-ico { display: none; }
+#modeToggle[data-system="numeric"] .mode-ico[data-for="numeric"] { display: block; }
+#modeToggle[data-system="v5"] .mode-ico[data-for="v5"] { display: block; }
+#modeToggle[data-system="fate"] .mode-ico[data-for="fate"] { display: block; }
+#modeToggle[data-system="genesys"] .mode-ico[data-for="genesys"] { display: block; }
+#modeToggle[data-system="daggerheart"] .mode-ico[data-for="daggerheart"] { display: block; }
+#modeToggle[data-system="cthulhutech"] .mode-ico[data-for="cthulhutech"] { display: block; }
+#modeToggle[data-system="starwars"] .mode-ico[data-for="starwars"] { display: block; }
+#modeToggle[data-system="onering"] .mode-ico[data-for="onering"] { display: block; }
+#modeToggle[data-system="pbta"] .mode-ico[data-for="pbta"] { display: block; }
+#modeToggle[data-system="mist"] .mode-ico[data-for="mist"] { display: block; }
+/* A named system's mark carries its own accent so the header reads as that mode
+   at a glance; the numeric default stays with the quiet chrome colour. */
+#modeToggle[data-system="v5"],
+#modeToggle[data-system="fate"],
+#modeToggle[data-system="genesys"],
+#modeToggle[data-system="daggerheart"],
+#modeToggle[data-system="cthulhutech"],
+#modeToggle[data-system="starwars"],
+#modeToggle[data-system="onering"],
+#modeToggle[data-system="pbta"],
+#modeToggle[data-system="mist"] { color: var(--accent); }
+
+/* ---- Vampire dice tray ---- */
+
+/* The dice to tap, then a Difficulty chip beneath. */
+.v5-picker {
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.v5-dice-row {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+/* Each die type is a tap-to-add button carrying the ankh — regular in the ink
+   colour, Hunger in blood red — with a count badge and a loaded state. */
+.v5-die-btn {
+  --dc: var(--line);
+  flex: 1 1 0;
+  min-width: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 12px 8px 9px;
+  border: 1px solid var(--hair);
+  border-radius: 12px;
+  background: none;
+  color: var(--dc);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: border-color 140ms ease, background 140ms ease, transform 120ms ease;
+}
+.v5-die-hunger { --dc: var(--accent); }
+.v5-die-name {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.v5-die-btn[data-count] { border-color: var(--dc); background: color-mix(in srgb, var(--dc) 12%, transparent); }
+.v5-die-btn[data-count] .v5-die-name { color: var(--line); }
+.v5-die-btn[data-count]::after {
+  content: attr(data-count);
+  position: absolute;
+  top: -6px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--dc);
+  color: var(--paper);
+  font: 700 10px system-ui;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.v5-die-btn:active { transform: scale(0.95); }
+
+/* ---- Fate dice ---- */
+
+/* Fate is fixed at 4dF, so the picker is just the modifier chip, centred. */
+.fate-picker { justify-content: center; }
+
+/* ---- Genesys dice ---- */
+
+.genesys-picker { padding: 0; }
+/* One row of buttons shaped like the real dice — tap to add, hold to remove. */
+.gen-chips {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+}
+.gen-chip {
+  --dc: var(--muted);
+  flex: 1 1 0;
+  min-width: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 9px 2px 6px;
+  border: 1px solid var(--hair);
+  border-radius: 12px;
+  background: none;
+  color: var(--dc);
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: border-color 140ms ease, background 140ms ease, transform 120ms ease;
+}
+/* The die silhouette: a faint fill of its colour under a solid outline. */
+.die-ico { width: 27px; height: 27px; display: block; }
+.die-ico path, .die-ico rect {
+  fill: currentColor;
+  fill-opacity: 0.16;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.gen-chip-label {
+  white-space: nowrap;
+  font-size: 10.5px;
+  color: var(--muted);
+  letter-spacing: 0.01em;
+}
+/* A loaded chip lights up in its die's colour, its silhouette fills, and a count
+   badge rides the corner. */
+.gen-chip[data-count] { border-color: var(--dc); background: color-mix(in srgb, var(--dc) 12%, transparent); }
+.gen-chip[data-count] .gen-chip-label { color: var(--line); }
+.gen-chip[data-count] .die-ico path, .gen-chip[data-count] .die-ico rect { fill-opacity: 0.34; }
+.gen-chip[data-count]::after {
+  content: attr(data-count);
+  position: absolute;
+  top: -6px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--dc);
+  color: var(--paper);
+  font: 700 10px system-ui;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.gen-chip:active { transform: scale(0.94); }
+
+/* The die-type hues, constant across light and dark (matched to the on-tray
+   dice in app.js GEN_COLORS). */
+.gen-chip[data-type="ability"]     { --dc: #4E9E60; }
+.gen-chip[data-type="proficiency"] { --dc: #C39A2E; }
+.gen-chip[data-type="boost"]       { --dc: #4C86C6; }
+.gen-chip[data-type="difficulty"]  { --dc: #8A5CC0; }
+.gen-chip[data-type="challenge"]   { --dc: #C24046; }
+.gen-chip[data-type="setback"]     { --dc: #7C828A; }
+.gen-chip[data-type="force"]       { --dc: #AEB4BC; }
+
+/* The Force chip belongs to Star Wars only — hidden until that mode adds it. */
+.genesys-picker:not(.with-force) .gen-chip-force { display: none; }
+
+/* A standalone die-add button — the Genesys rack's look, sized to sit inline
+   rather than fill a row. Used where a pool is one die type (CthulhuTech d10,
+   Fate dF, the Vampire pair, a One Ring Success die). */
+.die-btn {
+  --dc: var(--muted);
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 18px 7px;
+  border: 1px solid var(--hair);
+  border-radius: 12px;
+  background: none;
+  color: var(--dc);
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: border-color 140ms ease, background 140ms ease, transform 120ms ease;
+}
+.die-btn .die-ico { width: 30px; height: 30px; }
+.die-btn-label { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.die-btn[data-count] { border-color: var(--dc); background: color-mix(in srgb, var(--dc) 12%, transparent); }
+.die-btn[data-count] .die-btn-label { color: var(--line); }
+.die-btn[data-count] .die-ico path, .die-btn[data-count] .die-ico rect { fill-opacity: 0.34; }
+.die-btn[data-count]::after {
+  content: attr(data-count);
+  position: absolute;
+  top: -6px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--dc);
+  color: var(--paper);
+  font: 700 10px system-ui;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.die-btn:active { transform: scale(0.94); }
+
+/* Tap-to-cycle chip for a single number (Difficulty, Power, Target): tap to
+   raise, hold to lower — the die buttons' gesture, for the non-dice controls. */
+.spin-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 1px solid var(--hair);
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: border-color 140ms ease, transform 120ms ease;
+}
+.spin-chip-label { color: var(--muted); letter-spacing: 0.01em; }
+.spin-chip-val { color: var(--line); font-size: 16px; font-variant-numeric: tabular-nums; }
+.spin-chip-val[data-unset="1"] { color: var(--muted); font-size: 12.5px; }
+.spin-chip.is-set { border-color: color-mix(in srgb, var(--accent) 55%, var(--hair)); }
+.spin-chip:active { transform: scale(0.96); }
+
+/* CthulhuTech: one d10 to build the pool, Difficulty as a subordinate chip. */
+.ct-picker { display: flex; gap: 14px; justify-content: center; align-items: center; }
+.ct-picker .die-btn { --dc: #57B591; }
+
+/* PbtA / Mist: nothing to build (the 2d6 sit in the tray), so just the one chip. */
+.twod6-picker { display: flex; justify-content: center; }
+
+/* ---- Daggerheart ---- */
+
+.dh-picker {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+/* Three column buttons: the Advantage and Disadvantage d6 adders flank the
+   Duality roll — a split gold/violet d12, accent-filled so it reads as the
+   action rather than another adder. */
+.dh-adv-row { display: flex; align-items: stretch; gap: 8px; }
+.dh-adv-btn, .dh-roll {
+  flex: 1 1 0;
+  min-width: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 9px 4px 6px;
+  border: 1px solid var(--hair);
+  border-radius: 12px;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: border-color 140ms ease, background 140ms ease, transform 120ms ease;
+}
+.dh-adv-btn { --dc: var(--muted); color: var(--dc); }
+.dh-adv-btn[data-adv="adv"] { --dc: #4E9E60; }
+.dh-adv-btn[data-adv="dis"] { --dc: #C24046; }
+.dh-adv-label, .dh-roll-label { font-size: 10.5px; color: var(--muted); white-space: nowrap; }
+/* The adder die with its direction chevrons — up adds a d6, down subtracts. */
+.dh-adv-ico { width: 30px; height: 30px; display: block; }
+.dh-adv-ico .die { fill: currentColor; fill-opacity: 0.16; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; }
+.dh-adv-ico .chev { fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.dh-adv-btn[data-count] { border-color: var(--dc); background: color-mix(in srgb, var(--dc) 12%, transparent); }
+.dh-adv-btn[data-count] .dh-adv-label { color: var(--line); }
+.dh-adv-btn[data-count] .dh-adv-ico .die { fill-opacity: 0.34; }
+.dh-adv-btn[data-count]::after {
+  content: attr(data-count);
+  position: absolute;
+  top: -6px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--dc);
+  color: var(--paper);
+  font: 700 10px system-ui;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* The Duality roll is the primary action, so it wears the accent. */
+.dh-roll { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.dh-roll .dh-roll-label { color: var(--accent); }
+.dh-adv-btn:active, .dh-roll:active { transform: scale(0.95); }
+
+/* The modifier and difficulty chips, centred beneath the dice. */
+.dh-fields-row { display: flex; justify-content: center; gap: 12px; }
+
+/* Daggerheart's strip carries only the standard dice — hide the DCC oddities,
+   keep the custom-die picker and any dice the player made themselves. */
+.dice-buttons.standard-only .dbtn:not([data-std]):not(.custom):not([data-custom]) { display: none; }
+
+/* The total tinted by the duality tone. */
+.total[data-variant="hope"] { color: #C9A227; }
+.total[data-variant="fear"] { color: #8577C0; }
+.total[data-variant="critical"] { color: #E7C24C; }
+
+/* CthulhuTech: the hit count glows green when it meets the Difficulty, greys
+   out when it falls short. */
+.total[data-variant="ct-success"] { color: #57B591; }
+.total[data-variant="ct-failure"] { color: var(--muted); }
+
+/* CthulhuTech's difficulty can be unset — just count the hits. */
+.ct-picker .count[data-unset="1"] { color: var(--muted); }
+
+/* The One Ring: gold for a Gandalf auto-success, green for a success, muted for
+   a failure. */
+.total[data-variant="tor-gandalf"] { color: #E8C24E; }
+.total[data-variant="tor-success"] { color: #8FB77A; }
+.total[data-variant="tor-failure"] { color: var(--muted); }
+
+/* PbtA / Mist Engine share the Daggerheart picker chrome; their lone modifier
+   stepper just sits centred. */
+.twod6-picker { justify-content: center; }
+
+/* PbtA / Mist Engine 2d6 outcome: a hit reads green, a partial amber, a miss
+   muted — the same bands the dice take. */
+.total[data-variant="band-hit"] { color: #57B591; }
+.total[data-variant="band-partial"] { color: #C99A3C; }
+.total[data-variant="band-miss"] { color: var(--muted); }
+
+/* ---- The One Ring picker ---- */
+/* One Ring: a Success-d6 button + Target chip, then the condition toggles. */
+.tor-picker { flex-direction: column; align-items: center; gap: 10px; }
+.tor-controls-row { display: flex; gap: 12px; align-items: center; }
+.tor-success-btn { --dc: #B5893C; }
+.tor-flags-row { display: flex; gap: 8px; width: 100%; }
+/* Each condition is an icon toggle: favoured/ill show the two Feat dice with the
+   kept one on top (high for favoured, low for ill); Weary a struck Success die. */
+.tor-flag {
+  flex: 1 1 0;
+  min-width: 0;
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px 7px;
+  border: 1px solid var(--hair);
+  border-radius: 12px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: border-color 140ms ease, color 140ms ease, background 140ms ease, transform 120ms ease;
+}
+.tor-flag-ico { width: 30px; height: 30px; display: block; }
+.tor-flag-label { font-size: 10.5px; letter-spacing: 0.01em; white-space: nowrap; }
+/* Two Feat dice: the dropped one outlined grey, the kept one bronze and opaque so
+   it sits clearly on top; chevrons point to which was kept. */
+.tor-flag-ico .drop { fill: none; stroke: #6f6857; stroke-width: 2; stroke-linejoin: round; }
+.tor-flag-ico .keep { fill: color-mix(in srgb, #B5893C 18%, var(--paper)); stroke: #B5893C; stroke-width: 2.3; stroke-linejoin: round; }
+.tor-flag-ico .chev { fill: none; stroke: #B5893C; stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; }
+/* Weary: a Success die with its low faces struck through. */
+.tor-flag-ico .weary-die { fill: none; stroke: var(--muted); stroke-width: 2.2; }
+.tor-flag-ico .weary-pip { fill: var(--muted); }
+.tor-flag-ico .weary-strike { fill: none; stroke: var(--danger); stroke-width: 2.4; stroke-linecap: round; }
+.tor-flag[aria-pressed="true"] {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.tor-flag[aria-pressed="true"] .tor-flag-label { color: var(--line); }
+.tor-flag:active { transform: scale(0.96); }
+
+/* ---- mode sheet ---- */
+
+/* The mode sheet is a touch narrower than the modifier sheet: two cards want a
+   compact shelf, not the full width. */
+.modes-sheet .sheet-panel { max-width: 360px; }
+
+/* The fang on the Vampire card — filled from the card's own crimson, which the
+   inline currentColor already carries; this only pins the join style. */
+.mode-fang { stroke-linejoin: round; }
+
+.mode-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.mode-card {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 12px;
+  border: 1px solid var(--hair);
+  border-radius: 12px;
+  background: none;
+  color: var(--line);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease;
+}
+
+.mode-card .mode-glyph { color: var(--muted); transition: color 160ms ease; }
+.mode-card[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.mode-card[aria-pressed="true"] .mode-glyph { color: var(--accent); }
+
+/* The Vampire card carries its own crimson so it reads as blood on the shelf,
+   before it is ever chosen — the glyph and rule stay red in either theme. */
+.mode-v5 .mode-glyph { color: #b21e2b; }
+.mode-v5[aria-pressed="true"] { border-color: #b21e2b; background: color-mix(in srgb, #b21e2b 10%, transparent); }
+.mode-v5[aria-pressed="true"] .mode-glyph { color: #b21e2b; }
+
+/* The Fate card carries its own slate, the same way. */
+.mode-fate .mode-glyph { color: #4f79a3; }
+.mode-fate[aria-pressed="true"] { border-color: #4f79a3; background: color-mix(in srgb, #4f79a3 12%, transparent); }
+.mode-fate[aria-pressed="true"] .mode-glyph { color: #4f79a3; }
+
+/* The Genesys card's glyph is already multicolour (its own die hues); pressed,
+   it takes the narrative-gold accent border like the others. */
+.mode-genesys[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+
+/* Daggerheart's card is gold + violet; pressed, it takes its gold. */
+.mode-daggerheart[aria-pressed="true"] { border-color: #C9A227; background: color-mix(in srgb, #C9A227 12%, transparent); }
+
+/* CthulhuTech's card carries its eldritch green. */
+.mode-cthulhutech .mode-glyph { color: #57B591; }
+.mode-cthulhutech[aria-pressed="true"] { border-color: #57B591; background: color-mix(in srgb, #57B591 12%, transparent); }
+
+/* Star Wars' card is multicolour (its own die hues); pressed, it takes the
+   starfield blue. */
+.mode-starwars[aria-pressed="true"] { border-color: #5B9BD5; background: color-mix(in srgb, #5B9BD5 12%, transparent); }
+
+/* The One Ring's card is bronze. */
+.mode-onering[aria-pressed="true"] { border-color: #B5893C; background: color-mix(in srgb, #B5893C 12%, transparent); }
+
+/* PbtA runs ember-orange, Mist Engine misty teal. */
+.mode-pbta[aria-pressed="true"] { border-color: #D97A3C; background: color-mix(in srgb, #D97A3C 12%, transparent); }
+.mode-mist[aria-pressed="true"] { border-color: #3F9FA0; background: color-mix(in srgb, #3F9FA0 12%, transparent); }
+
+.mode-name {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.mode-sub {
+  font-size: 11px;
+  color: var(--muted);
+}
+.mode-note { margin-top: 12px; }
 
 /* How many dice each tap adds. Typing a number here and tapping d6 is how you
    get 100d6 without tapping a hundred times. */
@@ -1356,6 +1880,12 @@ body {
 
   <header class="bar">
     <h1 class="wordmark" id="wordmark">Dicebox</h1>
+    <!-- Which set of dice is loaded, kept on screen rather than only inside the
+         help panel: the palette changes with the system, and a coloured app with
+         no label on it is a mystery rather than a mode. Tapping it opens the
+         switcher. Hidden entirely on the numeric default, which needs no badge. -->
+    <button type="button" class="system-badge" id="systemBadge" hidden
+            aria-label="Dice system — change it"></button>
     <div class="bar-actions">
       <!-- Lit while a room is live, so the header itself carries the answer to
            "are my rolls going anywhere?". The dot is separate from the button
@@ -1375,6 +1905,94 @@ body {
             <path d="M2.6 16.2a4.6 4.6 0 0 1 9.2 0"/>
             <path d="M13.4 5.1a2.6 2.6 0 0 1 0 5"/>
             <path d="M14.6 11.9a4.6 4.6 0 0 1 2.8 4.3"/>
+          </g>
+        </svg>
+      </button>
+      <!-- Opens the dice-system picker. The icon is the active system's mark: a
+           wireframe d20 for the numeric default, an ankh for Vampire, and so on
+           as systems are added — so the button itself says which mode you are
+           in. data-system is set by the app; the CSS shows the matching mark. -->
+      <button id="modeToggle" class="ghost icon" data-system="numeric" aria-expanded="false"
+              aria-controls="modeSheet" aria-label="Choose a dice system">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
+          <!-- The Dicebox mark itself (brand/d20.svg): a deconstructed d20. The
+               numeric default is the app's own identity, so its button is the
+               logo. -->
+          <g class="mode-ico" data-for="numeric" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2.4 20.3 7v10L12 21.6 3.7 17V7z"/>
+            <path d="M12 2.4 16.4 9.6 12 12.2 7.6 9.6z"/>
+            <path d="M7.6 9.6 12 12.2v9.4M16.4 9.6 12 12.2M7.6 9.6 3.7 7m12.7 2.6L20.3 7"/>
+          </g>
+          <!-- Ankh: the Vampire mark (our own line-art, not official artwork). -->
+          <g class="mode-ico" data-for="v5" fill="none" stroke="currentColor"
+             stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="7.4" r="3.2"/>
+            <path d="M12 10.6V20M7.6 13.1h8.8"/>
+          </g>
+          <!-- Fate: a Fudge die carrying both a plus and a minus. -->
+          <g class="mode-ico" data-for="fate" fill="none" stroke="currentColor"
+             stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="4" y="4" width="16" height="16" rx="3.4"/>
+            <path d="M9 9V15M6 12H12"/>
+            <path d="M13 12H18"/>
+          </g>
+          <!-- Genesys: a narrative die (hexagon) with a triumph star. -->
+          <g class="mode-ico" data-for="genesys">
+            <path d="M12 2.6 20 7v10l-8 4.4L4 17V7z" fill="none" stroke="currentColor"
+                  stroke-width="1.6" stroke-linejoin="round"/>
+            <path d="M12 8l1.35 2.9 3.15.35-2.35 2.15.65 3.1L12 14.9 9.2 16.5l.65-3.1L7.5 11.25l3.15-.35z"
+                  fill="currentColor"/>
+          </g>
+          <!-- Daggerheart: a d12 split down the middle — the Hope/Fear duality. -->
+          <g class="mode-ico" data-for="daggerheart" fill="none" stroke="currentColor"
+             stroke-width="1.6" stroke-linejoin="round">
+            <path d="M12 2.6 20 7v10l-8 4.4L4 17V7z"/>
+            <path d="M12 2.6v18.8"/>
+          </g>
+          <!-- CthulhuTech: an eldritch eye trailing tentacles. -->
+          <g class="mode-ico" data-for="cthulhutech" fill="none" stroke="currentColor"
+             stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 10 C8 5 16 5 20 10 C16 15 8 15 4 10 Z"/>
+            <path d="M8 14 q-1 3 0 6"/>
+            <path d="M12 15 v6"/>
+            <path d="M16 14 q1 3 0 6"/>
+            <circle cx="12" cy="10" r="1.9" fill="currentColor" stroke="none"/>
+          </g>
+          <!-- Star Wars: a TIE fighter — cockpit between two hexagonal panels. -->
+          <g class="mode-ico" data-for="starwars">
+            <g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
+              <path d="M5 4 L8 7.3 L8 16.7 L5 20 L2 16.7 L2 7.3 Z"/>
+              <path d="M19 4 L22 7.3 L22 16.7 L19 20 L16 16.7 L16 7.3 Z"/>
+            </g>
+            <g fill="currentColor">
+              <rect x="7.6" y="11" width="2.2" height="2"/>
+              <rect x="14.2" y="11" width="2.2" height="2"/>
+              <circle cx="12" cy="12" r="2.7"/>
+            </g>
+          </g>
+          <!-- The One Ring: a plain ring. -->
+          <g class="mode-ico" data-for="onering" fill="none" stroke="currentColor">
+            <circle cx="12" cy="12" r="8.4" stroke-width="1.6"/>
+            <circle cx="12" cy="12" r="4.6" stroke-width="1.4"/>
+          </g>
+          <!-- PbtA: two pipped d6 — the pair you roll. -->
+          <g class="mode-ico" data-for="pbta" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linejoin="round">
+            <rect x="2.5" y="10" width="11" height="11" rx="2.4"/>
+            <rect x="12" y="3" width="11" height="11" rx="2.4"/>
+            <g fill="currentColor" stroke="none">
+              <circle cx="5.3" cy="12.8" r="1"/><circle cx="10.7" cy="12.8" r="1"/>
+              <circle cx="5.3" cy="18.2" r="1"/><circle cx="10.7" cy="18.2" r="1"/>
+              <circle cx="15" cy="6" r="1"/><circle cx="20" cy="11" r="1"/>
+            </g>
+          </g>
+          <!-- Mist Engine: fog drifting over the roll. -->
+          <g class="mode-ico" data-for="mist" fill="none" stroke="currentColor"
+             stroke-width="1.5" stroke-linecap="round">
+            <path d="M4 8.5c2-1.6 4-1.6 6 0s4 1.6 6 0"/>
+            <path d="M4 12.5c2-1.6 4-1.6 6 0s4 1.6 6 0"/>
+            <path d="M6 16.5c2-1.6 4-1.6 6 0s3 1.2 4 0.4"/>
           </g>
         </svg>
       </button>
@@ -1412,6 +2030,7 @@ body {
     </div>
 
     <div class="help" id="help" hidden>
+      <div id="helpNumeric">
       <dl class="syntax">
         <dt>3d6</dt>          <dd>three six-sided dice</dd>
         <dt>1d20+5</dt>       <dd>with a modifier</dd>
@@ -1429,6 +2048,166 @@ body {
         number of sides works, from d1 to d1000, so a d17 or a d57 is just as
         valid. Rolls stay on your device.
       </p>
+      </div>
+
+      <div id="helpV5" hidden>
+      <dl class="syntax">
+        <dt>v5:5</dt>     <dd>five dice, no Hunger</dd>
+        <dt>v5:8h3</dt>   <dd>eight dice, three of them Hunger</dd>
+        <dt>v5:8h3@3</dt> <dd>the same against difficulty 3</dd>
+        <dt>4d6</dt>      <dd>ordinary dice still roll as ordinary dice</dd>
+      </dl>
+      <p class="note">
+        Hunger dice <b>replace</b> dice in the pool rather than adding to it, so
+        the pool size is whatever you set. Every die showing 6 or more is a
+        success, and each <b>pair of 10s</b> adds two more on top. Set a
+        difficulty and the roll resolves itself — a win with a pair of 10s is a
+        Critical, and a Messy Critical if one of those 10s is on a Hunger die; a
+        loss with a Hunger 1 is a Bestial Failure. Leave the difficulty unset and
+        the roll reports its successes and lets the table call it.
+      </p>
+      <p class="note">
+        The dice show symbols the way the official ones do — a fang for a
+        success, the bite for a 10, a skull for a Hunger 1, and nothing at all
+        below 6. The numbers they landed on are in the line under the result and
+        in the history.
+      </p>
+      </div>
+
+      <div id="helpFate" hidden>
+      <dl class="syntax">
+        <dt>4dF</dt>    <dd>four Fudge dice — the standard roll</dd>
+        <dt>4dF+2</dt>  <dd>with a +2 skill</dd>
+        <dt>6dF-1</dt>  <dd>any number of dice, and a penalty</dd>
+      </dl>
+      <p class="note">
+        Each Fudge die is <b>+</b>, <b>−</b>, or blank — two of each on a d6 — so
+        it reads +1, −1, or 0. The result is the net total (−4 to +4 for four
+        dice) plus your modifier, and it lands on the <b>Fate ladder</b>:
+        Mediocre, Average, Fair, Good, Great, and up.
+      </p>
+      </div>
+
+      <div id="helpGenesys" hidden>
+      <dl class="syntax">
+        <dt>gen:2A+2D</dt>    <dd>two Ability, two Difficulty</dd>
+        <dt>gen:1P+1A+3D</dt> <dd>a Proficiency, an Ability, three Difficulty</dd>
+        <dt>gen:2A+1B+2D+1C</dt> <dd>Boost and Challenge in the mix</dd>
+      </dl>
+      <p class="note">
+        Six narrative dice: <b>Ability</b> (green), <b>Proficiency</b> (yellow),
+        <b>Boost</b> (blue) roll toward success; <b>Difficulty</b> (purple),
+        <b>Challenge</b> (red), <b>Setback</b> (grey) roll against you. Tap a
+        chip to add that die, hold it to remove one.
+      </p>
+      <p class="note">
+        Success (▲) cancels Failure (▼) and Advantage (◆) cancels Threat (✕), so
+        the result is what is left on each axis. A <b>Triumph</b> (★, on the
+        Proficiency die) is a success that also triggers something great; a
+        <b>Despair</b> (its inverted twin, on the Challenge die) is a failure
+        that goes badly wrong. Both survive cancellation.
+      </p>
+      </div>
+
+      <div id="helpStarwars" hidden>
+      <dl class="syntax">
+        <dt>sw:2A+2D</dt>   <dd>two Ability, two Difficulty</dd>
+        <dt>sw:1P+1A+2D</dt> <dd>a trained check</dd>
+        <dt>sw:3F</dt>       <dd>three Force dice (a Force power)</dd>
+      </dl>
+      <p class="note">
+        The same narrative dice as Genesys — success/failure and advantage/threat
+        cancel, with Triumph and Despair on the yellow and red dice — plus the
+        white <b>Force die</b>. Its <b>Light</b> (pale) and <b>Dark</b> (violet)
+        pips are a separate result that powers Force abilities; they don't touch
+        the success/advantage tally. Roll a handful of Force dice on their own for
+        a Force check.
+      </p>
+      </div>
+
+      <div id="helpDaggerheart" hidden>
+      <dl class="syntax">
+        <dt>dh:</dt>       <dd>the Duality Dice — Hope d12 + Fear d12</dd>
+        <dt>dh:+2</dt>     <dd>with a modifier (negatives too: dh:-1)</dd>
+        <dt>dh:@15</dt>    <dd>against difficulty 15</dd>
+        <dt>dh:adv2@15</dt> <dd>with two advantage dice, vs 15</dd>
+      </dl>
+      <p class="note">
+        Roll two d12 — a gold <b>Hope</b> die and a violet <b>Fear</b> die — and
+        add them. The higher die sets the tone: <b>with Hope</b> hands you a
+        Hope, <b>with Fear</b> hands the GM a Fear. <b>Matching</b> dice are a
+        <b>Critical Success</b> — it succeeds no matter the total, and comes with
+        Hope. Set a difficulty and the roll resolves to success or failure.
+      </p>
+      <p class="note">
+        Each <b>advantage</b> adds a d6 and each <b>disadvantage</b> subtracts
+        one; they cancel one-for-one, and stack past one (an ally's Help adds
+        another). Tap the buttons to add them, hold to remove. The
+        <b>Roll Duality</b> button throws the Hope + Fear; the dice below it roll
+        anything else — weapon damage and the rest.
+      </p>
+      </div>
+
+      <div id="helpCthulhutech" hidden>
+      <dl class="syntax">
+        <dt>ct:8</dt>    <dd>eight d10 — count the hits</dd>
+        <dt>ct:8@4</dt>  <dd>the same, against difficulty 4</dd>
+        <dt>ct:5@6</dt>  <dd>a five-die pool at a hard task</dd>
+      </dl>
+      <p class="note">
+        CthulhuTech 2e is a pool of coin-flips. Roll d10 equal to your
+        <b>Attribute + Skill</b>; every <b>even</b> die is a <b>Hit</b> (it glows
+        green), every odd one misses. Count your hits and meet the
+        <b>Difficulty</b> — roughly 3 for a simple task up to 6 or 7 for the
+        near-impossible. Leave the difficulty unset and it just reports the hits.
+      </p>
+      </div>
+
+      <div id="helpOnering" hidden>
+      <dl class="syntax">
+        <dt>tor:3@14</dt>   <dd>a Feat die + 3 Success dice, vs 14</dd>
+        <dt>tor:2fav@16</dt> <dd>favoured — roll two Feat dice, keep the best</dd>
+        <dt>tor:3w@18</dt>  <dd>Weary — Success dice of 1-3 count as 0</dd>
+      </dl>
+      <p class="note">
+        Always roll one <b>Feat die</b> (a d12: 1-10, plus the <b>Gandalf rune</b>
+        = automatic success and the <b>Eye of Sauron</b> = 0) with a pool of
+        <b>Success dice</b> (d6). Total them and meet the <b>Target Number</b>.
+        Each <b>6</b> is a Tengwar rune: one is a <b>Great</b> success, two or
+        more <b>Extraordinary</b>. <b>Favoured</b> / <b>ill-favoured</b> rolls two
+        Feat dice and keeps the best / worst; <b>Weary</b> makes Success dice of
+        1-3 count for nothing.
+      </p>
+      </div>
+
+      <div id="helpPbta" hidden>
+      <dl class="syntax">
+        <dt>pbta:</dt>    <dd>roll 2d6</dd>
+        <dt>pbta:+2</dt>  <dd>2d6 plus your stat</dd>
+        <dt>pbta:-1</dt>  <dd>2d6 with a penalty</dd>
+      </dl>
+      <p class="note">
+        Powered by the Apocalypse: roll <b>2d6</b> and add the relevant stat.
+        <b>10+</b> is a <b>Strong Hit</b>, <b>7-9</b> a <b>Weak Hit</b> (you get
+        it, but with a cost), <b>6 or under</b> a <b>Miss</b>. Set the modifier
+        below, or type it.
+      </p>
+      </div>
+
+      <div id="helpMist" hidden>
+      <dl class="syntax">
+        <dt>mist:</dt>    <dd>roll 2d6</dd>
+        <dt>mist:+1</dt>  <dd>2d6 plus your Power</dd>
+        <dt>mist:-2</dt>  <dd>2d6 with Weakness against you</dd>
+      </dl>
+      <p class="note">
+        The Mist Engine (City of Mist, Legend in the Mist) rolls <b>2d6</b> plus
+        your net <b>Power</b>. <b>10+</b> is a <b>Success</b>, <b>7-9</b> a
+        <b>Consequence</b> (you succeed with a complication), <b>6 or under</b> a
+        <b>Failure</b>. Set the modifier below, or type it.
+      </p>
+      </div>
+
       <p class="note install" id="installNote">
         <button type="button" class="install-button" id="install" hidden>Install as an app</button>
         <span id="installHint">This is the single-file build: it already works offline, and can be copied anywhere.</span>
@@ -1438,6 +2217,165 @@ body {
         <a href="https://github.com/SONDLecT/dicebox" target="_blank" rel="noopener noreferrer">Source on GitHub</a>
         <span class="build" id="build" hidden></span>
       </p>
+    </div>
+
+    <!-- The dice-system picker. A row of the header, a slide-out on the tray:
+         each card is a mode. Numeric is the default and needs no explanation;
+         the rest are named systems that recolour the app and swap the dice row.
+         Purely a UI preset — nothing here reinterprets notation you type. -->
+    <div class="sheet modes-sheet" id="modeSheet" hidden role="dialog"
+         aria-labelledby="modeTitle">
+      <div class="sheet-panel">
+        <p class="sheet-title">
+          <span id="modeTitle">Dice system</span>
+          <button type="button" class="sheet-close" id="modeClose"
+                  aria-label="Close">✕</button>
+        </p>
+        <div class="mode-cards" id="modeCards" role="group" aria-label="Dice system">
+          <button type="button" class="mode-card" data-system="numeric" aria-pressed="true">
+            <svg class="mode-glyph" viewBox="0 0 24 24" width="44" height="44" aria-hidden="true">
+              <!-- The Dicebox mark (brand/d20.svg), matching the header button. -->
+              <g fill="none" stroke="currentColor" stroke-width="1.5"
+                 stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2.4 20.3 7v10L12 21.6 3.7 17V7z"/>
+                <path d="M12 2.4 16.4 9.6 12 12.2 7.6 9.6z"/>
+                <path d="M7.6 9.6 12 12.2v9.4M16.4 9.6 12 12.2M7.6 9.6 3.7 7m12.7 2.6L20.3 7"/>
+              </g>
+            </svg>
+            <span class="mode-name">Numeric</span>
+            <span class="mode-sub">The classic roller</span>
+          </button>
+          <button type="button" class="mode-card mode-v5" data-system="v5" aria-pressed="false">
+            <svg class="mode-glyph" viewBox="0 0 44 44" width="44" height="44" aria-hidden="true">
+              <!-- A blood die: the d10 silhouette in crimson with an ankh on its
+                   face — the success mark the mode rolls. -->
+              <g fill="none" stroke="currentColor" stroke-width="1.6"
+                 stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 4l13 7.5v10L22 39 9 21.5v-10z"/>
+                <circle class="mode-fang" cx="22" cy="17.5" r="3.1"/>
+                <path class="mode-fang" d="M22 20.4v11.4M17.6 23.2h8.8"/>
+              </g>
+            </svg>
+            <span class="mode-name">Vampire</span>
+            <span class="mode-sub">The Masquerade · V5</span>
+          </button>
+          <button type="button" class="mode-card mode-fate" data-system="fate" aria-pressed="false">
+            <svg class="mode-glyph" viewBox="0 0 44 44" width="44" height="44" aria-hidden="true">
+              <!-- Three tumbling Fudge dice — the plus, blank, and minus faces
+                   that a 4dF roll is built from. -->
+              <g fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3.5" width="13" height="13" rx="3"/>
+                <path d="M9.5 7V13M6.5 10H12.5"/>
+                <rect x="15.5" y="15.5" width="13" height="13" rx="3"/>
+                <rect x="28" y="27.5" width="13" height="13" rx="3"/>
+                <path d="M31.5 34H37.5"/>
+              </g>
+            </svg>
+            <span class="mode-name">Fate</span>
+            <span class="mode-sub">Fudge · 4dF</span>
+          </button>
+          <button type="button" class="mode-card mode-genesys" data-system="genesys" aria-pressed="false">
+            <svg class="mode-glyph" viewBox="0 0 44 44" width="44" height="44" aria-hidden="true">
+              <!-- The multicolour narrative dice, shown as three of their symbols:
+                   a green success, a gold triumph, a purple threat. -->
+              <path d="M14 15l4.2 7.3H9.8z" fill="#4E9E60"/>
+              <path d="M31 9l1.7 3.6 4 .45-2.95 2.7.82 3.9L31 15.7l-3.6 2 .82-3.9-2.95-2.7 4-.45z" fill="#C39A2E"/>
+              <g stroke="#8A5CC0" stroke-width="2.4" stroke-linecap="round">
+                <path d="M25 27l7 7M25 34l7-7"/>
+              </g>
+            </svg>
+            <span class="mode-name">Genesys</span>
+            <span class="mode-sub">Narrative dice</span>
+          </button>
+          <button type="button" class="mode-card mode-daggerheart" data-system="daggerheart" aria-pressed="false">
+            <svg class="mode-glyph" viewBox="0 0 44 44" width="44" height="44" aria-hidden="true">
+              <!-- The Duality Dice: a gold Hope die and a violet Fear die. -->
+              <path d="M15 8 24 13v10l-9 5-9-5V13z" fill="none" stroke="#C9A227" stroke-width="1.9" stroke-linejoin="round"/>
+              <path d="M29 16 38 21v10l-9 5-9-5V21z" fill="none" stroke="#7E6BB5" stroke-width="1.9" stroke-linejoin="round"/>
+            </svg>
+            <span class="mode-name">Daggerheart</span>
+            <span class="mode-sub">Duality Dice</span>
+          </button>
+          <button type="button" class="mode-card mode-cthulhutech" data-system="cthulhutech" aria-pressed="false">
+            <svg class="mode-glyph" viewBox="0 0 44 44" width="44" height="44" aria-hidden="true">
+              <!-- An eldritch eye trailing tentacles — the mythos the mode wears
+                   over its even/odd d10 pool. -->
+              <g fill="none" stroke="#57B591" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8 17 C15 9 29 9 36 17 C29 25 15 25 8 17 Z"/>
+                <path d="M14 23 q-2 4 0 8 q1 2 -1 4"/>
+                <path d="M22 24 q2 3 0 6 q-2 3 0 6"/>
+                <path d="M30 23 q2 4 0 8 q-1 2 1 4"/>
+              </g>
+              <circle cx="22" cy="17" r="3" fill="#57B591"/>
+            </svg>
+            <span class="mode-name">CthulhuTech</span>
+            <span class="mode-sub">Even = hit · 2e</span>
+          </button>
+          <button type="button" class="mode-card mode-starwars" data-system="starwars" aria-pressed="false">
+            <svg class="mode-glyph" viewBox="0 0 44 44" width="44" height="44" aria-hidden="true">
+              <!-- A TIE fighter: a round cockpit between two hexagonal wing
+                   panels — the panels doubling as die facets. -->
+              <g fill="none" stroke="#5B9BD5" stroke-width="2.2" stroke-linejoin="round">
+                <path d="M9 7 L14.5 13 L14.5 31 L9 37 L3.5 31 L3.5 13 Z"/>
+                <path d="M35 7 L40.5 13 L40.5 31 L35 37 L29.5 31 L29.5 13 Z"/>
+              </g>
+              <g fill="#5B9BD5">
+                <rect x="14" y="20.5" width="3.5" height="3"/>
+                <rect x="26.5" y="20.5" width="3.5" height="3"/>
+                <circle cx="22" cy="22" r="5"/>
+              </g>
+            </svg>
+            <span class="mode-name">Star Wars</span>
+            <span class="mode-sub">Narrative + Force</span>
+          </button>
+          <button type="button" class="mode-card mode-onering" data-system="onering" aria-pressed="false">
+            <svg class="mode-glyph" viewBox="0 0 44 44" width="44" height="44" aria-hidden="true">
+              <!-- A ring, in bronze. -->
+              <circle cx="22" cy="22" r="15" fill="none" stroke="#B5893C" stroke-width="2.2"/>
+              <circle cx="22" cy="22" r="8.4" fill="none" stroke="#B5893C" stroke-width="1.8"/>
+            </svg>
+            <span class="mode-name">The One Ring</span>
+            <span class="mode-sub">Feat &amp; Success dice</span>
+          </button>
+          <button type="button" class="mode-card mode-pbta" data-system="pbta" aria-pressed="false">
+            <svg class="mode-glyph" viewBox="0 0 44 44" width="44" height="44" aria-hidden="true">
+              <!-- Two pipped d6 reading 4 and 6 — a total of ten, a Strong Hit. -->
+              <g fill="none" stroke="#D97A3C" stroke-width="2" stroke-linejoin="round">
+                <rect x="3" y="19" width="18" height="18" rx="4"/>
+                <rect x="23" y="5" width="18" height="18" rx="4"/>
+              </g>
+              <g fill="#D97A3C">
+                <circle cx="8" cy="24" r="1.8"/><circle cx="16" cy="24" r="1.8"/>
+                <circle cx="8" cy="32" r="1.8"/><circle cx="16" cy="32" r="1.8"/>
+                <circle cx="28" cy="9" r="1.8"/><circle cx="36" cy="9" r="1.8"/>
+                <circle cx="28" cy="14" r="1.8"/><circle cx="36" cy="14" r="1.8"/>
+                <circle cx="28" cy="19" r="1.8"/><circle cx="36" cy="19" r="1.8"/>
+              </g>
+            </svg>
+            <span class="mode-name">PbtA</span>
+            <span class="mode-sub">2d6 · hit / partial / miss</span>
+          </button>
+          <button type="button" class="mode-card mode-mist" data-system="mist" aria-pressed="false">
+            <svg class="mode-glyph" viewBox="0 0 44 44" width="44" height="44" aria-hidden="true">
+              <!-- Fog rolling in over water. -->
+              <g fill="none" stroke="#3F9FA0" stroke-width="2.2" stroke-linecap="round">
+                <path d="M8 15c3.5-2.8 7-2.8 10.5 0s7 2.8 10.5 0 5-1.4 7-0.4"/>
+                <path d="M8 23c3.5-2.8 7-2.8 10.5 0s7 2.8 10.5 0 5-1.4 7-0.4"/>
+                <path d="M12 31c3.5-2.8 7-2.8 10.5 0s5 2 8 0.8"/>
+              </g>
+            </svg>
+            <span class="mode-name">Mist Engine</span>
+            <span class="mode-sub">2d6 · success / consequence</span>
+          </button>
+        </div>
+        <p class="note mode-note">
+          The system recolours the app and changes the dice you tap. Typed
+          notation still means what it says — <b>4d6</b> is four six-sided dice
+          in any mode.
+        </p>
+      </div>
     </div>
 
     <!-- Opened by holding a die. Sits on the tray like the help panel, so the
@@ -1617,7 +2555,7 @@ body {
     <span class="breakdown" id="breakdown">Pick dice or type a roll</span>
   </output>
 
-  <section class="picker" aria-label="Dice">
+  <section class="picker" id="numPicker" aria-label="Dice">
     <div class="counter" title="How many dice each tap adds">
       <button class="step" id="countDown" aria-label="One fewer die per tap">−</button>
       <input id="count" class="count" type="text" inputmode="numeric"
@@ -1634,6 +2572,197 @@ body {
       <button type="button" class="nudge" id="diceRight" aria-label="Show larger dice"
               hidden>›</button>
     </div>
+  </section>
+
+  <!-- The Vampire dice tray. Where numeric mode taps d4…d1000, V5 taps two
+       dice: an ordinary black die and a red Hunger die. Each tap adds however
+       many the counter says, exactly like the numeric row, and builds the pool.
+       Hunger dice REPLACE, so the pool total is normal + Hunger. Difficulty is
+       optional — unset until the Storyteller calls one, because a roller that
+       invented a number would be lying about the outcome. -->
+  <!-- The two die types are tap-to-add buttons (hold to remove), carrying the
+       ankh; Difficulty is a subordinate chip. The pool renders in the tray. -->
+  <section class="picker v5-picker" id="v5Picker" aria-label="Vampire dice" hidden>
+    <div class="v5-dice-row">
+      <button type="button" class="v5-die-btn" id="v5NormalFace" aria-label="Add a regular die; hold to remove">
+        <svg viewBox="0 0 24 26" width="30" height="33" aria-hidden="true">
+          <path d="M12 1.5 21 9.5 12 24.5 3 9.5z" fill="none" stroke="currentColor"
+                stroke-width="1.4" stroke-linejoin="round"/>
+          <circle cx="12" cy="9" r="2.4" fill="none" stroke="currentColor" stroke-width="1.4"/>
+          <path d="M12 11.4v7.2M8.4 13.4h7.2" fill="none" stroke="currentColor"
+                stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <span class="v5-die-name">Regular</span>
+      </button>
+      <button type="button" class="v5-die-btn v5-die-hunger" id="v5HungerFace" aria-label="Add a Hunger die; hold to remove">
+        <svg viewBox="0 0 24 26" width="30" height="33" aria-hidden="true">
+          <path d="M12 1.5 21 9.5 12 24.5 3 9.5z" fill="none" stroke="currentColor"
+                stroke-width="1.4" stroke-linejoin="round"/>
+          <circle cx="12" cy="9" r="2.4" fill="currentColor" stroke="none"/>
+          <path d="M12 11.4v7.2M8.4 13.4h7.2" fill="none" stroke="currentColor"
+                stroke-width="1.4" stroke-linecap="round"/>
+        </svg>
+        <span class="v5-die-name">Hunger</span>
+      </button>
+    </div>
+    <button type="button" class="spin-chip" id="v5DiffChip" aria-label="Difficulty — tap to raise, hold to lower">
+      <span class="spin-chip-label">Difficulty</span>
+      <span class="spin-chip-val" id="v5Difficulty" data-unset="1">—</span>
+    </button>
+  </section>
+
+  <!-- Fate: how many Fudge dice, and a skill modifier. Standard is 4dF. -->
+  <!-- Fate always rolls 4dF (held in the tray); the only control is the skill
+       modifier, so the picker is a single chip, like PbtA / Mist. -->
+  <section class="picker fate-picker" id="fatePicker" aria-label="Fate dice" hidden>
+    <button type="button" class="spin-chip" id="fateModChip" aria-label="Modifier — tap to raise, hold to lower">
+      <span class="spin-chip-label">Modifier</span>
+      <span class="spin-chip-val" id="fateMod">0</span>
+    </button>
+  </section>
+
+  <!-- Genesys: six coloured die types. Tap a chip to add that die, hold (or
+       right-click) to remove one. -->
+  <section class="picker genesys-picker" id="genesysPicker" aria-label="Genesys dice" hidden>
+    <div class="gen-chips">
+      <button type="button" class="gen-chip" id="gen-ability" data-type="ability" aria-pressed="false" aria-label="Add an Ability die">
+        <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true"><path d="M15 3 27 15 15 27 3 15Z"/></svg>
+        <span class="gen-chip-label">Abil.</span>
+      </button>
+      <button type="button" class="gen-chip" id="gen-proficiency" data-type="proficiency" aria-pressed="false" aria-label="Add a Proficiency die">
+        <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true"><path d="M15 2.6 27.3 11.5 22.6 26 7.4 26 2.7 11.5Z"/></svg>
+        <span class="gen-chip-label">Prof.</span>
+      </button>
+      <button type="button" class="gen-chip" id="gen-boost" data-type="boost" aria-pressed="false" aria-label="Add a Boost die">
+        <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true"><rect x="5" y="5" width="20" height="20" rx="4.5"/></svg>
+        <span class="gen-chip-label">Boost</span>
+      </button>
+      <button type="button" class="gen-chip" id="gen-difficulty" data-type="difficulty" aria-pressed="false" aria-label="Add a Difficulty die">
+        <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true"><path d="M15 3 27 15 15 27 3 15Z"/></svg>
+        <span class="gen-chip-label">Diff.</span>
+      </button>
+      <button type="button" class="gen-chip" id="gen-challenge" data-type="challenge" aria-pressed="false" aria-label="Add a Challenge die">
+        <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true"><path d="M15 2.6 27.3 11.5 22.6 26 7.4 26 2.7 11.5Z"/></svg>
+        <span class="gen-chip-label">Chal.</span>
+      </button>
+      <button type="button" class="gen-chip" id="gen-setback" data-type="setback" aria-pressed="false" aria-label="Add a Setback die">
+        <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true"><rect x="5" y="5" width="20" height="20" rx="4.5"/></svg>
+        <span class="gen-chip-label">Setb.</span>
+      </button>
+      <button type="button" class="gen-chip gen-chip-force" id="gen-force" data-type="force" aria-pressed="false" aria-label="Add a Force die">
+        <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true"><path d="M15 2.6 27.3 11.5 22.6 26 7.4 26 2.7 11.5Z"/></svg>
+        <span class="gen-chip-label">Force</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- Daggerheart: the roll is always a Hope d12 + a Fear d12. The controls are
+       advantage/disadvantage (a ± d6), a flat modifier, and a difficulty. -->
+  <!-- The Hope + Fear pair is fixed (shown in the tray, rolled by Duality). The
+       adders are Advantage / Disadvantage d6; Mod and Diff are chips. The numeric
+       strip stays below for weapons and the rest. -->
+  <section class="picker dh-picker" id="dhPicker" aria-label="Daggerheart roll" hidden>
+    <div class="dh-adv-row">
+      <button type="button" class="dh-adv-btn" data-adv="adv" aria-pressed="false" aria-label="Add an advantage die; hold to remove">
+        <svg class="dh-adv-ico" viewBox="0 0 30 30" aria-hidden="true">
+          <rect class="die" x="5" y="5" width="20" height="20" rx="4.5"/>
+          <g class="chev"><path d="M10 17 15 12 20 17"/><path d="M10 22 15 17 20 22"/></g>
+        </svg>
+        <span class="dh-adv-label">Advantage</span>
+      </button>
+      <button type="button" class="dh-roll" id="dhRoll" aria-label="Roll the Duality Dice">
+        <svg viewBox="0 0 24 24" width="27" height="27" aria-hidden="true">
+          <path d="M12 3.4 5.4 7.5v9L12 20.6Z" fill="#C9A227"/>
+          <path d="M12 3.4 18.6 7.5v9L12 20.6Z" fill="#7E6BB5"/>
+          <path d="M12 2.4 19.4 7v10L12 21.6 4.6 17V7z" fill="none" stroke="currentColor"
+                stroke-width="1.3" stroke-linejoin="round"/>
+          <path d="M12 2.4v19.2" stroke="var(--paper)" stroke-width="1"/>
+        </svg>
+        <span class="dh-roll-label">Duality</span>
+      </button>
+      <button type="button" class="dh-adv-btn" data-adv="dis" aria-pressed="false" aria-label="Add a disadvantage die; hold to remove">
+        <svg class="dh-adv-ico" viewBox="0 0 30 30" aria-hidden="true">
+          <rect class="die" x="5" y="5" width="20" height="20" rx="4.5"/>
+          <g class="chev"><path d="M10 13 15 18 20 13"/><path d="M10 18 15 23 20 18"/></g>
+        </svg>
+        <span class="dh-adv-label">Disadvantage</span>
+      </button>
+    </div>
+    <div class="dh-fields-row">
+      <button type="button" class="spin-chip" id="dhModChip" aria-label="Modifier — tap to raise, hold to lower">
+        <span class="spin-chip-label">Mod</span>
+        <span class="spin-chip-val" id="dhMod">0</span>
+      </button>
+      <button type="button" class="spin-chip" id="dhDiffChip" aria-label="Difficulty — tap to raise, hold to lower">
+        <span class="spin-chip-label">Diff</span>
+        <span class="spin-chip-val" id="dhDifficulty" data-unset="1">—</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- CthulhuTech 2e: how many d10 (Attribute + Skill), and the Difficulty (the
+       number of even-die Hits you need). -->
+  <section class="picker ct-picker" id="ctPicker" aria-label="CthulhuTech pool" hidden>
+    <button type="button" class="die-btn" id="ctAddDie" aria-label="Add a d10 to the pool; hold to remove one">
+      <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true"><path d="M15 3 24 9 V17 L15 27 6 17 V9Z"/></svg>
+      <span class="die-btn-label">d10</span>
+    </button>
+    <button type="button" class="spin-chip" id="ctDiffChip" aria-label="Difficulty — tap to raise, hold to lower">
+      <span class="spin-chip-label">Difficulty</span>
+      <span class="spin-chip-val" id="ctDifficulty">3</span>
+    </button>
+  </section>
+
+  <!-- The One Ring: a Feat die is always rolled. The controls are the Success
+       dice, the Target Number, and the favoured/ill-favoured & Weary states. -->
+  <!-- The Feat die always rolls (shown in the tray); you build the Success pool
+       with the d6 button, set the Target, and toggle the conditions. -->
+  <section class="picker tor-picker" id="torPicker" aria-label="One Ring roll" hidden>
+    <div class="tor-controls-row">
+      <button type="button" class="die-btn tor-success-btn" id="torAddSuccess" aria-label="Add a Success die; hold to remove">
+        <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true"><rect x="5" y="5" width="20" height="20" rx="4.5"/></svg>
+        <span class="die-btn-label">Success</span>
+      </button>
+      <button type="button" class="spin-chip" id="torTnChip" aria-label="Target Number — tap to raise, hold to lower">
+        <span class="spin-chip-label">Target</span>
+        <span class="spin-chip-val" id="torTn">14</span>
+      </button>
+    </div>
+    <div class="tor-flags-row">
+      <button type="button" class="tor-flag" data-flag="fav" aria-pressed="false" aria-label="Favoured — roll two Feat dice, keep the best">
+        <svg class="tor-flag-ico" viewBox="0 0 40 40" aria-hidden="true">
+          <path class="drop" d="M15 15 24.5 21.9 20.9 33.1 9.1 33.1 5.5 21.9Z"/>
+          <path class="keep" d="M24 6 33.5 12.9 29.9 24.1 18.1 24.1 14.5 12.9Z"/>
+          <g class="chev"><path d="M20.5 17 24 13.5 27.5 17"/><path d="M20.5 21 24 17.5 27.5 21"/></g>
+        </svg>
+        <span class="tor-flag-label">Favoured</span>
+      </button>
+      <button type="button" class="tor-flag" data-flag="ill" aria-pressed="false" aria-label="Ill-favoured — roll two Feat dice, keep the worst">
+        <svg class="tor-flag-ico" viewBox="0 0 40 40" aria-hidden="true">
+          <path class="drop" d="M15 6 24.5 12.9 20.9 24.1 9.1 24.1 5.5 12.9Z"/>
+          <path class="keep" d="M24 15 33.5 21.9 29.9 33.1 18.1 33.1 14.5 21.9Z"/>
+          <g class="chev"><path d="M20.5 24 24 27.5 27.5 24"/><path d="M20.5 28 24 31.5 27.5 28"/></g>
+        </svg>
+        <span class="tor-flag-label">Ill-favoured</span>
+      </button>
+      <button type="button" class="tor-flag" data-flag="weary" aria-pressed="false" aria-label="Weary — Success dice of 1 to 3 count as zero">
+        <svg class="tor-flag-ico" viewBox="0 0 40 40" aria-hidden="true">
+          <rect class="weary-die" x="6" y="8" width="28" height="28" rx="6.5"/>
+          <g class="weary-pip"><circle cx="13.5" cy="15.5" r="1.9"/><circle cx="13.5" cy="22" r="1.9"/><circle cx="20" cy="22" r="1.9"/></g>
+          <path class="weary-strike" d="M10 28 30 12"/>
+        </svg>
+        <span class="tor-flag-label">Weary</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- PbtA & Mist Engine: a 2d6 roll with one modifier. Shared between both
+       modes, since only the readout differs. -->
+  <section class="picker twod6-picker" id="twod6Picker" aria-label="2d6 roll" hidden>
+    <button type="button" class="spin-chip" id="twod6ModChip" aria-label="Modifier — tap to raise, hold to lower">
+      <span class="spin-chip-label" id="twod6ModLabel">Modifier</span>
+      <span class="spin-chip-val" id="twod6Mod">0</span>
+    </button>
   </section>
 
   <form class="entry" id="entry">
@@ -1928,7 +3057,17 @@ function randInt(sides) {
 }
 
 function detectSystem(src) {
-  return /^v5:/.test(String(src || '').trim().toLowerCase()) ? 'v5' : 'numeric';
+  const s = String(src || '').trim().toLowerCase();
+  if (/^v5:/.test(s)) return 'v5';
+  if (/^gen:/.test(s)) return 'genesys';
+  if (/^dh:/.test(s)) return 'daggerheart';
+  if (/^ct:/.test(s)) return 'cthulhutech';
+  if (/^sw:/.test(s)) return 'starwars';
+  if (/^tor:/.test(s)) return 'onering';
+  if (/^pbta:/.test(s)) return 'pbta';
+  if (/^mist:/.test(s)) return 'mist';
+  if (FATE_REGEX.test(s)) return 'fate';
+  return 'numeric';
 }
 
 function parseV5(src) {
@@ -1967,35 +3106,51 @@ function rollV5(src) {
 }
 
 // V5 outcome rules
-//   * a die is a success on 6-9 (1 success); 10 counts as TWO successes
-//   * two dice showing 10 => a critical win
-//   * Messy Critical  = critical win where at least one Hunger die shows 10
+//   * every die showing 6+ is one success — a 10 is NOT worth two on its own
+//   * each PAIR of 10s is a critical: the pair adds two further successes, so
+//     two 10s together are worth four. An odd 10 left over is just its own
+//     single success. (Counting every 10 as two, as this once did, inflated any
+//     pool containing a lone 10 and quietly changed win/lose at the margin.)
+//   * a critical only *wins* if the roll also meets the difficulty; two 10s in
+//     a roll that falls short is still a failure, not a Critical
+//   * Messy Critical  = a winning critical where at least one Hunger die shows 10
 //   * Bestial Failure = the test fails AND at least one Hunger die shows 1
-// Difficulty is needed to resolve win/loss truthfully; when omitted (null) the
-// reducer reports successes + intrinsic critical + hunger events but does not
-// assert Bestial Failure (it cannot know whether the roll lost).
+//
+// Difficulty is what makes any of the resolved states truthful, so with it
+// omitted (null) the reducer reports the raw facts — successes, the crit pair,
+// the Hunger events — and asserts no outcome at all rather than guessing.
 function summarizeV5(dice, difficulty, pool = dice.length, hunger = dice.filter(d => d.hunger).length) {
-  let successes = 0, tenCount = 0, hungerTen = 0, hungerOne = 0;
+  let base = 0, tenCount = 0, hungerTen = 0, hungerOne = 0;
   for (const d of dice) {
     const v = d.value;
-    if (v >= 6) successes += v === 10 ? 2 : 1;
+    if (v >= 6) base++;
     if (v === 10) { tenCount++; if (d.hunger) hungerTen++; }
     if (v === 1 && d.hunger) hungerOne++;
   }
-  const critTwo = tenCount >= 2;
+  const critPairs = Math.floor(tenCount / 2);
+  const successes = base + critPairs * 2;
+  const critTwo = critPairs > 0;
   const margin = difficulty === null ? null : successes - difficulty;
+  const won = difficulty !== null && successes >= difficulty;
 
   let outcome = null;
-  if (critTwo && hungerTen > 0) outcome = 'messy-critical';
-  else if (critTwo) outcome = 'critical';
-  else if (difficulty !== null && margin >= 0) outcome = 'success';
-  else if (difficulty !== null && hungerOne > 0) outcome = 'bestial-failure';
-  else if (difficulty !== null) outcome = 'failure';
+  // Zero successes resolves without a difficulty: every difficulty is at least
+  // 1, so a roll with nothing on it has lost whatever the Storyteller had in
+  // mind — including, with a Hunger 1 among the dice, as a Bestial Failure.
+  if (difficulty === null && successes === 0) outcome = hungerOne > 0 ? 'bestial-failure' : 'failure';
+  else if (difficulty === null) outcome = null;
+  else if (won && critTwo) outcome = hungerTen > 0 ? 'messy-critical' : 'critical';
+  else if (won) outcome = 'success';
+  else if (hungerOne > 0) outcome = 'bestial-failure';
+  else outcome = 'failure';
 
   return {
     kind: 'v5', pool, hunger, difficulty,
     successes, outcome, margin,
-    critTwo, hungerTen, hungerOne, tenCount,
+    // A total failure — no successes at all — is its own thing at the table,
+    // and it is worth saying out loud whether or not a difficulty was set.
+    totalFailure: successes === 0,
+    critTwo, critPairs, hungerTen, hungerOne, tenCount,
   };
 }
 
@@ -2007,26 +3162,58 @@ const OUTCOME_LABEL = {
   failure: 'Failure',
 };
 
-function describeV5(result) {
-  const s = result.summary;
-  const parts = [`${s.successes} success${s.successes === 1 ? '' : 'es'}`];
-  if (s.outcome && OUTCOME_LABEL[s.outcome]) parts.push(OUTCOME_LABEL[s.outcome]);
-  if (s.outcome === 'success' && s.margin !== null) parts.push(`margin +${s.margin}`);
-  if (s.critTwo) parts.push('two 10s');
-  if (s.hungerTen) parts.push(`Hunger ${s.hungerTen > 1 ? `10 ×${s.hungerTen}` : '10'}`);
-  if (s.hungerOne) parts.push(`Hunger ${s.hungerOne > 1 ? `1 ×${s.hungerOne}` : '1'}`);
+// The raw dice, split into the two pools and labelled in words. The symbols on
+// the tray are the fun part, but the readout and the log spell out the actual
+// d10 values so a roll can be checked — and "Hunger 9, 7" reads as what it is
+// where "9⬥, 7⬥" needs a legend nobody has.
+function v5Dice(result) {
+  const regular = [], hunger = [];
+  for (const g of result.groups || []) {
+    for (const d of g.dice || []) (d.hunger ? hunger : regular).push(d.value);
+  }
+  const parts = [];
+  if (regular.length) parts.push(`Regular ${regular.join(', ')}`);
+  if (hunger.length) parts.push(`Hunger ${hunger.join(', ')}`);
   return parts.join(' · ');
 }
 
-// A compact headline for the big readout: the resolved outcome (or the success
-// count when difficulty is unknown), short enough not to overflow the total.
+// The line under the headline, in reading order: what happened, then the
+// arithmetic behind it, then a short "why" for the outcomes a bare count does
+// not explain, then the dice themselves.
+function describeV5(result) {
+  const s = result.summary;
+  const parts = [];
+  if (s.outcome && OUTCOME_LABEL[s.outcome]) parts.push(OUTCOME_LABEL[s.outcome]);
+  parts.push(`${s.successes} success${s.successes === 1 ? '' : 'es'}`
+    + (s.difficulty !== null ? ` vs difficulty ${s.difficulty}` : ''));
+  // Only the outcomes that a "successes ≥ difficulty" tally does not explain on
+  // its own get a reason, so the line stays short.
+  if (s.outcome === 'messy-critical') parts.push('a pair of 10s, one on a Hunger die');
+  else if (s.outcome === 'critical') parts.push(s.critPairs > 1 ? `${s.critPairs} pairs of 10s` : 'a pair of 10s');
+  else if (s.outcome === 'bestial-failure') parts.push('a Hunger die rolled 1');
+  else if (s.critTwo) parts.push(s.critPairs > 1 ? `${s.critPairs} pairs of 10s` : 'a pair of 10s');
+  const dice = v5Dice(result);
+  if (dice) parts.push(dice);
+  return parts.join(' · ');
+}
+
+// The big readout. Two shapes, because V5 has two different answers depending
+// on what the roll knows:
+//
+//   * with a difficulty, the answer is the resolved outcome — a phrase, set at
+//     the readout's text size so "Bestial Failure" does not run off the edge
+//     and overlap itself at 104px;
+//   * without one, nothing is resolved and the answer is simply how many
+//     successes came up — a number, which keeps the roller looking like itself.
 function v5Headline(result) {
   const s = result.summary;
   if (s.outcome) {
-    if (s.outcome === 'success' && s.margin !== null) return `Success (+${s.margin})`;
-    return OUTCOME_LABEL[s.outcome] || 'Roll';
+    const text = s.outcome === 'success' && s.margin !== null
+      ? `Success +${s.margin}`
+      : (OUTCOME_LABEL[s.outcome] || 'Roll');
+    return { kind: 'text', text };
   }
-  return `${s.successes} success${s.successes === 1 ? '' : 'es'}`;
+  return { kind: 'number', text: String(s.successes) };
 }
 
 // Dispatcher: an explicit system token in the notation wins; otherwise defer to
@@ -2034,7 +3221,711 @@ function v5Headline(result) {
 function rollAny(src, uiSystem = 'numeric') {
   const sys = detectSystem(src);
   if (sys === 'v5') return rollV5(src);
+  if (sys === 'fate') return rollFate(src);
+  if (sys === 'genesys') return rollGenesys(src);
+  if (sys === 'daggerheart') return rollDaggerheart(src);
+  if (sys === 'cthulhutech') return rollCthulhuTech(src);
+  if (sys === 'starwars') return rollStarWars(src);
+  if (sys === 'onering') return rollOneRing(src);
+  if (sys === 'pbta') return rollPbta(src);
+  if (sys === 'mist') return rollMist(src);
   return { system: 'numeric', deferred: true, notation: String(src) };
+}
+
+// ---- 2d6 systems: Powered by the Apocalypse + the Mist Engine ----
+//
+// One mechanic, two names. Roll 2d6, add a modifier, read the band: 10+ is a
+// full hit, 7-9 a partial (a hit with a cost), 6 or under a miss. PbtA calls
+// them Strong/Weak Hit and Miss; the Mist Engine (City of Mist, Legend in the
+// Mist, :Otherscape) calls them Success/Consequence/Failure and sources the
+// modifier from power tags minus weakness tags.
+const PBTA_REGEX = /^pbta:([+-]\d+)?$/;
+const MIST_REGEX = /^mist:([+-]\d+)?$/;
+
+const BAND_LABELS = {
+  pbta: { hit: 'Strong Hit', partial: 'Weak Hit', miss: 'Miss' },
+  mist: { hit: 'Success', partial: 'Consequence', miss: 'Failure' },
+};
+
+function parse2d6(src, regex, label) {
+  const m = regex.exec(String(src || '').trim().toLowerCase());
+  if (!m) throw new Error(`Expected a ${label} roll like "${label === 'PbtA' ? 'pbta' : 'mist'}:" or ":+2"`);
+  const modifier = m[1] ? Number(m[1]) : 0;
+  if (Math.abs(modifier) > 100) throw new Error('Modifier must be -100 to 100');
+  return { modifier };
+}
+function parsePbta(src) { return parse2d6(src, PBTA_REGEX, 'PbtA'); }
+function parseMist(src) { return parse2d6(src, MIST_REGEX, 'Mist'); }
+
+function roll2d6(src, system, parse) {
+  const { modifier } = parse(src);
+  const a = randInt(6), b = randInt(6);
+  const dice = [
+    { value: a, sides: 6, kept: true, rerolled: false, exploded: false },
+    { value: b, sides: 6, kept: true, rerolled: false, exploded: false },
+  ];
+  return {
+    schema: 2,
+    system,
+    notation: String(src),
+    groups: [{ kind: 'dice', dieType: system, sides: 6, count: 2, dice, subtotal: a + b }],
+    summary: summarize2d6(a, b, modifier, system),
+  };
+}
+function rollPbta(src) { return roll2d6(src, 'pbta', parsePbta); }
+function rollMist(src) { return roll2d6(src, 'mist', parseMist); }
+
+function summarize2d6(a, b, modifier, system) {
+  const sum = a + b;
+  const total = sum + modifier;
+  const band = total >= 10 ? 'hit' : total >= 7 ? 'partial' : 'miss';
+  return { kind: system, a, b, sum, modifier, total, band };
+}
+
+// Total as the big number, tinted by the band (green hit / amber partial /
+// muted miss). Shared by both 2d6 systems.
+function twod6Headline(result) {
+  return { kind: 'number', text: String(result.summary.total), variant: `band-${result.summary.band}` };
+}
+
+function describe2d6(result) {
+  const s = result.summary;
+  const parts = [BAND_LABELS[s.kind][s.band]];
+  let math = `${s.a} + ${s.b}`;
+  if (s.modifier) math += ` ${s.modifier > 0 ? '+' : '−'} ${Math.abs(s.modifier)}`;
+  parts.push(math, `total ${s.total}`);
+  return parts.join(' · ');
+}
+
+// ---- Star Wars (FFG / Edge Studio) — Genesys narrative dice + the Force die ----
+//
+// The six narrative dice resolve exactly as Genesys does; Star Wars adds a
+// seventh: the white Force die (d12), whose Light- and Dark-side pips are a
+// separate output used to power Force abilities. They do not cancel the
+// success/advantage axes. Force die faces: six single Dark, one double Dark,
+// three double Light, two single Light (8 pips each side, dark on more faces).
+const LIGHT = 'lightside', DARK = 'darkside';
+const FORCE_DIE = {
+  color: 'force', sides: 12,
+  faces: [
+    [DARK], [DARK], [DARK], [DARK], [DARK], [DARK],
+    [DARK, DARK],
+    [LIGHT, LIGHT], [LIGHT, LIGHT], [LIGHT, LIGHT],
+    [LIGHT], [LIGHT],
+  ],
+};
+const SW_LETTERS = { a: 'ability', p: 'proficiency', b: 'boost', s: 'setback', d: 'difficulty', c: 'challenge', f: 'force' };
+// Resolved at call time, not module load: GENESYS_DICE is declared further down.
+const swDie = type => (type === 'force' ? FORCE_DIE : GENESYS_DICE[type]);
+
+function parseStarWars(src) {
+  const raw = String(src || '').trim().toLowerCase();
+  const m = /^sw:(.+)$/.exec(raw);
+  if (!m) throw new Error('Expected a Star Wars pool like "sw:2A+2D+1F"');
+  const body = m[1].replace(/[\s+]/g, '');
+  if (!/^(\d*[apbsdcf])+$/.test(body)) {
+    throw new Error('Star Wars dice are A P B S D C F (the six narrative dice plus the Force die)');
+  }
+  const pool = [];
+  let total = 0;
+  for (const t of body.matchAll(/(\d*)([apbsdcf])/g)) {
+    const count = t[1] === '' ? 1 : Number(t[1]);
+    if (count < 1) throw new Error('Each die count must be at least 1');
+    total += count;
+    pool.push({ type: SW_LETTERS[t[2]], count });
+  }
+  if (total < 1 || total > 100) throw new Error('Star Wars pool must be 1-100 dice');
+  return pool;
+}
+
+function rollStarWars(src) {
+  const pool = parseStarWars(src);
+  const dice = [];
+  for (const { type, count } of pool) {
+    const def = swDie(type);
+    for (let i = 0; i < count; i++) {
+      const faceIndex = randInt(def.sides) - 1;
+      dice.push({
+        type, sides: def.sides, color: def.color,
+        faceIndex, symbols: def.faces[faceIndex],
+        value: faceIndex + 1, kept: true, rerolled: false, exploded: false,
+      });
+    }
+  }
+  return {
+    schema: 2,
+    system: 'starwars',
+    notation: String(src),
+    groups: [{ kind: 'dice', dieType: 'starwars', count: dice.length, dice, subtotal: 0 }],
+    summary: summarizeStarWars(dice),
+  };
+}
+
+function summarizeStarWars(dice) {
+  const narrative = dice.filter(d => d.type !== 'force');
+  const g = summarizeGenesys(narrative);
+  let lightside = 0, darkside = 0;
+  for (const d of dice) {
+    if (d.type !== 'force') continue;
+    for (const sym of d.symbols) { if (sym === LIGHT) lightside++; else darkside++; }
+  }
+  return {
+    ...g, kind: 'starwars',
+    lightside, darkside,
+    hasNarrative: narrative.length > 0,
+    hasForce: lightside + darkside > 0,
+  };
+}
+
+function starWarsHeadline(result) {
+  const s = result.summary;
+  // A Force-only roll (a Force-power check) leads with the pips; otherwise the
+  // narrative outcome leads and the pips ride along in the detail.
+  if (!s.hasNarrative && s.hasForce) {
+    const parts = [];
+    if (s.lightside) parts.push(`${s.lightside} Light`);
+    if (s.darkside) parts.push(`${s.darkside} Dark`);
+    return { kind: 'text', text: parts.join(' · ') || 'No Force' };
+  }
+  return genesysHeadline(result);
+}
+
+function describeStarWars(result) {
+  const s = result.summary;
+  let text = s.hasNarrative ? describeGenesys(result) : '';
+  if (s.hasForce) {
+    const force = [];
+    if (s.lightside) force.push(`${s.lightside} Light`);
+    if (s.darkside) force.push(`${s.darkside} Dark`);
+    const clause = `Force ${force.join(', ')}`;
+    text = text ? `${text} · ${clause}` : clause;
+  }
+  return text;
+}
+
+// ---- The One Ring 2e ----
+//
+// One Feat die (d12: 1-10, plus the Eye of Sauron = 0 and the Gandalf rune =
+// automatic success) rolled with a pool of Success dice (d6, where each 6 bears
+// a Tengwar rune). Total the dice and meet the Target Number. Each rune is a
+// mark of quality: one is a Great success, two or more Extraordinary. Favoured /
+// ill-favoured rolls two Feat dice and keeps the better / worse; when Weary,
+// Success dice of 1-3 count as nothing.
+//
+//   tor:3           a Feat die + three Success dice
+//   tor:3@16        the same, against Target Number 16
+//   tor:3fav@16     favoured (roll two Feat dice, keep the best)
+//   tor:2illw@18    ill-favoured and weary
+const TOR_REGEX = /^tor:(\d+)(fav|ill)?(w)?(?:@(\d+))?$/;
+
+function parseOneRing(src) {
+  const m = TOR_REGEX.exec(String(src || '').trim().toLowerCase());
+  if (!m) throw new Error('Expected an One Ring roll like "tor:3" or "tor:3fav@16"');
+  const success = Number(m[1]);
+  const favour = m[2] || null; // 'fav' | 'ill' | null
+  const weary = Boolean(m[3]);
+  const tn = m[4] === undefined ? null : Number(m[4]);
+  if (success < 0 || success > 20) throw new Error('Success dice must be 0-20');
+  if (tn !== null && (tn < 1 || tn > 100)) throw new Error('Target Number must be 1-100');
+  return { success, favour, weary, tn };
+}
+
+// A Feat die roll → {face, value, rank}. rank orders them for keeping the best
+// or worst: Gandalf beats every number beats the Eye.
+function rollFeatDie() {
+  const r = randInt(12);
+  if (r === 11) return { face: 'eye', value: 0, rank: -1 };       // Eye of Sauron = 0
+  if (r === 12) return { face: 'gandalf', value: 0, rank: 99 };   // Gandalf = automatic success
+  return { face: 'number', value: r, rank: r };                   // 1-10
+}
+
+function rollOneRing(src) {
+  const { success, favour, weary, tn } = parseOneRing(src);
+  // Favoured/ill-favoured rolls two Feat dice; the kept one resolves, the other
+  // is shown faded like a dropped die.
+  const feats = [rollFeatDie()];
+  if (favour) feats.push(rollFeatDie());
+  const kept = favour === 'ill'
+    ? feats.reduce((a, b) => (b.rank < a.rank ? b : a))
+    : feats.reduce((a, b) => (b.rank > a.rank ? b : a));
+
+  const dice = feats.map(f => ({
+    role: 'feat', face: f.face, value: f.value, sides: 12,
+    kept: f === kept, rerolled: false, exploded: false,
+  }));
+  for (let i = 0; i < success; i++) {
+    const value = randInt(6);
+    dice.push({ role: 'success', value, sides: 6, rune: value === 6, kept: true, rerolled: false, exploded: false });
+  }
+
+  return {
+    schema: 2,
+    system: 'onering',
+    notation: String(src),
+    groups: [{ kind: 'dice', dieType: 'onering', count: dice.length, dice, subtotal: 0 }],
+    summary: summarizeOneRing({ kept, dice, weary, tn }),
+  };
+}
+
+function summarizeOneRing({ kept, dice, weary = false, tn = null }) {
+  const successDice = dice.filter(d => d.role === 'success');
+  // Weary drops the botches: Success dice showing 1-3 count as zero.
+  let successSum = 0;
+  for (const d of successDice) {
+    d.counts = !(weary && d.value <= 3);
+    if (d.counts) successSum += d.value;
+  }
+  const runes = successDice.filter(d => d.value === 6).length;
+  const gandalf = kept.face === 'gandalf';
+  const eye = kept.face === 'eye';
+  const total = kept.value + successSum;
+  const success = tn === null ? null : (gandalf || total >= tn);
+  const degree = runes >= 2 ? 'extraordinary' : runes === 1 ? 'great' : 'ordinary';
+  return {
+    kind: 'onering',
+    feat: kept.face, featValue: kept.value, gandalf, eye,
+    successSum, runes, total, tn, weary, success, degree,
+  };
+}
+
+const TOR_DEGREE_LABEL = { great: 'Great Success', extraordinary: 'Extraordinary Success' };
+
+// The big readout is the total, tinted by the outcome (gold for a Gandalf
+// auto-success, green for success, muted for failure).
+function oneRingHeadline(result) {
+  const s = result.summary;
+  let variant;
+  if (s.gandalf) variant = 'tor-gandalf';
+  else if (s.success === true) variant = 'tor-success';
+  else if (s.success === false) variant = 'tor-failure';
+  return { kind: 'number', text: String(s.total), variant };
+}
+
+function describeOneRing(result) {
+  const s = result.summary;
+  const parts = [];
+  if (s.gandalf) parts.push('Automatic Success');
+  else if (s.success === true) parts.push('Success');
+  else if (s.success === false) parts.push('Failure');
+  if (s.success !== false && s.degree !== 'ordinary') parts.push(TOR_DEGREE_LABEL[s.degree]);
+  if (s.eye) parts.push('Eye of Sauron');
+  const feat = s.gandalf ? 'Gandalf' : s.eye ? 'Eye' : s.featValue;
+  parts.push(`Feat ${feat}`);
+  const successVals = result.groups[0].dice
+    .filter(d => d.role === 'success')
+    .map(d => (d.value === 6 ? 'ᚱ' : String(d.value)));
+  if (successVals.length) parts.push(`Success ${successVals.join(', ')}`);
+  parts.push(`total ${s.total}` + (s.tn !== null ? ` vs ${s.tn}` : ''));
+  return parts.join(' · ');
+}
+
+// ---- CthulhuTech 2e (the even/odd d10 pool) ----
+//
+// 2e dropped 1e's poker "Framewerk" for a pool of coin-flips: roll d10 equal to
+// your Attribute + Skill, and every EVEN die is a Hit (odd is a miss). Count the
+// hits and meet the Difficulty (about 3 for a simple task up to 6-7 for a near
+// impossible one). A pool that meets or beats the Difficulty succeeds.
+//
+//   ct:8       roll eight d10, report the hits
+//   ct:8@4     the same, resolved against Difficulty 4
+const CT_REGEX = /^ct:(\d+)(?:@(\d+))?$/;
+
+function parseCthulhuTech(src) {
+  const m = CT_REGEX.exec(String(src || '').trim().toLowerCase());
+  if (!m) throw new Error('Expected a CthulhuTech pool like "ct:8" or "ct:8@4"');
+  const dice = Number(m[1]);
+  const difficulty = m[2] === undefined ? null : Number(m[2]);
+  if (dice < 1 || dice > 100) throw new Error('Pool must be 1-100 dice');
+  if (difficulty !== null && (difficulty < 1 || difficulty > 20)) {
+    throw new Error('Difficulty must be 1-20');
+  }
+  return { dice, difficulty };
+}
+
+function rollCthulhuTech(src) {
+  const { dice: count, difficulty } = parseCthulhuTech(src);
+  const dice = [];
+  for (let i = 0; i < count; i++) {
+    const value = randInt(10);
+    dice.push({ value, hit: value % 2 === 0, kept: true, rerolled: false, exploded: false });
+  }
+  return {
+    schema: 2,
+    system: 'cthulhutech',
+    notation: String(src),
+    groups: [{ kind: 'dice', dieType: 'cthulhutech', sides: 10, count, dice, subtotal: 0 }],
+    summary: summarizeCthulhuTech(dice, difficulty, count),
+  };
+}
+
+function summarizeCthulhuTech(dice, difficulty = null, count = dice.length) {
+  let hits = 0;
+  for (const d of dice) if (d.value % 2 === 0) hits++;
+  const success = difficulty === null ? null : hits >= difficulty;
+  const margin = difficulty === null ? null : hits - difficulty;
+  return { kind: 'cthulhutech', count, hits, misses: count - hits, difficulty, success, margin };
+}
+
+// The big readout is the hit count, tinted by whether it met the Difficulty.
+function cthulhutechHeadline(result) {
+  const s = result.summary;
+  const variant = s.success === null ? undefined : s.success ? 'ct-success' : 'ct-failure';
+  return { kind: 'number', text: String(s.hits), variant };
+}
+
+function describeCthulhuTech(result) {
+  const s = result.summary;
+  const parts = [`${s.hits} hit${s.hits === 1 ? '' : 's'}`
+    + (s.difficulty !== null ? ` vs difficulty ${s.difficulty}` : '')];
+  if (s.success !== null) {
+    parts.push(s.success ? (s.margin > 0 ? `Success +${s.margin}` : 'Success') : 'Failure');
+  }
+  const dice = result.groups[0].dice;
+  const hitVals = dice.filter(d => d.value % 2 === 0).map(d => d.value);
+  const missVals = dice.filter(d => d.value % 2 !== 0).map(d => d.value);
+  parts.push(`hits ${hitVals.length ? hitVals.join(', ') : 'none'}`);
+  if (missVals.length) parts.push(`missed ${missVals.join(', ')}`);
+  return parts.join(' · ');
+}
+
+// ---- Daggerheart (Duality Dice) ----
+//
+// The core roll is two d12s — a Hope die and a Fear die — summed with an
+// optional modifier and compared to a Difficulty. Which die is higher decides
+// the tone: Hope high hands the player a Hope, Fear high hands the GM a Fear.
+// Matching dice are a Critical Success (a success regardless of the total, and
+// it comes with Hope). Advantage/disadvantage add or subtract a d6.
+//
+// `advantage` is a signed count of d6 the pool carries: positive = that many
+// advantage dice (each added), negative = that many disadvantage dice (each
+// subtracted), 0 = none. Advantage and disadvantage cancel one-for-one, so a
+// pool never holds both; multiple of one kind stack (e.g. an ally's Help).
+//
+//   dh:            just the duality
+//   dh:+2          with a flat +2 (modifiers can be negative — dh:-1)
+//   dh:@15         against difficulty 15
+//   dh:adv         with one advantage d6
+//   dh:adv2        with two advantage d6 (added)
+//   dh:dis+1@15    with a disadvantage d6, +1, vs 15
+const DH_REGEX = /^dh:(?:(adv|dis)(\d*))?([+-]\d+)?(?:@(\d+))?$/;
+
+function parseDaggerheart(src) {
+  const m = DH_REGEX.exec(String(src || '').trim().toLowerCase());
+  if (!m) throw new Error('Expected a Daggerheart roll like "dh:", "dh:+2", or "dh:adv@15"');
+  let advantage = 0;
+  if (m[1]) {
+    const count = m[2] === '' || m[2] === undefined ? 1 : Number(m[2]);
+    if (count < 1 || count > 20) throw new Error('Advantage/disadvantage dice must be 1-20');
+    advantage = m[1] === 'adv' ? count : -count;
+  }
+  const modifier = m[3] ? Number(m[3]) : 0;
+  const difficulty = m[4] === undefined ? null : Number(m[4]);
+  if (Math.abs(modifier) > 100) throw new Error('Modifier must be -100 to 100');
+  if (difficulty !== null && (difficulty < 1 || difficulty > 100)) {
+    throw new Error('Difficulty must be 1-100');
+  }
+  return { advantage, modifier, difficulty };
+}
+
+function rollDaggerheart(src) {
+  const { advantage, modifier, difficulty } = parseDaggerheart(src);
+  const hope = randInt(12), fear = randInt(12);
+  const dice = [
+    { value: hope, role: 'hope', sides: 12, kept: true, rerolled: false, exploded: false },
+    { value: fear, role: 'fear', sides: 12, kept: true, rerolled: false, exploded: false },
+  ];
+  // One d6 per advantage (or disadvantage) source, each added (or subtracted).
+  let mod = modifier;
+  const n = Math.abs(advantage);
+  const role = advantage > 0 ? 'advantage' : 'disadvantage';
+  for (let i = 0; i < n; i++) {
+    const v = randInt(6);
+    dice.push({ value: v, role, sides: 6, kept: true, rerolled: false, exploded: false });
+    mod += advantage > 0 ? v : -v;
+  }
+  const total = hope + fear + mod;
+  return {
+    schema: 2,
+    system: 'daggerheart',
+    notation: String(src),
+    groups: [{ kind: 'dice', dieType: 'daggerheart', count: dice.length, dice, subtotal: total }],
+    summary: summarizeDaggerheart({ hope, fear, total, modifier, advantage, difficulty }),
+  };
+}
+
+function summarizeDaggerheart({ hope, fear, total, modifier = 0, advantage = 0, difficulty = null }) {
+  const critical = hope === fear;
+  const withHope = hope > fear;
+  // A Critical always succeeds, whatever the total. Otherwise the total is
+  // measured against the difficulty when one was set.
+  const success = difficulty === null ? null : (critical || total >= difficulty);
+  let outcome;
+  if (critical) outcome = 'critical';
+  else if (difficulty !== null) outcome = (success ? 'success-' : 'failure-') + (withHope ? 'hope' : 'fear');
+  else outcome = withHope ? 'hope' : 'fear';
+  return { kind: 'daggerheart', hope, fear, total, modifier, advantage, difficulty, critical, withHope, success, outcome };
+}
+
+const DH_OUTCOME_LABEL = {
+  critical: 'Critical Success',
+  'success-hope': 'Success with Hope',
+  'success-fear': 'Success with Fear',
+  'failure-hope': 'Failure with Hope',
+  'failure-fear': 'Failure with Fear',
+  hope: 'with Hope',
+  fear: 'with Fear',
+};
+
+// The big readout is the total, tinted by the tone: gold for Hope, violet for
+// Fear, a brighter gold for a Critical. `variant` carries that to the DOM.
+function daggerheartHeadline(result) {
+  const s = result.summary;
+  const variant = s.critical ? 'critical' : s.withHope ? 'hope' : 'fear';
+  return { kind: 'number', text: String(s.total), variant };
+}
+
+function describeDaggerheart(result) {
+  const s = result.summary;
+  const parts = [DH_OUTCOME_LABEL[s.outcome], `Hope ${s.hope}, Fear ${s.fear}`];
+  const dice = result.groups[0].dice;
+  const adv = dice.filter(d => d.role === 'advantage').map(d => d.value);
+  const dis = dice.filter(d => d.role === 'disadvantage').map(d => d.value);
+  if (adv.length) parts.push(`advantage +${adv.join(', +')}`);
+  if (dis.length) parts.push(`disadvantage −${dis.join(', −')}`);
+  if (s.modifier) parts.push(`${s.modifier > 0 ? '+' : '−'}${Math.abs(s.modifier)} modifier`);
+  parts.push(s.difficulty !== null ? `total ${s.total} vs ${s.difficulty}` : `total ${s.total}`);
+  return parts.join(' · ');
+}
+
+// ---- Genesys (narrative dice) ----
+//
+// The six FFG/Genesys narrative dice, by exact face table. A face carries a
+// multiset of symbols (0-2 of them); the pool is reduced on two independent
+// axes — Success cancels Failure, Advantage cancels Threat — while Triumph and
+// Despair persist uncancelled (a Triumph also counts as a Success, a Despair
+// also as a Failure). Star Wars is the same set plus a Force die, added later.
+//
+// s=success a=advantage t=triumph  f=failure h=threat d=despair
+const S = 'success', A = 'advantage', TRI = 'triumph';
+const F = 'failure', H = 'threat', DES = 'despair';
+
+const GENESYS_DICE = {
+  // Boost — light blue d6.
+  boost: { color: 'boost', sides: 6, faces: [[], [], [S], [A], [S, A], [A, A]] },
+  // Setback — black d6.
+  setback: { color: 'setback', sides: 6, faces: [[], [], [F], [F], [H], [H]] },
+  // Ability — green d8.
+  ability: { color: 'ability', sides: 8, faces: [[], [S], [S], [S, S], [A], [A], [S, A], [A, A]] },
+  // Difficulty — purple d8.
+  difficulty: { color: 'difficulty', sides: 8, faces: [[], [F], [F, F], [H], [H], [H], [H, H], [F, H]] },
+  // Proficiency — yellow d12 (carries the Triumph).
+  proficiency: {
+    color: 'proficiency', sides: 12,
+    faces: [[], [S], [S], [S, S], [S, S], [A], [S, A], [S, A], [S, A], [A, A], [A, A], [TRI]],
+  },
+  // Challenge — red d12 (carries the Despair).
+  challenge: {
+    color: 'challenge', sides: 12,
+    faces: [[], [F], [F], [F, F], [F, F], [H], [H], [F, H], [F, H], [H, H], [H, H], [DES]],
+  },
+};
+
+// Pool shorthand: gen:2A+1P+2D+1S — Ability, Proficiency, Boost, Setback,
+// Difficulty, Challenge by their initials. The + separators are optional.
+const GENESYS_LETTERS = { a: 'ability', p: 'proficiency', b: 'boost', s: 'setback', d: 'difficulty', c: 'challenge' };
+
+function parseGenesys(src) {
+  const raw = String(src || '').trim().toLowerCase();
+  const m = /^gen:(.+)$/.exec(raw);
+  if (!m) throw new Error('Expected a Genesys pool like "gen:2A+1P+2D"');
+  const body = m[1].replace(/[\s+]/g, '');
+  if (!/^(\d*[apbsdc])+$/.test(body)) {
+    throw new Error('Genesys dice are A P B S D C (Ability, Proficiency, Boost, Setback, Difficulty, Challenge)');
+  }
+  const pool = [];
+  let total = 0;
+  for (const t of body.matchAll(/(\d*)([apbsdc])/g)) {
+    const count = t[1] === '' ? 1 : Number(t[1]);
+    if (count < 1) throw new Error('Each die count must be at least 1');
+    total += count;
+    pool.push({ type: GENESYS_LETTERS[t[2]], count });
+  }
+  if (total < 1 || total > 100) throw new Error('Genesys pool must be 1-100 dice');
+  return pool;
+}
+
+function rollGenesys(src) {
+  const pool = parseGenesys(src);
+  const dice = [];
+  for (const { type, count } of pool) {
+    const def = GENESYS_DICE[type];
+    for (let i = 0; i < count; i++) {
+      const faceIndex = randInt(def.sides) - 1;
+      dice.push({
+        type, sides: def.sides, color: def.color,
+        faceIndex, symbols: def.faces[faceIndex],
+        value: faceIndex + 1, kept: true, rerolled: false, exploded: false,
+      });
+    }
+  }
+  return {
+    schema: 2,
+    system: 'genesys',
+    notation: String(src),
+    groups: [{ kind: 'dice', dieType: 'genesys', count: dice.length, dice, subtotal: 0 }],
+    summary: summarizeGenesys(dice),
+  };
+}
+
+function summarizeGenesys(dice) {
+  const raw = { success: 0, advantage: 0, triumph: 0, failure: 0, threat: 0, despair: 0 };
+  for (const d of dice) {
+    for (const sym of d.symbols || []) raw[sym]++;
+  }
+  // Triumph counts as a Success and Despair as a Failure for the pass/fail axis,
+  // but both are also reported on their own since they never cancel.
+  const netSuccess = (raw.success + raw.triumph) - (raw.failure + raw.despair);
+  const netAdvantage = raw.advantage - raw.threat;
+  return {
+    kind: 'genesys',
+    ...raw,
+    netSuccess,
+    netAdvantage,
+    success: netSuccess > 0 ? netSuccess : 0,
+    failure: netSuccess < 0 ? -netSuccess : 0,
+    advantage: netAdvantage > 0 ? netAdvantage : 0,
+    threat: netAdvantage < 0 ? -netAdvantage : 0,
+    raw,
+  };
+}
+
+// The success/failure axis is the outcome; it leads. A wash (net 0) is a
+// failure, since Genesys needs at least one net success to pass.
+function genesysHeadline(result) {
+  const s = result.summary;
+  const parts = [];
+  if (s.netSuccess > 0) parts.push(`${s.netSuccess} Success`);
+  else parts.push('Failure');
+  if (s.netAdvantage > 0) parts.push(`${s.netAdvantage} Advantage`);
+  else if (s.netAdvantage < 0) parts.push(`${-s.netAdvantage} Threat`);
+  if (s.raw.triumph) parts.push(s.raw.triumph > 1 ? `${s.raw.triumph} Triumph` : 'Triumph');
+  if (s.raw.despair) parts.push(s.raw.despair > 1 ? `${s.raw.despair} Despair` : 'Despair');
+  return { kind: 'text', text: parts.join(' · ') };
+}
+
+function describeGenesys(result) {
+  const s = result.summary;
+  // The net result, spelled out, then the raw tally so the cancellation is
+  // auditable ("2 success, 3 failure → net 1 failure").
+  const net = genesysHeadline(result).text;
+  const r = s.raw;
+  const rawParts = [];
+  const pushRaw = (n, one, many) => { if (n) rawParts.push(`${n} ${n === 1 ? one : many}`); };
+  pushRaw(r.success, 'success', 'success');
+  pushRaw(r.advantage, 'advantage', 'advantage');
+  pushRaw(r.triumph, 'Triumph', 'Triumph');
+  pushRaw(r.failure, 'failure', 'failure');
+  pushRaw(r.threat, 'threat', 'threat');
+  pushRaw(r.despair, 'Despair', 'Despair');
+  const rolled = rawParts.length ? `rolled ${rawParts.join(', ')}` : 'all blank';
+  return `${net} · ${rolled}`;
+}
+
+// The symbols a face shows, for the renderer.
+function genesysFace(type, faceIndex) {
+  return GENESYS_DICE[type]?.faces[faceIndex] ?? [];
+}
+
+// ---- Fate / Fudge ----
+//
+// NdF[+/-M]: N Fudge dice, each a d6 with two + faces, two − faces and two
+// blanks, so a die reads +1 / −1 / 0. The result is the net sum plus an optional
+// skill modifier. N defaults to 4 (the standard 4dF, net −4…+4).
+const FATE_REGEX = /^(\d+)?df([+-]\d+)?$/;
+
+function parseFate(src) {
+  const m = FATE_REGEX.exec(String(src || '').trim().toLowerCase());
+  if (!m) throw new Error('Expected a Fate pool like "4dF" or "4dF+2"');
+  const count = m[1] === undefined ? 4 : Number(m[1]);
+  const modifier = m[2] === undefined ? 0 : Number(m[2]);
+  if (count < 1 || count > 100) throw new Error('Fate dice must be 1-100');
+  if (Math.abs(modifier) > 100) throw new Error('Modifier must be -100 to 100');
+  return { count, modifier };
+}
+
+function rollFate(src) {
+  const { count, modifier } = parseFate(src);
+  // Each die is a uniform d6; two faces each map to +1, −1 and 0. Rolling the
+  // d6 and mapping keeps the die an honest cube with an exact face distribution.
+  const dice = [];
+  for (let i = 0; i < count; i++) {
+    const face = randInt(6);
+    const value = face <= 2 ? 1 : face <= 4 ? -1 : 0;
+    dice.push({ value, kept: true, rerolled: false, exploded: false });
+  }
+  return {
+    schema: 2,
+    system: 'fate',
+    notation: String(src),
+    groups: [{ kind: 'dice', dieType: 'fate', sides: 6, count, dice, subtotal: 0 }],
+    summary: summarizeFate(dice, modifier, count),
+  };
+}
+
+function summarizeFate(dice, modifier = 0, count = dice.length) {
+  let plus = 0, minus = 0, blank = 0, sum = 0;
+  for (const d of dice) {
+    if (d.value > 0) plus++;
+    else if (d.value < 0) minus++;
+    else blank++;
+    sum += d.value;
+  }
+  return { kind: 'fate', count, modifier, sum, total: sum + modifier, plus, minus, blank };
+}
+
+// The Fate ladder: every total has an adjective, which is half the fun of the
+// system. Clamped at the ends rather than left blank.
+const FATE_LADDER = [
+  'Mediocre', 'Average', 'Fair', 'Good', 'Great',
+  'Superb', 'Fantastic', 'Epic', 'Legendary',
+];
+function fateLadder(n) {
+  if (n >= 8) return 'Legendary';
+  if (n <= -2) return 'Terrible';
+  if (n === -1) return 'Poor';
+  return FATE_LADDER[n];
+}
+
+// A signed total, using a real minus sign so "−2" lines up with the glyphs.
+function fateSigned(n) {
+  return n > 0 ? `+${n}` : n < 0 ? `−${Math.abs(n)}` : '0';
+}
+
+// The glyph a die shows: a plus, a minus, or a blank face.
+function fateFace(value) {
+  return value > 0 ? 'plus' : value < 0 ? 'minus' : 'blank';
+}
+
+const FATE_SYMBOL = { 1: '+', 0: '▢', '-1': '−' };
+
+function describeFate(result) {
+  const s = result.summary;
+  const syms = result.groups
+    .flatMap(g => g.dice)
+    .map(d => FATE_SYMBOL[d.value] ?? '▢')
+    .join(' ');
+  const parts = [fateLadder(s.total), syms];
+  // Only spell out the arithmetic when a modifier makes the total differ from
+  // the dice; otherwise the glyphs already are the sum.
+  if (s.modifier) {
+    parts.push(`dice ${fateSigned(s.sum)}`, `${fateSigned(s.modifier)} modifier`);
+  }
+  return parts.join(' · ');
+}
+
+// The big readout: the signed total, at the numeral size (it is short).
+function fateHeadline(result) {
+  return { kind: 'number', text: fateSigned(result.summary.total) };
 }
 
 // V5 dice are still uniform d10s (value 1-10); the official dice merely *render*
@@ -2054,7 +3945,7 @@ function v5Face(value, hunger) {
   return 'critical';
 }
 
-Object.assign(__dicebox, { detectSystem, parseV5, rollV5, summarizeV5, describeV5, v5Headline, rollAny, v5Face });
+Object.assign(__dicebox, { detectSystem, parseV5, rollV5, summarizeV5, v5Dice, describeV5, v5Headline, rollAny, parsePbta, parseMist, rollPbta, rollMist, summarize2d6, twod6Headline, describe2d6, parseStarWars, rollStarWars, summarizeStarWars, starWarsHeadline, describeStarWars, parseOneRing, rollOneRing, summarizeOneRing, oneRingHeadline, describeOneRing, parseCthulhuTech, rollCthulhuTech, summarizeCthulhuTech, cthulhutechHeadline, describeCthulhuTech, parseDaggerheart, rollDaggerheart, summarizeDaggerheart, daggerheartHeadline, describeDaggerheart, GENESYS_DICE, parseGenesys, rollGenesys, summarizeGenesys, genesysHeadline, describeGenesys, genesysFace, parseFate, rollFate, summarizeFate, fateLadder, fateFace, describeFate, fateHeadline, v5Face });
 })();
 
 // render.js
@@ -3371,7 +5262,7 @@ class Die {
       }
       // Hunger (blood) dice draw their whole wireframe in the accent colour so
       // they read as a distinct class on the tray, not only by their glyph.
-      ctx.strokeStyle = this.hunger ? theme.accent : theme.line;
+      ctx.strokeStyle = this.genColor || (this.hunger ? theme.accent : theme.line);
       ctx.globalAlpha = fade * alpha;
       ctx.lineWidth = width;
       ctx.stroke();
@@ -3405,7 +5296,7 @@ class Die {
         ctx.moveTo(proj[edge.a][0], proj[edge.a][1]);
         ctx.lineTo(proj[edge.b][0], proj[edge.b][1]);
       }
-      ctx.strokeStyle = this.hunger ? theme.accent : theme.line;
+      ctx.strokeStyle = this.genColor || (this.hunger ? theme.accent : theme.line);
       // Scaled rather than set, so a dropped die's fade survives this pass.
       ctx.globalAlpha = fade * (pass ? 1 : 0.22);
       ctx.lineWidth = pass ? 1.6 : 1.1;
@@ -3501,7 +5392,7 @@ class Die {
 
     // V5 hunger (blood) dice read their numeral in the accent colour so they are
     // visually distinct from the ordinary d10s in the same pool.
-    const ink = this.hunger ? theme.accent : theme.line;
+    const ink = this.genColor || (this.hunger ? theme.accent : theme.line);
 
     // Spherical high dice (d101+, exact facets): no microface can legibly hold a
     // three- or four-digit result, so it floats at the die's centre over a small
@@ -3583,6 +5474,60 @@ class Die {
     const c2 = best.reduce((a, i) => [a[0] + proj[i][0], a[1] + proj[i][1]], [0, 0])
                    .map(v => v / best.length);
 
+    // V5 symbol dice are drawn here and return early: the glyph sits upright and
+    // centred on the up-face, always the same way round however the die settled,
+    // and is sized to the face's inscribed circle so it fills the face rather
+    // than floating small in the middle. Numerals skew into the face plane to
+    // read as engraved; a symbol reads better flat and consistent, which is what
+    // was asked for.
+    if (this.v5Face) {
+      const r = faceInradiusScreen(best, proj, c2);
+      const box = Math.max(6, r * 1.82 * (0.9 + 0.1 * alpha));
+      // Stand the glyph up along the face's own axis: the loop points at the
+      // kite's apex, the blade toward the equator, so the mark reads as printed
+      // on the die rather than pasted on flat.
+      const [ux, uy] = faceUpAxis(best, proj, c2);
+      const dnx = -ux, dny = -uy;           // local +y (blade) → toward equator
+      ctx.save();
+      ctx.translate(c2[0], c2[1]);
+      ctx.transform(dny, -dnx, dnx, dny, 0, 0); // pure rotation onto the axis
+      ctx.globalAlpha = alpha;
+      drawV5Glyph(ctx, this.v5Face, box, ink, theme.paper);
+      this.drawFaceMark(ctx, theme, box * 0.6);
+      ctx.restore();
+      ctx.globalAlpha = 1;
+      return;
+    }
+
+    // Fate dice: a plus, a minus, or a blank on the cube face. The marks are
+    // symmetric enough to sit screen-upright rather than tracking a square face's
+    // (ambiguous) axis, and centred to the face's inscribed circle.
+    if (this.fateFace) {
+      const r = faceInradiusScreen(best, proj, c2);
+      const box = Math.max(6, r * 1.5 * (0.9 + 0.1 * alpha));
+      ctx.save();
+      ctx.translate(c2[0], c2[1]);
+      ctx.globalAlpha = alpha;
+      drawFateGlyph(ctx, this.fateFace, box, ink);
+      ctx.restore();
+      ctx.globalAlpha = 1;
+      return;
+    }
+
+    // The One Ring's Feat die shows the Eye of Sauron or the Gandalf rune in
+    // place of a number; both sit upright and centred.
+    if (this.torFace) {
+      const r = faceInradiusScreen(best, proj, c2);
+      const box = Math.max(6, r * 1.55 * (0.9 + 0.1 * alpha));
+      ctx.save();
+      ctx.translate(c2[0], c2[1]);
+      ctx.globalAlpha = alpha;
+      drawTorGlyph(ctx, this.torFace, box, ink);
+      ctx.restore();
+      ctx.globalAlpha = 1;
+      return;
+    }
+
     // The transform below maps the glyph's local +x onto (ux, uy), so this is the
     // direction the text reads along. Pick the face's own axis that runs closest
     // to screen-right, which keeps the numeral upright.
@@ -3611,6 +5556,22 @@ class Die {
       }
     }
 
+    // Genesys narrative dice sit in the face plane like the numerals do —
+    // rotated to a face edge and foreshortened by how far the face is turned —
+    // so the symbols read as printed on the die rather than floating flat over
+    // whatever angle it settled at. Sized to the face's inscribed circle.
+    if (this.genFace) {
+      const r = faceInradiusScreen(best, proj, c2) * 0.92 * (0.9 + 0.1 * alpha);
+      ctx.save();
+      ctx.translate(c2[0], c2[1]);
+      ctx.transform(ux, uy, -uy * bestFacing, ux * bestFacing, 0, 0);
+      ctx.globalAlpha = alpha;
+      drawGenesysSymbols(ctx, this.genFace, r, ink);
+      ctx.restore();
+      ctx.globalAlpha = 1;
+      return;
+    }
+
     const label = String(this.value);
     // Long labels (d100 can show 3 digits) need to shrink to stay on the face.
     const fit = label.length > 2 ? 0.34 : label.length > 1 ? 0.42 : 0.52;
@@ -3632,14 +5593,7 @@ class Die {
     ctx.textBaseline = 'middle';
     ctx.fillStyle = ink;
     ctx.globalAlpha = alpha;
-    if (this.v5Face) {
-      // V5 symbol dice paint their glyph — same settle/pop, same ink rules
-      // (hunger dice draw in the blood accent) — but scaled down a touch so the
-      // mark sits inside the face instead of reaching its edges.
-      drawV5Glyph(ctx, this.v5Face, grown * 0.8, ink);
-    } else {
-      ctx.fillText(label, 0, 0);
-    }
+    ctx.fillText(label, 0, 0);
     // Drawn here so it shares the face's skew: the ring sits in the surface with
     // the numeral rather than floating flat over the die.
     this.drawFaceMark(ctx, theme, size);
@@ -3648,60 +5602,344 @@ class Die {
   }
 }
 
-// Original line-art glyphs for the V5 symbol dice. NOT copied from the official
-// dice — a minimal wireframe vocabulary that reads at 30-60px. Each glyph is
-// sized to sit inside the die face (kept within ~±0.42·s so nothing bleeds past
-// the edge, even at the settle-pop scale).
-function drawV5Glyph(ctx, face, s, color) {
+// The radius of the largest circle that fits inside a face, measured where the
+// The screen direction from the face centre toward a d10 kite's apex — the
+// pole vertex the face narrows to. A V5 glyph is stood up along this axis (loop
+// at the apex, blade toward the equator) so it sits on the die the way a symbol
+// is printed on a real die, not merely upright on the screen.
+//
+// A kite has one axis of symmetry, through the two vertices where the adjacent
+// edges are equal; the apex is the one whose adjacent edges are the longer pair
+// (the pointier, pole end). Non-kite faces have no such axis, so they fall back
+// to screen-up.
+function faceUpAxis(face, proj, c2) {
+  if (face.length !== 4) return [0, -1];
+  const P = face.map(i => proj[i]);
+  // edge[i] is the length of the edge from vertex i to i+1.
+  const edge = P.map((p, i) => {
+    const q = P[(i + 1) % 4];
+    return Math.hypot(q[0] - p[0], q[1] - p[1]);
+  });
+  // At vertex i the adjacent edges are edge[i-1] (incoming) and edge[i].
+  const adjDiff = i => Math.abs(edge[(i + 3) % 4] - edge[i]);
+  const adjSum  = i => edge[(i + 3) % 4] + edge[i];
+  // The two vertices whose adjacent edges are most nearly equal are the axis.
+  const axis = [0, 1, 2, 3].sort((a, b) => adjDiff(a) - adjDiff(b)).slice(0, 2);
+  const apex = adjSum(axis[0]) >= adjSum(axis[1]) ? axis[0] : axis[1];
+  const dx = P[apex][0] - c2[0], dy = P[apex][1] - c2[1];
+  const len = Math.hypot(dx, dy) || 1;
+  return [dx / len, dy / len];
+}
+
+// The radius of the largest circle that fits inside the face as it appears on
+// screen — the shortest distance from the face centre to any of its projected
+// edges. The V5 glyph is drawn centred, so this one number is exactly how big
+// the mark can grow before it touches an edge.
+function faceInradiusScreen(face, proj, c2) {
+  let r = Infinity;
+  for (let i = 0; i < face.length; i++) {
+    const a = proj[face[i]], b = proj[face[(i + 1) % face.length]];
+    const ex = b[0] - a[0], ey = b[1] - a[1];
+    const len = Math.hypot(ex, ey);
+    if (len < 1e-6) continue;
+    // Perpendicular distance from c2 to the line through a and b.
+    r = Math.min(r, Math.abs(ex * (a[1] - c2[1]) - ey * (a[0] - c2[0])) / len);
+  }
+  return Number.isFinite(r) ? r : 0;
+}
+
+// Original line-art glyphs for the V5 symbol dice — our own vocabulary in the
+// spirit of the official set, NOT copied from it. The success mark is an ankh
+// drawn as a dagger (a ring pommel over a downward blade); a critical adds an
+// ornament that differs by die class — sparks on an ordinary die, fangs on a
+// Hunger die — and the Hunger 1 is a skull.
+//
+// The ornament, not just the base shape, is what tells a success from a critical
+// across a table at twenty pixels: an ankh and an ankh-with-sparks read apart
+// where an ankh and an ankh-with-a-tick would not.
+//
+// Everything is drawn inside a box of side L centred on the origin, with the
+// furthest ink about 0.47·L out, which is what lets the caller size the mark
+// from the face's inscribed circle.
+function drawV5Glyph(ctx, face, L, color, paper) {
   ctx.strokeStyle = color;
   ctx.fillStyle = color;
-  ctx.lineWidth = Math.max(0.8, s * 0.085);
+  ctx.lineWidth = Math.max(1, L * 0.10);
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  const L = s;
-  const ring = (cx, cy, r) => { ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.stroke(); };
   switch (face) {
-    case 'success':
-    case 'hunger-success': {
-      // A compact ankh. Loop on top, one clean stem, a short crossbar — reads as
-      // the canonical success mark without shouting.
-      ring(0, -L * 0.20, L * 0.17);
-      ctx.beginPath(); ctx.moveTo(0, -L * 0.03); ctx.lineTo(0, L * 0.42); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(-L * 0.24, L * 0.02); ctx.lineTo(L * 0.24, L * 0.02); ctx.stroke();
-      break;
-    }
-    case 'critical':
-    case 'hunger-critical': {
-      // The success mark with short ticks radiating off the loop — the "starred"
-      // critical variant.
-      ring(0, -L * 0.20, L * 0.17);
-      ctx.beginPath(); ctx.moveTo(0, -L * 0.03); ctx.lineTo(0, L * 0.42); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(-L * 0.24, L * 0.02); ctx.lineTo(L * 0.24, L * 0.02); ctx.stroke();
-      ctx.beginPath();
-      for (let i = 0; i < 6; i++) {
-        const a = i * Math.PI / 3 + Math.PI / 6;
-        const r0 = L * 0.24, r1 = L * 0.33;
-        ctx.moveTo(Math.cos(a) * r0, -L * 0.20 + Math.sin(a) * r0);
-        ctx.lineTo(Math.cos(a) * r1, -L * 0.20 + Math.sin(a) * r1);
-      }
-      ctx.stroke();
-      break;
-    }
-    case 'skull': {
-      // A plain skull: cranium, jaw, two eyes, a nose — kept open and neat so it
-      // reads as a 1 at hunting distance, not a blob.
-      ring(0, -L * 0.06, L * 0.34);
-      ctx.beginPath(); ctx.arc(0, L * 0.26, L * 0.24, Math.PI * 0.16, Math.PI * 0.84); ctx.stroke();
-      ctx.beginPath(); ctx.arc(-L * 0.13, -L * 0.08, L * 0.075, 0, TAU); ctx.fill();
-      ctx.beginPath(); ctx.arc( L * 0.13, -L * 0.08, L * 0.075, 0, TAU); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(0, -L * 0.02); ctx.lineTo(-L * 0.045, L * 0.10); ctx.lineTo(L * 0.045, L * 0.10); ctx.closePath(); ctx.fill();
-      break;
-    }
+    // Success is the bare mark; a critical adds an ornament that differs by die
+    // class — sparks for an ordinary die, fangs for a Hunger die — so the two
+    // criticals never read as the same face.
+    case 'success':         drawDaggerAnkh(ctx, L, 'none');  break;
+    case 'hunger-success':  drawDaggerAnkh(ctx, L, 'none');  break;
+    case 'critical':        drawDaggerAnkh(ctx, L, 'stars'); break;
+    case 'hunger-critical': drawDaggerAnkh(ctx, L, 'fangs'); break;
+    case 'skull':           drawSkull(ctx, L, paper);        break;
     case 'blank':
     default:
       // Blank faces are empty, exactly like the real die — nothing to draw.
       break;
   }
+}
+
+// The success mark: an ankh whose stem is a dagger. A ring pommel at the top,
+// a crossguard, and a tapered blade pointing straight down — always upright, so
+// the blade always points at the die's centre. `ornament` decorates the
+// critical: 'stars' (an ordinary die's 10) or 'fangs' (a Hunger die's 10).
+function drawDaggerAnkh(ctx, L, ornament) {
+  const loopCy = -0.34 * L, loopR = 0.14 * L;
+  const guardY = -0.12 * L, guardX = 0.21 * L;
+  const tipY = 0.47 * L, bw = 0.08 * L, bladeTopY = guardY - 0.01 * L;
+  const lw = ctx.lineWidth;
+
+  // Ornament sits behind the ankh so the blade's edges read over it.
+  if (ornament === 'stars') {
+    drawSpark(ctx, -0.30 * L, -0.30 * L, 0.11 * L);
+    drawSpark(ctx, 0.30 * L, -0.30 * L, 0.11 * L);
+    drawSpark(ctx, -0.34 * L, 0.06 * L, 0.075 * L);
+    drawSpark(ctx, 0.34 * L, 0.06 * L, 0.075 * L);
+  } else if (ornament === 'fangs') {
+    drawFang(ctx, -0.30 * L, guardY + 0.02 * L, 0.075 * L, 0.26 * L);
+    drawFang(ctx, 0.30 * L, guardY + 0.02 * L, 0.075 * L, 0.26 * L);
+  }
+
+  // Pommel ring, neck, crossguard.
+  ctx.beginPath();
+  ctx.arc(0, loopCy, loopR, 0, TAU);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(0, loopCy + loopR);
+  ctx.lineTo(0, bladeTopY);
+  ctx.moveTo(-guardX, guardY);
+  ctx.lineTo(guardX, guardY);
+  ctx.stroke();
+
+  // Blade: a filled taper to a point.
+  const mid = bladeTopY + 0.6 * (tipY - bladeTopY);
+  ctx.beginPath();
+  ctx.moveTo(-bw, bladeTopY);
+  ctx.lineTo(bw, bladeTopY);
+  ctx.quadraticCurveTo(bw * 0.5, mid, 0, tipY);
+  ctx.quadraticCurveTo(-bw * 0.5, mid, -bw, bladeTopY);
+  ctx.closePath();
+  ctx.fill();
+}
+
+// Fate / Fudge marks: a bold plus, a bold minus, or nothing. Kept heavy and
+// simple so a + and a − read apart at a glance across a table.
+function drawFateGlyph(ctx, face, L, color) {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(1.4, L * 0.16);
+  ctx.lineCap = 'round';
+  const a = L * 0.42;
+  ctx.beginPath();
+  if (face === 'plus') {
+    ctx.moveTo(-a, 0); ctx.lineTo(a, 0);
+    ctx.moveTo(0, -a); ctx.lineTo(0, a);
+    ctx.stroke();
+  } else if (face === 'minus') {
+    ctx.moveTo(-a, 0); ctx.lineTo(a, 0);
+    ctx.stroke();
+  }
+  // blank: nothing, exactly like the real die.
+}
+
+// The One Ring's two special Feat-die faces — our own line-art. The Eye is a
+// lidded eye with a slit pupil; the Gandalf mark an angular rune. Neither copies
+// the official artwork.
+function drawTorGlyph(ctx, face, L, color) {
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = Math.max(1.1, L * 0.09);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  if (face === 'eye') {
+    // Almond eye: two facing arcs, with a few rays for the flame.
+    ctx.beginPath();
+    ctx.moveTo(-0.46 * L, 0);
+    ctx.quadraticCurveTo(0, -0.34 * L, 0.46 * L, 0);
+    ctx.quadraticCurveTo(0, 0.34 * L, -0.46 * L, 0);
+    ctx.stroke();
+    // Vertical slit pupil.
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 0.07 * L, 0.19 * L, 0, 0, TAU);
+    ctx.fill();
+    // Short flame rays above and below.
+    ctx.beginPath();
+    for (const dy of [-1, 1]) {
+      for (const dx of [-0.22, 0, 0.22]) {
+        ctx.moveTo(dx * L, dy * 0.33 * L);
+        ctx.lineTo(dx * L * 1.05, dy * 0.46 * L);
+      }
+    }
+    ctx.stroke();
+    return;
+  }
+  // Gandalf rune: an angular "G" mark — a squared C with a tongue, the way the
+  // rune reads on the die. Original line-art, not the Tolkien glyph.
+  ctx.beginPath();
+  ctx.moveTo(0.30 * L, -0.40 * L);
+  ctx.lineTo(-0.28 * L, -0.40 * L);
+  ctx.lineTo(-0.28 * L, 0.40 * L);
+  ctx.lineTo(0.30 * L, 0.40 * L);
+  ctx.lineTo(0.30 * L, 0.02 * L);
+  ctx.lineTo(0.00 * L, 0.02 * L);
+  ctx.stroke();
+}
+
+// Genesys symbols — our own line-art, one shape per meaning, chosen to survive
+// tray size and to pair up: triangles for the success axis (up = good, down =
+// bad; a star is its triumphant / despairing form), and a diamond vs an X for
+// the advantage axis. A face shows nought, one, or two of them.
+//
+// `r` is the face's inscribed radius. One symbol fills it; two sit side by side.
+function drawGenesysSymbols(ctx, symbols, r, color) {
+  if (!symbols || symbols.length === 0) return;
+  if (symbols.length === 1) {
+    drawGenSymbol(ctx, symbols[0], 0, 0, r * 1.5, color);
+  } else {
+    drawGenSymbol(ctx, symbols[0], -r * 0.5, 0, r * 0.98, color);
+    drawGenSymbol(ctx, symbols[1], r * 0.5, 0, r * 0.98, color);
+  }
+}
+
+// Draw one symbol centred at (cx,cy), fitting a box of side `s` (ink within
+// ±0.5·s of the centre).
+function drawGenSymbol(ctx, sym, cx, cy, s, color) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.fillStyle = color;
+  ctx.strokeStyle = color;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  const tri = down => {
+    const d = down ? -1 : 1;
+    ctx.beginPath();
+    ctx.moveTo(0, -0.5 * s * d);
+    ctx.lineTo(0.46 * s, 0.4 * s * d);
+    ctx.lineTo(-0.46 * s, 0.4 * s * d);
+    ctx.closePath();
+    ctx.fill();
+  };
+  const star = down => {
+    const d = down ? -1 : 1;
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const a = -Math.PI / 2 + (Math.PI / 5) * i;
+      const rad = (i % 2 === 0 ? 0.5 : 0.21) * s;
+      const x = Math.cos(a) * rad, y = Math.sin(a) * rad * d;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fill();
+  };
+  switch (sym) {
+    case 'success': tri(false); break;
+    case 'failure': tri(true); break;
+    case 'triumph': star(false); break;
+    case 'despair': star(true); break;
+    case 'advantage': {
+      ctx.beginPath();
+      ctx.moveTo(0, -0.5 * s);
+      ctx.lineTo(0.42 * s, 0);
+      ctx.lineTo(0, 0.5 * s);
+      ctx.lineTo(-0.42 * s, 0);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
+    case 'threat': {
+      ctx.lineWidth = Math.max(1.2, s * 0.16);
+      const a = 0.4 * s;
+      ctx.beginPath();
+      ctx.moveTo(-a, -a); ctx.lineTo(a, a);
+      ctx.moveTo(-a, a); ctx.lineTo(a, -a);
+      ctx.stroke();
+      break;
+    }
+    // Star Wars Force pips — a filled circle. The die is already coloured light
+    // or dark, so the pip itself carries no extra distinction.
+    case 'lightside':
+    case 'darkside': {
+      ctx.beginPath();
+      ctx.arc(0, 0, 0.34 * s, 0, TAU);
+      ctx.fill();
+      break;
+    }
+  }
+  ctx.restore();
+}
+
+// A four-point spark: sharp outer points, a pinched waist. Filled.
+function drawSpark(ctx, cx, cy, r) {
+  const ir = r * 0.34;
+  ctx.beginPath();
+  for (let i = 0; i < 8; i++) {
+    const a = (Math.PI / 4) * i - Math.PI / 2;
+    const rad = i % 2 === 0 ? r : ir;
+    const x = cx + Math.cos(a) * rad, y = cy + Math.sin(a) * rad;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.fill();
+}
+
+// A downward fang: rounded crown, curved sides, a sharp point. Filled.
+function drawFang(ctx, cx, topY, w, h) {
+  ctx.beginPath();
+  ctx.moveTo(cx - w, topY);
+  ctx.quadraticCurveTo(cx, topY - 0.35 * h, cx + w, topY);
+  ctx.quadraticCurveTo(cx + 0.4 * w, topY + 0.6 * h, cx, topY + h);
+  ctx.quadraticCurveTo(cx - 0.4 * w, topY + 0.6 * h, cx - w, topY);
+  ctx.closePath();
+  ctx.fill();
+}
+
+// A skull as one filled silhouette — cranium, cheekbones, a rounded jaw drawn
+// in a single path so there is no seam — with the eyes, nose and teeth punched
+// back out in paper. An outlined skull turns to mush at twenty pixels; a solid
+// one with holes in it keeps its shape.
+function drawSkull(ctx, L, paper) {
+  ctx.beginPath();
+  ctx.moveTo(-0.30 * L, -0.02 * L);
+  // Cranium dome.
+  ctx.bezierCurveTo(-0.34 * L, -0.40 * L, 0.34 * L, -0.40 * L, 0.30 * L, -0.02 * L);
+  // Right cheekbone in.
+  ctx.bezierCurveTo(0.28 * L, 0.10 * L, 0.24 * L, 0.12 * L, 0.19 * L, 0.16 * L);
+  // Right jaw down to the chin.
+  ctx.lineTo(0.16 * L, 0.30 * L);
+  ctx.bezierCurveTo(0.16 * L, 0.40 * L, -0.16 * L, 0.40 * L, -0.16 * L, 0.30 * L);
+  // Left jaw up, left cheekbone back to the temple.
+  ctx.lineTo(-0.19 * L, 0.16 * L);
+  ctx.bezierCurveTo(-0.24 * L, 0.12 * L, -0.28 * L, 0.10 * L, -0.30 * L, -0.02 * L);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = paper;
+  // Eyes: large angled sockets that give the skull its glare.
+  for (const dir of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(dir * 0.06 * L, -0.10 * L);
+    ctx.bezierCurveTo(dir * 0.12 * L, -0.14 * L, dir * 0.22 * L, -0.10 * L, dir * 0.21 * L, -0.02 * L);
+    ctx.bezierCurveTo(dir * 0.20 * L, 0.04 * L, dir * 0.10 * L, 0.04 * L, dir * 0.06 * L, -0.10 * L);
+    ctx.closePath();
+    ctx.fill();
+  }
+  // Nose: an inverted heart.
+  ctx.beginPath();
+  ctx.moveTo(0, 0.14 * L);
+  ctx.bezierCurveTo(-0.08 * L, 0.06 * L, -0.06 * L, -0.01 * L, 0, 0.03 * L);
+  ctx.bezierCurveTo(0.06 * L, -0.01 * L, 0.08 * L, 0.06 * L, 0, 0.14 * L);
+  ctx.closePath();
+  ctx.fill();
+  // Teeth: gaps cut across the jaw.
+  ctx.strokeStyle = paper;
+  ctx.lineWidth = Math.max(0.7, L * 0.045);
+  ctx.beginPath();
+  ctx.moveTo(-0.13 * L, 0.24 * L); ctx.lineTo(0.13 * L, 0.24 * L);
+  for (const x of [-0.065, 0.065, 0]) { ctx.moveTo(x * L, 0.24 * L); ctx.lineTo(x * L, 0.36 * L); }
+  ctx.stroke();
 }
 
 function roundRect(ctx, x, y, w, h, r) {
@@ -4473,6 +6711,55 @@ function validateRoll(msg) {
   return total === msg.total;
 }
 
+// The system modes (V5, Fate, Genesys, …) don't reduce to a single numeric
+// total, so they travel as `k:'roll2'` carrying the system id, its notation, the
+// dice groups, and the per-system summary the sender already computed. There is
+// nothing to re-derive a total against here; instead we bound every field so a
+// malformed or oversized payload can't crash or wedge the receiver's renderer.
+// Values are deliberately permissive — Fate dice are -1/0/+1, symbol dice carry
+// glyph arrays — but everything is length- and range-capped. The summary is
+// trusted for display only (the room is end-to-end encrypted among people who
+// share the passphrase); the receiver still renders it inside a try/catch.
+const SYSTEM_ROLL_KINDS = new Set([
+  'v5', 'fate', 'genesys', 'daggerheart', 'cthulhutech', 'starwars', 'onering', 'pbta', 'mist',
+]);
+
+function validateSystemRoll(msg) {
+  if (!msg || typeof msg !== 'object') return false;
+  if (typeof msg.system !== 'string' || !SYSTEM_ROLL_KINDS.has(msg.system)) return false;
+  if (typeof msg.notation !== 'string' || !msg.notation || msg.notation.length > 200) return false;
+  if (!msg.summary || typeof msg.summary !== 'object' || Array.isArray(msg.summary)) return false;
+  if (!Array.isArray(msg.groups) || msg.groups.length === 0 || msg.groups.length > 50) return false;
+
+  for (const g of msg.groups) {
+    if (!g || typeof g !== 'object') return false;
+    if (g.kind === 'const') {
+      if (!Number.isInteger(g.value)) return false;
+      continue;
+    }
+    if (g.kind !== 'dice') return false;
+    if (!Array.isArray(g.dice) || g.dice.length === 0 || g.dice.length > 500) return false;
+    if (g.sides !== undefined && (!Number.isInteger(g.sides) || g.sides < 1 || g.sides > 10000)) return false;
+
+    for (const d of g.dice) {
+      if (!d || typeof d !== 'object') return false;
+      // Fate dice go negative; exploded dice go high. Wide but bounded.
+      if (!Number.isInteger(d.value) || d.value < -100 || d.value > 100000) return false;
+      if (d.sides !== undefined && (!Number.isInteger(d.sides) || d.sides < 1 || d.sides > 10000)) return false;
+      if (d.symbols !== undefined) {
+        if (!Array.isArray(d.symbols) || d.symbols.length > 12) return false;
+        for (const s of d.symbols) if (typeof s !== 'string' || s.length > 24) return false;
+      }
+      // Short string tags the renderer keys off (die-type colour, role, face).
+      for (const key of ['color', 'role', 'face', 'type']) {
+        if (d[key] !== undefined && (typeof d[key] !== 'string' || d[key].length > 24)) return false;
+      }
+    }
+  }
+
+  return true;
+}
+
 function createRoom(options = {}) {
   const noop = () => {};
   const onStateCb = options.onState || noop;
@@ -4663,6 +6950,24 @@ function createRoom(options = {}) {
           notation: msg.notation,
           groups: msg.groups,
           total: msg.total,
+        });
+      } catch { /* see setState */ }
+      return;
+    }
+
+    if (msg.k === 'roll2') {
+      touchMember(msg.from, at);
+      if (!validateSystemRoll(msg)) return;
+      const clean = cleanName(msg.name);
+      try {
+        onRoll({
+          from: msg.from,
+          name: clean || 'Someone',
+          at: Number.isFinite(msg.at) ? msg.at : at,
+          system: msg.system,
+          notation: msg.notation,
+          groups: msg.groups,
+          summary: msg.summary,
         });
       } catch { /* see setState */ }
       return;
@@ -4953,6 +7258,23 @@ function createRoom(options = {}) {
     share(result) {
       if (!isOpen() || !room || !sender) return;
       if (!result || typeof result !== 'object') return;
+      // A system roll (V5, Fate, …) has no single total to reduce to, so it goes
+      // out as roll2 carrying its summary. Numeric rolls keep the original roll
+      // schema, so a client still serving the old bundle from cache reads them
+      // unchanged (and silently ignores the roll2 it doesn't know).
+      const sys = result.system;
+      if (sys && sys !== 'numeric') {
+        sendEncrypted({
+          k: 'roll2',
+          at: now(),
+          name,
+          system: sys,
+          notation: result.notation,
+          groups: result.groups,
+          summary: result.summary,
+        });
+        return;
+      }
       sendEncrypted({
         k: 'roll',
         at: now(),
@@ -4981,12 +7303,19 @@ function createRoom(options = {}) {
   return api;
 }
 
-Object.assign(__dicebox, { ROOM_STATES, backoffDelay, parsePassphraseFromHash, validateRoll, createRoom });
+Object.assign(__dicebox, { ROOM_STATES, backoffDelay, parsePassphraseFromHash, validateRoll, validateSystemRoll, createRoom });
 })();
 
 // app.js
 (() => {
-const { roll, describe, rollV5, describeV5, v5Headline, detectSystem, Die, Surface, separate, beginFrame, solidFor, UNDER_30_GAP, deriveRoom, newSender, encryptMessage, decryptMessage, normalizePassphrase, generatePassphrase, PROTOCOL_VERSION, createRoom, parsePassphraseFromHash } = __dicebox;
+const { roll, describe, rollV5, describeV5, v5Headline, detectSystem, v5Face, parseV5, rollFate, describeFate, fateHeadline, fateFace, parseFate, rollGenesys, describeGenesys, genesysHeadline, parseGenesys, rollDaggerheart, describeDaggerheart, daggerheartHeadline, parseDaggerheart, rollCthulhuTech, describeCthulhuTech, cthulhutechHeadline, parseCthulhuTech, rollStarWars, describeStarWars, starWarsHeadline, parseStarWars, rollOneRing, describeOneRing, oneRingHeadline, parseOneRing, rollPbta, rollMist, twod6Headline, describe2d6, parsePbta, parseMist, Die, Surface, separate, beginFrame, solidFor, UNDER_30_GAP, deriveRoom, newSender, encryptMessage, decryptMessage, normalizePassphrase, generatePassphrase, PROTOCOL_VERSION, createRoom, parsePassphraseFromHash } = __dicebox;
+
+
+
+
+
+
+
 
 
 
@@ -5013,6 +7342,10 @@ const embedded = (() => {
 // Crawl Classics chain rung, plus d100. Gaps like d9 and d11 are deliberate —
 // no published system uses them, and the notation field covers anything here.
 const QUICK = [1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 30, 100];
+
+// The standard polyhedral set. Daggerheart (and most systems) only ever roll
+// these, so its dice strip hides the rest of the DCC oddities.
+const STANDARD_DICE = new Set([4, 6, 8, 10, 12, 20]);
 
 // Above this many dice, throwing them across the tray stops being legible and
 // the pairwise separation gets expensive. Larger rolls spin in place instead.
@@ -5075,13 +7408,16 @@ $('themeToggle').addEventListener('click', () => {
   updateThemeColor();
   // Re-apply the active system's palette so its dark/light pair follows the
   // toggle instead of being frozen at whichever mode was active on roll.
-  applySystemTheme(activeSystem);
+  applySystemTheme(uiSystem);
 });
 
 systemDark.addEventListener('change', () => {
   if (document.documentElement.dataset.theme) return; // pinned by choice
   syncThemeLabel();
   updateThemeColor();
+  // A system palette is written as inline custom properties, so it overrides the
+  // stylesheet's own dark rules and cannot follow the OS on its own.
+  applySystemTheme(uiSystem);
 });
 
 // The button shows the theme you are in and switches to the other one, so the
@@ -5112,24 +7448,183 @@ function theme() {
 // read, so switching systems visibly recolours the whole app. Every system ships
 // a dark and a light pair (the approved design doc: each system = a different
 // background/text/line, each with a light-dark pair).
+// Every variable the stylesheet themes, so a system palette replaces the whole
+// scheme rather than recolouring four of seven and leaving panel fills and hair
+// lines behind from the default one.
+const THEMED_VARS = ['--paper', '--face', '--line', '--muted', '--hair', '--accent', '--danger'];
+
 const SYSTEM_THEMES = {
-  // Vampire the Masquerade — blood crimson on near-black / aged paper.
+  // Vampire the Masquerade — blood crimson on near-black / aged paper. The
+  // crimson is the constant: only the neutrals flip, so the mode stays
+  // recognisable as V5 in either theme.
   v5: {
-    dark:  { '--paper': '#0b0809', '--line': '#c9b3ad', '--muted': '#7a6a63', '--accent': '#c3212e' },
-    light: { '--paper': '#efe6de', '--line': '#3b2326', '--muted': '#8a7070', '--accent': '#a31621' },
+    dark: {
+      '--paper': '#0B0809', '--face': '#151011', '--line': '#E4D3CE', '--muted': '#7A6A63',
+      '--hair': '#2A1C1E', '--accent': '#C3212E', '--danger': '#E0685F',
+    },
+    light: {
+      '--paper': '#EFE6DE', '--face': '#F8F2EC', '--line': '#241417', '--muted': '#8A7070',
+      '--hair': '#D8C9BE', '--accent': '#A31621', '--danger': '#8C3A2E',
+    },
+  },
+  // Fate / Fudge — a calm steel-slate blue, matching the system's unadorned
+  // feel. The slate is the constant; the neutrals cool slightly and flip.
+  fate: {
+    dark: {
+      '--paper': '#0E1114', '--face': '#171B20', '--line': '#D6DCE3', '--muted': '#6B7580',
+      '--hair': '#252C33', '--accent': '#6E96BE', '--danger': '#CB7E70',
+    },
+    light: {
+      '--paper': '#ECEFF3', '--face': '#F7F9FB', '--line': '#1B2530', '--muted': '#78828D',
+      '--hair': '#D2D8DF', '--accent': '#3C6489', '--danger': '#8C3A2E',
+    },
+  },
+  // Genesys — the dice carry the colour here (a per-type map, below), so the
+  // chrome stays neutral with a warm narrative-gold accent for the readout.
+  genesys: {
+    dark: {
+      '--paper': '#0F1012', '--face': '#191A1D', '--line': '#DCDDE1', '--muted': '#6D6F75',
+      '--hair': '#26282C', '--accent': '#BFA766', '--danger': '#C97A6E',
+    },
+    light: {
+      '--paper': '#EDEEF0', '--face': '#F8F8FA', '--line': '#1C1D20', '--muted': '#74767C',
+      '--hair': '#D6D7DB', '--accent': '#8A7327', '--danger': '#8C3A2E',
+    },
+  },
+  // Daggerheart — gold and deep violet, its Hope/Fear duality. Gold accent; the
+  // Hope/Fear dice carry their own colours (below).
+  daggerheart: {
+    dark: {
+      '--paper': '#12101A', '--face': '#1C1826', '--line': '#E7E1EE', '--muted': '#726C82',
+      '--hair': '#2A2536', '--accent': '#D4A93C', '--danger': '#C97A6E',
+    },
+    light: {
+      '--paper': '#F0ECF2', '--face': '#FAF7FB', '--line': '#211B2A', '--muted': '#7C7488',
+      '--hair': '#DBD4E1', '--accent': '#976C1B', '--danger': '#8C3A2E',
+    },
+  },
+  // CthulhuTech — a sickly eldritch sea-green on near-black. Even dice (hits)
+  // glow green; odd ones stay grey (below).
+  cthulhutech: {
+    dark: {
+      '--paper': '#0B0F0D', '--face': '#131A16', '--line': '#DBE3DD', '--muted': '#647069',
+      '--hair': '#1E2822', '--accent': '#57A98A', '--danger': '#C77A6E',
+    },
+    light: {
+      '--paper': '#E9EEEB', '--face': '#F5F8F6', '--line': '#141D18', '--muted': '#6C7871',
+      '--hair': '#D0DAD3', '--accent': '#2E7358', '--danger': '#8C3A2E',
+    },
+  },
+  // Star Wars — like Genesys, the dice carry the colour; the chrome is a calm
+  // starfield blue.
+  starwars: {
+    dark: {
+      '--paper': '#0C0F14', '--face': '#141922', '--line': '#DCE1E8', '--muted': '#69707B',
+      '--hair': '#212833', '--accent': '#5B9BD5', '--danger': '#C77A6E',
+    },
+    light: {
+      '--paper': '#ECEEF2', '--face': '#F7F8FB', '--line': '#161B22', '--muted': '#727984',
+      '--hair': '#D4D9E0', '--accent': '#2F6FB0', '--danger': '#8C3A2E',
+    },
+  },
+  // The One Ring — bronze and gold on dark wood-and-stone; aged parchment for
+  // light.
+  onering: {
+    dark: {
+      '--paper': '#14110B', '--face': '#1E1911', '--line': '#E6DCC6', '--muted': '#7A6F5A',
+      '--hair': '#2A2317', '--accent': '#B5893C', '--danger': '#C0453F',
+    },
+    light: {
+      '--paper': '#EEE7D8', '--face': '#F8F3E8', '--line': '#211B11', '--muted': '#7E6E56',
+      '--hair': '#DBD0BB', '--accent': '#7A5A22', '--danger': '#8C3A2E',
+    },
+  },
+  // Powered by the Apocalypse — warm ember: rust and amber over charred paper,
+  // a lit-hearth cream for light.
+  pbta: {
+    dark: {
+      '--paper': '#181210', '--face': '#241A16', '--line': '#F0E3D6', '--muted': '#8A7566',
+      '--hair': '#33241D', '--accent': '#D97A3C', '--danger': '#C0453F',
+    },
+    light: {
+      '--paper': '#F3E9DF', '--face': '#FBF4EC', '--line': '#241812', '--muted': '#836E5E',
+      '--hair': '#E4D5C6', '--accent': '#B75A22', '--danger': '#9A3A2E',
+    },
+  },
+  // Mist Engine — moody teal and dim gold, fog over deep water; a pale seafoam
+  // for light.
+  mist: {
+    dark: {
+      '--paper': '#0E1618', '--face': '#152123', '--line': '#DCEAEA', '--muted': '#5F8385',
+      '--hair': '#1E2E30', '--accent': '#3F9FA0', '--danger': '#C25B54',
+    },
+    light: {
+      '--paper': '#E3EEED', '--face': '#F0F7F6', '--line': '#0F1E1F', '--muted': '#557072',
+      '--hair': '#CBDDDC', '--accent': '#227E7F', '--danger': '#9A443C',
+    },
   },
 };
-// The active dice system; drives the palette and, later, the switcher/slug.
-let activeSystem = 'numeric';
+
+// PbtA / Mist Engine 2d6 outcome bands, applied to both dice: a strong result
+// glows, a partial is cautionary amber, a miss goes muted. Legible on both trays.
+const BAND_COLORS = { hit: '#57B591', partial: '#C99A3C', miss: '#9A7070' };
+
+// The Force die's pips: Light side pale, Dark side a mystic violet (the pips are
+// black/white on the real die, but black is invisible on the dark tray).
+const FORCE_COLORS = { lightside: '#DEE4EC', darkside: '#8267AE' };
+
+// One Ring dice colours: the bronze Feat die, a bright gold for the Gandalf
+// rune, Sauron-red for the Eye; Success dice in parchment, their Tengwar 6 in
+// gold, and Weary-nullified (1-3) faded.
+const TOR_COLORS = {
+  feat: '#B5893C', gandalf: '#E8C24E', eye: '#C0453F',
+  success: '#CBBF9F', rune: '#D8AE45', weary: '#5E5A4E',
+};
+
+// CthulhuTech dice are d10s read even/odd: every even is a Hit and glows green,
+// every odd is a miss and stays grey. Constant hues, legible on both trays.
+const CT_COLORS = { hit: '#57B591', miss: '#6B7378' };
+
+// Daggerheart dice colour by role — Hope gold, Fear violet, and a green/red d6
+// for advantage/disadvantage. Constant hues, legible on both trays.
+const DH_COLORS = {
+  hope: '#C9A227',
+  fear: '#7E6BB5',
+  advantage: '#4E9E60',
+  disadvantage: '#C24046',
+};
+
+// Genesys dice are colour-coded by type — the one place a system paints its own
+// dice rather than using the chrome accent. Medium tones chosen to read on both
+// the light and dark tray.
+const GEN_COLORS = {
+  ability: '#4E9E60',      // green
+  proficiency: '#C39A2E',  // yellow
+  boost: '#4C86C6',        // blue
+  difficulty: '#8A5CC0',   // purple
+  challenge: '#C24046',    // red
+  setback: '#7C828A',      // black die → a legible smoke grey
+};
+
 function applySystemTheme(system) {
   const root = document.documentElement;
   const scheme = SYSTEM_THEMES[system];
-  const mode = root.dataset.theme === 'dark' ? 'dark' : 'light';
+  // isDark(), not the pinned attribute: with no theme chosen the attribute is
+  // absent and the OS decides, and reading the attribute alone put every
+  // system-dice user on a dark machine into the light palette — which is what
+  // "there is no dark mode" looked like from the outside.
+  const mode = isDark() ? 'dark' : 'light';
   root.dataset.systemTheme = scheme ? system : '';
-  for (const k of ['--paper', '--line', '--muted', '--accent']) root.style.removeProperty(k);
+  for (const k of THEMED_VARS) root.style.removeProperty(k);
   if (scheme) for (const [k, v] of Object.entries(scheme[mode])) root.style.setProperty(k, v);
   updateThemeColor();
 }
+
+// The selected dice system — the UI preset chosen in the mode sheet. It drives
+// the palette, the badge, and which dice row is shown, and it persists across
+// rolls: a numeric roll typed while V5 is selected stays V5-coloured, because
+// notation carries the roll's identity while the mode is the room you are in.
+let uiSystem = 'numeric';
 
 // ---- canvas sizing ----
 
@@ -5221,33 +7716,19 @@ function placeGrid(dice) {
 
 // ---- rolling ----
 
-function doRoll(notation) {
-  let result;
-  try {
-    // An explicit system token ("v5:…") routes to that system's roller; anything
-    // else stays on the numeric engine untouched.
-    result = detectSystem(notation) === 'v5' ? rollV5(notation) : roll(notation);
-  } catch (err) {
-    showError(err.message);
-    return;
-  }
-  clearError();
-
-  // Switching to a system roll recolours the app to that system's palette; a
-  // numeric roll restores the default theme.
-  activeSystem = result.system;
-  applySystemTheme(activeSystem);
-
-  state.last = result;
-  $('notation').value = result.notation;
-
+// Flatten a roll's dice groups into a paint list, carrying every field a system
+// die needs to draw itself — the symbols on its face, its role, its Feat face,
+// its colour key. Shared by a local roll and by one arriving from a room, so a
+// peer's dice look exactly like your own.
+function flattenRollDice(result) {
   const flat = [];
   for (const g of result.groups) {
     if (g.kind !== 'dice') continue;
     for (const d of g.dice) {
       flat.push({
-        // V5 groups are d10s and carry no numeric `sides`; fall back to 10.
-        sides: g.sides ?? 10,
+        // Genesys dice carry their own `sides` per type; V5 groups are d10s and
+        // carry no numeric `sides`; fall back to 10.
+        sides: d.sides ?? g.sides ?? 10,
         value: d.value,
         // Carried onto the tray so a die can show what happened to it: dropped
         // dice fade, exploded and rerolled ones get a mark. Hunger dice (V5)
@@ -5256,26 +7737,101 @@ function doRoll(notation) {
         exploded: d.exploded,
         rerolled: d.rerolled,
         hunger: d.hunger,
+        // Genesys: the symbols the face shows and the die-type colour key.
+        symbols: d.symbols,
+        genColorKey: d.color,
+        // Daggerheart/One Ring: the die's role, and (One Ring) its Feat face.
+        role: d.role,
+        torFaceKind: d.face,
       });
     }
   }
+  return flat;
+}
+
+// Turn the paint list into tray dice, stamping each with its system's face and
+// colour so the renderer stays system-agnostic. `remote` marks a peer's dice so
+// haptics fire only on your own throws; they look identical either way.
+function buildTrayDice(flat, result, { remote = false } = {}) {
+  return flat.map(f => {
+    const die = new Die(f.sides, f.value, 0, 0, 40);
+    die.kept = f.kept;
+    die.exploded = f.exploded;
+    die.rerolled = f.rerolled;
+    if (f.hunger) die.hunger = true;
+    if (remote) die.remote = true;
+    // Symbol dice stamp the face the die should draw when it settles, so the
+    // renderer needs no system knowledge — it just paints a glyph.
+    if (result.system === 'v5') die.v5Face = v5Face(f.value, f.hunger);
+    else if (result.system === 'fate') die.fateFace = fateFace(f.value);
+    else if (result.system === 'genesys' || result.system === 'starwars') {
+      die.genFace = f.symbols;
+      // The Force die is coloured by the pips it rolled (light or dark); every
+      // other narrative die by its type.
+      die.genColor = f.genColorKey === 'force'
+        ? FORCE_COLORS[f.symbols[0]] || CT_COLORS.miss
+        : GEN_COLORS[f.genColorKey];
+    }
+    // Daggerheart dice are numbered d12s/d6s tinted by their role — no glyph,
+    // just the value drawn in the Hope/Fear colour.
+    else if (result.system === 'daggerheart') die.genColor = DH_COLORS[f.role];
+    // CthulhuTech d10s glow green when even (a Hit), grey when odd (a miss).
+    else if (result.system === 'cthulhutech') die.genColor = f.value % 2 === 0 ? CT_COLORS.hit : CT_COLORS.miss;
+    // One Ring: the Feat die shows a numeral, the Eye, or the Gandalf rune;
+    // Success dice show their value, tinted (Tengwar 6 gold, Weary 1-3 faded).
+    else if (result.system === 'onering') {
+      if (f.role === 'feat') {
+        if (f.torFaceKind === 'eye' || f.torFaceKind === 'gandalf') die.torFace = f.torFaceKind;
+        die.genColor = f.torFaceKind === 'gandalf' ? TOR_COLORS.gandalf
+          : f.torFaceKind === 'eye' ? TOR_COLORS.eye : TOR_COLORS.feat;
+      } else {
+        const dropped = result.summary?.weary && f.value <= 3;
+        die.genColor = dropped ? TOR_COLORS.weary : f.value === 6 ? TOR_COLORS.rune : TOR_COLORS.success;
+      }
+    }
+    // PbtA / Mist: both d6s take the outcome-band colour of the whole roll.
+    else if (result.system === 'pbta' || result.system === 'mist') die.genColor = BAND_COLORS[result.summary?.band];
+    return die;
+  });
+}
+
+function doRoll(notation) {
+  let result;
+  try {
+    // An explicit system token ("v5:…", "4dF") routes to that system's roller;
+    // anything else stays on the numeric engine untouched.
+    const sys = detectSystem(notation);
+    result = sys === 'v5' ? rollV5(notation)
+      : sys === 'fate' ? rollFate(notation)
+      : sys === 'genesys' ? rollGenesys(notation)
+      : sys === 'daggerheart' ? rollDaggerheart(notation)
+      : sys === 'cthulhutech' ? rollCthulhuTech(notation)
+      : sys === 'starwars' ? rollStarWars(notation)
+      : sys === 'onering' ? rollOneRing(notation)
+      : sys === 'pbta' ? rollPbta(notation)
+      : sys === 'mist' ? rollMist(notation)
+      : roll(notation);
+  } catch (err) {
+    showError(err.message);
+    return;
+  }
+  clearError();
+
+  // The palette follows the selected mode, not this roll's system: a numeric
+  // roll typed in V5 mode stays V5-coloured. applySystemTheme runs at mode
+  // selection, so nothing to do here.
+
+  state.last = result;
+  $('notation').value = result.notation;
+
+  const flat = flattenRollDice(result);
 
   // Your throw takes the tray outright. Dropping the claim stops a remote
   // roll still in the air from writing its total over yours when its timer
   // fires.
   state.remoteClaim = null;
 
-  state.dice = flat.map(f => {
-    const die = new Die(f.sides, f.value, 0, 0, 40);
-    die.kept = f.kept;
-    die.exploded = f.exploded;
-    die.rerolled = f.rerolled;
-    if (f.hunger) die.hunger = true;
-    // V5 symbol dice: stamp the face the die should draw when it settles so the
-    // renderer needs no system knowledge — it just paints a glyph.
-    if (result.system === 'v5') die.v5Face = v5Face(f.value, f.hunger);
-    return die;
-  });
+  state.dice = buildTrayDice(flat, result);
   placeGrid(state.dice);
 
   // Small rolls get thrown across the tray. Large ones spin in place: the dice
@@ -5323,32 +7879,56 @@ function rerollDelay(flat) {
 // Per-system result presentation. System rolls have no numeric `total`; their
 // headline/detail come from their own formatter, while the numeric engine's
 // formatters produce exactly what Dicebox has always shown.
+//
+// A headline is `{kind, text}`: numeric rolls and V5 success counts are a
+// `number`, set at the big numeral size; a resolved V5 outcome is `text`, a
+// phrase set smaller so "Bestial Failure" does not overrun the readout. The
+// `kind` reaches the DOM as a data attribute the stylesheet keys off.
 function resultHeadline(result) {
-  return result.system === 'v5' ? v5Headline(result) : String(result.total);
+  if (result.system === 'v5') return v5Headline(result);
+  if (result.system === 'fate') return fateHeadline(result);
+  if (result.system === 'genesys') return genesysHeadline(result);
+  if (result.system === 'daggerheart') return daggerheartHeadline(result);
+  if (result.system === 'cthulhutech') return cthulhutechHeadline(result);
+  if (result.system === 'starwars') return starWarsHeadline(result);
+  if (result.system === 'onering') return oneRingHeadline(result);
+  if (result.system === 'pbta' || result.system === 'mist') return twod6Headline(result);
+  return { kind: 'number', text: String(result.total) };
 }
 function resultDetail(result) {
-  if (result.system === 'v5') {
-    const vals = result.groups.flatMap(g => g.dice).map(d => `${d.value}${d.hunger ? '⬥' : ''}`).join(', ');
-    return `${describeV5(result)} — dice ${vals}`;
-  }
+  if (result.system === 'v5') return describeV5(result);
+  if (result.system === 'fate') return describeFate(result);
+  if (result.system === 'genesys') return describeGenesys(result);
+  if (result.system === 'daggerheart') return describeDaggerheart(result);
+  if (result.system === 'cthulhutech') return describeCthulhuTech(result);
+  if (result.system === 'starwars') return describeStarWars(result);
+  if (result.system === 'onering') return describeOneRing(result);
+  if (result.system === 'pbta' || result.system === 'mist') return describe2d6(result);
   return describe(result.groups);
+}
+
+// Write a headline to the big readout, carrying its kind so words and numbers
+// get their own type sizes, and an optional variant (Daggerheart's Hope/Fear
+// tint) that colours the total.
+function setTotal(headline) {
+  const total = $('total');
+  total.textContent = headline.text;
+  total.dataset.kind = headline.kind;
+  if (headline.variant) total.dataset.variant = headline.variant;
+  else delete total.dataset.variant;
 }
 
 function finish(result) {
   delete $('total').dataset.rolling;
   delete $('total').dataset.idle;
-  $('total').textContent = resultHeadline(result);
+  setTotal(resultHeadline(result));
   $('breakdown').textContent = resultDetail(result);
   addHistory(result, selfName(), true);
   // After addHistory, so a throw in room code could not cost the local roll its
   // place in the log. share() is synchronous and a no-op when there is no room,
-  // which is what keeps this line off the critical path.
-  if (result.system === 'v5') {
-    // V5 rolls are not shared to rooms yet (needs the k:'roll2' schema); nothing
-    // is sent rather than sending a half-valid numeric payload.
-  } else {
-    roomLink.share(result);
-  }
+  // which is what keeps this line off the critical path. It picks the wire
+  // schema by system: numeric rolls go as `roll`, the system modes as `roll2`.
+  roomLink.share(result);
   // The name has done its job by the first roll; let the tray have the page.
   $('wordmark').dataset.faded = '1';
 }
@@ -5385,8 +7965,10 @@ function recordRoll(result, who = null, mine = false) {
     notation: result.notation,
     // Numeric rolls keep their scalar `total`; system rolls carry a formatted
     // headline instead of a bogus scalar.
-    total: result.system === 'v5' ? null : result.total,
-    headline: resultHeadline(result),
+    // Only numeric rolls carry a scalar total; system rolls store a formatted
+    // headline instead and leave this null.
+    total: result.total ?? null,
+    headline: resultHeadline(result).text,
     detail: resultDetail(result),
     dice: result.groups
       .filter(g => g.kind === 'dice')
@@ -5430,7 +8012,7 @@ function addHistory(result, who = null, mine = false) {
   label.append(result.notation);
 
   const val = document.createElement('b');
-  val.textContent = resultHeadline(result);
+  val.textContent = resultHeadline(result).text;
 
   top.append(label, val);
   li.append(top);
@@ -5471,6 +8053,18 @@ $('entry').addEventListener('submit', e => {
 // Typing is another way of staging dice, so the tray follows the field as it is
 // edited: backspace away "+2d3" and those dice leave the tray immediately.
 $('notation').addEventListener('input', () => {
+  // A system pool typed by hand keeps that system's controls in step instead of
+  // being torn apart by the numeric pool parser, which would read "v5:8h3" as
+  // garbage.
+  const typedSystem = detectSystem($('notation').value);
+  if (typedSystem === 'v5') { syncV5FromField(); return; }
+  if (typedSystem === 'fate') { syncFateFromField(); return; }
+  if (typedSystem === 'genesys' || typedSystem === 'starwars') { syncGenFromField(); return; }
+  if (typedSystem === 'daggerheart') { syncDhFromField(); return; }
+  if (typedSystem === 'cthulhutech') { syncCtFromField(); return; }
+  if (typedSystem === 'onering') { syncTorFromField(); return; }
+  if (typedSystem === 'pbta') { pbtaCtl.fromField(); return; }
+  if (typedSystem === 'mist') { mistCtl.fromField(); return; }
   pool = parsePool($('notation').value);
   // Typing an unusual die earns it a button too, so the row always accounts for
   // everything in the pool.
@@ -5486,7 +8080,7 @@ const help = $('help');
 const helpToggle = $('helpToggle');
 
 function setHelp(open) {
-  if (open) { closeSheet(); closeDial(); closeHistory(); closeRoom(); }
+  if (open) { closeSheet(); closeDial(); closeHistory(); closeRoom(); closeMode(); }
   help.hidden = !open;
   helpToggle.setAttribute('aria-expanded', String(open));
   helpToggle.setAttribute('aria-label', open ? 'Hide syntax reference' : 'Show syntax reference');
@@ -5516,6 +8110,647 @@ help.querySelectorAll('.syntax dt').forEach(dt => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); use(); }
   });
 });
+
+// ---- systems ----
+//
+// The mode sheet is a UI preset: it recolours the app, swaps the dice row, and
+// picks how a result reads. It never touches the meaning of typed notation.
+
+const SYSTEMS = {
+  numeric: { badge: '' },
+  v5: { badge: 'Vampire' },
+  fate: { badge: 'Fate' },
+  genesys: { badge: 'Genesys' },
+  daggerheart: { badge: 'Daggerheart' },
+  cthulhutech: { badge: 'CthulhuTech' },
+  starwars: { badge: 'Star Wars' },
+  onering: { badge: 'The One Ring' },
+  pbta: { badge: 'PbtA' },
+  mist: { badge: 'Mist Engine' },
+};
+
+// Empty-tray copy. Most modes build a pool by tapping dice, so the default
+// speaks of dice. PbtA and Mist have no pool — the roll is always 2d6 and the
+// only input is a modifier — so their prompts point at that instead, and Mist
+// calls its modifier "Power" the way the game does.
+const DEFAULT_HINT = { idle: 'Pick dice or type a roll', placeholder: 'Tap dice above, or type 3d6+2' };
+const SYSTEM_HINTS = {
+  pbta: { idle: 'Set a modifier, then roll 2d6', placeholder: 'Set a modifier, or type pbta:+2' },
+  mist: { idle: 'Set your Power, then roll 2d6', placeholder: 'Set your Power, or type mist:+1' },
+};
+function systemHint(system) { return SYSTEM_HINTS[system] || DEFAULT_HINT; }
+
+// Permanent slugs, so a link opens Dicebox already in a system. The Worker
+// rewrites these paths to the app shell; numeric is the bare root. Kept branded
+// (/vtm rather than /v5) since the URL is the shareable name.
+const SLUG_TO_SYSTEM = { vtm: 'v5', fate: 'fate', genesys: 'genesys', daggerheart: 'daggerheart', cthulhutech: 'cthulhutech', starwars: 'starwars', onering: 'onering', pbta: 'pbta', mist: 'mist' };
+const SYSTEM_TO_SLUG = { v5: 'vtm', fate: 'fate', genesys: 'genesys', daggerheart: 'daggerheart', cthulhutech: 'cthulhutech', starwars: 'starwars', onering: 'onering', pbta: 'pbta', mist: 'mist' };
+
+function systemFromPath() {
+  const seg = (location.pathname || '/').replace(/^\/+|\/+$/g, '').toLowerCase();
+  return SLUG_TO_SYSTEM[seg] || 'numeric';
+}
+function pathForSystem(system) {
+  return SYSTEM_TO_SLUG[system] ? `/${SYSTEM_TO_SLUG[system]}` : '/';
+}
+
+const modeSheet = $('modeSheet');
+const modeToggle = $('modeToggle');
+const systemBadge = $('systemBadge');
+const numPicker = $('numPicker');
+const v5Picker = $('v5Picker');
+const fatePicker = $('fatePicker');
+const genesysPicker = $('genesysPicker');
+const dhPicker = $('dhPicker');
+const ctPicker = $('ctPicker');
+const torPicker = $('torPicker');
+// PbtA and Mist Engine share one picker: their only control is a modifier
+// stepper, identical between the two modes.
+const twod6Picker = $('twod6Picker');
+// Numeric's strip lives last in the DOM so that in Daggerheart mode (the only
+// mode that shows two pickers) the duality controls sit above it. In every
+// other mode the other pickers are hidden, so its position is invisible.
+dhPicker.after?.(numPicker);
+
+function setSystem(system, { roll = false, url = true } = {}) {
+  if (!SYSTEMS[system]) system = 'numeric';
+  const changed = system !== uiSystem;
+  uiSystem = system;
+
+  // Reflect the mode into the address so the current view is shareable and the
+  // browser's back button returns to the previous system. Guarded because some
+  // embeddings forbid history writes (the same reason the room code guards it).
+  if (url) {
+    const path = pathForSystem(system);
+    // window.history, not history: app.js binds `history` to the roll log array,
+    // which shadows the global and has no pushState.
+    if (location.pathname !== path) {
+      try { window.history.pushState({ system }, '', path); } catch { /* embedded */ }
+    }
+  }
+
+  // The palette is the loud half of the switch; do it first so the rest of the
+  // repaint happens under the right colours.
+  applySystemTheme(system);
+
+  // The badge names the mode beside the wordmark, and disappears on numeric,
+  // which is the app's own identity and needs no label.
+  const badge = SYSTEMS[system].badge;
+  systemBadge.hidden = !badge;
+  systemBadge.textContent = badge;
+
+  // The mode button wears the active system's mark (d20 / ankh / …).
+  modeToggle.dataset.system = system;
+
+  // Swap the dice row for the active system's controls. Daggerheart keeps the
+  // numeric strip too — its duality is one roll, but weapons and the rest need
+  // ordinary dice — so its own controls sit above the numeric ones. In that mode
+  // the strip is trimmed to the standard polyhedral dice.
+  numPicker.hidden = system !== 'numeric' && system !== 'daggerheart';
+  diceButtons.classList.toggle('standard-only', system === 'daggerheart');
+  v5Picker.hidden = system !== 'v5';
+  fatePicker.hidden = system !== 'fate';
+  // Star Wars reuses the Genesys chip picker; the Force chip only appears there.
+  genesysPicker.hidden = system !== 'genesys' && system !== 'starwars';
+  genesysPicker.classList.toggle('with-force', system === 'starwars');
+  dhPicker.hidden = system !== 'daggerheart';
+  ctPicker.hidden = system !== 'cthulhutech';
+  torPicker.hidden = system !== 'onering';
+  twod6Picker.hidden = system !== 'pbta' && system !== 'mist';
+  // Mist calls the 2d6 modifier "Power"; PbtA just "Modifier". The picker is
+  // shared, so the label follows the active mode.
+  if (system === 'pbta' || system === 'mist') {
+    const term = system === 'mist' ? 'Power' : 'Modifier';
+    $('twod6ModLabel').textContent = term;
+    $('twod6ModChip').setAttribute('aria-label', `${term} — tap to raise, hold to lower`);
+  }
+
+  // The input placeholder and the empty-tray line match what this mode offers —
+  // "tap dice" is wrong where there are no dice to tap.
+  const hint = systemHint(system);
+  $('notation').setAttribute('placeholder', hint.placeholder);
+  if ($('total').dataset.idle === '1') $('breakdown').textContent = hint.idle;
+
+  // Help follows the mode so its syntax examples match the dice on screen.
+  $('helpNumeric').hidden = system !== 'numeric';
+  $('helpV5').hidden = system !== 'v5';
+  $('helpFate').hidden = system !== 'fate';
+  $('helpGenesys').hidden = system !== 'genesys';
+  $('helpStarwars').hidden = system !== 'starwars';
+  $('helpDaggerheart').hidden = system !== 'daggerheart';
+  $('helpCthulhutech').hidden = system !== 'cthulhutech';
+  $('helpOnering').hidden = system !== 'onering';
+  $('helpPbta').hidden = system !== 'pbta';
+  $('helpMist').hidden = system !== 'mist';
+
+  // The sheet's cards reflect the choice.
+  for (const card of modeCards) {
+    card.setAttribute('aria-pressed', String(card.dataset.system === system));
+  }
+
+  // Switching modes clears the tray to a fresh start: the old pool's notation
+  // (`v5:8h3` or `2d20`) is meaningless in the other mode, so carrying it over
+  // would only confuse. A no-op re-selection leaves everything alone.
+  if (changed && !roll) {
+    resetV5();
+    resetFate();
+    resetGenesys();
+    resetDaggerheart();
+    resetCthulhuTech();
+    resetOneRing();
+    pbtaCtl.reset();
+    mistCtl.reset();
+    clearPool();
+    // Daggerheart seeds the field with its duality so a plain Roll or flick
+    // throws the Hope + Fear; tapping numeric dice replaces it with that pool.
+    if (system === 'daggerheart') $('notation').value = dhNotation();
+  }
+}
+
+// ---- mode sheet ----
+
+const modeCards = [...$('modeCards').querySelectorAll('.mode-card')];
+
+function openMode() {
+  setHelp(false);
+  closeSheet();
+  closeDial();
+  closeHistory();
+  closeRoom();
+  modeSheet.hidden = false;
+  modeToggle.setAttribute('aria-expanded', 'true');
+  hideHint();
+}
+function closeMode() {
+  modeSheet.hidden = true;
+  modeToggle.setAttribute('aria-expanded', 'false');
+}
+
+modeToggle.addEventListener('click', () => {
+  if (modeSheet.hidden) openMode(); else closeMode();
+});
+// The badge is the second way in: it names the mode, and tapping it changes it.
+systemBadge.addEventListener('click', openMode);
+$('modeClose').addEventListener('click', closeMode);
+
+for (const card of modeCards) {
+  card.addEventListener('click', () => {
+    setSystem(card.dataset.system);
+    closeMode();
+  });
+}
+
+// ---- Vampire pool ----
+//
+// V5's dice are two counts, not a numeric strip: ordinary dice and Hunger dice,
+// each set directly with its own stepper under the die it is. The state is the
+// source the notation field is written from; typing a `v5:` pool by hand feeds
+// back into it through syncV5FromField.
+
+const v5 = { normal: 0, hunger: 0, difficulty: null };
+const v5NormalFace = $('v5NormalFace');
+const v5HungerFace = $('v5HungerFace');
+const v5DiffChip = $('v5DiffChip');
+const v5DiffVal = $('v5Difficulty');
+
+function resetV5() {
+  v5.normal = 0;
+  v5.hunger = 0;
+  v5.difficulty = null;
+  syncV5({ writeField: false });
+}
+
+// Build the notation the pool represents. An empty pool writes nothing, so the
+// readout stays idle rather than showing a "v5:0".
+function v5Notation() {
+  const total = v5.normal + v5.hunger;
+  if (total < 1) return '';
+  let s = `v5:${total}`;
+  if (v5.hunger > 0) s += `h${v5.hunger}`;
+  if (v5.difficulty !== null) s += `@${v5.difficulty}`;
+  return s;
+}
+
+// Reflect the state onto the controls, and (by default) into the field.
+function syncV5({ writeField = true } = {}) {
+  if (v5.normal > 0) v5NormalFace.dataset.count = String(v5.normal); else delete v5NormalFace.dataset.count;
+  if (v5.hunger > 0) v5HungerFace.dataset.count = String(v5.hunger); else delete v5HungerFace.dataset.count;
+
+  if (v5.difficulty === null) {
+    v5DiffVal.textContent = '—'; v5DiffVal.dataset.unset = '1'; v5DiffChip.classList.remove('is-set');
+  } else {
+    v5DiffVal.textContent = String(v5.difficulty); delete v5DiffVal.dataset.unset; v5DiffChip.classList.add('is-set');
+  }
+
+  if (writeField) $('notation').value = v5Notation();
+  if (uiSystem === 'v5') stageSystemPool();
+}
+
+// Step a die count, keeping the pool inside the parser's limits: 0–100 dice
+// total, and no more Hunger than there are dice.
+function v5Step(kind, by) {
+  const other = kind === 'hunger' ? v5.normal : v5.hunger;
+  const current = kind === 'hunger' ? v5.hunger : v5.normal;
+  const next = Math.max(0, Math.min(current + by, 100 - other));
+  if (kind === 'hunger') v5.hunger = next; else v5.normal = next;
+  syncV5();
+}
+
+// Tap a die to add one, hold (or right-click) to remove — and a die tapped in
+// the tray comes off too. Difficulty cycles unset → 1 … 10; below 1 returns to
+// unset, which the reducer treats differently from a difficulty of 1.
+bindTapHold(v5NormalFace, dir => v5Step('normal', dir));
+bindTapHold(v5HungerFace, dir => v5Step('hunger', dir));
+bindTapHold(v5DiffChip, dir => {
+  if (dir > 0) v5.difficulty = v5.difficulty === null ? 1 : Math.min(10, v5.difficulty + 1);
+  else v5.difficulty = v5.difficulty === null || v5.difficulty <= 1 ? null : v5.difficulty - 1;
+  syncV5();
+});
+
+// A `v5:` pool typed into the field drives the controls, so the two never
+// disagree about what will roll. Invalid part-typed strings are left alone.
+function syncV5FromField() {
+  try {
+    const { pool, hunger, difficulty } = parseV5($('notation').value);
+    v5.normal = pool - hunger;
+    v5.hunger = hunger;
+    v5.difficulty = difficulty;
+    syncV5({ writeField: false });
+  } catch { /* mid-type, not yet valid */ }
+}
+
+// ---- Fate pool ----
+//
+// Fate is two numbers: how many Fudge dice, and a skill modifier. The standard
+// roll is 4dF, so that is the default.
+
+// The die count is fixed at 4dF (the Fate roll); only the modifier varies, so
+// that is the whole picker. Typing NdF still adjusts the count for the rare case.
+const fate = { count: 4, modifier: 0 };
+const fateModField = $('fateMod');
+
+function resetFate() {
+  fate.count = 4;
+  fate.modifier = 0;
+  syncFate({ writeField: false });
+}
+
+function fateNotation() {
+  const mod = fate.modifier > 0 ? `+${fate.modifier}` : fate.modifier < 0 ? String(fate.modifier) : '';
+  return `${fate.count}dF${mod}`;
+}
+
+function syncFate({ writeField = true } = {}) {
+  fateModField.textContent = fate.modifier > 0 ? `+${fate.modifier}` : String(fate.modifier);
+  if (writeField) $('notation').value = fateNotation();
+  if (uiSystem === 'fate') stageSystemPool();
+}
+
+bindTapHold($('fateModChip'), dir => { fate.modifier = Math.max(-100, Math.min(100, fate.modifier + dir)); syncFate(); });
+
+function syncFateFromField() {
+  try {
+    const { count, modifier } = parseFate($('notation').value);
+    fate.count = count;
+    fate.modifier = modifier;
+    syncFate({ writeField: false });
+  } catch { /* mid-type, not yet valid */ }
+}
+
+// ---- Genesys pool ----
+//
+// Six die types, built by tapping their chips (hold, or right-click, to remove).
+// Each type keeps a count; the chips show it and the notation is written from it.
+
+const GEN_TYPES = [
+  { type: 'ability', letter: 'A', label: 'Ability' },
+  { type: 'proficiency', letter: 'P', label: 'Proficiency' },
+  { type: 'boost', letter: 'B', label: 'Boost' },
+  { type: 'difficulty', letter: 'D', label: 'Difficulty' },
+  { type: 'challenge', letter: 'C', label: 'Challenge' },
+  { type: 'setback', letter: 'S', label: 'Setback' },
+  // The Force die — Star Wars only. Its chip is hidden in Genesys mode.
+  { type: 'force', letter: 'F', label: 'Force' },
+];
+const GEN_LETTER = Object.fromEntries(GEN_TYPES.map(t => [t.type, t.letter]));
+const gen = Object.fromEntries(GEN_TYPES.map(t => [t.type, 0]));
+
+function resetGenesys() {
+  for (const t of GEN_TYPES) gen[t.type] = 0;
+  syncGen({ writeField: false });
+}
+
+function genNotation() {
+  const terms = GEN_TYPES.filter(t => gen[t.type] > 0).map(t => `${gen[t.type]}${t.letter}`);
+  if (!terms.length) return '';
+  // Same chips, two systems: Star Wars adds the Force die and uses the sw: prefix.
+  return `${uiSystem === 'starwars' ? 'sw' : 'gen'}:${terms.join('+')}`;
+}
+
+function syncGen({ writeField = true } = {}) {
+  for (const t of GEN_TYPES) {
+    const chip = $(`gen-${t.type}`);
+    const n = gen[t.type];
+    if (n > 0) { chip.dataset.count = String(n); chip.setAttribute('aria-pressed', 'true'); }
+    else { delete chip.dataset.count; chip.setAttribute('aria-pressed', 'false'); }
+  }
+  if (writeField) $('notation').value = genNotation();
+  if (uiSystem === 'genesys' || uiSystem === 'starwars') stageSystemPool();
+}
+
+function genStep(type, by) {
+  const total = GEN_TYPES.reduce((s, t) => s + gen[t.type], 0);
+  const next = Math.max(0, Math.min(gen[type] + by, gen[type] + (100 - total)));
+  gen[type] = next;
+  syncGen();
+}
+
+function syncGenFromField() {
+  try {
+    const field = $('notation').value;
+    const pool = detectSystem(field) === 'starwars' ? parseStarWars(field) : parseGenesys(field);
+    for (const t of GEN_TYPES) gen[t.type] = 0;
+    for (const { type, count } of pool) gen[type] = count;
+    syncGen({ writeField: false });
+  } catch { /* mid-type, not yet valid */ }
+}
+
+// Tap a chip to add that die; hold it (or right-click) to remove one — the same
+// tap/long-press language the numeric row uses for its modifiers.
+for (const t of GEN_TYPES) {
+  bindTapHold($(`gen-${t.type}`), dir => genStep(t.type, dir));
+}
+
+// ---- Daggerheart pool ----
+//
+// The roll is fixed — a Hope d12 and a Fear d12 — so the controls are the things
+// around it: advantage or disadvantage (a ± d6), a flat modifier, and an
+// optional difficulty to resolve success against.
+
+// advantage is a signed count of d6: +N advantage dice, −N disadvantage dice.
+const dhState = { advantage: 0, modifier: 0, difficulty: null };
+const dhModField = $('dhMod');
+const dhDiffField = $('dhDifficulty');
+const dhModChip = $('dhModChip');
+const dhDiffChip = $('dhDiffChip');
+
+function resetDaggerheart() {
+  dhState.advantage = 0;
+  dhState.modifier = 0;
+  dhState.difficulty = null;
+  syncDh({ writeField: false });
+}
+
+function dhNotation() {
+  let s = 'dh:';
+  if (dhState.advantage > 0) s += 'adv' + (dhState.advantage > 1 ? dhState.advantage : '');
+  else if (dhState.advantage < 0) s += 'dis' + (-dhState.advantage > 1 ? -dhState.advantage : '');
+  if (dhState.modifier > 0) s += `+${dhState.modifier}`;
+  else if (dhState.modifier < 0) s += String(dhState.modifier);
+  if (dhState.difficulty !== null) s += `@${dhState.difficulty}`;
+  return s;
+}
+
+function syncDh({ writeField = true } = {}) {
+  for (const btn of dhAdvButtons) {
+    // Each button shows its own kind's count; advantage and disadvantage cancel,
+    // so only one is ever lit.
+    const n = btn.dataset.adv === 'adv' ? Math.max(0, dhState.advantage) : Math.max(0, -dhState.advantage);
+    if (n > 0) { btn.dataset.count = String(n); btn.setAttribute('aria-pressed', 'true'); }
+    else { delete btn.dataset.count; btn.setAttribute('aria-pressed', 'false'); }
+  }
+  dhModField.textContent = dhState.modifier > 0 ? `+${dhState.modifier}` : String(dhState.modifier);
+  if (dhState.difficulty === null) {
+    dhDiffField.textContent = '—'; dhDiffField.dataset.unset = '1'; dhDiffChip.classList.remove('is-set');
+  } else {
+    dhDiffField.textContent = String(dhState.difficulty); delete dhDiffField.dataset.unset; dhDiffChip.classList.add('is-set');
+  }
+  if (writeField) $('notation').value = dhNotation();
+  if (uiSystem === 'daggerheart') stageSystemPool();
+}
+
+const dhAdvButtons = [...document.querySelectorAll('.dh-adv-btn')];
+function setAdvantage(n) {
+  dhState.advantage = Math.max(-20, Math.min(20, n));
+  syncDh();
+}
+// Advantage and Disadvantage are a signed count that cancels. Tapping a die adds
+// one of its kind; holding removes one of that kind only (never crossing zero
+// into the other), so a hold on Advantage can't quietly add Disadvantage.
+bindTapHold(dhAdvButtons.find(b => b.dataset.adv === 'adv'), dir => {
+  if (dir > 0) setAdvantage(dhState.advantage + 1);
+  else if (dhState.advantage > 0) setAdvantage(dhState.advantage - 1);
+});
+bindTapHold(dhAdvButtons.find(b => b.dataset.adv === 'dis'), dir => {
+  if (dir > 0) setAdvantage(dhState.advantage - 1);
+  else if (dhState.advantage < 0) setAdvantage(dhState.advantage + 1);
+});
+
+// The Duality button rolls the Hope + Fear (with the current advantage, modifier
+// and difficulty) straight away — separate from the numeric strip, which builds
+// ordinary rolls for weapons and the rest.
+$('dhRoll').addEventListener('click', () => doRoll(dhNotation()));
+
+bindTapHold(dhModChip, dir => { dhState.modifier = Math.max(-100, Math.min(100, dhState.modifier + dir)); syncDh(); });
+bindTapHold(dhDiffChip, dir => {
+  if (dir > 0) dhState.difficulty = dhState.difficulty === null ? 10 : Math.min(100, dhState.difficulty + 1);
+  else dhState.difficulty = dhState.difficulty === null || dhState.difficulty <= 1 ? null : dhState.difficulty - 1;
+  syncDh();
+});
+
+function syncDhFromField() {
+  try {
+    const { advantage, modifier, difficulty } = parseDaggerheart($('notation').value);
+    dhState.advantage = advantage;
+    dhState.modifier = modifier;
+    dhState.difficulty = difficulty;
+    syncDh({ writeField: false });
+  } catch { /* mid-type, not yet valid */ }
+}
+
+// ---- CthulhuTech pool ----
+//
+// The whole roll is two numbers: how many d10 (your Attribute + Skill), and an
+// optional Difficulty (the hits you need). Evens are hits; the reducer does the
+// counting.
+
+// Tap to step up, hold (or right-click) to step down — the tap/long-press
+// language the Genesys die buttons use, reused for the single die-add buttons and
+// the tap-to-cycle chips. `step(+1|-1)` applies the change and re-syncs.
+function bindTapHold(el, step) {
+  if (!el) return;
+  let held = false, timer = null;
+  const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } };
+  // Remove exactly once per long-press. On touch a long-press fires the hold
+  // timer AND a contextmenu; `held` gates the second so they can't both step.
+  const removeOnce = () => { if (held) return; held = true; step(-1); if (navigator.vibrate) navigator.vibrate(8); };
+  el.addEventListener('pointerdown', () => {
+    held = false;
+    timer = setTimeout(() => { timer = null; removeOnce(); }, 450);
+  });
+  el.addEventListener('pointerup', cancel);
+  el.addEventListener('pointercancel', cancel);
+  el.addEventListener('pointerleave', cancel);
+  el.addEventListener('click', () => { if (held) { held = false; return; } step(1); });
+  el.addEventListener('contextmenu', e => { e.preventDefault(); cancel(); removeOnce(); });
+}
+
+const ct = { dice: 6, difficulty: 3 };
+const ctAddDie = $('ctAddDie');
+const ctDiffChip = $('ctDiffChip');
+const ctDiffVal = $('ctDifficulty');
+
+function resetCthulhuTech() {
+  // CthulhuTech builds a pool, so it opens empty like the numeric tray — tap the
+  // d10 to add. Difficulty is a setting, not a die, so it keeps its default.
+  ct.dice = 0;
+  ct.difficulty = 3;
+  syncCt({ writeField: false });
+}
+
+function ctNotation() {
+  if (ct.dice < 1) return ''; // an empty pool writes nothing, like a bare numeric tray
+  return `ct:${ct.dice}` + (ct.difficulty !== null ? `@${ct.difficulty}` : '');
+}
+
+// The example roll thrown when you flick an empty CthulhuTech tray: a six-die
+// pool at the difficulty currently set.
+function ctExample() {
+  return `ct:6` + (ct.difficulty !== null ? `@${ct.difficulty}` : '');
+}
+
+function syncCt({ writeField = true } = {}) {
+  // The d10 button badges the pool count, and shows none while the pool is empty.
+  if (ct.dice > 0) ctAddDie.dataset.count = String(ct.dice);
+  else delete ctAddDie.dataset.count;
+  if (ct.difficulty === null) {
+    ctDiffVal.textContent = '—'; ctDiffVal.dataset.unset = '1'; ctDiffChip.classList.remove('is-set');
+  } else {
+    ctDiffVal.textContent = String(ct.difficulty); delete ctDiffVal.dataset.unset; ctDiffChip.classList.add('is-set');
+  }
+  if (writeField) $('notation').value = ctNotation();
+  if (uiSystem === 'cthulhutech') stageSystemPool();
+}
+
+// Tap the d10 to add to the pool, hold to remove one (down to empty).
+bindTapHold(ctAddDie, dir => { ct.dice = Math.max(0, Math.min(100, ct.dice + dir)); syncCt(); });
+// Difficulty cycles unset → 1 … 20; holding below 1 returns to unset (report hits).
+bindTapHold(ctDiffChip, dir => {
+  if (dir > 0) ct.difficulty = ct.difficulty === null ? 1 : Math.min(20, ct.difficulty + 1);
+  else ct.difficulty = ct.difficulty === null || ct.difficulty <= 1 ? null : ct.difficulty - 1;
+  syncCt();
+});
+
+function syncCtFromField() {
+  try {
+    const { dice, difficulty } = parseCthulhuTech($('notation').value);
+    ct.dice = dice;
+    ct.difficulty = difficulty;
+    syncCt({ writeField: false });
+  } catch { /* mid-type, not yet valid */ }
+}
+
+// ---- One Ring pool ----
+//
+// A Feat die is always rolled; the controls are how many Success dice, the
+// Target Number, whether the roll is favoured / ill-favoured, and whether the
+// hero is Weary.
+
+// Success starts empty — the Feat die always rolls and shows in the tray, and you
+// build the Success pool on top of it.
+const tor = { success: 0, favour: null, weary: false, tn: 14 };
+const torAddSuccess = $('torAddSuccess');
+const torTnChip = $('torTnChip');
+const torTnVal = $('torTn');
+const torFlagButtons = [...document.querySelectorAll('.tor-flag')];
+
+function resetOneRing() {
+  tor.success = 0;
+  tor.favour = null;
+  tor.weary = false;
+  tor.tn = 14;
+  syncTor({ writeField: false });
+}
+
+function torNotation() {
+  return `tor:${tor.success}` + (tor.favour || '') + (tor.weary ? 'w' : '')
+    + (tor.tn !== null ? `@${tor.tn}` : '');
+}
+
+function syncTor({ writeField = true } = {}) {
+  if (tor.success > 0) torAddSuccess.dataset.count = String(tor.success); else delete torAddSuccess.dataset.count;
+  if (tor.tn === null) { torTnVal.textContent = '—'; torTnVal.dataset.unset = '1'; torTnChip.classList.remove('is-set'); }
+  else { torTnVal.textContent = String(tor.tn); delete torTnVal.dataset.unset; torTnChip.classList.add('is-set'); }
+  for (const btn of torFlagButtons) {
+    const flag = btn.dataset.flag;
+    const on = flag === 'weary' ? tor.weary : tor.favour === flag;
+    btn.setAttribute('aria-pressed', String(on));
+  }
+  if (writeField) $('notation').value = torNotation();
+  if (uiSystem === 'onering') stageSystemPool();
+}
+
+for (const btn of torFlagButtons) {
+  btn.addEventListener('click', () => {
+    const flag = btn.dataset.flag;
+    if (flag === 'weary') tor.weary = !tor.weary;
+    else tor.favour = tor.favour === flag ? null : flag; // fav/ill are exclusive
+    syncTor();
+  });
+}
+// Tap the d6 to add a Success die, hold to remove one.
+bindTapHold(torAddSuccess, dir => { tor.success = Math.max(0, Math.min(20, tor.success + dir)); syncTor(); });
+// Target cycles unset → 10 … 100; holding below 1 returns to unset.
+bindTapHold(torTnChip, dir => {
+  if (dir > 0) tor.tn = tor.tn === null ? 10 : Math.min(100, tor.tn + 1);
+  else tor.tn = tor.tn === null || tor.tn <= 1 ? null : tor.tn - 1;
+  syncTor();
+});
+
+function syncTorFromField() {
+  try {
+    const { success, favour, weary, tn } = parseOneRing($('notation').value);
+    tor.success = success;
+    tor.favour = favour;
+    tor.weary = weary;
+    tor.tn = tn;
+    syncTor({ writeField: false });
+  } catch { /* mid-type, not yet valid */ }
+}
+
+// ---- PbtA / Mist Engine (2d6 + modifier) ----
+// The two systems roll identically — 2d6 plus a modifier — and differ only in
+// how the result reads and in colour, so they share one picker (a single
+// modifier stepper) and one controller. The active mode (uiSystem) decides which
+// prefix the notation carries.
+const twod6 = { modifier: 0 };
+const twod6ModField = $('twod6Mod');
+
+function twod6Notation(system) {
+  const m = twod6.modifier;
+  return `${system}:` + (m ? (m > 0 ? `+${m}` : String(m)) : '');
+}
+function syncTwod6({ writeField = true } = {}) {
+  const m = twod6.modifier;
+  if (twod6ModField) twod6ModField.textContent = m > 0 ? `+${m}` : String(m);
+  if (writeField && (uiSystem === 'pbta' || uiSystem === 'mist')) {
+    $('notation').value = twod6Notation(uiSystem);
+  }
+  if (uiSystem === 'pbta' || uiSystem === 'mist') stageSystemPool();
+}
+function resetTwod6() { twod6.modifier = 0; syncTwod6({ writeField: false }); }
+function syncTwod6FromField() {
+  const src = $('notation').value;
+  const parse = detectSystem(src) === 'mist' ? parseMist : parsePbta;
+  try { twod6.modifier = parse(src).modifier; syncTwod6({ writeField: false }); }
+  catch { /* mid-type, not yet valid */ }
+}
+bindTapHold($('twod6ModChip'), dir => { twod6.modifier = Math.max(-100, Math.min(100, twod6.modifier + dir)); syncTwod6(); });
+
+// Both modes go through the one controller; the picker is shared, so a modifier
+// set in PbtA carries into Mist and vice versa — which is the intuitive result.
+const pbtaCtl = { notation: () => twod6Notation('pbta'), reset: resetTwod6, fromField: syncTwod6FromField };
+const mistCtl = { notation: () => twod6Notation('mist'), reset: resetTwod6, fromField: syncTwod6FromField };
 
 // ---- the pool ----
 //
@@ -5656,7 +8891,7 @@ function stageFromPool({ writeField }) {
   $('total').textContent = '—';
   $('breakdown').textContent = staged.length
     ? `${staged.length} ${staged.length === 1 ? 'die' : 'dice'} ready`
-    : 'Pick dice or type a roll';
+    : systemHint(uiSystem).idle;
   markPool();
   hideHint();
 }
@@ -5689,6 +8924,128 @@ function markPool() {
   }
 }
 
+// ---- staging the system pools like the numeric one ----
+//
+// The numeric row already does the thing that feels good: tap a die and it lands
+// in the tray as a blank die; tap one in the tray and it leaves; Roll throws the
+// lot. The system modes never drove that — they only wrote notation. These give
+// every system the same behaviour: each maps its pool state to a flat list of
+// blank-die descriptors, the shared stager renders them, and each staged die is
+// tagged so a tap in the tray removes the right one.
+
+// The polyhedral sides each Genesys die uses, so a staged pool draws the true
+// shape (d8 Ability, d12 Proficiency, d6 Boost, …) the way the numeric pool does.
+const GEN_SIDES = { ability: 8, proficiency: 12, boost: 6, difficulty: 8, challenge: 12, setback: 6, force: 12 };
+// A Force die has no side until it is rolled (light or dark), so it stages in a
+// neutral metal grey.
+const FORCE_STAGE_COLOR = '#9AA0A6';
+
+// The pool the active system would roll, as a flat list of blank-die descriptors
+// { sides, genColor?, hunger?, kind }. `kind` is the tag a tap in the tray
+// removes on. Mandatory dice (Hope/Fear, the Feat die, the fixed 2d6) are
+// present but their kind is not removable.
+function systemStageDescriptors() {
+  const out = [];
+  const add = (n, d) => { for (let i = 0; i < Math.max(0, n); i++) out.push(d); };
+  switch (uiSystem) {
+    case 'v5':
+      add(v5.normal, { sides: 10, kind: 'v5-normal' });
+      add(v5.hunger, { sides: 10, hunger: true, kind: 'v5-hunger' });
+      break;
+    case 'fate':
+      add(fate.count, { sides: 6, kind: 'fate' });
+      break;
+    case 'genesys':
+    case 'starwars':
+      for (const t of GEN_TYPES) {
+        if (t.type === 'force' && uiSystem !== 'starwars') continue;
+        add(gen[t.type], {
+          sides: GEN_SIDES[t.type],
+          genColor: t.type === 'force' ? FORCE_STAGE_COLOR : GEN_COLORS[t.type],
+          kind: `gen-${t.type}`,
+        });
+      }
+      break;
+    case 'daggerheart':
+      out.push({ sides: 12, genColor: DH_COLORS.hope, kind: 'dh-hope' });
+      out.push({ sides: 12, genColor: DH_COLORS.fear, kind: 'dh-fear' });
+      add(Math.abs(dhState.advantage), {
+        sides: 6,
+        genColor: dhState.advantage < 0 ? DH_COLORS.disadvantage : DH_COLORS.advantage,
+        kind: 'dh-adv',
+      });
+      break;
+    case 'cthulhutech':
+      add(ct.dice, { sides: 10, genColor: CT_COLORS.miss, kind: 'ct' });
+      break;
+    case 'onering':
+      add(tor.favour ? 2 : 1, { sides: 12, genColor: TOR_COLORS.feat, kind: 'tor-feat' });
+      add(tor.success, { sides: 6, genColor: TOR_COLORS.success, kind: 'tor-success' });
+      break;
+    case 'pbta':
+    case 'mist':
+      add(2, { sides: 6, kind: '2d6' });
+      break;
+  }
+  return out;
+}
+
+// Render the active system's pool as blank tray dice, exactly the way
+// stageFromPool renders the numeric pool. Callers guard on their own system so
+// the mode switch (which resets every system's controls in turn) only paints the
+// tray for the active one. Notation is owned by the caller's sync* (this never
+// writes it).
+function stageSystemPool() {
+  const staged = systemStageDescriptors().slice(0, ANIMATE_LIMIT).map(d => {
+    const die = new Die(d.sides, null, 0, 0, 40);
+    if (d.hunger) die.hunger = true;
+    if (d.genColor) die.genColor = d.genColor;
+    die.stageKind = d.kind;
+    return die;
+  });
+  state.dice = staged;
+  placeGrid(state.dice);
+  for (const die of state.dice) {
+    die.settled = true;
+    die.settling = true;
+    die.settleT = 1;
+    die.rot = [0.5, 0.6, 0.1];
+    die.homeX = die.x;
+    die.homeY = die.y;
+  }
+
+  $('total').dataset.idle = '1';
+  $('total').dataset.kind = 'number';
+  $('total').textContent = '—';
+  $('breakdown').textContent = staged.length
+    ? `${staged.length} ${staged.length === 1 ? 'die' : 'dice'} ready`
+    : systemHint(uiSystem).idle;
+  hideHint();
+}
+
+// Take one staged die of `kind` back off the pool by stepping the owning
+// system's state, then let its sync re-render. Mandatory dice return false so a
+// tap on them is a gentle no-op rather than an error.
+function removeSystemStageKind(kind) {
+  switch (kind) {
+    case 'v5-normal': v5.normal = Math.max(0, v5.normal - 1); syncV5(); return true;
+    case 'v5-hunger': v5.hunger = Math.max(0, v5.hunger - 1); syncV5(); return true;
+    case 'fate': fate.count = Math.max(1, fate.count - 1); syncFate(); return true;
+    case 'ct': ct.dice = Math.max(0, ct.dice - 1); syncCt(); return true;
+    case 'tor-success': tor.success = Math.max(0, tor.success - 1); syncTor(); return true;
+    case 'dh-adv':
+      dhState.advantage -= Math.sign(dhState.advantage);
+      syncDh();
+      return true;
+    default:
+      if (kind && kind.startsWith('gen-')) {
+        const type = kind.slice(4);
+        if (gen[type] > 0) { gen[type] -= 1; syncGen(); return true; }
+      }
+      return false; // Hope/Fear, the Feat die, the fixed 2d6 — not removable.
+  }
+}
+
 // Marks shown on a die button, chosen to say which modifier without a legend:
 // arrows point the way the kept die goes, a burst means exploding, a cycle means
 // reroll. Drop shares the arrow but points at what leaves.
@@ -5710,13 +9067,33 @@ function modifierGlyph(mod) {
 
 function clearPool() {
   pool = new Map();
+  clearError();
+
+  // A system keeps its pool in its own state, and clearing returns it to the
+  // standard roll rather than to nothing: 0dF and ct:0 do not parse, so "empty"
+  // is not a valid system pool. Its sync then restages the tray and rewrites the
+  // field. Build-from-scratch systems (V5, Genesys) default to an empty pool, so
+  // they clear to nothing just like numeric.
+  if (uiSystem !== 'numeric') {
+    switch (uiSystem) {
+      case 'v5': resetV5(); syncV5(); break;
+      case 'fate': resetFate(); syncFate(); break;
+      case 'genesys': case 'starwars': resetGenesys(); syncGen(); break;
+      case 'daggerheart': resetDaggerheart(); syncDh(); break;
+      case 'cthulhutech': resetCthulhuTech(); syncCt(); break;
+      case 'onering': resetOneRing(); syncTor(); break;
+      case 'pbta': case 'mist': resetTwod6(); syncTwod6(); break;
+    }
+    return;
+  }
+
   state.dice = [];
   $('notation').value = '';
   $('total').dataset.idle = '1';
+  $('total').dataset.kind = 'number';
   $('total').textContent = '—';
-  $('breakdown').textContent = 'Pick dice or type a roll';
+  $('breakdown').textContent = systemHint(uiSystem).idle;
   markPool();
-  clearError();
 }
 
 $('clear').addEventListener('click', () => {
@@ -5753,6 +9130,7 @@ function makeDieButton(sides) {
   b.className = 'dbtn';
   b.type = 'button';
   b.dataset.sides = String(sides);
+  if (STANDARD_DICE.has(sides)) b.dataset.std = '';
 
   // The hold-fill is its own element: ::before carries the modifier glyph and
   // ::after the count, so a pseudo-element here would collide with one of them.
@@ -5871,6 +9249,7 @@ function openHistory() {
   closeSheet();
   closeDial();
   closeRoom();
+  closeMode();
 
   const list = $('historyFull');
   list.replaceChildren();
@@ -6089,6 +9468,7 @@ function openDial() {
   closeSheet();
   closeHistory();
   closeRoom();
+  closeMode();
   dial.hidden = false;
   setDial(dialValue());
   hideHint();
@@ -6344,6 +9724,12 @@ document.addEventListener('keydown', e => {
   if (!dial.hidden) closeDial();
   if (!historyPanel.hidden) closeHistory();
   if (!roomPanel.hidden) closeRoom();
+  if (!modeSheet.hidden) closeMode();
+});
+
+// Tapping the empty space around the mode cards closes the sheet, like the rest.
+modeSheet.addEventListener('click', e => {
+  if (e.target === modeSheet) closeMode();
 });
 
 // Long-press on touch, right-click on desktop — long-press has no mouse
@@ -6471,17 +9857,36 @@ canvas.addEventListener('pointerup', e => {
   // die from a handful without clearing everything or editing the text.
   if (speed < 120 && travelled < 10 && removeDieAt(e.clientX, e.clientY)) return;
 
-  // Throw whatever is staged; failing that, re-roll the last notation. The tray
-  // is never a dead surface, so a tap on an empty one rolls the selected die.
-  const target = $('notation').value.trim()
-    || (state.last && state.last.notation)
-    || `d${state.defaultSides}`;
+  // Throw whatever is staged; failing that, roll the mode's default. The tray is
+  // never a dead surface, so a tap on an empty one still rolls — but it must roll
+  // the current system's dice, not a d20 left over from numeric mode.
+  const typed = $('notation').value.trim();
+  const target = typed || emptyTrayRoll();
 
   doRoll(target);
   if (speed > 120) {
     for (const d of state.dice) d.throwWith(vx * 0.5, Math.abs(vy) * 0.5 + 200);
   }
 });
+
+// What a flick or tap on an empty tray rolls. In a system mode it must be that
+// system's own default — a bare d20 makes no sense in Vampire — so V5 throws a
+// starter pool of one ordinary die and one Hunger die. Numeric keeps re-rolling
+// your last roll, or the selected die if there is none yet.
+function emptyTrayRoll() {
+  if (uiSystem === 'v5') return v5Notation() || 'v5:2h1';
+  if (uiSystem === 'fate') return fateNotation();
+  if (uiSystem === 'genesys') return genNotation() || 'gen:1P+1A+2D';
+  if (uiSystem === 'starwars') return genNotation() || 'sw:1A+2D+1F';
+  if (uiSystem === 'onering') return torNotation();
+  if (uiSystem === 'daggerheart') return dhNotation();
+  if (uiSystem === 'cthulhutech') return ctNotation() || ctExample();
+  if (uiSystem === 'pbta') return pbtaCtl.notation();
+  if (uiSystem === 'mist') return mistCtl.notation();
+  const last = state.last;
+  const lastNumeric = last && (last.system === 'numeric' || last.system === undefined);
+  return (lastNumeric && last.notation) || `d${state.defaultSides}`;
+}
 
 // Remove one staged die under the given screen point. Only staged dice can be
 // picked off: once a roll has happened the numbers are a result, not a pool, and
@@ -6499,6 +9904,13 @@ function removeDieAt(clientX, clientY) {
     if (dist < d.size * 0.62 && dist < best) { best = dist; hit = d; }
   }
   if (!hit) return false;
+
+  // A system die knows which pool it belongs to; its sync re-renders the tray.
+  if (uiSystem !== 'numeric') {
+    const removed = removeSystemStageKind(hit.stageKind);
+    if (removed && navigator.vibrate) navigator.vibrate(8);
+    return removed;
+  }
 
   const entry = pool.get(hit.sides);
   if (!entry) return false;
@@ -6837,7 +10249,17 @@ const roomLink = createRoom({
 // The one thing this must not do is interrupt a throw of your own, which the
 // dataset.rolling guard below covers.
 function showRemoteRoll(roll) {
-  addHistory({ notation: roll.notation, groups: roll.groups, total: roll.total }, roll.name);
+  // Rebuild the shape the formatters and the tray expect. A numeric roll travels
+  // as a total; a system roll (V5, Fate, …) travels with its system id and the
+  // summary its headline and detail are rendered from.
+  const result = {
+    system: roll.system || 'numeric',
+    notation: roll.notation,
+    groups: roll.groups,
+    total: roll.total,
+    summary: roll.summary,
+  };
+  addHistory(result, roll.name);
 
   // Yield to a throw of your own, but not to another remote roll. Testing
   // dataset.rolling alone treated both the same, so once remote rolls started
@@ -6848,27 +10270,12 @@ function showRemoteRoll(roll) {
   // table does: the next handful lands and you look at that instead.
   if ($('total').dataset.rolling && !state.remoteClaim) return;
 
-  const flat = [];
-  for (const g of roll.groups) {
-    if (g.kind !== 'dice') continue;
-    for (const d of g.dice) {
-      flat.push({ sides: g.sides, value: d.value, kept: d.kept,
-                  exploded: d.exploded, rerolled: d.rerolled });
-    }
-  }
+  const flat = flattenRollDice(result);
   if (!flat.length || flat.length > ANIMATE_LIMIT) return;
 
-  state.dice = flat.map(f => {
-    const die = new Die(f.sides, f.value, 0, 0, 40);
-    die.kept = f.kept;
-    die.exploded = f.exploded;
-    die.rerolled = f.rerolled;
-    // Someone else's die. Used only to keep the haptics to your own rolls; it
-    // looks identical on the tray, because whose die it is belongs in the
-    // readout rather than in the drawing.
-    die.remote = true;
-    return die;
-  });
+  // Someone else's dice, stamped with their system's faces and colours so they
+  // look exactly like a local roll; `remote` only steers haptics away.
+  state.dice = buildTrayDice(flat, result, { remote: true });
   placeGrid(state.dice);
 
   // The readout updates when the dice land rather than now, so the number
@@ -6884,8 +10291,16 @@ function showRemoteRoll(roll) {
     if (state.remoteClaim !== claim) return;
     delete $('total').dataset.rolling;
     delete $('total').dataset.idle;
-    $('total').textContent = String(roll.total);
-    $('breakdown').textContent = `${roll.name} · ${describe(roll.groups)}`;
+    // Render the peer's result through the same formatters as your own. Guarded
+    // because the summary crossed the wire: a malformed one must not wedge the
+    // tray, so it falls back to a plain line.
+    try {
+      setTotal(resultHeadline(result));
+      $('breakdown').textContent = `${roll.name} · ${resultDetail(result)}`;
+    } catch {
+      setTotal({ kind: 'number', text: result.total != null ? String(result.total) : '—' });
+      $('breakdown').textContent = `${roll.name} · ${result.notation}`;
+    }
   };
 
   // Same thresholds as a local roll: thrown when there are few enough to follow,
@@ -6996,6 +10411,7 @@ function openRoom() {
   closeSheet();
   closeDial();
   closeHistory();
+  closeMode();
   roomPanel.hidden = false;
   roomToggle.setAttribute('aria-expanded', 'true');
   if (!roomNameField.value) roomNameField.value = roomLink.name;
@@ -7144,6 +10560,14 @@ if (fromLink) {
   openRoom();
   enterRoom(fromLink);
 }
+
+// A branded slug (/vtm, /fate, /genesys) opens the app already in that system.
+// url:false because the address is already the slug — we are reading it, not
+// writing it. Runs after every control exists, so setSystem can touch them all.
+setSystem(systemFromPath(), { url: false });
+
+// Back/forward moves between the systems the address has visited.
+window.addEventListener('popstate', () => setSystem(systemFromPath(), { url: false }));
 
 })();
 </script>

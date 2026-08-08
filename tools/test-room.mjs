@@ -16,10 +16,10 @@ if (!globalThis.btoa) {
 }
 
 import {
-  createRoom, validateRoll, backoffDelay, parsePassphraseFromHash, ROOM_STATES,
+  createRoom, validateRoll, validateSystemRoll, backoffDelay, parsePassphraseFromHash, ROOM_STATES,
 } from '../room.js';
 import {
-  deriveRoom, newSender, encryptMessage, PROTOCOL_VERSION,
+  deriveRoom, newSender, encryptMessage, decryptMessage, PROTOCOL_VERSION,
 } from '../room-crypto.js';
 import { readFileSync } from 'node:fs';
 
@@ -439,6 +439,126 @@ const sampleRoll = {
         subtotal: 5 },
       { kind: 'const', sign: -1, value: 1 },
     ],
+  }));
+}
+
+// --- system rolls travel as roll2 and re-render from their summary ---
+
+const sampleSystemRoll = {
+  k: 'roll2',
+  at: 1768000000000,
+  name: 'Bram Oak',
+  system: 'v5',
+  notation: 'v5:5h1',
+  groups: [
+    { kind: 'dice', sides: 10, count: 5, subtotal: 0, dice: [
+      { value: 10, hunger: false, kept: true, exploded: false, rerolled: false },
+      { value: 6, hunger: false, kept: true, exploded: false, rerolled: false },
+      { value: 3, hunger: false, kept: true, exploded: false, rerolled: false },
+      { value: 8, hunger: false, kept: true, exploded: false, rerolled: false },
+      { value: 2, hunger: true, kept: true, exploded: false, rerolled: false },
+    ] },
+  ],
+  summary: { successes: 3, tens: 1, crit: false, messy: false, bestial: false, outcome: 'success' },
+};
+
+// A peer's system roll arrives whole: its system id, notation, groups, and the
+// summary the receiver renders the headline and detail from.
+{
+  const { r, sock, events } = await liveRoom();
+  const peer = newSender();
+  sock.deliver({ t: 'msg', c: await encryptMessage(room, peer, sampleSystemRoll) });
+  await settle(() => events.rolls.length === 1);
+
+  ok('a system roll reaches onRoll', events.rolls.length === 1);
+  const got = events.rolls[0];
+  ok('the system id survives', got.system === 'v5');
+  ok('the system notation survives', got.notation === 'v5:5h1');
+  ok('the summary rides along', !!got.summary && got.summary.successes === 3);
+  ok('a system roll carries no numeric total', got.total === undefined);
+  ok('system groups pass through unaltered',
+     JSON.stringify(got.groups) === JSON.stringify(sampleSystemRoll.groups));
+  r.leave();
+}
+
+// share() routes by system: a V5 result goes out as roll2 carrying its summary,
+// not as the numeric roll schema (which has no place for it).
+{
+  const { r, sock } = await liveRoom();
+  r.share({ system: 'v5', notation: 'v5:2h1', summary: { successes: 1 },
+    groups: [{ kind: 'dice', sides: 10, count: 2, subtotal: 0,
+      dice: [{ value: 7, kept: true }, { value: 2, hunger: true, kept: true }] }] });
+  await settle(() => sock.frames('send').length >= 2);
+  const frames = sock.frames('send');
+  const decoded = await decryptMessage(room, new Map(), frames[frames.length - 1].c);
+  ok('share() sends a system roll as roll2', !!decoded && decoded.k === 'roll2');
+  ok('the roll2 frame carries the system and summary',
+     decoded.system === 'v5' && decoded.summary.successes === 1);
+  r.leave();
+}
+
+// A numeric roll still goes out under the original schema, so a client serving
+// the old bundle from cache reads it unchanged.
+{
+  const { r, sock } = await liveRoom();
+  r.share({ notation: '1d20', total: 15, groups: [{ kind: 'dice', sign: 1, count: 1, sides: 20,
+    mods: {}, dice: [{ value: 15, kept: true, exploded: false, rerolled: false, crit: null }], subtotal: 15 }] });
+  await settle(() => sock.frames('send').length >= 2);
+  const frames = sock.frames('send');
+  const decoded = await decryptMessage(room, new Map(), frames[frames.length - 1].c);
+  ok('a numeric roll still goes out as roll', !!decoded && decoded.k === 'roll');
+  r.leave();
+}
+
+// --- validateSystemRoll: a shape guard, permissive on values, capped on size ---
+
+{
+  ok('a well-formed system roll validates', validateSystemRoll(sampleSystemRoll));
+
+  const bad = obj => validateSystemRoll({ ...sampleSystemRoll, ...obj });
+
+  ok('an unknown system is rejected', !bad({ system: 'definitely-not-a-system' }));
+  ok('a missing system is rejected', !bad({ system: '' }));
+  ok('an empty notation is rejected', !bad({ notation: '' }));
+  ok('an over-long notation is rejected', !bad({ notation: 'v'.repeat(201) }));
+  ok('a non-object summary is rejected', !bad({ summary: null }) && !bad({ summary: [1, 2] }) && !bad({ summary: 'x' }));
+  ok('empty groups are rejected', !bad({ groups: [] }));
+  ok('a non-object is rejected', !validateSystemRoll(null) && !validateSystemRoll('x'));
+
+  // Fate dice are -1/0/+1 with no per-die sides — the numeric validator would
+  // reject them, this one must not.
+  ok('a Fate roll validates', validateSystemRoll({
+    system: 'fate', notation: '4dF', summary: { net: 1, total: 1, ladder: 'Fair' },
+    groups: [{ kind: 'dice', sides: 6, count: 4, subtotal: 0, dice: [
+      { value: 1, kept: true }, { value: -1, kept: true },
+      { value: 0, kept: true }, { value: 1, kept: true },
+    ] }],
+  }));
+
+  // Genesys dice carry glyph arrays and a colour tag.
+  ok('a Genesys roll validates', validateSystemRoll({
+    system: 'genesys', notation: 'gen:2A', summary: { success: 1, advantage: 0 },
+    groups: [{ kind: 'dice', count: 2, subtotal: 0, dice: [
+      { value: 3, sides: 8, color: 'ability', symbols: ['success'], kept: true },
+      { value: 1, sides: 8, color: 'ability', symbols: [], kept: true },
+    ] }],
+  }));
+
+  ok('a wildly out-of-range die value is rejected', !validateSystemRoll({
+    ...sampleSystemRoll,
+    groups: [{ kind: 'dice', sides: 10, count: 1, subtotal: 0, dice: [{ value: 1e9, kept: true }] }],
+  }));
+  ok('a non-string glyph is rejected', !validateSystemRoll({
+    system: 'genesys', notation: 'gen:1A', summary: {},
+    groups: [{ kind: 'dice', count: 1, subtotal: 0, dice: [{ value: 1, symbols: [42], kept: true }] }],
+  }));
+  ok('an over-long glyph list is rejected', !validateSystemRoll({
+    system: 'genesys', notation: 'gen:1A', summary: {},
+    groups: [{ kind: 'dice', count: 1, subtotal: 0, dice: [{ value: 1, symbols: Array(13).fill('s'), kept: true }] }],
+  }));
+  ok('too many groups are rejected', !validateSystemRoll({
+    ...sampleSystemRoll,
+    groups: Array(51).fill({ kind: 'dice', count: 1, subtotal: 0, dice: [{ value: 1, kept: true }] }),
   }));
 }
 
