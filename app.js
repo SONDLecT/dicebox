@@ -811,12 +811,12 @@ const SYSTEMS = {
   v5: { badge: 'Vampire' },
   fate: { badge: 'Fate' },
   genesys: { badge: 'Genesys' },
-  daggerheart: { badge: 'Daggerheart' },
+  daggerheart: { badge: 'Daggerheart Compatible' },
   cthulhutech: { badge: 'CthulhuTech' },
-  starwars: { badge: 'Star Wars' },
-  onering: { badge: 'The One Ring' },
+  starwars: { badge: 'Star Wars Compatible' },
+  onering: { badge: 'The One Ring Compatible' },
   pbta: { badge: 'PbtA' },
-  mist: { badge: 'Mist Engine' },
+  mist: { badge: 'Mist Engine Compatible' },
 };
 
 // Empty-tray copy. Most modes build a pool by tapping dice, so the default

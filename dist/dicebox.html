@@ -293,6 +293,16 @@ body {
   margin: 0 6px;
 }
 
+/* The fine print: trademark/affiliation notice and the credits the publishers'
+   policies ask for. Quiet, small, and last. */
+.disclaimer {
+  margin: 12px 0 0;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--muted);
+  opacity: 0.85;
+}
+
 .help .colophon a {
   color: var(--accent);
   text-decoration: none;
@@ -2217,6 +2227,18 @@ body {
         <a href="https://github.com/SONDLecT/dicebox" target="_blank" rel="noopener noreferrer">Source on GitHub</a>
         <span class="build" id="build" hidden></span>
       </p>
+
+      <p class="disclaimer">
+        Dicebox is an independent, non-commercial fan project. Game names are
+        trademarks of their respective owners and are used only to indicate
+        rules compatibility — Dicebox is not affiliated with, endorsed, or
+        sponsored by any of them.
+        Portions of the Vampire: The Masquerade materials are the copyrights and
+        trademarks of Paradox Interactive AB and are used with permission; all
+        rights reserved (worldofdarkness.com). This is not official World of
+        Darkness material. The PbtA mode is inspired by Apocalypse World by
+        Meguey &amp; Vincent Baker.
+      </p>
     </div>
 
     <!-- The dice-system picker. A row of the header, a slide-out on the tray:
@@ -2294,7 +2316,7 @@ body {
               <path d="M15 8 24 13v10l-9 5-9-5V13z" fill="none" stroke="#C9A227" stroke-width="1.9" stroke-linejoin="round"/>
               <path d="M29 16 38 21v10l-9 5-9-5V21z" fill="none" stroke="#7E6BB5" stroke-width="1.9" stroke-linejoin="round"/>
             </svg>
-            <span class="mode-name">Daggerheart</span>
+            <span class="mode-name">Daggerheart Compatible</span>
             <span class="mode-sub">Duality Dice</span>
           </button>
           <button type="button" class="mode-card mode-cthulhutech" data-system="cthulhutech" aria-pressed="false">
@@ -2327,7 +2349,7 @@ body {
                 <circle cx="22" cy="22" r="5"/>
               </g>
             </svg>
-            <span class="mode-name">Star Wars</span>
+            <span class="mode-name">Star Wars Compatible</span>
             <span class="mode-sub">Narrative + Force</span>
           </button>
           <button type="button" class="mode-card mode-onering" data-system="onering" aria-pressed="false">
@@ -2336,7 +2358,7 @@ body {
               <circle cx="22" cy="22" r="15" fill="none" stroke="#B5893C" stroke-width="2.2"/>
               <circle cx="22" cy="22" r="8.4" fill="none" stroke="#B5893C" stroke-width="1.8"/>
             </svg>
-            <span class="mode-name">The One Ring</span>
+            <span class="mode-name">The One Ring Compatible</span>
             <span class="mode-sub">Feat &amp; Success dice</span>
           </button>
           <button type="button" class="mode-card mode-pbta" data-system="pbta" aria-pressed="false">
@@ -2366,7 +2388,7 @@ body {
                 <path d="M12 31c3.5-2.8 7-2.8 10.5 0s5 2 8 0.8"/>
               </g>
             </svg>
-            <span class="mode-name">Mist Engine</span>
+            <span class="mode-name">Mist Engine Compatible</span>
             <span class="mode-sub">2d6 · success / consequence</span>
           </button>
         </div>
@@ -8121,12 +8143,12 @@ const SYSTEMS = {
   v5: { badge: 'Vampire' },
   fate: { badge: 'Fate' },
   genesys: { badge: 'Genesys' },
-  daggerheart: { badge: 'Daggerheart' },
+  daggerheart: { badge: 'Daggerheart Compatible' },
   cthulhutech: { badge: 'CthulhuTech' },
-  starwars: { badge: 'Star Wars' },
-  onering: { badge: 'The One Ring' },
+  starwars: { badge: 'Star Wars Compatible' },
+  onering: { badge: 'The One Ring Compatible' },
   pbta: { badge: 'PbtA' },
-  mist: { badge: 'Mist Engine' },
+  mist: { badge: 'Mist Engine Compatible' },
 };
 
 // Empty-tray copy. Most modes build a pool by tapping dice, so the default
