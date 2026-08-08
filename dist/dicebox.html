@@ -2229,15 +2229,8 @@ body {
       </p>
 
       <p class="disclaimer">
-        Dicebox is an independent, non-commercial fan project. Game names are
-        trademarks of their respective owners and are used only to indicate
-        rules compatibility — Dicebox is not affiliated with, endorsed, or
-        sponsored by any of them.
-        Portions of the Vampire: The Masquerade materials are the copyrights and
-        trademarks of Paradox Interactive AB and are used with permission; all
-        rights reserved (worldofdarkness.com). This is not official World of
-        Darkness material. The PbtA mode is inspired by Apocalypse World by
-        Meguey &amp; Vincent Baker.
+        An unofficial fan tool — not affiliated with or endorsed by the makers
+        of the games it can roll for.
       </p>
     </div>
 
@@ -2316,7 +2309,7 @@ body {
               <path d="M15 8 24 13v10l-9 5-9-5V13z" fill="none" stroke="#C9A227" stroke-width="1.9" stroke-linejoin="round"/>
               <path d="M29 16 38 21v10l-9 5-9-5V21z" fill="none" stroke="#7E6BB5" stroke-width="1.9" stroke-linejoin="round"/>
             </svg>
-            <span class="mode-name">Daggerheart Compatible</span>
+            <span class="mode-name">Daggerheart</span>
             <span class="mode-sub">Duality Dice</span>
           </button>
           <button type="button" class="mode-card mode-cthulhutech" data-system="cthulhutech" aria-pressed="false">
@@ -2349,7 +2342,7 @@ body {
                 <circle cx="22" cy="22" r="5"/>
               </g>
             </svg>
-            <span class="mode-name">Star Wars Compatible</span>
+            <span class="mode-name">Force Dice</span>
             <span class="mode-sub">Narrative + Force</span>
           </button>
           <button type="button" class="mode-card mode-onering" data-system="onering" aria-pressed="false">
@@ -2358,7 +2351,7 @@ body {
               <circle cx="22" cy="22" r="15" fill="none" stroke="#B5893C" stroke-width="2.2"/>
               <circle cx="22" cy="22" r="8.4" fill="none" stroke="#B5893C" stroke-width="1.8"/>
             </svg>
-            <span class="mode-name">The One Ring Compatible</span>
+            <span class="mode-name">Feat Dice</span>
             <span class="mode-sub">Feat &amp; Success dice</span>
           </button>
           <button type="button" class="mode-card mode-pbta" data-system="pbta" aria-pressed="false">
@@ -2388,7 +2381,7 @@ body {
                 <path d="M12 31c3.5-2.8 7-2.8 10.5 0s5 2 8 0.8"/>
               </g>
             </svg>
-            <span class="mode-name">Mist Engine Compatible</span>
+            <span class="mode-name">Mist Engine</span>
             <span class="mode-sub">2d6 · success / consequence</span>
           </button>
         </div>
@@ -2739,7 +2732,7 @@ body {
        dice, the Target Number, and the favoured/ill-favoured & Weary states. -->
   <!-- The Feat die always rolls (shown in the tray); you build the Success pool
        with the d6 button, set the Target, and toggle the conditions. -->
-  <section class="picker tor-picker" id="torPicker" aria-label="One Ring roll" hidden>
+  <section class="picker tor-picker" id="torPicker" aria-label="Feat Dice roll" hidden>
     <div class="tor-controls-row">
       <button type="button" class="die-btn tor-success-btn" id="torAddSuccess" aria-label="Add a Success die; hold to remove">
         <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true"><rect x="5" y="5" width="20" height="20" rx="4.5"/></svg>
@@ -8143,12 +8136,12 @@ const SYSTEMS = {
   v5: { badge: 'Vampire' },
   fate: { badge: 'Fate' },
   genesys: { badge: 'Genesys' },
-  daggerheart: { badge: 'Daggerheart Compatible' },
+  daggerheart: { badge: 'Daggerheart' },
   cthulhutech: { badge: 'CthulhuTech' },
-  starwars: { badge: 'Star Wars Compatible' },
-  onering: { badge: 'The One Ring Compatible' },
+  starwars: { badge: 'Force Dice' },
+  onering: { badge: 'Feat Dice' },
   pbta: { badge: 'PbtA' },
-  mist: { badge: 'Mist Engine Compatible' },
+  mist: { badge: 'Mist Engine' },
 };
 
 // Empty-tray copy. Most modes build a pool by tapping dice, so the default
@@ -8165,8 +8158,8 @@ function systemHint(system) { return SYSTEM_HINTS[system] || DEFAULT_HINT; }
 // Permanent slugs, so a link opens Dicebox already in a system. The Worker
 // rewrites these paths to the app shell; numeric is the bare root. Kept branded
 // (/vtm rather than /v5) since the URL is the shareable name.
-const SLUG_TO_SYSTEM = { vtm: 'v5', fate: 'fate', genesys: 'genesys', daggerheart: 'daggerheart', cthulhutech: 'cthulhutech', starwars: 'starwars', onering: 'onering', pbta: 'pbta', mist: 'mist' };
-const SYSTEM_TO_SLUG = { v5: 'vtm', fate: 'fate', genesys: 'genesys', daggerheart: 'daggerheart', cthulhutech: 'cthulhutech', starwars: 'starwars', onering: 'onering', pbta: 'pbta', mist: 'mist' };
+const SLUG_TO_SYSTEM = { vtm: 'v5', fate: 'fate', genesys: 'genesys', daggerheart: 'daggerheart', cthulhutech: 'cthulhutech', force: 'starwars', feat: 'onering', pbta: 'pbta', mist: 'mist' };
+const SYSTEM_TO_SLUG = { v5: 'vtm', fate: 'fate', genesys: 'genesys', daggerheart: 'daggerheart', cthulhutech: 'cthulhutech', starwars: 'force', onering: 'feat', pbta: 'pbta', mist: 'mist' };
 
 function systemFromPath() {
   const seg = (location.pathname || '/').replace(/^\/+|\/+$/g, '').toLowerCase();
