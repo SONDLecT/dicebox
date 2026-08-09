@@ -142,10 +142,10 @@ ok('Mothership long-press die sheets are count-only, without generic modifiers',
 
 ok('Mothership Advantage and Disadvantage visibly stage the second roll',
    /case 'mothership':[^]*const copies = ms\.advantage \? 2 : 1;[^]*add\(copies, \{ sides: 20[^]*add\(copies, \{ sides: 10[^]*add\(copies, \{ sides: 10/.test(js));
-ok('Mothership Check and Panic tiles roll directly between advantage choices',
+ok('Mothership Check and Panic tiles select the roll type without rolling (Roll/tray rolls)',
    /class="ms-action-row"[^]*data-adv="adv"[^]*id="msCheckRoll"[^]*id="msPanicRoll"[^]*data-adv="dis"/.test(msMarkup) &&
-   /msCheckRoll\.addEventListener\('click'[^]*ms\.mode = 'check'[^]*doRoll/.test(js) &&
-   /msPanicRoll\.addEventListener\('click'[^]*ms\.mode = 'panic'[^]*doRoll/.test(js));
+   /msCheckRoll\.addEventListener\('click',[^}]*ms\.mode = 'check';[^}]*syncMs\(\)/.test(js) &&
+   /msPanicRoll\.addEventListener\('click',[^}]*ms\.mode = 'panic';[^}]*syncMs\(\)/.test(js));
 const msSharedActionRule = css.indexOf('.ms-adv, .ms-role-roll');
 const msActiveRoleRule = css.indexOf('.ms-role-roll[aria-pressed="true"]');
 ok('Mothership highlights only the active roll type, following the current mode',

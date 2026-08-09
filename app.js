@@ -1612,18 +1612,12 @@ msStressDial.addEventListener('click', () => {
     commit: setStress,
   });
 });
-// The illustrated signature dice are the actions themselves. This removes a
-// redundant mode-selection row and a second generic Roll button.
-msCheckRoll.addEventListener('click', () => {
-  ms.mode = 'check';
-  syncMs();
-  doRoll(msNotation());
-});
-msPanicRoll.addEventListener('click', () => {
-  ms.mode = 'panic';
-  syncMs();
-  doRoll(msNotation());
-});
+// The two tiles choose the roll type: each stages its dice in the tray (the
+// percentile pair or the Panic d20) and lights its tile — they do not roll.
+// Rolling is the Roll button or a tap/flick on the tray, exactly like the numeric
+// pool and every other system.
+msCheckRoll.addEventListener('click', () => { ms.mode = 'check'; syncMs(); });
+msPanicRoll.addEventListener('click', () => { ms.mode = 'panic'; syncMs(); });
 
 function syncMsFromField() {
   try {
