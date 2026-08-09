@@ -119,6 +119,22 @@ ok('Mothership advantage choices show kept and dropped dice',
    (msMarkup.match(/class="drop"/g) || []).length >= 2 &&
    (msMarkup.match(/class="keep"/g) || []).length >= 2 &&
    />Advantage</.test(msMarkup) && />Disadvantage</.test(msMarkup));
+ok('Mothership tactile value buttons own the full 44px target',
+   (numMarkup.match(/class="ms-direct-field ms-dial-field"/g) || []).length === 2 &&
+   /\.mothership-rail \.ms-dial-field\s*\{[^}]*padding:\s*0/.test(css) &&
+   /\.ms-value-dial\s*\{[^}]*width:\s*100%[^}]*min-height:\s*44px/.test(css));
+ok('Shared number dial is modal and manages keyboard focus',
+   /id="dial"[^>]*role="dialog"[^>]*aria-modal="true"/.test(html) &&
+   /let dialReturnFocus\s*=\s*null/.test(js) &&
+   /dialInput\.focus\(\)/.test(js) &&
+   /dial\.addEventListener\('keydown'[^]*e\.key !== 'Tab'/.test(js) &&
+   /function closeDial[^]*dialReturnFocus[^]*\.focus\(\)/.test(js));
+ok('Mothership rail and notation form remain within the page width',
+   /\.picker\.mothership-rail\s*\{[^}]*width:\s*100%[^}]*max-width:\s*100%[^}]*min-width:\s*0[^}]*scrollbar-width:\s*thin/.test(css) &&
+   /\.picker\.mothership-rail::-webkit-scrollbar\s*\{[^}]*height:\s*4px/.test(css) &&
+   /\.entry input\s*\{[^}]*min-width:\s*0/.test(css) &&
+   /@media \(max-width:\s*380px\)[^]*\.wordmark\s*\{[^}]*font-size:\s*13px[^}]*letter-spacing:\s*0\.15em[^]*\.system-badge\s*\{[^}]*margin-left:\s*6px[^}]*padding:\s*3px 6px/.test(css));
+
 ok('Mothership long-press die sheets are count-only, without generic modifiers',
    /function modifiersFor\(sides\)\s*\{[^]{0,500}if \(uiSystem === 'mothership'\) return \[\];/.test(js));
 

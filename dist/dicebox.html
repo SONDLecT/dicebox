@@ -834,12 +834,17 @@ body {
 /* The second and final visual row is a single horizontal rail: character setup,
    dice-per-tap, then the five rules-grounded dice. It scrolls instead of wrapping. */
 .picker.mothership-rail {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   overflow-x: auto;
   flex-wrap: nowrap;
-  scrollbar-width: none;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--accent) 65%, transparent) transparent;
   -webkit-overflow-scrolling: touch;
 }
-.picker.mothership-rail::-webkit-scrollbar { display: none; }
+.picker.mothership-rail::-webkit-scrollbar { height: 4px; }
+.picker.mothership-rail::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--accent) 65%, transparent); border-radius: 999px; }
 .mothership-rail .ms-fields-row, .mothership-rail .counter, .mothership-rail .dice-scroll { flex: 0 0 auto; }
 .mothership-rail .dice-scroll { min-width: max-content; }
 .mothership-rail .dice-scroll { order: 2; }
@@ -854,6 +859,16 @@ body {
   justify-content: center;
   gap: 1px;
   padding: 0 4px;
+}
+.mothership-rail .ms-dial-field { position: relative; padding: 0; overflow: hidden; }
+.mothership-rail .ms-dial-field > span {
+  position: absolute;
+  z-index: 1;
+  top: 5px;
+  left: 0;
+  width: 100%;
+  text-align: center;
+  pointer-events: none;
 }
 .mothership-rail .ms-direct-field span { font-size: 9px; line-height: 1; }
 .mothership-rail .ms-direct-field select { width: 62px; font-size: 12px; }
@@ -920,10 +935,12 @@ body {
 .ms-direct-field input { width: 42px; text-align: center; }
 .ms-direct-field select { width: 94px; cursor: pointer; }
 .ms-value-dial {
+  width: 100%;
   min-width: 42px;
-  padding: 2px 4px;
+  min-height: 44px;
+  padding: 10px 4px 0;
   border: 0;
-  border-radius: 8px;
+  border-radius: 999px;
   background: none;
   color: var(--line);
   font: 600 15px/1 system-ui, sans-serif;
@@ -1523,6 +1540,7 @@ body {
 
 .entry input {
   flex: 1 1 auto;
+  min-width: 0;
   min-height: var(--tap);
   padding: 0 14px;
   border: 1px solid var(--hair);
@@ -1814,6 +1832,8 @@ body {
    still carries it, and the panel spells it out. */
 @media (max-width: 380px) {
   .share-flag-text { display: none; }
+  .wordmark { font-size: 13px; letter-spacing: 0.15em; }
+  .system-badge { margin-left: 6px; padding: 3px 6px; font-size: 9px; letter-spacing: 0.1em; }
 }
 
 #roomToggle[data-live] {
@@ -2735,7 +2755,7 @@ body {
 
     <!-- Custom die picker: a scroll wheel for browsing and a field for jumping
          straight to a number. -->
-    <div class="sheet dial" id="dial" hidden role="dialog" aria-labelledby="dialTitle">
+    <div class="sheet dial" id="dial" hidden role="dialog" aria-modal="true" aria-labelledby="dialTitle">
       <div class="sheet-panel">
         <p class="sheet-title">
           <span id="dialTitle">Custom die</span>
@@ -2765,11 +2785,11 @@ body {
 
   <section class="picker" id="numPicker" aria-label="Dice">
     <div class="ms-fields-row" id="msFieldsRow" hidden>
-      <div class="ms-direct-field">
+      <div class="ms-direct-field ms-dial-field">
         <span>Target</span>
         <button type="button" class="ms-value-dial" id="msTargetDial" aria-haspopup="dialog" aria-controls="dial" aria-label="Set Target">30</button>
       </div>
-      <div class="ms-direct-field">
+      <div class="ms-direct-field ms-dial-field">
         <span>Stress</span>
         <button type="button" class="ms-value-dial" id="msStressDial" aria-haspopup="dialog" aria-controls="dial" aria-label="Set Stress">2</button>
       </div>
@@ -10096,7 +10116,9 @@ const dialInput = $('dialInput');
 const dialTitle = $('dialTitle');
 const dialPrefix = $('dialPrefix');
 const dialAdd = $('dialAdd');
+const dialClose = $('dialClose');
 let customSides = 20;
+let dialReturnFocus = null;
 let dialConfig = {
   title: 'Custom die', value: customSides, min: 1, max: MAX_SIDES, prefix: 'd',
   actionLabel: 'Add to tray', inputLabel: 'Number of sides', commit: () => {},
@@ -10176,6 +10198,8 @@ dialInput.addEventListener('input', () => {
 dialInput.addEventListener('focus', () => dialInput.select());
 
 function openNumberDial(config) {
+  const active = document.activeElement;
+  dialReturnFocus = active && typeof active.focus === 'function' ? active : null;
   dialConfig = { prefix: '', ...config };
   dialTitle.textContent = dialConfig.title;
   dialPrefix.textContent = dialConfig.prefix;
@@ -10195,6 +10219,8 @@ function openNumberDial(config) {
   closeMode();
   dial.hidden = false;
   setDial(dialConfig.value);
+  dialInput.focus();
+  dialInput.select();
   hideHint();
 }
 
@@ -10211,10 +10237,34 @@ function openDial() {
   });
 }
 
-function closeDial() { dial.hidden = true; }
+function closeDial() {
+  if (dial.hidden) return;
+  dial.hidden = true;
+  const target = dialReturnFocus;
+  dialReturnFocus = null;
+  if (target && target.isConnected && typeof target.focus === 'function') target.focus();
+}
+
+dial.addEventListener('keydown', e => {
+  if (e.key !== 'Tab' || dial.hidden) return;
+  const focusable = [dialClose, wheel, dialInput, dialAdd].filter(el => !el.hidden && !el.disabled);
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault();
+    first.focus();
+  } else if (!focusable.includes(document.activeElement)) {
+    e.preventDefault();
+    first.focus();
+  }
+});
 
 $('customDie').addEventListener('click', openDial);
-$('dialClose').addEventListener('click', closeDial);
+dialClose.addEventListener('click', closeDial);
 dialAdd.addEventListener('click', () => {
   const value = dialValue();
   const commit = dialConfig.commit;

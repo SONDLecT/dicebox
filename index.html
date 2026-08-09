@@ -733,7 +733,7 @@
 
     <!-- Custom die picker: a scroll wheel for browsing and a field for jumping
          straight to a number. -->
-    <div class="sheet dial" id="dial" hidden role="dialog" aria-labelledby="dialTitle">
+    <div class="sheet dial" id="dial" hidden role="dialog" aria-modal="true" aria-labelledby="dialTitle">
       <div class="sheet-panel">
         <p class="sheet-title">
           <span id="dialTitle">Custom die</span>
@@ -763,11 +763,11 @@
 
   <section class="picker" id="numPicker" aria-label="Dice">
     <div class="ms-fields-row" id="msFieldsRow" hidden>
-      <div class="ms-direct-field">
+      <div class="ms-direct-field ms-dial-field">
         <span>Target</span>
         <button type="button" class="ms-value-dial" id="msTargetDial" aria-haspopup="dialog" aria-controls="dial" aria-label="Set Target">30</button>
       </div>
-      <div class="ms-direct-field">
+      <div class="ms-direct-field ms-dial-field">
         <span>Stress</span>
         <button type="button" class="ms-value-dial" id="msStressDial" aria-haspopup="dialog" aria-controls="dial" aria-label="Set Stress">2</button>
       </div>

@@ -802,12 +802,17 @@ body {
 /* The second and final visual row is a single horizontal rail: character setup,
    dice-per-tap, then the five rules-grounded dice. It scrolls instead of wrapping. */
 .picker.mothership-rail {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   overflow-x: auto;
   flex-wrap: nowrap;
-  scrollbar-width: none;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--accent) 65%, transparent) transparent;
   -webkit-overflow-scrolling: touch;
 }
-.picker.mothership-rail::-webkit-scrollbar { display: none; }
+.picker.mothership-rail::-webkit-scrollbar { height: 4px; }
+.picker.mothership-rail::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--accent) 65%, transparent); border-radius: 999px; }
 .mothership-rail .ms-fields-row, .mothership-rail .counter, .mothership-rail .dice-scroll { flex: 0 0 auto; }
 .mothership-rail .dice-scroll { min-width: max-content; }
 .mothership-rail .dice-scroll { order: 2; }
@@ -822,6 +827,16 @@ body {
   justify-content: center;
   gap: 1px;
   padding: 0 4px;
+}
+.mothership-rail .ms-dial-field { position: relative; padding: 0; overflow: hidden; }
+.mothership-rail .ms-dial-field > span {
+  position: absolute;
+  z-index: 1;
+  top: 5px;
+  left: 0;
+  width: 100%;
+  text-align: center;
+  pointer-events: none;
 }
 .mothership-rail .ms-direct-field span { font-size: 9px; line-height: 1; }
 .mothership-rail .ms-direct-field select { width: 62px; font-size: 12px; }
@@ -888,10 +903,12 @@ body {
 .ms-direct-field input { width: 42px; text-align: center; }
 .ms-direct-field select { width: 94px; cursor: pointer; }
 .ms-value-dial {
+  width: 100%;
   min-width: 42px;
-  padding: 2px 4px;
+  min-height: 44px;
+  padding: 10px 4px 0;
   border: 0;
-  border-radius: 8px;
+  border-radius: 999px;
   background: none;
   color: var(--line);
   font: 600 15px/1 system-ui, sans-serif;
@@ -1491,6 +1508,7 @@ body {
 
 .entry input {
   flex: 1 1 auto;
+  min-width: 0;
   min-height: var(--tap);
   padding: 0 14px;
   border: 1px solid var(--hair);
@@ -1782,6 +1800,8 @@ body {
    still carries it, and the panel spells it out. */
 @media (max-width: 380px) {
   .share-flag-text { display: none; }
+  .wordmark { font-size: 13px; letter-spacing: 0.15em; }
+  .system-badge { margin-left: 6px; padding: 3px 6px; font-size: 9px; letter-spacing: 0.1em; }
 }
 
 #roomToggle[data-live] {

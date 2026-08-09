@@ -2281,7 +2281,9 @@ const dialInput = $('dialInput');
 const dialTitle = $('dialTitle');
 const dialPrefix = $('dialPrefix');
 const dialAdd = $('dialAdd');
+const dialClose = $('dialClose');
 let customSides = 20;
+let dialReturnFocus = null;
 let dialConfig = {
   title: 'Custom die', value: customSides, min: 1, max: MAX_SIDES, prefix: 'd',
   actionLabel: 'Add to tray', inputLabel: 'Number of sides', commit: () => {},
@@ -2361,6 +2363,8 @@ dialInput.addEventListener('input', () => {
 dialInput.addEventListener('focus', () => dialInput.select());
 
 function openNumberDial(config) {
+  const active = document.activeElement;
+  dialReturnFocus = active && typeof active.focus === 'function' ? active : null;
   dialConfig = { prefix: '', ...config };
   dialTitle.textContent = dialConfig.title;
   dialPrefix.textContent = dialConfig.prefix;
@@ -2380,6 +2384,8 @@ function openNumberDial(config) {
   closeMode();
   dial.hidden = false;
   setDial(dialConfig.value);
+  dialInput.focus();
+  dialInput.select();
   hideHint();
 }
 
@@ -2396,10 +2402,34 @@ function openDial() {
   });
 }
 
-function closeDial() { dial.hidden = true; }
+function closeDial() {
+  if (dial.hidden) return;
+  dial.hidden = true;
+  const target = dialReturnFocus;
+  dialReturnFocus = null;
+  if (target && target.isConnected && typeof target.focus === 'function') target.focus();
+}
+
+dial.addEventListener('keydown', e => {
+  if (e.key !== 'Tab' || dial.hidden) return;
+  const focusable = [dialClose, wheel, dialInput, dialAdd].filter(el => !el.hidden && !el.disabled);
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault();
+    last.focus();
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault();
+    first.focus();
+  } else if (!focusable.includes(document.activeElement)) {
+    e.preventDefault();
+    first.focus();
+  }
+});
 
 $('customDie').addEventListener('click', openDial);
-$('dialClose').addEventListener('click', closeDial);
+dialClose.addEventListener('click', closeDial);
 dialAdd.addEventListener('click', () => {
   const value = dialValue();
   const commit = dialConfig.commit;
