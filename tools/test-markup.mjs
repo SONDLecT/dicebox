@@ -176,7 +176,7 @@ ok('Mothership numeric rail is limited to rules dice plus d-question',
      order.join(',') === 'numeric,cthulhutech,daggerheart,fate,genesys,mist,mothership,pbta,starwars,onering,v5' &&
      /class="mode-row mode-row-pinned" data-system="numeric"[^]*?>Dicebox</.test(pop));
   ok('picker rows carry the community shorthand',
-     ['CTech 2e', 'DH', 'Fate', 'Genesys', 'Mist', 'MoSh 1e', 'PbtA', 'SWRPG', 'TOR 2e', 'V5']
+     ['CTech 2e', 'DH', 'Fate', 'Genesys', 'Mist', 'MoSh 1e', 'PbtA', 'SWRPG', 'TOR 2e', 'VtM V5']
        .every(nm => pop.includes(`<span class="mode-row-name">${nm}</span>`)));
   ok('corner popovers anchor to their buttons and close on outside tap / Escape / resize',
      /function anchorPop\(pop, btn\)/.test(js) &&

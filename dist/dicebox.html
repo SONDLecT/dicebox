@@ -2605,7 +2605,7 @@ body {
             <path d="M12 10.6V20M7.6 13.1h8.8"/>
           </g>
         </svg>
-        <span class="mode-row-name">V5</span>
+        <span class="mode-row-name">VtM V5</span>
         <span class="mode-row-sub">d10 pool + Hunger</span>
       </button>
     </div>
@@ -8693,7 +8693,7 @@ const SYSTEMS = {
   // Community shorthand, matching the picker rows. Numeric shows no badge — the
   // wordmark already says Dicebox.
   numeric: { badge: '' },
-  v5: { badge: 'V5' },
+  v5: { badge: 'VtM V5' },
   fate: { badge: 'Fate' },
   genesys: { badge: 'Genesys' },
   daggerheart: { badge: 'DH' },
@@ -8724,12 +8724,12 @@ function systemHint(system) { return SYSTEM_HINTS[system] || DEFAULT_HINT; }
 // URL the app puts in the bar) always uses the canonical shorthand, edition
 // included, matching the picker labels.
 const SLUG_TO_SYSTEM = {
-  v5: 'v5', fate: 'fate', genesys: 'genesys', dh: 'daggerheart', ctech2e: 'cthulhutech',
+  vtmv5: 'v5', fate: 'fate', genesys: 'genesys', dh: 'daggerheart', ctech2e: 'cthulhutech',
   swrpg: 'starwars', tor2e: 'onering', pbta: 'pbta', mist: 'mist', mosh1e: 'mothership',
-  vtm: 'v5', daggerheart: 'daggerheart', cthulhutech: 'cthulhutech', ctech: 'cthulhutech',
+  v5: 'v5', vtm: 'v5', daggerheart: 'daggerheart', cthulhutech: 'cthulhutech', ctech: 'cthulhutech',
   force: 'starwars', feat: 'onering', tor: 'onering', mothership: 'mothership', mosh: 'mothership',
 };
-const SYSTEM_TO_SLUG = { v5: 'v5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', mothership: 'mosh1e' };
+const SYSTEM_TO_SLUG = { v5: 'vtmv5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', mothership: 'mosh1e' };
 
 function systemFromPath() {
   const seg = (location.pathname || '/').replace(/^\/+|\/+$/g, '').toLowerCase();
