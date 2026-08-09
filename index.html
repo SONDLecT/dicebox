@@ -771,15 +771,10 @@
         <span>Stress</span>
         <button type="button" class="ms-value-dial" id="msStressDial" aria-haspopup="dialog" aria-controls="dial" aria-label="Set Stress">2</button>
       </div>
-      <label class="ms-direct-field ms-skill-field" for="msSkillSelect">
+      <div class="ms-direct-field ms-skill-field">
         <span>Skill</span>
-        <select id="msSkillSelect" aria-label="Skill tier">
-          <option value="">None</option>
-          <option value="t">Trained +10</option>
-          <option value="e">Expert +15</option>
-          <option value="m">Master +20</option>
-        </select>
-      </label>
+        <button type="button" class="ms-skill-dial" id="msSkillDial" aria-label="Skill tier, current None — tap to raise, hold to lower">None</button>
+      </div>
     </div>
     <div class="counter" title="How many dice each tap adds">
       <button class="step" id="countDown" aria-label="One fewer die per tap">−</button>
@@ -997,8 +992,8 @@
     <div class="ms-action-row">
       <button type="button" class="ms-adv" data-adv="adv" aria-pressed="false" aria-label="Advantage — roll twice, keep the better resolved result">
         <svg class="ms-keep-dice" viewBox="0 0 40 40" aria-hidden="true">
-          <path class="drop" d="M14 15 23 21v8L14 37 5 29v-8Z"/><path class="keep" d="M26 3 35 9v8l-9 8-9-8V9Z"/>
-          <g class="chev"><path d="m22 14 4-4 4 4"/><path d="m22 18 4-4 4 4"/></g>
+          <path class="drop" d="M26 3 35 9v8l-9 8-9-8V9Z"/><path class="keep" d="M14 15 23 21v8L14 37 5 29v-8Z"/>
+          <g class="chev"><path d="m10 24 4 4 4-4"/><path d="m10 28 4 4 4-4"/></g>
         </svg>
         <span class="ms-adv-label">Advantage</span>
       </button>
@@ -1021,8 +1016,8 @@
       </button>
       <button type="button" class="ms-adv" data-adv="dis" aria-pressed="false" aria-label="Disadvantage — roll twice, keep the worse resolved result">
         <svg class="ms-keep-dice" viewBox="0 0 40 40" aria-hidden="true">
-          <path class="drop" d="M26 3 35 9v8l-9 8-9-8V9Z"/><path class="keep" d="M14 15 23 21v8L14 37 5 29v-8Z"/>
-          <g class="chev"><path d="m10 24 4 4 4-4"/><path d="m10 28 4 4 4-4"/></g>
+          <path class="drop" d="M14 15 23 21v8L14 37 5 29v-8Z"/><path class="keep" d="M26 3 35 9v8l-9 8-9-8V9Z"/>
+          <g class="chev"><path d="m22 14 4-4 4 4"/><path d="m22 18 4-4 4 4"/></g>
         </svg>
         <span class="ms-adv-label">Disadvantage</span>
       </button>

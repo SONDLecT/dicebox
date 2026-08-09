@@ -1532,8 +1532,14 @@ const ms = { mode: 'check', target: 30, skill: null, advantage: null, stress: 2 
 const msAdvButtons = [...document.querySelectorAll('.ms-adv')];
 const msFieldsRow = $('msFieldsRow');
 const msTargetDial = $('msTargetDial');
-const msSkillSelect = $('msSkillSelect');
+const msSkillDial = $('msSkillDial');
 const msStressDial = $('msStressDial');
+// Skill has only four fixed tiers, so it cycles on a tap/hold rather than opening
+// the number dial: None → Trained → Expert → Master (and back).
+const MS_SKILL_ORDER = [null, 't', 'e', 'm'];
+const MS_SKILL_NAME = { t: 'Trained', e: 'Expert', m: 'Master' };
+const MS_SKILL_BONUS_TEXT = { t: '+10', e: '+15', m: '+20' };
+const msSkillLabel = () => (ms.skill ? MS_SKILL_NAME[ms.skill] : 'None');
 const msCheckRoll = $('msCheckRoll');
 const msPanicRoll = $('msPanicRoll');
 
@@ -1564,7 +1570,9 @@ function setStress(n, { restage = true } = {}) {
 function syncMs({ writeField = true } = {}) {
   msTargetDial.textContent = ms.target === null ? '—' : String(ms.target);
   msTargetDial.setAttribute('aria-label', `Set Target, current ${ms.target === null ? 'unset' : ms.target}`);
-  msSkillSelect.value = ms.skill || '';
+  msSkillDial.textContent = msSkillLabel();
+  msSkillDial.setAttribute('aria-label',
+    `Skill tier, current ${msSkillLabel()}${ms.skill ? ' ' + MS_SKILL_BONUS_TEXT[ms.skill] : ''} — tap to raise, hold to lower`);
   for (const b of msAdvButtons) b.setAttribute('aria-pressed', String(ms.advantage === b.dataset.adv));
   msStressDial.textContent = String(ms.stress);
   msStressDial.setAttribute('aria-label', `Set Stress, current ${ms.stress}`);
@@ -1583,8 +1591,11 @@ msTargetDial.addEventListener('click', () => {
     commit: value => { ms.target = value; syncMs(); },
   });
 });
-msSkillSelect.addEventListener('change', () => {
-  ms.skill = msSkillSelect.value || null;
+// Tap raises a tier (None → Master), hold lowers one; keyboard arrows do the same
+// through bindTapHold, and it clamps at the ends rather than wrapping.
+bindTapHold(msSkillDial, dir => {
+  const i = MS_SKILL_ORDER.indexOf(ms.skill);
+  ms.skill = MS_SKILL_ORDER[Math.max(0, Math.min(MS_SKILL_ORDER.length - 1, i + dir))];
   syncMs();
 });
 msStressDial.addEventListener('click', () => {

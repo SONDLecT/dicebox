@@ -109,11 +109,13 @@ ok('Mothership role glyphs use canonical solid projections without CSS distortio
    /\.ms-role-ico\s*\{[^}]*height:\s*34px[^}]*flex:\s*0 0 auto/.test(css) &&
    /\.ms-percentile-ico\s*\{[^}]*width:\s*42px/.test(css));
 ok('Mothership direct settings share the numeric rail',
-   /id="msFieldsRow"[^]*id="msTargetDial"[^]*id="msStressDial"[^]*id="msSkillSelect"/.test(numMarkup) &&
+   /id="msFieldsRow"[^]*id="msTargetDial"[^]*id="msStressDial"[^]*id="msSkillDial"/.test(numMarkup) &&
    !/class="ms-fields-row"/.test(msMarkup));
-ok('Mothership Skill is a direct four-tier select',
-   /id="msSkillSelect"[^]*value=""[^]*value="t"[^]*value="e"[^]*value="m"/.test(numMarkup) &&
-   /msSkillSelect\.addEventListener\('change'/.test(js));
+ok('Mothership Skill taps up and holds down through four tiers',
+   /id="msSkillDial"/.test(numMarkup) &&
+   !/id="msSkillSelect"/.test(numMarkup) &&
+   /MS_SKILL_ORDER\s*=\s*\[null, 't', 'e', 'm'\]/.test(js) &&
+   /bindTapHold\(msSkillDial/.test(js));
 ok('Mothership advantage choices show kept and dropped dice',
    (msMarkup.match(/class="ms-keep-dice"/g) || []).length === 2 &&
    (msMarkup.match(/class="drop"/g) || []).length >= 2 &&
@@ -157,7 +159,7 @@ ok('Mothership picker is two non-wrapping visual rows',
    /\.ms-role-roll\s*\{[^}]*padding:\s*4px/.test(css) &&
    /\.ms-direct-field\s*\{[^}]*min-height:\s*44px/.test(css) &&
    /\.mothership-rail \.ms-skill-field\s*\{[^}]*width:\s*82px/.test(css) &&
-   /\.mothership-rail \.ms-skill-field select\s*\{[^}]*width:\s*72px/.test(css) &&
+   /\.ms-skill-dial\s*\{[^}]*min-height:\s*44px/.test(css) &&
    /\.ms-adv, \.ms-role-roll\s*\{[^}]*padding:\s*5px 4px 4px/.test(css));
 ok('Mothership numeric rail is limited to rules dice plus d-question',
    /diceButtons\.classList\.toggle\('mothership-only', system === 'mothership'\)/.test(js) &&

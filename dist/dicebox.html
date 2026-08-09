@@ -871,9 +871,16 @@ body {
   pointer-events: none;
 }
 .mothership-rail .ms-direct-field span { font-size: 9px; line-height: 1; }
-.mothership-rail .ms-direct-field select { width: 62px; font-size: 12px; }
-.mothership-rail .ms-skill-field { width: 82px; }
-.mothership-rail .ms-skill-field select { width: 72px; font-size: 11.5px; }
+.mothership-rail .ms-skill-field { width: 82px; position: relative; padding: 0; overflow: hidden; }
+.mothership-rail .ms-skill-field > span {
+  position: absolute;
+  z-index: 1;
+  top: 5px;
+  left: 0;
+  width: 100%;
+  text-align: center;
+  pointer-events: none;
+}
 .mothership-rail .counter .step { width: 22px; }
 .mothership-rail .counter .count { width: 28px; }
 .mothership-rail .dice-buttons { gap: 2px; }
@@ -949,6 +956,20 @@ body {
 }
 .ms-value-dial::after { content: "↕"; margin-left: 4px; color: var(--accent); font-size: 10px; }
 .ms-value-dial:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* Skill is a four-tier cycle (None → Trained → Expert → Master), not a number
+   wheel, so it is a plain tap-to-raise / hold-to-lower button with no ↕ marker. */
+.ms-skill-dial {
+  width: 100%;
+  min-height: 44px;
+  padding: 12px 4px 0;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--line);
+  font: 600 12px/1 system-ui, sans-serif;
+  cursor: pointer;
+}
+.ms-skill-dial:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .ms-direct-field:focus-within { border-color: var(--accent); }
 /* Advantage and Disadvantage borrow One Ring's visual explanation: the outlined
    die is discarded and the accent die is kept. This remains accurate because
@@ -2793,15 +2814,10 @@ body {
         <span>Stress</span>
         <button type="button" class="ms-value-dial" id="msStressDial" aria-haspopup="dialog" aria-controls="dial" aria-label="Set Stress">2</button>
       </div>
-      <label class="ms-direct-field ms-skill-field" for="msSkillSelect">
+      <div class="ms-direct-field ms-skill-field">
         <span>Skill</span>
-        <select id="msSkillSelect" aria-label="Skill tier">
-          <option value="">None</option>
-          <option value="t">Trained +10</option>
-          <option value="e">Expert +15</option>
-          <option value="m">Master +20</option>
-        </select>
-      </label>
+        <button type="button" class="ms-skill-dial" id="msSkillDial" aria-label="Skill tier, current None — tap to raise, hold to lower">None</button>
+      </div>
     </div>
     <div class="counter" title="How many dice each tap adds">
       <button class="step" id="countDown" aria-label="One fewer die per tap">−</button>
@@ -3019,8 +3035,8 @@ body {
     <div class="ms-action-row">
       <button type="button" class="ms-adv" data-adv="adv" aria-pressed="false" aria-label="Advantage — roll twice, keep the better resolved result">
         <svg class="ms-keep-dice" viewBox="0 0 40 40" aria-hidden="true">
-          <path class="drop" d="M14 15 23 21v8L14 37 5 29v-8Z"/><path class="keep" d="M26 3 35 9v8l-9 8-9-8V9Z"/>
-          <g class="chev"><path d="m22 14 4-4 4 4"/><path d="m22 18 4-4 4 4"/></g>
+          <path class="drop" d="M26 3 35 9v8l-9 8-9-8V9Z"/><path class="keep" d="M14 15 23 21v8L14 37 5 29v-8Z"/>
+          <g class="chev"><path d="m10 24 4 4 4-4"/><path d="m10 28 4 4 4-4"/></g>
         </svg>
         <span class="ms-adv-label">Advantage</span>
       </button>
@@ -3043,8 +3059,8 @@ body {
       </button>
       <button type="button" class="ms-adv" data-adv="dis" aria-pressed="false" aria-label="Disadvantage — roll twice, keep the worse resolved result">
         <svg class="ms-keep-dice" viewBox="0 0 40 40" aria-hidden="true">
-          <path class="drop" d="M26 3 35 9v8l-9 8-9-8V9Z"/><path class="keep" d="M14 15 23 21v8L14 37 5 29v-8Z"/>
-          <g class="chev"><path d="m10 24 4 4 4-4"/><path d="m10 28 4 4 4-4"/></g>
+          <path class="drop" d="M14 15 23 21v8L14 37 5 29v-8Z"/><path class="keep" d="M26 3 35 9v8l-9 8-9-8V9Z"/>
+          <g class="chev"><path d="m22 14 4-4 4 4"/><path d="m22 18 4-4 4 4"/></g>
         </svg>
         <span class="ms-adv-label">Disadvantage</span>
       </button>
@@ -9367,8 +9383,14 @@ const ms = { mode: 'check', target: 30, skill: null, advantage: null, stress: 2 
 const msAdvButtons = [...document.querySelectorAll('.ms-adv')];
 const msFieldsRow = $('msFieldsRow');
 const msTargetDial = $('msTargetDial');
-const msSkillSelect = $('msSkillSelect');
+const msSkillDial = $('msSkillDial');
 const msStressDial = $('msStressDial');
+// Skill has only four fixed tiers, so it cycles on a tap/hold rather than opening
+// the number dial: None → Trained → Expert → Master (and back).
+const MS_SKILL_ORDER = [null, 't', 'e', 'm'];
+const MS_SKILL_NAME = { t: 'Trained', e: 'Expert', m: 'Master' };
+const MS_SKILL_BONUS_TEXT = { t: '+10', e: '+15', m: '+20' };
+const msSkillLabel = () => (ms.skill ? MS_SKILL_NAME[ms.skill] : 'None');
 const msCheckRoll = $('msCheckRoll');
 const msPanicRoll = $('msPanicRoll');
 
@@ -9399,7 +9421,9 @@ function setStress(n, { restage = true } = {}) {
 function syncMs({ writeField = true } = {}) {
   msTargetDial.textContent = ms.target === null ? '—' : String(ms.target);
   msTargetDial.setAttribute('aria-label', `Set Target, current ${ms.target === null ? 'unset' : ms.target}`);
-  msSkillSelect.value = ms.skill || '';
+  msSkillDial.textContent = msSkillLabel();
+  msSkillDial.setAttribute('aria-label',
+    `Skill tier, current ${msSkillLabel()}${ms.skill ? ' ' + MS_SKILL_BONUS_TEXT[ms.skill] : ''} — tap to raise, hold to lower`);
   for (const b of msAdvButtons) b.setAttribute('aria-pressed', String(ms.advantage === b.dataset.adv));
   msStressDial.textContent = String(ms.stress);
   msStressDial.setAttribute('aria-label', `Set Stress, current ${ms.stress}`);
@@ -9418,8 +9442,11 @@ msTargetDial.addEventListener('click', () => {
     commit: value => { ms.target = value; syncMs(); },
   });
 });
-msSkillSelect.addEventListener('change', () => {
-  ms.skill = msSkillSelect.value || null;
+// Tap raises a tier (None → Master), hold lowers one; keyboard arrows do the same
+// through bindTapHold, and it clamps at the ends rather than wrapping.
+bindTapHold(msSkillDial, dir => {
+  const i = MS_SKILL_ORDER.indexOf(ms.skill);
+  ms.skill = MS_SKILL_ORDER[Math.max(0, Math.min(MS_SKILL_ORDER.length - 1, i + dir))];
   syncMs();
 });
 msStressDial.addEventListener('click', () => {
