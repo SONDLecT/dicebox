@@ -887,8 +887,15 @@ function systemHint(system) { return SYSTEM_HINTS[system] || DEFAULT_HINT; }
 // Permanent slugs, so a link opens Dicebox already in a system. The Worker
 // rewrites these paths to the app shell; numeric is the bare root. Kept branded
 // (/vtm rather than /v5) since the URL is the shareable name.
-const SLUG_TO_SYSTEM = { vtm: 'v5', fate: 'fate', genesys: 'genesys', daggerheart: 'daggerheart', cthulhutech: 'cthulhutech', force: 'starwars', feat: 'onering', pbta: 'pbta', mist: 'mist', mothership: 'mothership' };
-const SYSTEM_TO_SLUG = { v5: 'vtm', fate: 'fate', genesys: 'genesys', daggerheart: 'daggerheart', cthulhutech: 'cthulhutech', starwars: 'force', onering: 'feat', pbta: 'pbta', mist: 'mist', mothership: 'mothership' };
+// Reading accepts both the shorthand slugs and the pre-rename aliases; writing
+// (the URL the app puts in the bar) always uses the canonical shorthand.
+const SLUG_TO_SYSTEM = {
+  v5: 'v5', fate: 'fate', genesys: 'genesys', dh: 'daggerheart', ctech: 'cthulhutech',
+  swrpg: 'starwars', tor: 'onering', pbta: 'pbta', mist: 'mist', mosh: 'mothership',
+  vtm: 'v5', daggerheart: 'daggerheart', cthulhutech: 'cthulhutech',
+  force: 'starwars', feat: 'onering', mothership: 'mothership',
+};
+const SYSTEM_TO_SLUG = { v5: 'v5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech', starwars: 'swrpg', onering: 'tor', pbta: 'pbta', mist: 'mist', mothership: 'mosh' };
 
 function systemFromPath() {
   const seg = (location.pathname || '/').replace(/^\/+|\/+$/g, '').toLowerCase();
