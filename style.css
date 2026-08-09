@@ -910,6 +910,13 @@ body {
   touch-action: manipulation;
   transition: border-color 140ms ease, color 140ms ease, background 140ms ease, transform 120ms ease;
 }
+/* Signature dice are the primary roll actions, so restore their accent treatment
+   after the shared modifier/action geometry above. Cascade order is deliberate. */
+.ms-role-roll {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+}
 .ms-keep-dice { width: 34px; height: 34px; display: block; }
 .ms-keep-dice .drop { fill: none; stroke: var(--muted); stroke-width: 1.8; stroke-linejoin: round; }
 .ms-keep-dice .keep { fill: color-mix(in srgb, var(--accent) 18%, var(--paper)); stroke: var(--accent); stroke-width: 2.1; stroke-linejoin: round; }
@@ -917,15 +924,6 @@ body {
 .ms-adv-label { font-size: 10px; letter-spacing: 0.01em; white-space: nowrap; }
 .ms-adv[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .ms-adv[aria-pressed="true"] .ms-adv-label { color: var(--line); }
-.ms-roll { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
-.ms-roll-ico { width: 42px; height: 30px; display: block; }
-.ms-roll-ico path { fill: currentColor; fill-opacity: 0.2; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; }
-.ms-roll-ico .rear { opacity: 0.58; }
-.ms-roll-ico .facet { fill: none; stroke-width: 0.9; }
-.ms-roll-label { color: var(--accent); font-weight: 650; }
-.ms-roll-panic { display: none; }
-.ms-panic-mode .ms-roll-check { display: none; }
-.ms-panic-mode .ms-roll-panic { display: block; }
 .ms-adv:active, .ms-role-roll:active { transform: scale(0.96); }
 
 /* ---- mode sheet ---- */

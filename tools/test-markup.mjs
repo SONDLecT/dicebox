@@ -119,6 +119,11 @@ ok('Mothership Check and Panic tiles roll directly between advantage choices',
    /class="ms-action-row"[^]*data-adv="adv"[^]*id="msCheckRoll"[^]*id="msPanicRoll"[^]*data-adv="dis"/.test(msMarkup) &&
    /msCheckRoll\.addEventListener\('click'[^]*ms\.mode = 'check'[^]*doRoll/.test(js) &&
    /msPanicRoll\.addEventListener\('click'[^]*ms\.mode = 'panic'[^]*doRoll/.test(js));
+const msSharedActionRule = css.indexOf('.ms-adv, .ms-role-roll');
+const msFinalRoleRule = css.indexOf('\n.ms-role-roll {', msSharedActionRule + 1);
+ok('Mothership signature rolls retain primary-action styling after shared rules',
+   msFinalRoleRule > msSharedActionRule &&
+   /border-color:\s*var\(--accent\)[^}]*background:\s*color-mix\([^}]*color:\s*var\(--accent\)/.test(css.slice(msFinalRoleRule)));
 ok('Mothership picker is two non-wrapping visual rows',
    !/class="ms-dice-row"/.test(msMarkup) &&
    /\.ms-action-row[^}]*display:\s*flex/.test(css) &&
