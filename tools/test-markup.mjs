@@ -120,7 +120,9 @@ ok('Mothership picker uses compact three-row styling',
    /\.ms-picker\s*\{[^}]*gap:\s*6px/.test(css) &&
    /\.ms-dice-row[^}]*display:\s*flex/.test(css) &&
    /\.ms-fields-row[^}]*display:\s*flex/.test(css) &&
-   /\.ms-action-row[^}]*display:\s*flex/.test(css));
+   /\.ms-action-row[^}]*display:\s*flex/.test(css) &&
+   /\.ms-mode-btn\s*\{[^}]*padding:\s*5px 10px/.test(css) &&
+   /\.ms-adv, \.ms-roll\s*\{[^}]*padding:\s*5px 4px 4px/.test(css));
 
 // --- classes must be styled ---
 const htmlClasses = [...html.matchAll(/class="([^"]+)"/g)].flatMap(m => m[1].split(/\s+/));
