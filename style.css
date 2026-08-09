@@ -1048,8 +1048,8 @@ body {
 .mode-mist[aria-pressed="true"] { border-color: #3F9FA0; background: color-mix(in srgb, #3F9FA0 12%, transparent); }
 
 /* Mothership's card carries its hazard amber. */
-.mode-mothership .mode-glyph { color: #C7A93E; }
-.mode-mothership[aria-pressed="true"] { border-color: #C7A93E; background: color-mix(in srgb, #C7A93E 12%, transparent); }
+.mode-mothership .mode-glyph { color: #AEC93C; }
+.mode-mothership[aria-pressed="true"] { border-color: #AEC93C; background: color-mix(in srgb, #AEC93C 12%, transparent); }
 
 .mode-name {
   font-size: 14px;

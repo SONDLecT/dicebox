@@ -254,17 +254,18 @@ const SYSTEM_THEMES = {
       '--hair': '#CBDDDC', '--accent': '#227E7F', '--danger': '#9A443C',
     },
   },
-  // Mothership — a hazard-label palette: acid amber over cold gunmetal steel,
-  // deliberately colder and more industrial than PbtA's warm ember. The amber is
-  // the constant; only the steel neutrals flip for light.
+  // Mothership — a hazard-label palette: reactor-warning chartreuse over cold
+  // gunmetal steel, the industrial radiation-caution look that sets it apart from
+  // the four gold systems. The acid green is the constant; only the steel
+  // neutrals flip for light, where the accent deepens to hold WCAG AA contrast.
   mothership: {
     dark: {
       '--paper': '#0C0E10', '--face': '#15181C', '--line': '#DCE2E6', '--muted': '#7D8991',
-      '--hair': '#232a30', '--accent': '#C7A93E', '--danger': '#D2603E',
+      '--hair': '#232a30', '--accent': '#AEC93C', '--danger': '#D2603E',
     },
     light: {
       '--paper': '#E7EAEC', '--face': '#F4F6F7', '--line': '#14181B', '--muted': '#59656B',
-      '--hair': '#CBD2D6', '--accent': '#6B570F', '--danger': '#9A3E24',
+      '--hair': '#CBD2D6', '--accent': '#4C6210', '--danger': '#9A3E24',
     },
   },
 };
@@ -301,10 +302,10 @@ const DH_COLORS = {
 // Mothership dice tint by outcome, the way CthulhuTech tints hits: a Check comes
 // up green when it lands under the target, red when it fails; a Panic d20 goes
 // red on a Panic, green when it holds. Before a roll the staged percentile pair
-// wears its amber tens / steel ones so the d100 reads as two dice.
+// wears its acid-green tens / steel ones so the d100 reads as two dice.
 const MS_COLORS = {
   success: '#5DAE6A', fail: '#D2603E',
-  tens: '#C7A93E', ones: '#6A757C', panic: '#8FA0A8',
+  tens: '#AEC93C', ones: '#6A757C', panic: '#8FA0A8',
 };
 
 // Genesys dice are colour-coded by type — the one place a system paints its own

@@ -1080,8 +1080,8 @@ body {
 .mode-mist[aria-pressed="true"] { border-color: #3F9FA0; background: color-mix(in srgb, #3F9FA0 12%, transparent); }
 
 /* Mothership's card carries its hazard amber. */
-.mode-mothership .mode-glyph { color: #C7A93E; }
-.mode-mothership[aria-pressed="true"] { border-color: #C7A93E; background: color-mix(in srgb, #C7A93E 12%, transparent); }
+.mode-mothership .mode-glyph { color: #AEC93C; }
+.mode-mothership[aria-pressed="true"] { border-color: #AEC93C; background: color-mix(in srgb, #AEC93C 12%, transparent); }
 
 .mode-name {
   font-size: 14px;
@@ -2609,7 +2609,7 @@ body {
             <svg class="mode-glyph" viewBox="0 0 44 44" width="44" height="44" aria-hidden="true">
               <!-- A spacesuit helmet — dome and curved visor — the space-horror
                    mode over its roll-under d100. -->
-              <g fill="none" stroke="#C7A93E" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round">
+              <g fill="none" stroke="#AEC93C" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round">
                 <path d="M22 6c-7.5 0-12.5 5.5-12.5 12.8v6.2c0 2.9 2.3 5.2 5.1 5.2h14.8c2.8 0 5.1-2.3 5.1-5.2V18.8C34.5 11.5 29.5 6 22 6Z"/>
                 <path d="M22 13.2c-4.8 0-7.9 3.1-7.9 7.1 0 2.9 2.2 5.1 5 5.1h5.8c2.8 0 5-2.2 5-5.1 0-4-3.1-7.1-7.9-7.1Z"/>
                 <path d="M17.3 17.8c1.2-1.1 2.7-1.7 4.7-1.7"/>
@@ -8105,17 +8105,18 @@ const SYSTEM_THEMES = {
       '--hair': '#CBDDDC', '--accent': '#227E7F', '--danger': '#9A443C',
     },
   },
-  // Mothership — a hazard-label palette: acid amber over cold gunmetal steel,
-  // deliberately colder and more industrial than PbtA's warm ember. The amber is
-  // the constant; only the steel neutrals flip for light.
+  // Mothership — a hazard-label palette: reactor-warning chartreuse over cold
+  // gunmetal steel, the industrial radiation-caution look that sets it apart from
+  // the four gold systems. The acid green is the constant; only the steel
+  // neutrals flip for light, where the accent deepens to hold WCAG AA contrast.
   mothership: {
     dark: {
       '--paper': '#0C0E10', '--face': '#15181C', '--line': '#DCE2E6', '--muted': '#7D8991',
-      '--hair': '#232a30', '--accent': '#C7A93E', '--danger': '#D2603E',
+      '--hair': '#232a30', '--accent': '#AEC93C', '--danger': '#D2603E',
     },
     light: {
       '--paper': '#E7EAEC', '--face': '#F4F6F7', '--line': '#14181B', '--muted': '#59656B',
-      '--hair': '#CBD2D6', '--accent': '#6B570F', '--danger': '#9A3E24',
+      '--hair': '#CBD2D6', '--accent': '#4C6210', '--danger': '#9A3E24',
     },
   },
 };
@@ -8152,10 +8153,10 @@ const DH_COLORS = {
 // Mothership dice tint by outcome, the way CthulhuTech tints hits: a Check comes
 // up green when it lands under the target, red when it fails; a Panic d20 goes
 // red on a Panic, green when it holds. Before a roll the staged percentile pair
-// wears its amber tens / steel ones so the d100 reads as two dice.
+// wears its acid-green tens / steel ones so the d100 reads as two dice.
 const MS_COLORS = {
   success: '#5DAE6A', fail: '#D2603E',
-  tens: '#C7A93E', ones: '#6A757C', panic: '#8FA0A8',
+  tens: '#AEC93C', ones: '#6A757C', panic: '#8FA0A8',
 };
 
 // Genesys dice are colour-coded by type — the one place a system paints its own
