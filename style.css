@@ -825,9 +825,12 @@ body {
 }
 .mothership-rail .ms-direct-field span { font-size: 9px; line-height: 1; }
 .mothership-rail .ms-direct-field select { width: 62px; font-size: 12px; }
+.mothership-rail .ms-skill-field { width: 82px; }
+.mothership-rail .ms-skill-field select { width: 72px; font-size: 11.5px; }
 .mothership-rail .counter .step { width: 22px; }
 .mothership-rail .counter .count { width: 28px; }
-.mothership-rail .dbtn { min-width: 38px; padding-inline: 5px; }
+.mothership-rail .dice-buttons { gap: 2px; }
+.mothership-rail .dbtn { min-width: 38px; padding-inline: 3px; }
 /* Square SVG viewports prevent the percentile pair and d20 from inheriting the
    old wide-card distortion that made one look thin and the other look fat. */
 .ms-role-roll {
