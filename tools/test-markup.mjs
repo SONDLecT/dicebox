@@ -126,6 +126,8 @@ ok('Mothership picker is two non-wrapping visual rows',
    /msFieldsRow\.hidden = system !== 'mothership'/.test(js) &&
    /\.ms-role-roll\s*\{[^}]*padding:\s*4px/.test(css) &&
    /\.ms-direct-field\s*\{[^}]*min-height:\s*44px/.test(css) &&
+   /\.mothership-rail \.ms-skill-field\s*\{[^}]*width:\s*82px/.test(css) &&
+   /\.mothership-rail \.ms-skill-field select\s*\{[^}]*width:\s*72px/.test(css) &&
    /\.ms-adv, \.ms-role-roll\s*\{[^}]*padding:\s*5px 4px 4px/.test(css));
 ok('Mothership numeric rail is limited to rules dice plus d-question',
    /diceButtons\.classList\.toggle\('mothership-only', system === 'mothership'\)/.test(js) &&
