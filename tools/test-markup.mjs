@@ -95,6 +95,33 @@ if (msTheme) for (const block of msTheme.slice(1)) {
 }
 ok('Mothership small text meets WCAG AA contrast in both themes', contrastPass);
 
+// Mothership follows the established tactile picker grammar: illustrated role
+// dice, compact number pills, and keep/drop dice around the primary roll action.
+const msMarkup = html.slice(html.indexOf('id="msPicker"'), html.indexOf('</section>', html.indexOf('id="msPicker"')));
+ok('Mothership uses illustrated percentile and d20 role tiles',
+   (msMarkup.match(/class="ms-role-ico/g) || []).length === 2 &&
+   /data-mode="check"[^]*class="ms-role-ico ms-percentile-ico"/.test(msMarkup) &&
+   /data-mode="panic"[^]*class="ms-role-ico ms-panic-ico"/.test(msMarkup));
+ok('Mothership settings are one compact Target Skill Stress row',
+   /class="ms-fields-row"/.test(msMarkup) && /id="msSkillChip"/.test(msMarkup) &&
+   !/class="ms-skill-row"/.test(msMarkup));
+ok('Mothership compact Skill pill cycles the four rules tiers',
+   /const MS_SKILL_TIERS = \[null, 't', 'e', 'm'\]/.test(js) &&
+   /bindTapHold\(msSkillChip,[^]*MS_SKILL_TIERS/.test(js) &&
+   /msSkillLabel\.textContent/.test(js) && /msSkillBonus\.textContent/.test(js));
+ok('Mothership advantage choices show kept and dropped dice',
+   (msMarkup.match(/class="ms-keep-dice"/g) || []).length === 2 &&
+   (msMarkup.match(/class="drop"/g) || []).length >= 2 &&
+   (msMarkup.match(/class="keep"/g) || []).length >= 2);
+ok('Mothership primary Roll is a die-role tile between advantage choices',
+   /class="ms-action-row"[^]*data-adv="adv"[^]*id="msRoll"[^]*data-adv="dis"/.test(msMarkup) &&
+   /id="msRoll"[^]*class="ms-roll-ico/.test(msMarkup));
+ok('Mothership picker uses compact three-row styling',
+   /\.ms-picker\s*\{[^}]*gap:\s*6px/.test(css) &&
+   /\.ms-dice-row[^}]*display:\s*flex/.test(css) &&
+   /\.ms-fields-row[^}]*display:\s*flex/.test(css) &&
+   /\.ms-action-row[^}]*display:\s*flex/.test(css));
+
 // --- classes must be styled ---
 const htmlClasses = [...html.matchAll(/class="([^"]+)"/g)].flatMap(m => m[1].split(/\s+/));
 const jsClasses = [...js.matchAll(/className\s*=\s*'([^']+)'/g)].flatMap(m => m[1].split(/\s+/));

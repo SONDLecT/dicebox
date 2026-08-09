@@ -793,65 +793,88 @@ body {
 .tor-flag:active { transform: scale(0.96); }
 
 /* ---- Mothership ---- */
-/* A stack of rows: the sub-mode toggle, then (Check/Save only) the Target and
-   Skill tiers, then Advantage, then the always-present Stress tracker + Roll. */
-.ms-picker { flex-direction: column; align-items: stretch; gap: 8px; }
-/* Sub-mode segmented toggle: Check/Save vs Panic. */
-.ms-mode-row { display: flex; gap: 6px; }
+/* Three compact rows reuse Dicebox's established language: role-die tiles,
+   number pills, then keep/drop dice around the signature Roll action. */
+.ms-picker { flex-direction: column; align-items: stretch; gap: 6px; }
+.ms-dice-row, .ms-fields-row, .ms-action-row { display: flex; align-items: stretch; gap: 6px; }
+/* The signature dice choose the roll. Keeping the silhouette large and the words
+   subordinate makes these read like the Genesys rack, not form tabs. */
 .ms-mode-btn {
   flex: 1 1 0;
-  padding: 8px 6px;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 54px auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 8px;
+  padding: 5px 10px;
   border: 1px solid var(--hair);
-  border-radius: 10px;
+  border-radius: 12px;
   background: none;
   color: var(--muted);
   font: inherit;
-  font-size: 12.5px;
-  font-weight: 600;
+  text-align: left;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
   transition: border-color 140ms ease, color 140ms ease, background 140ms ease, transform 120ms ease;
 }
-.ms-mode-btn[aria-pressed="true"] {
-  color: var(--line);
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-}
+.ms-role-ico { grid-row: 1 / 3; width: 54px; height: 32px; display: block; }
+.ms-panic-ico { overflow: visible; }
+.ms-role-ico path { fill: currentColor; fill-opacity: 0.1; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; }
+.ms-role-ico .facet { fill: none; stroke-width: 1.05; opacity: 0.72; }
+.ms-percentile-ico .rear { opacity: 0.6; }
+.ms-role-label { align-self: end; color: var(--line); font-size: 11.5px; font-weight: 650; white-space: nowrap; }
+.ms-role-die { align-self: start; color: var(--muted); font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase; }
+.ms-mode-btn[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.ms-mode-btn[aria-pressed="true"] .ms-role-ico path { fill-opacity: 0.23; }
 .ms-mode-btn:active { transform: scale(0.97); }
-.ms-target-row { display: flex; justify-content: center; }
-/* Skill tiers reuse the .tor-flag toggle: the tier name over its bonus. */
-.ms-skill-row { display: flex; gap: 8px; }
-.ms-skill { gap: 1px; padding: 7px 4px; }
-.ms-skill-name { font-size: 11.5px; font-weight: 600; white-space: nowrap; }
-.ms-skill-bonus { font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.ms-skill[aria-pressed="true"] .ms-skill-bonus { color: var(--line); }
-/* Advantage/Disadvantage, in Mothership's own [+] / [−] notation. */
-.ms-adv-row { display: flex; gap: 8px; }
-.ms-adv { padding: 7px 4px; }
-.ms-adv-ico { width: 26px; height: 26px; display: block; }
-.ms-adv-ico .bracket { fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
-.ms-adv-ico .sign { fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
-.ms-adv-label { font-size: 10.5px; letter-spacing: 0.01em; white-space: nowrap; }
-/* Stress tracker + Roll on one row; Panic hides the Check-only controls. */
-.ms-stress-row { display: flex; gap: 8px; align-items: stretch; justify-content: center; }
+/* Target, Skill tier, and Stress are numbers rather than dice, so they use the
+   same compact pills as Daggerheart's modifier and difficulty. */
+.ms-fields-row { justify-content: center; align-items: center; }
+.ms-fields-row .spin-chip { padding: 7px 11px; gap: 6px; }
+.ms-fields-row .spin-chip-val { font-size: 15px; }
 .ms-stress-chip { align-items: center; }
-.ms-roll {
-  display: inline-flex;
+#msSkillChip .spin-chip-label { max-width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Advantage and Disadvantage borrow One Ring's visual explanation: the outlined
+   die is discarded and the accent die is kept. This remains accurate because
+   Mothership compares resolved outcomes, not merely high or low numbers. */
+.ms-adv, .ms-roll {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  padding: 8px 22px;
-  border: 1px solid var(--accent);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  color: var(--accent);
+  justify-content: center;
+  gap: 2px;
+  padding: 5px 4px 4px;
+  border: 1px solid var(--hair);
+  border-radius: 12px;
+  background: none;
+  color: var(--muted);
   font: inherit;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
-  transition: transform 120ms ease;
+  transition: border-color 140ms ease, color 140ms ease, background 140ms ease, transform 120ms ease;
 }
-.ms-roll-label { font-size: 13px; font-weight: 600; letter-spacing: 0.02em; }
-.ms-roll:active { transform: scale(0.96); }
+.ms-keep-dice { width: 34px; height: 34px; display: block; }
+.ms-keep-dice .drop { fill: none; stroke: var(--muted); stroke-width: 1.8; stroke-linejoin: round; }
+.ms-keep-dice .keep { fill: color-mix(in srgb, var(--accent) 18%, var(--paper)); stroke: var(--accent); stroke-width: 2.1; stroke-linejoin: round; }
+.ms-keep-dice .chev { fill: none; stroke: var(--accent); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.ms-adv-label, .ms-roll-label { font-size: 10.5px; letter-spacing: 0.01em; white-space: nowrap; }
+.ms-adv[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.ms-adv[aria-pressed="true"] .ms-adv-label { color: var(--line); }
+.ms-roll { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
+.ms-roll-ico { width: 42px; height: 30px; display: block; }
+.ms-roll-ico path { fill: currentColor; fill-opacity: 0.2; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; }
+.ms-roll-ico .rear { opacity: 0.58; }
+.ms-roll-ico .facet { fill: none; stroke-width: 0.9; }
+.ms-roll-label { color: var(--accent); font-weight: 650; }
+.ms-roll-panic { display: none; }
+.ms-panic-mode .ms-roll-check { display: none; }
+.ms-panic-mode .ms-roll-panic { display: block; }
+.ms-adv:active, .ms-roll:active { transform: scale(0.96); }
 .ms-panic-mode .ms-check-only { display: none; }
 
 /* ---- mode sheet ---- */

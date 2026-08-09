@@ -1522,18 +1522,28 @@ const mistCtl = { notation: () => twod6Notation('mist'), reset: resetTwod6, from
 // strip below (plain xd10 / 1d5 / 1d100).
 const MS_STRESS_KEY = 'dicebox:ms:stress';
 const ms = { mode: 'check', target: 30, skill: null, advantage: null, stress: 2 };
+const MS_SKILL_TIERS = [null, 't', 'e', 'm'];
+const MS_SKILL_DISPLAY = {
+  t: ['Trained', '+10'],
+  e: ['Expert', '+15'],
+  m: ['Master', '+20'],
+};
 {
   // Restore the tracked Stress; anything out of the 2-20 band falls back to 2.
   const saved = Number(store.get(MS_STRESS_KEY));
   if (Number.isFinite(saved) && saved >= 2 && saved <= 20) ms.stress = Math.round(saved);
 }
 const msModeButtons = [...document.querySelectorAll('.ms-mode-btn')];
-const msSkillButtons = [...document.querySelectorAll('.ms-skill')];
 const msAdvButtons = [...document.querySelectorAll('.ms-adv')];
 const msTargetChip = $('msTargetChip');
 const msTargetVal = $('msTarget');
+const msSkillChip = $('msSkillChip');
+const msSkillLabel = $('msSkillLabel');
+const msSkillBonus = $('msSkillBonus');
 const msStressChip = $('msStressChip');
 const msStressVal = $('msStress');
+const msRoll = $('msRoll');
+const msRollLabel = $('msRollLabel');
 
 function resetMothership() {
   // The roll config resets; Stress does not — it is the character's state.
@@ -1568,17 +1578,23 @@ function syncMs({ writeField = true } = {}) {
   } else {
     msTargetVal.textContent = String(ms.target); delete msTargetVal.dataset.unset; msTargetChip.classList.add('is-set');
   }
-  for (const b of msSkillButtons) b.setAttribute('aria-pressed', String(ms.skill === b.dataset.skill));
+  const skillDisplay = MS_SKILL_DISPLAY[ms.skill];
+  msSkillLabel.textContent = skillDisplay ? skillDisplay[0] : 'Skill';
+  msSkillBonus.textContent = skillDisplay ? skillDisplay[1] : '—';
+  msSkillChip.classList.toggle('is-set', Boolean(skillDisplay));
+  msSkillChip.setAttribute('aria-label', skillDisplay
+    ? `${skillDisplay[0]} ${skillDisplay[1]} — tap or Arrow Up for the next tier; hold or Arrow Down for the previous tier`
+    : 'Skill — tap or Arrow Up for the next tier; hold or Arrow Down for the previous tier');
   for (const b of msAdvButtons) b.setAttribute('aria-pressed', String(ms.advantage === b.dataset.adv));
   msStressVal.textContent = String(ms.stress);
+  msRollLabel.textContent = ms.mode === 'panic' ? 'Roll Panic' : 'Roll Check';
+  msRoll.setAttribute('aria-label', ms.mode === 'panic' ? 'Roll Panic Check' : 'Roll Check or Save');
   if (writeField) $('notation').value = msNotation();
   if (uiSystem === 'mothership') stageSystemPool();
 }
 
 for (const b of msModeButtons) b.addEventListener('click', () => { ms.mode = b.dataset.mode; syncMs(); });
-// Skill tiers and Advantage/Disadvantage are each mutually exclusive; tapping the
-// active one again clears it back to None.
-for (const b of msSkillButtons) b.addEventListener('click', () => { ms.skill = ms.skill === b.dataset.skill ? null : b.dataset.skill; syncMs(); });
+// Advantage/Disadvantage are mutually exclusive; tapping the active choice clears it.
 for (const b of msAdvButtons) b.addEventListener('click', () => { ms.advantage = ms.advantage === b.dataset.adv ? null : b.dataset.adv; syncMs(); });
 // Target cycles unset → 1 … 99; holding below 1 returns to unset.
 bindTapHold(msTargetChip, dir => {
@@ -1586,11 +1602,19 @@ bindTapHold(msTargetChip, dir => {
   else ms.target = ms.target === null || ms.target <= 1 ? null : ms.target - 1;
   syncMs();
 });
+// A single compact pill replaces three full-width tier cards. Tap/ArrowUp walks
+// None → Trained → Expert → Master → None; hold/ArrowDown walks back toward None.
+bindTapHold(msSkillChip, dir => {
+  const current = Math.max(0, MS_SKILL_TIERS.indexOf(ms.skill));
+  const next = dir > 0 ? (current + 1) % MS_SKILL_TIERS.length : Math.max(0, current - 1);
+  ms.skill = MS_SKILL_TIERS[next];
+  syncMs();
+});
 // Stress: tap to raise, hold to lower (a Rest reduces it). Bounded 2-20.
 bindTapHold(msStressChip, dir => setStress(ms.stress + dir));
 // A dedicated Roll button throws the current Check/Save or Panic, so you can roll
 // it again after building a damage pool on the numeric strip.
-$('msRoll').addEventListener('click', () => doRoll(msNotation()));
+msRoll.addEventListener('click', () => doRoll(msNotation()));
 
 function syncMsFromField() {
   try {

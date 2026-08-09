@@ -825,65 +825,88 @@ body {
 .tor-flag:active { transform: scale(0.96); }
 
 /* ---- Mothership ---- */
-/* A stack of rows: the sub-mode toggle, then (Check/Save only) the Target and
-   Skill tiers, then Advantage, then the always-present Stress tracker + Roll. */
-.ms-picker { flex-direction: column; align-items: stretch; gap: 8px; }
-/* Sub-mode segmented toggle: Check/Save vs Panic. */
-.ms-mode-row { display: flex; gap: 6px; }
+/* Three compact rows reuse Dicebox's established language: role-die tiles,
+   number pills, then keep/drop dice around the signature Roll action. */
+.ms-picker { flex-direction: column; align-items: stretch; gap: 6px; }
+.ms-dice-row, .ms-fields-row, .ms-action-row { display: flex; align-items: stretch; gap: 6px; }
+/* The signature dice choose the roll. Keeping the silhouette large and the words
+   subordinate makes these read like the Genesys rack, not form tabs. */
 .ms-mode-btn {
   flex: 1 1 0;
-  padding: 8px 6px;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 54px auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 8px;
+  padding: 5px 10px;
   border: 1px solid var(--hair);
-  border-radius: 10px;
+  border-radius: 12px;
   background: none;
   color: var(--muted);
   font: inherit;
-  font-size: 12.5px;
-  font-weight: 600;
+  text-align: left;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
   transition: border-color 140ms ease, color 140ms ease, background 140ms ease, transform 120ms ease;
 }
-.ms-mode-btn[aria-pressed="true"] {
-  color: var(--line);
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-}
+.ms-role-ico { grid-row: 1 / 3; width: 54px; height: 32px; display: block; }
+.ms-panic-ico { overflow: visible; }
+.ms-role-ico path { fill: currentColor; fill-opacity: 0.1; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; }
+.ms-role-ico .facet { fill: none; stroke-width: 1.05; opacity: 0.72; }
+.ms-percentile-ico .rear { opacity: 0.6; }
+.ms-role-label { align-self: end; color: var(--line); font-size: 11.5px; font-weight: 650; white-space: nowrap; }
+.ms-role-die { align-self: start; color: var(--muted); font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase; }
+.ms-mode-btn[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.ms-mode-btn[aria-pressed="true"] .ms-role-ico path { fill-opacity: 0.23; }
 .ms-mode-btn:active { transform: scale(0.97); }
-.ms-target-row { display: flex; justify-content: center; }
-/* Skill tiers reuse the .tor-flag toggle: the tier name over its bonus. */
-.ms-skill-row { display: flex; gap: 8px; }
-.ms-skill { gap: 1px; padding: 7px 4px; }
-.ms-skill-name { font-size: 11.5px; font-weight: 600; white-space: nowrap; }
-.ms-skill-bonus { font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.ms-skill[aria-pressed="true"] .ms-skill-bonus { color: var(--line); }
-/* Advantage/Disadvantage, in Mothership's own [+] / [−] notation. */
-.ms-adv-row { display: flex; gap: 8px; }
-.ms-adv { padding: 7px 4px; }
-.ms-adv-ico { width: 26px; height: 26px; display: block; }
-.ms-adv-ico .bracket { fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
-.ms-adv-ico .sign { fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
-.ms-adv-label { font-size: 10.5px; letter-spacing: 0.01em; white-space: nowrap; }
-/* Stress tracker + Roll on one row; Panic hides the Check-only controls. */
-.ms-stress-row { display: flex; gap: 8px; align-items: stretch; justify-content: center; }
+/* Target, Skill tier, and Stress are numbers rather than dice, so they use the
+   same compact pills as Daggerheart's modifier and difficulty. */
+.ms-fields-row { justify-content: center; align-items: center; }
+.ms-fields-row .spin-chip { padding: 7px 11px; gap: 6px; }
+.ms-fields-row .spin-chip-val { font-size: 15px; }
 .ms-stress-chip { align-items: center; }
-.ms-roll {
-  display: inline-flex;
+#msSkillChip .spin-chip-label { max-width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Advantage and Disadvantage borrow One Ring's visual explanation: the outlined
+   die is discarded and the accent die is kept. This remains accurate because
+   Mothership compares resolved outcomes, not merely high or low numbers. */
+.ms-adv, .ms-roll {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  padding: 8px 22px;
-  border: 1px solid var(--accent);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  color: var(--accent);
+  justify-content: center;
+  gap: 2px;
+  padding: 5px 4px 4px;
+  border: 1px solid var(--hair);
+  border-radius: 12px;
+  background: none;
+  color: var(--muted);
   font: inherit;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
-  transition: transform 120ms ease;
+  transition: border-color 140ms ease, color 140ms ease, background 140ms ease, transform 120ms ease;
 }
-.ms-roll-label { font-size: 13px; font-weight: 600; letter-spacing: 0.02em; }
-.ms-roll:active { transform: scale(0.96); }
+.ms-keep-dice { width: 34px; height: 34px; display: block; }
+.ms-keep-dice .drop { fill: none; stroke: var(--muted); stroke-width: 1.8; stroke-linejoin: round; }
+.ms-keep-dice .keep { fill: color-mix(in srgb, var(--accent) 18%, var(--paper)); stroke: var(--accent); stroke-width: 2.1; stroke-linejoin: round; }
+.ms-keep-dice .chev { fill: none; stroke: var(--accent); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.ms-adv-label, .ms-roll-label { font-size: 10.5px; letter-spacing: 0.01em; white-space: nowrap; }
+.ms-adv[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.ms-adv[aria-pressed="true"] .ms-adv-label { color: var(--line); }
+.ms-roll { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
+.ms-roll-ico { width: 42px; height: 30px; display: block; }
+.ms-roll-ico path { fill: currentColor; fill-opacity: 0.2; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; }
+.ms-roll-ico .rear { opacity: 0.58; }
+.ms-roll-ico .facet { fill: none; stroke-width: 0.9; }
+.ms-roll-label { color: var(--accent); font-weight: 650; }
+.ms-roll-panic { display: none; }
+.ms-panic-mode .ms-roll-check { display: none; }
+.ms-panic-mode .ms-roll-panic { display: block; }
+.ms-adv:active, .ms-roll:active { transform: scale(0.96); }
 .ms-panic-mode .ms-check-only { display: none; }
 
 /* ---- mode sheet ---- */
@@ -2888,58 +2911,61 @@ body {
     </button>
   </section>
 
-  <!-- Mothership 1e: a sub-mode toggle picks the signature roll. Check/Save is a
-       roll-under d100 (Target + optional Skill tier + Advantage); Panic is a d20
-       over the tracked Stress. Stress is the character's own resource — the Panic
-       target, climbing on failed checks — so it persists across mode switches and
-       reloads. Damage/wounds use the numeric strip below. -->
+  <!-- Mothership 1e: the signature dice are the controls. The percentile pair and
+       Panic d20 choose the roll; compact Target, Skill, and Stress pills hold its
+       numbers; keep-better / keep-worse dice flank the primary Roll tile. Ordinary
+       damage and wound dice remain in the numeric strip below. -->
   <section class="picker ms-picker" id="msPicker" aria-label="Mothership roll" hidden>
-    <div class="ms-mode-row" role="group" aria-label="Roll type">
-      <button type="button" class="ms-mode-btn" data-mode="check" aria-pressed="true">Check / Save</button>
-      <button type="button" class="ms-mode-btn" data-mode="panic" aria-pressed="false">Panic</button>
-    </div>
-    <div class="ms-check-only ms-target-row">
-      <button type="button" class="spin-chip" id="msTargetChip" aria-label="Target — tap or Arrow Up to raise; hold or Arrow Down to lower" aria-keyshortcuts="ArrowUp ArrowDown">
-        <span class="spin-chip-label">Target</span>
-        <span class="spin-chip-val" id="msTarget">30</span>
-      </button>
-    </div>
-    <div class="ms-check-only ms-skill-row">
-      <button type="button" class="tor-flag ms-skill" data-skill="t" aria-pressed="false" aria-label="Trained — add 10 to the target">
-        <span class="ms-skill-name">Trained</span><span class="ms-skill-bonus">+10</span>
-      </button>
-      <button type="button" class="tor-flag ms-skill" data-skill="e" aria-pressed="false" aria-label="Expert — add 15 to the target">
-        <span class="ms-skill-name">Expert</span><span class="ms-skill-bonus">+15</span>
-      </button>
-      <button type="button" class="tor-flag ms-skill" data-skill="m" aria-pressed="false" aria-label="Master — add 20 to the target">
-        <span class="ms-skill-name">Master</span><span class="ms-skill-bonus">+20</span>
-      </button>
-    </div>
-    <div class="ms-adv-row">
-      <button type="button" class="tor-flag ms-adv" data-adv="adv" aria-pressed="false" aria-label="Advantage — roll twice, keep the better">
-        <svg class="ms-adv-ico" viewBox="0 0 30 30" aria-hidden="true">
-          <path class="bracket" d="M11 8 8 8 8 22 11 22"/>
-          <path class="bracket" d="M19 8 22 8 22 22 19 22"/>
-          <path class="sign" d="M15 12 15 18 M12 15 18 15"/>
+    <div class="ms-dice-row" role="group" aria-label="Roll type">
+      <button type="button" class="ms-mode-btn" data-mode="check" aria-pressed="true" aria-label="Choose Check or Save — roll percentile dice">
+        <svg class="ms-role-ico ms-percentile-ico" viewBox="0 0 54 32" aria-hidden="true">
+          <g class="rear"><path d="M17 3 26 9v8L17 29 8 17V9Z"/><path class="facet" d="M8 9 17 15 26 9M17 15v14"/></g>
+          <g><path d="M37 3 46 9v8L37 29 28 17V9Z"/><path class="facet" d="M28 9 37 15 46 9M37 15v14"/></g>
         </svg>
-        <span class="ms-adv-label">Advantage</span>
+        <span class="ms-role-label">Check / Save</span><span class="ms-role-die">d100</span>
       </button>
-      <button type="button" class="tor-flag ms-adv" data-adv="dis" aria-pressed="false" aria-label="Disadvantage — roll twice, keep the worse">
-        <svg class="ms-adv-ico" viewBox="0 0 30 30" aria-hidden="true">
-          <path class="bracket" d="M11 8 8 8 8 22 11 22"/>
-          <path class="bracket" d="M19 8 22 8 22 22 19 22"/>
-          <path class="sign" d="M12 15 18 15"/>
+      <button type="button" class="ms-mode-btn" data-mode="panic" aria-pressed="false" aria-label="Choose Panic — roll a d20">
+        <svg class="ms-role-ico ms-panic-ico" viewBox="0 0 54 32" aria-hidden="true">
+          <path d="M27 2 45 10 42 25 27 30 12 25 9 10Z"/>
+          <path class="facet" d="M27 2 19 13 9 10M27 2l8 11 10-3M19 13l8 17 8-17M12 25l7-12h16l7 12"/>
         </svg>
-        <span class="ms-adv-label">Disadvantage</span>
+        <span class="ms-role-label">Panic</span><span class="ms-role-die">d20</span>
       </button>
     </div>
-    <div class="ms-stress-row">
+    <div class="ms-fields-row">
+      <button type="button" class="spin-chip ms-check-only" id="msTargetChip" aria-label="Target — tap or Arrow Up to raise; hold or Arrow Down to lower" aria-keyshortcuts="ArrowUp ArrowDown">
+        <span class="spin-chip-label">Target</span><span class="spin-chip-val" id="msTarget">30</span>
+      </button>
+      <button type="button" class="spin-chip ms-check-only" id="msSkillChip" aria-label="Skill — tap or Arrow Up for the next tier; hold or Arrow Down for the previous tier" aria-keyshortcuts="ArrowUp ArrowDown">
+        <span class="spin-chip-label" id="msSkillLabel">Skill</span><span class="spin-chip-val" id="msSkillBonus">—</span>
+      </button>
       <button type="button" class="spin-chip ms-stress-chip" id="msStressChip" aria-label="Stress — tap or Arrow Up to raise; hold or Arrow Down to lower" aria-keyshortcuts="ArrowUp ArrowDown">
-        <span class="spin-chip-label">Stress</span>
-        <span class="spin-chip-val" id="msStress">2</span>
+        <span class="spin-chip-label">Stress</span><span class="spin-chip-val" id="msStress">2</span>
       </button>
-      <button type="button" class="ms-roll" id="msRoll" aria-label="Roll">
-        <span class="ms-roll-label">Roll</span>
+    </div>
+    <div class="ms-action-row">
+      <button type="button" class="ms-adv" data-adv="adv" aria-pressed="false" aria-label="Advantage — roll twice, keep the better resolved result">
+        <svg class="ms-keep-dice" viewBox="0 0 40 40" aria-hidden="true">
+          <path class="drop" d="M14 15 23 21v8L14 37 5 29v-8Z"/><path class="keep" d="M26 3 35 9v8l-9 8-9-8V9Z"/>
+          <g class="chev"><path d="m22 14 4-4 4 4"/><path d="m22 18 4-4 4 4"/></g>
+        </svg>
+        <span class="ms-adv-label">Keep better</span>
+      </button>
+      <button type="button" class="ms-roll" id="msRoll" aria-label="Roll Check or Save">
+        <svg class="ms-roll-ico ms-roll-check" viewBox="0 0 42 30" aria-hidden="true">
+          <path class="rear" d="M13 3 21 8v7l-8 12-8-12V8Z"/><path d="M29 3 37 8v7l-8 12-8-12V8Z"/>
+        </svg>
+        <svg class="ms-roll-ico ms-roll-panic" viewBox="0 0 42 30" aria-hidden="true">
+          <path d="M21 2 36 9l-3 15-12 4-12-4L6 9Z"/><path class="facet" d="m21 2-7 11-8-4m15-7 7 11 8-4M14 13l7 15 7-15M9 24l5-11h14l5 11"/>
+        </svg>
+        <span class="ms-roll-label" id="msRollLabel">Roll Check</span>
+      </button>
+      <button type="button" class="ms-adv" data-adv="dis" aria-pressed="false" aria-label="Disadvantage — roll twice, keep the worse resolved result">
+        <svg class="ms-keep-dice" viewBox="0 0 40 40" aria-hidden="true">
+          <path class="drop" d="M26 3 35 9v8l-9 8-9-8V9Z"/><path class="keep" d="M14 15 23 21v8L14 37 5 29v-8Z"/>
+          <g class="chev"><path d="m10 24 4 4 4-4"/><path d="m10 28 4 4 4-4"/></g>
+        </svg>
+        <span class="ms-adv-label">Keep worse</span>
       </button>
     </div>
   </section>
@@ -9250,18 +9276,28 @@ const mistCtl = { notation: () => twod6Notation('mist'), reset: resetTwod6, from
 // strip below (plain xd10 / 1d5 / 1d100).
 const MS_STRESS_KEY = 'dicebox:ms:stress';
 const ms = { mode: 'check', target: 30, skill: null, advantage: null, stress: 2 };
+const MS_SKILL_TIERS = [null, 't', 'e', 'm'];
+const MS_SKILL_DISPLAY = {
+  t: ['Trained', '+10'],
+  e: ['Expert', '+15'],
+  m: ['Master', '+20'],
+};
 {
   // Restore the tracked Stress; anything out of the 2-20 band falls back to 2.
   const saved = Number(store.get(MS_STRESS_KEY));
   if (Number.isFinite(saved) && saved >= 2 && saved <= 20) ms.stress = Math.round(saved);
 }
 const msModeButtons = [...document.querySelectorAll('.ms-mode-btn')];
-const msSkillButtons = [...document.querySelectorAll('.ms-skill')];
 const msAdvButtons = [...document.querySelectorAll('.ms-adv')];
 const msTargetChip = $('msTargetChip');
 const msTargetVal = $('msTarget');
+const msSkillChip = $('msSkillChip');
+const msSkillLabel = $('msSkillLabel');
+const msSkillBonus = $('msSkillBonus');
 const msStressChip = $('msStressChip');
 const msStressVal = $('msStress');
+const msRoll = $('msRoll');
+const msRollLabel = $('msRollLabel');
 
 function resetMothership() {
   // The roll config resets; Stress does not — it is the character's state.
@@ -9296,17 +9332,23 @@ function syncMs({ writeField = true } = {}) {
   } else {
     msTargetVal.textContent = String(ms.target); delete msTargetVal.dataset.unset; msTargetChip.classList.add('is-set');
   }
-  for (const b of msSkillButtons) b.setAttribute('aria-pressed', String(ms.skill === b.dataset.skill));
+  const skillDisplay = MS_SKILL_DISPLAY[ms.skill];
+  msSkillLabel.textContent = skillDisplay ? skillDisplay[0] : 'Skill';
+  msSkillBonus.textContent = skillDisplay ? skillDisplay[1] : '—';
+  msSkillChip.classList.toggle('is-set', Boolean(skillDisplay));
+  msSkillChip.setAttribute('aria-label', skillDisplay
+    ? `${skillDisplay[0]} ${skillDisplay[1]} — tap or Arrow Up for the next tier; hold or Arrow Down for the previous tier`
+    : 'Skill — tap or Arrow Up for the next tier; hold or Arrow Down for the previous tier');
   for (const b of msAdvButtons) b.setAttribute('aria-pressed', String(ms.advantage === b.dataset.adv));
   msStressVal.textContent = String(ms.stress);
+  msRollLabel.textContent = ms.mode === 'panic' ? 'Roll Panic' : 'Roll Check';
+  msRoll.setAttribute('aria-label', ms.mode === 'panic' ? 'Roll Panic Check' : 'Roll Check or Save');
   if (writeField) $('notation').value = msNotation();
   if (uiSystem === 'mothership') stageSystemPool();
 }
 
 for (const b of msModeButtons) b.addEventListener('click', () => { ms.mode = b.dataset.mode; syncMs(); });
-// Skill tiers and Advantage/Disadvantage are each mutually exclusive; tapping the
-// active one again clears it back to None.
-for (const b of msSkillButtons) b.addEventListener('click', () => { ms.skill = ms.skill === b.dataset.skill ? null : b.dataset.skill; syncMs(); });
+// Advantage/Disadvantage are mutually exclusive; tapping the active choice clears it.
 for (const b of msAdvButtons) b.addEventListener('click', () => { ms.advantage = ms.advantage === b.dataset.adv ? null : b.dataset.adv; syncMs(); });
 // Target cycles unset → 1 … 99; holding below 1 returns to unset.
 bindTapHold(msTargetChip, dir => {
@@ -9314,11 +9356,19 @@ bindTapHold(msTargetChip, dir => {
   else ms.target = ms.target === null || ms.target <= 1 ? null : ms.target - 1;
   syncMs();
 });
+// A single compact pill replaces three full-width tier cards. Tap/ArrowUp walks
+// None → Trained → Expert → Master → None; hold/ArrowDown walks back toward None.
+bindTapHold(msSkillChip, dir => {
+  const current = Math.max(0, MS_SKILL_TIERS.indexOf(ms.skill));
+  const next = dir > 0 ? (current + 1) % MS_SKILL_TIERS.length : Math.max(0, current - 1);
+  ms.skill = MS_SKILL_TIERS[next];
+  syncMs();
+});
 // Stress: tap to raise, hold to lower (a Rest reduces it). Bounded 2-20.
 bindTapHold(msStressChip, dir => setStress(ms.stress + dir));
 // A dedicated Roll button throws the current Check/Save or Panic, so you can roll
 // it again after building a damage pool on the numeric strip.
-$('msRoll').addEventListener('click', () => doRoll(msNotation()));
+msRoll.addEventListener('click', () => doRoll(msNotation()));
 
 function syncMsFromField() {
   try {
