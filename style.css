@@ -404,6 +404,7 @@ body {
 #modeToggle[data-system="onering"] .mode-ico[data-for="onering"] { display: block; }
 #modeToggle[data-system="pbta"] .mode-ico[data-for="pbta"] { display: block; }
 #modeToggle[data-system="mist"] .mode-ico[data-for="mist"] { display: block; }
+#modeToggle[data-system="mothership"] .mode-ico[data-for="mothership"] { display: block; }
 /* A named system's mark carries its own accent so the header reads as that mode
    at a glance; the numeric default stays with the quiet chrome colour. */
 #modeToggle[data-system="v5"],
@@ -414,7 +415,8 @@ body {
 #modeToggle[data-system="starwars"],
 #modeToggle[data-system="onering"],
 #modeToggle[data-system="pbta"],
-#modeToggle[data-system="mist"] { color: var(--accent); }
+#modeToggle[data-system="mist"],
+#modeToggle[data-system="mothership"] { color: var(--accent); }
 
 /* ---- Vampire dice tray ---- */
 
@@ -790,6 +792,68 @@ body {
 .tor-flag[aria-pressed="true"] .tor-flag-label { color: var(--line); }
 .tor-flag:active { transform: scale(0.96); }
 
+/* ---- Mothership ---- */
+/* A stack of rows: the sub-mode toggle, then (Check/Save only) the Target and
+   Skill tiers, then Advantage, then the always-present Stress tracker + Roll. */
+.ms-picker { flex-direction: column; align-items: stretch; gap: 8px; }
+/* Sub-mode segmented toggle: Check/Save vs Panic. */
+.ms-mode-row { display: flex; gap: 6px; }
+.ms-mode-btn {
+  flex: 1 1 0;
+  padding: 8px 6px;
+  border: 1px solid var(--hair);
+  border-radius: 10px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: border-color 140ms ease, color 140ms ease, background 140ms ease, transform 120ms ease;
+}
+.ms-mode-btn[aria-pressed="true"] {
+  color: var(--line);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.ms-mode-btn:active { transform: scale(0.97); }
+.ms-target-row { display: flex; justify-content: center; }
+/* Skill tiers reuse the .tor-flag toggle: the tier name over its bonus. */
+.ms-skill-row { display: flex; gap: 8px; }
+.ms-skill { gap: 1px; padding: 7px 4px; }
+.ms-skill-name { font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+.ms-skill-bonus { font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.ms-skill[aria-pressed="true"] .ms-skill-bonus { color: var(--line); }
+/* Advantage/Disadvantage, in Mothership's own [+] / [−] notation. */
+.ms-adv-row { display: flex; gap: 8px; }
+.ms-adv { padding: 7px 4px; }
+.ms-adv-ico { width: 26px; height: 26px; display: block; }
+.ms-adv-ico .bracket { fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.ms-adv-ico .sign { fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
+.ms-adv-label { font-size: 10.5px; letter-spacing: 0.01em; white-space: nowrap; }
+/* Stress tracker + Roll on one row; Panic hides the Check-only controls. */
+.ms-stress-row { display: flex; gap: 8px; align-items: stretch; justify-content: center; }
+.ms-stress-chip { align-items: center; }
+.ms-roll {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 22px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: transform 120ms ease;
+}
+.ms-roll-label { font-size: 13px; font-weight: 600; letter-spacing: 0.02em; }
+.ms-roll:active { transform: scale(0.96); }
+.ms-panic-mode .ms-check-only { display: none; }
+
 /* ---- mode sheet ---- */
 
 /* The mode sheet is a touch narrower than the modifier sheet: two cards want a
@@ -859,6 +923,10 @@ body {
 /* PbtA runs ember-orange, Mist Engine misty teal. */
 .mode-pbta[aria-pressed="true"] { border-color: #D97A3C; background: color-mix(in srgb, #D97A3C 12%, transparent); }
 .mode-mist[aria-pressed="true"] { border-color: #3F9FA0; background: color-mix(in srgb, #3F9FA0 12%, transparent); }
+
+/* Mothership's card carries its hazard amber. */
+.mode-mothership .mode-glyph { color: #C7A93E; }
+.mode-mothership[aria-pressed="true"] { border-color: #C7A93E; background: color-mix(in srgb, #C7A93E 12%, transparent); }
 
 .mode-name {
   font-size: 14px;

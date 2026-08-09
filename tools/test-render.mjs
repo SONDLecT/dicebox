@@ -441,6 +441,30 @@ ok('zero-velocity die settles', still.settled, `after ${n} steps`);
      `label at ${labelAt.map(v => v.toFixed(1)).join(',')}`);
 }
 
+// A percentile tens die needs a display label independent of its logical value:
+// its zero face is printed "00", while the result still remains numeric zero.
+{
+  const texts = [];
+  const noop = () => {};
+  const ctx = new Proxy({}, {
+    get: (_t, k) => {
+      if (k === 'canvas') return { width: 300, height: 200 };
+      if (k === 'fillText') return text => { texts.push(String(text)); };
+      return noop;
+    },
+    set: () => true,
+  });
+  const tens = new Die(10, 0, 0, 0, 96);
+  tens.displayLabel = '00';
+  tens.rot = [0, 0, 0];
+  tens.settled = true;
+  tens.numeralIn = 1;
+  tens.draw(ctx, { line: '#000', muted: '#999', paper: '#fff', accent: '#0a0' });
+  ok('a percentile zero tens face renders as 00 while retaining value 0',
+     texts.includes('00') && tens.value === 0,
+     `labels: ${texts.join(', ')}`);
+}
+
 // d1 is a real rung on the DCC chain, so it must have geometry to draw.
 ok('d1 has a solid', solidFor(1) !== null);
 ok('d0 has no solid', solidFor(0) === null);

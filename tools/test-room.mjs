@@ -544,6 +544,22 @@ const sampleSystemRoll = {
     ] }],
   }));
 
+  // Mothership: a percentile pair (tens die reads up to 90) with role tags, plus
+  // a summary that carries a Stress delta — all display-only on the receiver.
+  ok('a Mothership check validates', validateSystemRoll({
+    system: 'mothership', notation: 'ms:c@35e',
+    summary: { mode: 'check', value: 42, outcome: 'failure', success: false, stressDelta: 1 },
+    groups: [{ kind: 'dice', count: 2, subtotal: 0, dice: [
+      { value: 40, sides: 10, role: 'tens', kept: true },
+      { value: 2, sides: 10, role: 'ones', kept: true },
+    ] }],
+  }));
+  ok('a Mothership panic validates', validateSystemRoll({
+    system: 'mothership', notation: 'ms:p@8',
+    summary: { mode: 'panic', value: 5, panicked: true, lookup: 5 },
+    groups: [{ kind: 'dice', count: 1, subtotal: 0, dice: [{ value: 5, sides: 20, role: 'panic', kept: true }] }],
+  }));
+
   ok('a wildly out-of-range die value is rejected', !validateSystemRoll({
     ...sampleSystemRoll,
     groups: [{ kind: 'dice', sides: 10, count: 1, subtotal: 0, dice: [{ value: 1e9, kept: true }] }],

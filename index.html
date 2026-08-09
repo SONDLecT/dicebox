@@ -150,6 +150,13 @@
             <path d="M4 12.5c2-1.6 4-1.6 6 0s4 1.6 6 0"/>
             <path d="M6 16.5c2-1.6 4-1.6 6 0s3 1.2 4 0.4"/>
           </g>
+          <!-- Mothership: a spacesuit helmet — dome and curved visor. -->
+          <g class="mode-ico" data-for="mothership" fill="none" stroke="currentColor"
+             stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">
+            <path d="M12 3.2c-4.1 0-6.8 3-6.8 7v3.4c0 1.6 1.2 2.9 2.8 2.9h8c1.6 0 2.8-1.3 2.8-2.9V10.2c0-4-2.7-7-6.8-7Z"/>
+            <path d="M12 7.1c-2.6 0-4.3 1.7-4.3 3.9 0 1.6 1.2 2.8 2.8 2.8h3c1.6 0 2.8-1.2 2.8-2.8 0-2.2-1.7-3.9-4.3-3.9Z"/>
+            <path d="M9.4 9.6c.7-.6 1.5-.9 2.6-.9"/>
+          </g>
         </svg>
       </button>
       <button id="helpToggle" class="ghost icon" aria-expanded="false"
@@ -364,6 +371,26 @@
       </p>
       </div>
 
+      <div id="helpMothership" hidden>
+      <dl class="syntax">
+        <dt>ms:c@35</dt>    <dd>Check/Save — roll d100 under 35</dd>
+        <dt>ms:c@35e</dt>   <dd>the same, Expert skill (+15 → under 50)</dd>
+        <dt>ms:c@35adv</dt> <dd>Advantage — roll twice, keep the better</dd>
+        <dt>ms:p@8</dt>     <dd>Panic — roll d20 over Stress 8</dd>
+      </dl>
+      <p class="note">
+        Mothership rolls <b>1d100 under</b> your Stat or Save: less than the number
+        succeeds, a fail costs <b>1 Stress</b>. <b>00</b> always crits, <b>99</b>
+        always crit-fails, <b>90-99</b> always fails, and doubles are a Critical. A
+        <b>Skill</b> tier (Trained&nbsp;+10, Expert&nbsp;+15, Master&nbsp;+20) raises
+        the number you roll under. <b>Panic</b> rolls a d20 <b>over</b> your Stress;
+        roll at or under it and you Panic — look up the die on your own Panic Table.
+        <b>Stress</b> is tracked here: it climbs on failed rolls and is what Panic
+        rolls against. Damage and Wounds are ordinary dice — type <b>4d10</b> or tap
+        the strip.
+      </p>
+      </div>
+
       <p class="note install" id="installNote">
         <button type="button" class="install-button" id="install" hidden>Install as an app</button>
         <span id="installHint">Add this to your home screen and it works offline, with no
@@ -534,6 +561,19 @@
             </svg>
             <span class="mode-name">Mist Engine</span>
             <span class="mode-sub">2d6 · success / consequence</span>
+          </button>
+          <button type="button" class="mode-card mode-mothership" data-system="mothership" aria-pressed="false">
+            <svg class="mode-glyph" viewBox="0 0 44 44" width="44" height="44" aria-hidden="true">
+              <!-- A spacesuit helmet — dome and curved visor — the space-horror
+                   mode over its roll-under d100. -->
+              <g fill="none" stroke="#C7A93E" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round">
+                <path d="M22 6c-7.5 0-12.5 5.5-12.5 12.8v6.2c0 2.9 2.3 5.2 5.1 5.2h14.8c2.8 0 5.1-2.3 5.1-5.2V18.8C34.5 11.5 29.5 6 22 6Z"/>
+                <path d="M22 13.2c-4.8 0-7.9 3.1-7.9 7.1 0 2.9 2.2 5.1 5 5.1h5.8c2.8 0 5-2.2 5-5.1 0-4-3.1-7.1-7.9-7.1Z"/>
+                <path d="M17.3 17.8c1.2-1.1 2.7-1.7 4.7-1.7"/>
+              </g>
+            </svg>
+            <span class="mode-name">Mothership</span>
+            <span class="mode-sub">d100 · roll under</span>
           </button>
         </div>
         <p class="note mode-note">
@@ -929,6 +969,62 @@
       <span class="spin-chip-label" id="twod6ModLabel">Modifier</span>
       <span class="spin-chip-val" id="twod6Mod">0</span>
     </button>
+  </section>
+
+  <!-- Mothership 1e: a sub-mode toggle picks the signature roll. Check/Save is a
+       roll-under d100 (Target + optional Skill tier + Advantage); Panic is a d20
+       over the tracked Stress. Stress is the character's own resource — the Panic
+       target, climbing on failed checks — so it persists across mode switches and
+       reloads. Damage/wounds use the numeric strip below. -->
+  <section class="picker ms-picker" id="msPicker" aria-label="Mothership roll" hidden>
+    <div class="ms-mode-row" role="group" aria-label="Roll type">
+      <button type="button" class="ms-mode-btn" data-mode="check" aria-pressed="true">Check / Save</button>
+      <button type="button" class="ms-mode-btn" data-mode="panic" aria-pressed="false">Panic</button>
+    </div>
+    <div class="ms-check-only ms-target-row">
+      <button type="button" class="spin-chip" id="msTargetChip" aria-label="Target — tap to raise, hold to lower">
+        <span class="spin-chip-label">Target</span>
+        <span class="spin-chip-val" id="msTarget">30</span>
+      </button>
+    </div>
+    <div class="ms-check-only ms-skill-row">
+      <button type="button" class="tor-flag ms-skill" data-skill="t" aria-pressed="false" aria-label="Trained — add 10 to the target">
+        <span class="ms-skill-name">Trained</span><span class="ms-skill-bonus">+10</span>
+      </button>
+      <button type="button" class="tor-flag ms-skill" data-skill="e" aria-pressed="false" aria-label="Expert — add 15 to the target">
+        <span class="ms-skill-name">Expert</span><span class="ms-skill-bonus">+15</span>
+      </button>
+      <button type="button" class="tor-flag ms-skill" data-skill="m" aria-pressed="false" aria-label="Master — add 20 to the target">
+        <span class="ms-skill-name">Master</span><span class="ms-skill-bonus">+20</span>
+      </button>
+    </div>
+    <div class="ms-adv-row">
+      <button type="button" class="tor-flag ms-adv" data-adv="adv" aria-pressed="false" aria-label="Advantage — roll twice, keep the better">
+        <svg class="ms-adv-ico" viewBox="0 0 30 30" aria-hidden="true">
+          <path class="bracket" d="M11 8 8 8 8 22 11 22"/>
+          <path class="bracket" d="M19 8 22 8 22 22 19 22"/>
+          <path class="sign" d="M15 12 15 18 M12 15 18 15"/>
+        </svg>
+        <span class="ms-adv-label">Advantage</span>
+      </button>
+      <button type="button" class="tor-flag ms-adv" data-adv="dis" aria-pressed="false" aria-label="Disadvantage — roll twice, keep the worse">
+        <svg class="ms-adv-ico" viewBox="0 0 30 30" aria-hidden="true">
+          <path class="bracket" d="M11 8 8 8 8 22 11 22"/>
+          <path class="bracket" d="M19 8 22 8 22 22 19 22"/>
+          <path class="sign" d="M12 15 18 15"/>
+        </svg>
+        <span class="ms-adv-label">Disadvantage</span>
+      </button>
+    </div>
+    <div class="ms-stress-row">
+      <button type="button" class="spin-chip ms-stress-chip" id="msStressChip" aria-label="Stress — tap to raise, hold to lower">
+        <span class="spin-chip-label">Stress</span>
+        <span class="spin-chip-val" id="msStress">2</span>
+      </button>
+      <button type="button" class="ms-roll" id="msRoll" aria-label="Roll">
+        <span class="ms-roll-label">Roll</span>
+      </button>
+    </div>
   </section>
 
   <form class="entry" id="entry">

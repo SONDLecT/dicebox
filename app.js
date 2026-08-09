@@ -7,6 +7,7 @@ import { rollFate, describeFate, fateHeadline, fateFace, parseFate } from './sys
 import { rollGenesys, describeGenesys, genesysHeadline, parseGenesys } from './system-dice.js';
 import { rollDaggerheart, describeDaggerheart, daggerheartHeadline, parseDaggerheart } from './system-dice.js';
 import { rollCthulhuTech, describeCthulhuTech, cthulhutechHeadline, parseCthulhuTech } from './system-dice.js';
+import { rollMothership, describeMothership, mothershipHeadline, parseMothership } from './system-dice.js';
 import { rollStarWars, describeStarWars, starWarsHeadline, parseStarWars } from './system-dice.js';
 import { rollOneRing, describeOneRing, oneRingHeadline, parseOneRing } from './system-dice.js';
 import { rollPbta, rollMist, twod6Headline, describe2d6, parsePbta, parseMist } from './system-dice.js';
@@ -253,6 +254,19 @@ const SYSTEM_THEMES = {
       '--hair': '#CBDDDC', '--accent': '#227E7F', '--danger': '#9A443C',
     },
   },
+  // Mothership — a hazard-label palette: acid amber over cold gunmetal steel,
+  // deliberately colder and more industrial than PbtA's warm ember. The amber is
+  // the constant; only the steel neutrals flip for light.
+  mothership: {
+    dark: {
+      '--paper': '#0C0E10', '--face': '#15181C', '--line': '#DCE2E6', '--muted': '#6A757C',
+      '--hair': '#232a30', '--accent': '#C7A93E', '--danger': '#D2603E',
+    },
+    light: {
+      '--paper': '#E7EAEC', '--face': '#F4F6F7', '--line': '#14181B', '--muted': '#6E787E',
+      '--hair': '#CBD2D6', '--accent': '#8A7018', '--danger': '#9A3E24',
+    },
+  },
 };
 
 // PbtA / Mist Engine 2d6 outcome bands, applied to both dice: a strong result
@@ -282,6 +296,15 @@ const DH_COLORS = {
   fear: '#7E6BB5',
   advantage: '#4E9E60',
   disadvantage: '#C24046',
+};
+
+// Mothership dice tint by outcome, the way CthulhuTech tints hits: a Check comes
+// up green when it lands under the target, red when it fails; a Panic d20 goes
+// red on a Panic, green when it holds. Before a roll the staged percentile pair
+// wears its amber tens / steel ones so the d100 reads as two dice.
+const MS_COLORS = {
+  success: '#5DAE6A', fail: '#D2603E',
+  tens: '#C7A93E', ones: '#6A757C', panic: '#8FA0A8',
 };
 
 // Genesys dice are colour-coded by type — the one place a system paints its own
@@ -481,6 +504,19 @@ function buildTrayDice(flat, result, { remote = false } = {}) {
     }
     // PbtA / Mist: both d6s take the outcome-band colour of the whole roll.
     else if (result.system === 'pbta' || result.system === 'mist') die.genColor = BAND_COLORS[result.summary?.band];
+    // Mothership: the kept dice tint by the resolved outcome (green pass / red
+    // fail); a dropped adv/dis pair fades on its own via kept=false. With no
+    // outcome yet (unresolved check), keep the percentile tens/ones tints.
+    else if (result.system === 'mothership') {
+      const s = result.summary;
+      const passed = s.mode === 'panic' ? s.panicked === false : s.success;
+      // A percentile tens die is labelled 00–90 while retaining its numeric
+      // 0–90 value for reduction, history, and room validation.
+      if (f.role === 'tens') die.displayLabel = String(f.value).padStart(2, '0');
+      if (passed === true) die.genColor = MS_COLORS.success;
+      else if (passed === false) die.genColor = MS_COLORS.fail;
+      else die.genColor = f.role === 'tens' ? MS_COLORS.tens : f.role === 'panic' ? MS_COLORS.panic : MS_COLORS.ones;
+    }
     return die;
   });
 }
@@ -500,12 +536,20 @@ function doRoll(notation) {
       : sys === 'onering' ? rollOneRing(notation)
       : sys === 'pbta' ? rollPbta(notation)
       : sys === 'mist' ? rollMist(notation)
+      : sys === 'mothership' ? rollMothership(notation)
       : roll(notation);
   } catch (err) {
     showError(err.message);
     return;
   }
   clearError();
+
+  // Mothership tracks Stress: a failed Check or Save adds 1, and that new value
+  // is what the next Panic Check rolls against. Only a local roll moves your own
+  // Stress — a peer's roll (showRemoteRoll) never touches it.
+  if (result.system === 'mothership' && result.summary.stressDelta) {
+    setStress(ms.stress + result.summary.stressDelta, { restage: false });
+  }
 
   // The palette follows the selected mode, not this roll's system: a numeric
   // roll typed in V5 mode stays V5-coloured. applySystemTheme runs at mode
@@ -583,6 +627,7 @@ function resultHeadline(result) {
   if (result.system === 'starwars') return starWarsHeadline(result);
   if (result.system === 'onering') return oneRingHeadline(result);
   if (result.system === 'pbta' || result.system === 'mist') return twod6Headline(result);
+  if (result.system === 'mothership') return mothershipHeadline(result);
   return { kind: 'number', text: String(result.total) };
 }
 function resultDetail(result) {
@@ -594,6 +639,7 @@ function resultDetail(result) {
   if (result.system === 'starwars') return describeStarWars(result);
   if (result.system === 'onering') return describeOneRing(result);
   if (result.system === 'pbta' || result.system === 'mist') return describe2d6(result);
+  if (result.system === 'mothership') return describeMothership(result);
   return describe(result.groups);
 }
 
@@ -755,6 +801,7 @@ $('notation').addEventListener('input', () => {
   if (typedSystem === 'onering') { syncTorFromField(); return; }
   if (typedSystem === 'pbta') { pbtaCtl.fromField(); return; }
   if (typedSystem === 'mist') { mistCtl.fromField(); return; }
+  if (typedSystem === 'mothership') { syncMsFromField(); return; }
   pool = parsePool($('notation').value);
   // Typing an unusual die earns it a button too, so the row always accounts for
   // everything in the pool.
@@ -817,6 +864,7 @@ const SYSTEMS = {
   onering: { badge: 'Feat Dice' },
   pbta: { badge: 'PbtA' },
   mist: { badge: 'Mist Engine' },
+  mothership: { badge: 'Mothership' },
 };
 
 // Empty-tray copy. Most modes build a pool by tapping dice, so the default
@@ -827,14 +875,15 @@ const DEFAULT_HINT = { idle: 'Pick dice or type a roll', placeholder: 'Tap dice 
 const SYSTEM_HINTS = {
   pbta: { idle: 'Set a modifier, then roll 2d6', placeholder: 'Set a modifier, or type pbta:+2' },
   mist: { idle: 'Set your Power, then roll 2d6', placeholder: 'Set your Power, or type mist:+1' },
+  mothership: { idle: 'Set your target, then roll under it', placeholder: 'Set a target, or type ms:c@35' },
 };
 function systemHint(system) { return SYSTEM_HINTS[system] || DEFAULT_HINT; }
 
 // Permanent slugs, so a link opens Dicebox already in a system. The Worker
 // rewrites these paths to the app shell; numeric is the bare root. Kept branded
 // (/vtm rather than /v5) since the URL is the shareable name.
-const SLUG_TO_SYSTEM = { vtm: 'v5', fate: 'fate', genesys: 'genesys', daggerheart: 'daggerheart', cthulhutech: 'cthulhutech', force: 'starwars', feat: 'onering', pbta: 'pbta', mist: 'mist' };
-const SYSTEM_TO_SLUG = { v5: 'vtm', fate: 'fate', genesys: 'genesys', daggerheart: 'daggerheart', cthulhutech: 'cthulhutech', starwars: 'force', onering: 'feat', pbta: 'pbta', mist: 'mist' };
+const SLUG_TO_SYSTEM = { vtm: 'v5', fate: 'fate', genesys: 'genesys', daggerheart: 'daggerheart', cthulhutech: 'cthulhutech', force: 'starwars', feat: 'onering', pbta: 'pbta', mist: 'mist', mothership: 'mothership' };
+const SYSTEM_TO_SLUG = { v5: 'vtm', fate: 'fate', genesys: 'genesys', daggerheart: 'daggerheart', cthulhutech: 'cthulhutech', starwars: 'force', onering: 'feat', pbta: 'pbta', mist: 'mist', mothership: 'mothership' };
 
 function systemFromPath() {
   const seg = (location.pathname || '/').replace(/^\/+|\/+$/g, '').toLowerCase();
@@ -857,6 +906,7 @@ const torPicker = $('torPicker');
 // PbtA and Mist Engine share one picker: their only control is a modifier
 // stepper, identical between the two modes.
 const twod6Picker = $('twod6Picker');
+const msPicker = $('msPicker');
 // Numeric's strip lives last in the DOM so that in Daggerheart mode (the only
 // mode that shows two pickers) the duality controls sit above it. In every
 // other mode the other pickers are hidden, so its position is invisible.
@@ -896,7 +946,11 @@ function setSystem(system, { roll = false, url = true } = {}) {
   // numeric strip too — its duality is one roll, but weapons and the rest need
   // ordinary dice — so its own controls sit above the numeric ones. In that mode
   // the strip is trimmed to the standard polyhedral dice.
-  numPicker.hidden = system !== 'numeric' && system !== 'daggerheart';
+  // Daggerheart and Mothership keep the numeric strip too — their signature roll
+  // is separate, but weapons/damage/wounds are ordinary dice. Daggerheart trims
+  // the strip to the standard polyhedrals; Mothership leaves it full, since its
+  // damage uses d5 and d100 as well as d10.
+  numPicker.hidden = system !== 'numeric' && system !== 'daggerheart' && system !== 'mothership';
   diceButtons.classList.toggle('standard-only', system === 'daggerheart');
   v5Picker.hidden = system !== 'v5';
   fatePicker.hidden = system !== 'fate';
@@ -907,6 +961,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
   ctPicker.hidden = system !== 'cthulhutech';
   torPicker.hidden = system !== 'onering';
   twod6Picker.hidden = system !== 'pbta' && system !== 'mist';
+  msPicker.hidden = system !== 'mothership';
   // Mist calls the 2d6 modifier "Power"; PbtA just "Modifier". The picker is
   // shared, so the label follows the active mode.
   if (system === 'pbta' || system === 'mist') {
@@ -932,6 +987,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
   $('helpOnering').hidden = system !== 'onering';
   $('helpPbta').hidden = system !== 'pbta';
   $('helpMist').hidden = system !== 'mist';
+  $('helpMothership').hidden = system !== 'mothership';
 
   // The sheet's cards reflect the choice.
   for (const card of modeCards) {
@@ -950,10 +1006,15 @@ function setSystem(system, { roll = false, url = true } = {}) {
     resetOneRing();
     pbtaCtl.reset();
     mistCtl.reset();
+    // Mothership resets the roll config (mode, target, skill, advantage) but NOT
+    // Stress — that is the character's ongoing state, not pool setup, so it must
+    // survive a mode switch the way it survives a reload.
+    resetMothership();
     clearPool();
-    // Daggerheart seeds the field with its duality so a plain Roll or flick
-    // throws the Hope + Fear; tapping numeric dice replaces it with that pool.
+    // Daggerheart and Mothership seed the field with their signature roll so a
+    // plain Roll or flick throws it; tapping numeric dice replaces it with a pool.
     if (system === 'daggerheart') $('notation').value = dhNotation();
+    if (system === 'mothership') $('notation').value = msNotation();
   }
 }
 
@@ -1442,6 +1503,102 @@ bindTapHold($('twod6ModChip'), dir => { twod6.modifier = Math.max(-100, Math.min
 const pbtaCtl = { notation: () => twod6Notation('pbta'), reset: resetTwod6, fromField: syncTwod6FromField };
 const mistCtl = { notation: () => twod6Notation('mist'), reset: resetTwod6, fromField: syncTwod6FromField };
 
+// ---- Mothership 1e ----
+//
+// Two signature rolls under one picker, chosen with a sub-mode toggle: a Check /
+// Save (roll d100 under Target, plus an optional Skill tier and Advantage) and a
+// Panic Check (roll d20 over Stress). Stress is a tracked resource, not pool
+// setup: it is the Panic target, it climbs by 1 on every failed Check/Save, and
+// it persists across reloads and mode switches. Damage/wounds use the numeric
+// strip below (plain xd10 / 1d5 / 1d100).
+const MS_STRESS_KEY = 'dicebox:ms:stress';
+const ms = { mode: 'check', target: 30, skill: null, advantage: null, stress: 2 };
+{
+  // Restore the tracked Stress; anything out of the 2-20 band falls back to 2.
+  const saved = Number(store.get(MS_STRESS_KEY));
+  if (Number.isFinite(saved) && saved >= 2 && saved <= 20) ms.stress = Math.round(saved);
+}
+const msModeButtons = [...document.querySelectorAll('.ms-mode-btn')];
+const msSkillButtons = [...document.querySelectorAll('.ms-skill')];
+const msAdvButtons = [...document.querySelectorAll('.ms-adv')];
+const msTargetChip = $('msTargetChip');
+const msTargetVal = $('msTarget');
+const msStressChip = $('msStressChip');
+const msStressVal = $('msStress');
+
+function resetMothership() {
+  // The roll config resets; Stress does not — it is the character's state.
+  ms.mode = 'check';
+  ms.target = 30;
+  ms.skill = null;
+  ms.advantage = null;
+  syncMs({ writeField: false });
+}
+
+function msNotation() {
+  if (ms.mode === 'panic') return `ms:p@${ms.stress}` + (ms.advantage || '');
+  return 'ms:c' + (ms.target !== null ? `@${ms.target}` : '') + (ms.skill || '') + (ms.advantage || '');
+}
+
+// Stress lives in localStorage so it survives a reload. `restage` is skipped when
+// a roll drives the bump — there the tray already holds the settling dice, so we
+// only refresh the chip and persist, never re-stage over the result.
+function setStress(n, { restage = true } = {}) {
+  ms.stress = Math.max(2, Math.min(20, n));
+  store.set(MS_STRESS_KEY, String(ms.stress));
+  if (restage) syncMs();
+  else msStressVal.textContent = String(ms.stress);
+}
+
+function syncMs({ writeField = true } = {}) {
+  for (const b of msModeButtons) b.setAttribute('aria-pressed', String(b.dataset.mode === ms.mode));
+  // Panic hides the Check-only controls (Target, Skill) and rolls against Stress.
+  msPicker.classList.toggle('ms-panic-mode', ms.mode === 'panic');
+  if (ms.target === null) {
+    msTargetVal.textContent = '—'; msTargetVal.dataset.unset = '1'; msTargetChip.classList.remove('is-set');
+  } else {
+    msTargetVal.textContent = String(ms.target); delete msTargetVal.dataset.unset; msTargetChip.classList.add('is-set');
+  }
+  for (const b of msSkillButtons) b.setAttribute('aria-pressed', String(ms.skill === b.dataset.skill));
+  for (const b of msAdvButtons) b.setAttribute('aria-pressed', String(ms.advantage === b.dataset.adv));
+  msStressVal.textContent = String(ms.stress);
+  if (writeField) $('notation').value = msNotation();
+  if (uiSystem === 'mothership') stageSystemPool();
+}
+
+for (const b of msModeButtons) b.addEventListener('click', () => { ms.mode = b.dataset.mode; syncMs(); });
+// Skill tiers and Advantage/Disadvantage are each mutually exclusive; tapping the
+// active one again clears it back to None.
+for (const b of msSkillButtons) b.addEventListener('click', () => { ms.skill = ms.skill === b.dataset.skill ? null : b.dataset.skill; syncMs(); });
+for (const b of msAdvButtons) b.addEventListener('click', () => { ms.advantage = ms.advantage === b.dataset.adv ? null : b.dataset.adv; syncMs(); });
+// Target cycles unset → 1 … 99; holding below 1 returns to unset.
+bindTapHold(msTargetChip, dir => {
+  if (dir > 0) ms.target = ms.target === null ? 1 : Math.min(99, ms.target + 1);
+  else ms.target = ms.target === null || ms.target <= 1 ? null : ms.target - 1;
+  syncMs();
+});
+// Stress: tap to raise, hold to lower (a Rest reduces it). Bounded 2-20.
+bindTapHold(msStressChip, dir => setStress(ms.stress + dir));
+// A dedicated Roll button throws the current Check/Save or Panic, so you can roll
+// it again after building a damage pool on the numeric strip.
+$('msRoll').addEventListener('click', () => doRoll(msNotation()));
+
+function syncMsFromField() {
+  try {
+    const { mode, target, skill, advantage } = parseMothership($('notation').value);
+    ms.mode = mode;
+    ms.advantage = advantage;
+    if (mode === 'panic') {
+      // A typed Panic carries its Stress; reflect it in the tracker (clamped).
+      if (target !== null) { ms.stress = Math.max(2, Math.min(20, target)); store.set(MS_STRESS_KEY, String(ms.stress)); }
+    } else {
+      ms.target = target;
+      ms.skill = skill;
+    }
+    syncMs({ writeField: false });
+  } catch { /* mid-type, not yet valid */ }
+}
+
 // ---- the pool ----
 //
 // Tapping dice builds a pool: tap d20 twice and d6 once and you have 2d20+1d6,
@@ -1676,6 +1833,16 @@ function systemStageDescriptors() {
     case 'mist':
       add(2, { sides: 6, kind: '2d6' });
       break;
+    case 'mothership':
+      // A Check/Save previews the percentile pair (tens + ones); a Panic Check
+      // previews the single d20. Both are fixed rolls, shown on entry.
+      if (ms.mode === 'panic') {
+        out.push({ sides: 20, genColor: MS_COLORS.panic, kind: 'ms-panic' });
+      } else {
+        out.push({ sides: 10, genColor: MS_COLORS.tens, kind: 'ms-check' });
+        out.push({ sides: 10, genColor: MS_COLORS.ones, kind: 'ms-check' });
+      }
+      break;
   }
   return out;
 }
@@ -1773,6 +1940,7 @@ function clearPool() {
       case 'cthulhutech': resetCthulhuTech(); syncCt(); break;
       case 'onering': resetOneRing(); syncTor(); break;
       case 'pbta': case 'mist': resetTwod6(); syncTwod6(); break;
+      case 'mothership': resetMothership(); syncMs(); break;
     }
     return;
   }
@@ -2573,6 +2741,7 @@ function emptyTrayRoll() {
   if (uiSystem === 'cthulhutech') return ctNotation() || ctExample();
   if (uiSystem === 'pbta') return pbtaCtl.notation();
   if (uiSystem === 'mist') return mistCtl.notation();
+  if (uiSystem === 'mothership') return msNotation();
   const last = state.last;
   const lastNumeric = last && (last.system === 'numeric' || last.system === undefined);
   return (lastNumeric && last.notation) || `d${state.defaultSides}`;

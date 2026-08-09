@@ -12,6 +12,7 @@ import { parseCthulhuTech, rollCthulhuTech, summarizeCthulhuTech, describeCthulh
 import { parseStarWars, rollStarWars, summarizeStarWars, describeStarWars, starWarsHeadline } from '../system-dice.js';
 import { parseOneRing, rollOneRing, summarizeOneRing, describeOneRing, oneRingHeadline } from '../system-dice.js';
 import { parsePbta, parseMist, rollPbta, rollMist, summarize2d6, describe2d6, twod6Headline } from '../system-dice.js';
+import { parseMothership, rollMothership, summarizeMothershipCheck, summarizeMothershipPanic, describeMothership, mothershipHeadline } from '../system-dice.js';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, extra = '') => {
@@ -593,6 +594,100 @@ ok('negative modifier drops the band', summarize2d6(4, 4, -3, 'pbta').band === '
   ok('2d6 headline is total', h.text === '11' && h.kind === 'number');
   ok('2d6 headline band variant', h.variant === 'band-hit');
   ok('2d6 describe shows the math', /5 \+ 5 \+ 1 · total 11/.test(describe2d6(p)));
+}
+
+// ---- Mothership 1e ----
+// A check summary from an explicit tens/ones pair, so outcomes are deterministic.
+const msc = (tens, ones, target, skill = null, adv = null) =>
+  summarizeMothershipCheck({ tens, ones, value: tens + ones, double: tens / 10 === ones }, target, skill, adv);
+
+// detection / parsing
+ok('detect ms check', detectSystem('ms:c@35') === 'mothership');
+ok('detect ms panic', detectSystem('ms:p@8') === 'mothership');
+ok('ms not numeric', detectSystem('1d100') === 'numeric');
+ok('parse ms:c@35', eq(parseMothership('ms:c@35'), { mode: 'check', target: 35, skill: null, advantage: null }));
+ok('parse ms:c@35eadv', eq(parseMothership('ms:c@35eadv'), { mode: 'check', target: 35, skill: 'e', advantage: 'adv' }));
+ok('parse ms:p@8dis', eq(parseMothership('ms:p@8dis'), { mode: 'panic', target: 8, skill: null, advantage: 'dis' }));
+ok('parse bare ms:c', eq(parseMothership('ms:c'), { mode: 'check', target: null, skill: null, advantage: null }));
+for (const bad of ['ms:', 'ms:x@5', 'ms:c@100', 'ms:p@5e', 'ms:p@1', 'ms:p@21', 'ms:c@0', 'ct:8']) {
+  ok(`reject ms ${bad}`, (() => { try { parseMothership(bad); return false; } catch { return true; } })());
+}
+
+// roll-under outcomes and the absolute-rule specials
+{
+  ok('00 always crit-success', msc(0, 0, 35).outcome === 'crit-success');
+  ok('99 always crit-failure', msc(90, 9, 35).outcome === 'crit-failure');
+  ok('90-99 always fails', msc(90, 5, 99).outcome === 'failure');
+  ok('under target succeeds', msc(20, 2, 35).success === true);          // 22 (also doubles)
+  ok('at/over target fails', msc(40, 2, 35).outcome === 'failure');      // 42 ≥ 35
+  ok('doubles under → crit-success', msc(30, 3, 35).outcome === 'crit-success'); // 33 < 35
+  ok('doubles over → crit-failure', msc(40, 4, 35).outcome === 'crit-failure');  // 44 ≥ 35
+  ok('crit-failure forces a Panic Check', msc(40, 4, 35).forcesPanic === true);
+  ok('failed check gains 1 Stress', msc(40, 2, 35).stressDelta === 1);
+  ok('success gains no Stress', msc(20, 0, 35).stressDelta === 0);
+  ok('no target → unresolved', msc(40, 2, null).outcome === 'unresolved' && msc(40, 2, null).success === null);
+}
+// skill tier folds into the effective roll-under
+{
+  ok('expert raises the target by 15', msc(40, 0, 35, 'e').effective === 50);
+  ok('40 under 50 (expert) succeeds', msc(40, 0, 35, 'e').success === true);
+  ok('40 under 35 (no skill) fails', msc(40, 0, 35).success === false);
+  ok('master is +20', msc(0, 0, 30, 'm').effective === 50);
+}
+// panic: roll over Stress
+{
+  const p = summarizeMothershipPanic(5, 8);
+  ok('roll ≤ Stress panics', p.panicked === true && p.lookup === 5);
+  ok('panic reports only the number', summarizeMothershipPanic(3, 8).lookup === 3);
+  ok('roll over Stress holds', summarizeMothershipPanic(12, 8).panicked === false);
+  ok('panic no stress → unresolved', summarizeMothershipPanic(5, null).panicked === null);
+}
+// roll shape: a check is a percentile pair, advantage rolls two and keeps one
+{
+  const r = rollMothership('ms:c@35');
+  ok('ms system tag', r.system === 'mothership');
+  ok('ms check is two d10', r.groups[0].dice.length === 2 && r.groups[0].dice.every(d => d.sides === 10));
+  ok('ms check roles tens/ones', eq(r.groups[0].dice.map(d => d.role), ['tens', 'ones']));
+  ok('rollAny routes ms', rollAny('ms:c@35').system === 'mothership');
+  const ra = rollMothership('ms:c@35adv');
+  ok('ms advantage rolls two pairs', ra.groups[0].dice.length === 4);
+  ok('ms advantage keeps one pair', ra.groups[0].dice.filter(d => d.kept).length === 2);
+  const rp = rollMothership('ms:p@8');
+  ok('ms panic is one d20', rp.groups[0].dice.length === 1 && rp.groups[0].dice[0].sides === 20);
+}
+// Advantage/disadvantage keeps the best/worst resolved result, not merely the
+// lower/higher raw number. Critical doubles can invert the numeric ordering.
+{
+  const withRandom = (values, fn) => {
+    const original = globalThis.crypto.getRandomValues;
+    const queue = [...values];
+    globalThis.crypto.getRandomValues = array => { array[0] = queue.shift(); return array; };
+    try { return fn(); } finally { globalThis.crypto.getRandomValues = original; }
+  };
+  // 10 = ordinary Success; 11 = Critical Success. Advantage must keep 11.
+  const adv = withRandom([1, 0, 1, 1], () => rollMothership('ms:c@35adv'));
+  ok('ms advantage prefers Critical Success 11 over ordinary Success 10',
+     adv.summary.value === 11 && eq(adv.groups[0].dice.map(d => d.kept), [false, false, true, true]));
+  // 88 = Critical Failure; 89 = ordinary Failure. Disadvantage must keep 88.
+  const dis = withRandom([8, 8, 8, 9], () => rollMothership('ms:c@35dis'));
+  ok('ms disadvantage prefers Critical Failure 88 over ordinary Failure 89',
+     dis.summary.value === 88 && dis.summary.forcesPanic === true &&
+     eq(dis.groups[0].dice.map(d => d.kept), [true, true, false, false]));
+}
+// headline + describe
+{
+  ok('ms headline crit-success variant', mothershipHeadline({ summary: msc(0, 0, 35) }).variant === 'ms-crit-success');
+  ok('ms headline failure text', mothershipHeadline({ summary: msc(40, 2, 35) }).text === 'Failure');
+  ok('ms unresolved headline is a number', mothershipHeadline({ summary: msc(40, 2, null) }).kind === 'number');
+  ok('ms panic headline', mothershipHeadline({ summary: summarizeMothershipPanic(5, 8) }).text === 'Panic');
+  ok('ms steady headline', mothershipHeadline({ summary: summarizeMothershipPanic(12, 8) }).text === 'Steady');
+  const txt = describeMothership({ summary: msc(40, 2, 35, 'e') });
+  ok('ms describe shows percentile read', /rolled 42 \(40 \+ 2\)/.test(txt));
+  ok('ms describe shows the effective target + skill', /under 50 \(35 \+15 Expert\)/.test(txt));
+  ok('ms describe formats percentile zero as 00', /rolled 00 \(00 \+ 0\)/.test(describeMothership({ summary: msc(0, 0, 35) })));
+  const panicTxt = describeMothership({ summary: summarizeMothershipPanic(5, 8) });
+  ok('ms panic describe says look up the number', /look up 5 on the Panic Table/.test(panicTxt));
+  ok('ms panic describe reproduces no table text', !/Coward|Nervous|Adrenaline/.test(panicTxt));
 }
 
 console.log(`\nsystem-dice: ${pass} passed, ${fail} failed`);

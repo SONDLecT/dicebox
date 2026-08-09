@@ -39,6 +39,7 @@ export function detectSystem(src) {
   if (/^tor:/.test(s)) return 'onering';
   if (/^pbta:/.test(s)) return 'pbta';
   if (/^mist:/.test(s)) return 'mist';
+  if (/^ms:/.test(s)) return 'mothership';
   if (FATE_REGEX.test(s)) return 'fate';
   return 'numeric';
 }
@@ -202,6 +203,7 @@ export function rollAny(src, uiSystem = 'numeric') {
   if (sys === 'onering') return rollOneRing(src);
   if (sys === 'pbta') return rollPbta(src);
   if (sys === 'mist') return rollMist(src);
+  if (sys === 'mothership') return rollMothership(src);
   return { system: 'numeric', deferred: true, notation: String(src) };
 }
 
@@ -558,6 +560,222 @@ export function describeCthulhuTech(result) {
   const missVals = dice.filter(d => d.value % 2 !== 0).map(d => d.value);
   parts.push(`hits ${hitVals.length ? hitVals.join(', ') : 'none'}`);
   if (missVals.length) parts.push(`missed ${missVals.join(', ')}`);
+  return parts.join(' · ');
+}
+
+// ---- Mothership 1e ----
+//
+// A roll-under percentile system with a companion Panic die and a tracked Stress
+// resource. Two signature rolls share the "ms:" prefix; ordinary damage/wounds
+// stay on the numeric engine (they are plain xd10 / 1d5 / 1d100 sums).
+//
+//   Check / Save  ms:c@35        1d100 (two d10: tens 00-90 + ones 0-9). Roll
+//                                UNDER the target to succeed. A failed Check or
+//                                Save gains 1 Stress.
+//     skill tier  ms:c@35e       add the Skill bonus to the target before the
+//                                roll (t Trained +10, e Expert +15, m Master +20)
+//     advantage   ms:c@35adv     roll two d100, keep the better (lower); dis keeps
+//                                the worse (higher). The dropped pair shows faded.
+//   Panic         ms:p@8         1d20, roll OVER current Stress; a result ≤ Stress
+//                                is a Panic — look up the die on the Panic Table
+//                                (the table text is the publisher's, so the roller
+//                                only ever reports the NUMBER to look up).
+//
+// Roll-under specials (PSG p.19): 00 is always a Critical Success, 99 always a
+// Critical Failure, and any 90-99 always fails. Doubles (00, 11 … 99) are a
+// Critical — a Critical Success if the roll also came in under, a Critical Failure
+// if it did not. A Critical Failure also demands a Panic Check.
+const MS_REGEX = /^ms:(c|p)(?:@(\d+))?(t|e|m)?(adv|dis)?$/;
+const MS_SKILL_BONUS = { t: 10, e: 15, m: 20 };
+const MS_SKILL_LABEL = { t: 'Trained', e: 'Expert', m: 'Master' };
+
+export function parseMothership(src) {
+  const m = MS_REGEX.exec(String(src || '').trim().toLowerCase());
+  if (!m) throw new Error('Expected a Mothership roll like "ms:c@35" or "ms:p@8"');
+  const mode = m[1] === 'p' ? 'panic' : 'check';
+  const target = m[2] === undefined ? null : Number(m[2]);
+  const skill = m[3] || null;
+  const advantage = m[4] || null; // 'adv' | 'dis' | null
+  if (mode === 'panic' && skill) throw new Error('A Panic Check takes no Skill bonus');
+  if (target !== null) {
+    if (mode === 'check' && (target < 1 || target > 99)) throw new Error('Check target must be 1-99');
+    if (mode === 'panic' && (target < 2 || target > 20)) throw new Error('Stress must be 2-20');
+  }
+  return { mode, target, skill, advantage };
+}
+
+// A single d100 as a percentile pair: the tens die reads 00-90, the ones 0-9, so
+// the tray shows the two dice a Mothership player actually reads (a 40 die and a
+// 2 die = 42), and doubles are visible as matching digits.
+function rollD100() {
+  const tens = (randInt(10) - 1) * 10; // 0,10,…,90
+  const ones = randInt(10) - 1;        // 0-9
+  return { tens, ones, value: tens + ones, double: tens / 10 === ones };
+}
+
+export function rollMothership(src) {
+  const { mode, target, skill, advantage } = parseMothership(src);
+  // Advantage/disadvantage rolls the whole check twice and keeps one; the other
+  // is shown faded like a dropped die, the way The One Ring shows its two Feat
+  // dice. A plain roll makes just the one.
+  const dice = [];
+  let summary;
+
+  if (mode === 'panic') {
+    const rolls = [randInt(20)];
+    if (advantage) rolls.push(randInt(20));
+    // Panic wants a HIGH roll (over Stress), so advantage keeps the higher.
+    const keep = advantage === 'dis'
+      ? Math.min(...rolls)
+      : advantage === 'adv' ? Math.max(...rolls) : rolls[0];
+    let kept = false;
+    for (const v of rolls) {
+      const isKept = !kept && v === keep;
+      if (isKept) kept = true;
+      dice.push({ role: 'panic', value: v, sides: 20, kept: isKept, rerolled: false, exploded: false });
+    }
+    summary = summarizeMothershipPanic(keep, target, advantage);
+  } else {
+    const pairs = [rollD100()];
+    if (advantage) pairs.push(rollD100());
+    // Mothership keeps the best/worst *result*, not simply the lowest/highest
+    // percentile. Criticals change that ordering: at target 35, 11 (Critical
+    // Success) beats 10 (Success), while 88 (Critical Failure) is worse than 89
+    // (ordinary Failure). Raw value is only the tie-breaker within one outcome.
+    const quality = pair => ({
+      'crit-success': 3,
+      success: 2,
+      unresolved: 2,
+      failure: 1,
+      'crit-failure': 0,
+    })[summarizeMothershipCheck(pair, target, skill).outcome];
+    const keep = pairs.reduce((a, b) => {
+      const aq = quality(a), bq = quality(b);
+      if (aq !== bq) return advantage === 'dis' ? (bq < aq ? b : a) : (bq > aq ? b : a);
+      return advantage === 'dis' ? (b.value > a.value ? b : a) : (b.value < a.value ? b : a);
+    });
+    for (const p of pairs) {
+      const isKept = p === keep;
+      dice.push({ role: 'tens', value: p.tens, sides: 10, kept: isKept, rerolled: false, exploded: false });
+      dice.push({ role: 'ones', value: p.ones, sides: 10, kept: isKept, rerolled: false, exploded: false });
+    }
+    summary = summarizeMothershipCheck(keep, target, skill, advantage);
+  }
+
+  return {
+    schema: 2,
+    system: 'mothership',
+    notation: String(src),
+    groups: [{ kind: 'dice', dieType: 'mothership', count: dice.length, dice, subtotal: 0 }],
+    summary,
+  };
+}
+
+export function summarizeMothershipCheck(roll, target, skill = null, advantage = null) {
+  const bonus = skill ? MS_SKILL_BONUS[skill] : 0;
+  const effective = target === null ? null : target + bonus;
+  const value = roll.value;
+  const double = roll.double;
+
+  // The absolute rules first (they hold whatever the target is), then the
+  // target comparison. Without a target the roll cannot pass or fail, so it is
+  // reported unresolved — a bare number, no Stress moves.
+  let outcome;
+  if (effective === null) {
+    outcome = 'unresolved';
+  } else if (value === 0) {
+    outcome = 'crit-success';
+  } else if (value === 99) {
+    outcome = 'crit-failure';
+  } else if (value >= 90) {
+    outcome = 'failure';           // 90-99 always fails, doubles or not
+  } else {
+    const under = value < effective;
+    outcome = under
+      ? (double ? 'crit-success' : 'success')
+      : (double ? 'crit-failure' : 'failure');
+  }
+
+  const failed = outcome === 'failure' || outcome === 'crit-failure';
+  return {
+    kind: 'mothership', mode: 'check',
+    tens: roll.tens, ones: roll.ones, value, double,
+    target, skill, skillBonus: bonus, effective, advantage,
+    outcome,
+    success: outcome === 'unresolved' ? null : !failed,
+    // A failed Check or Save gains 1 Stress; a Critical Failure also forces a
+    // Panic Check. Both drive the tracker in the UI.
+    stressDelta: failed ? 1 : 0,
+    forcesPanic: outcome === 'crit-failure',
+  };
+}
+
+export function summarizeMothershipPanic(value, stress = null, advantage = null) {
+  // Roll OVER Stress to hold it together; a result at or below Stress is a Panic.
+  const panicked = stress === null ? null : value <= stress;
+  return {
+    kind: 'mothership', mode: 'panic',
+    value, stress, advantage,
+    panicked,
+    // What the player looks up on their own Panic Table — the number only.
+    lookup: panicked ? value : null,
+  };
+}
+
+const MS_OUTCOME_LABEL = {
+  'crit-success': 'Critical Success',
+  success: 'Success',
+  failure: 'Failure',
+  'crit-failure': 'Critical Failure',
+};
+
+// The big readout. A resolved Check is its outcome phrase (tinted by success);
+// an unresolved one is the bare percentile number. Panic is Steady or Panic.
+export function mothershipHeadline(result) {
+  const s = result.summary;
+  if (s.mode === 'panic') {
+    if (s.panicked === null) return { kind: 'number', text: String(s.value) };
+    return s.panicked
+      ? { kind: 'text', text: 'Panic', variant: 'ms-panic' }
+      : { kind: 'text', text: 'Steady', variant: 'ms-steady' };
+  }
+  if (s.outcome === 'unresolved') return { kind: 'number', text: String(s.value) };
+  const variant = s.outcome === 'crit-success' ? 'ms-crit-success'
+    : s.outcome === 'success' ? 'ms-success'
+    : s.outcome === 'crit-failure' ? 'ms-crit-failure'
+    : 'ms-failure';
+  return { kind: 'text', text: MS_OUTCOME_LABEL[s.outcome], variant };
+}
+
+export function describeMothership(result) {
+  const s = result.summary;
+  const parts = [];
+  if (s.mode === 'panic') {
+    if (s.panicked === null) parts.push(`rolled ${s.value}`);
+    else {
+      parts.push(s.panicked ? 'Panic' : 'Steady');
+      parts.push(`rolled ${s.value} vs Stress ${s.stress}`);
+      if (s.panicked) parts.push(`look up ${s.lookup} on the Panic Table`);
+    }
+    if (s.advantage) parts.push(s.advantage === 'adv' ? 'advantage' : 'disadvantage');
+    return parts.join(' · ');
+  }
+  // Check / Save.
+  if (s.outcome !== 'unresolved') parts.push(MS_OUTCOME_LABEL[s.outcome]);
+  // The percentile read: "42 (40 + 2)". The zero tens face is printed 00,
+  // including an absolute critical-success result of 00.
+  const valueLabel = s.value === 0 ? '00' : String(s.value);
+  const tensLabel = s.tens === 0 ? '00' : String(s.tens);
+  let read = `rolled ${valueLabel} (${tensLabel} + ${s.ones})`;
+  if (s.double && s.value !== 0 && s.value !== 99) read += ', doubles';
+  parts.push(read);
+  if (s.effective !== null) {
+    const skillNote = s.skill ? ` (${s.target} +${s.skillBonus} ${MS_SKILL_LABEL[s.skill]})` : '';
+    parts.push(`under ${s.effective}${skillNote}`);
+  }
+  if (s.advantage) parts.push(s.advantage === 'adv' ? 'advantage' : 'disadvantage');
+  if (s.stressDelta) parts.push('+1 Stress');
+  if (s.forcesPanic) parts.push('Panic Check');
   return parts.join(' · ');
 }
 

@@ -1448,7 +1448,7 @@ export class Die {
     // paper knockout that clears the surrounding micro-edges. Opaque-shell dice
     // (d7, which use valueAnchors) keep their engraved-silhouette placement.
     if (!this.solid.hideSmoothEdges && !this.solid.valueAnchors?.length && this.solid.faces.length > SPHERICAL_AT) {
-      const label = String(this.value);
+      const label = String(this.displayLabel ?? this.value);
       const fit = label.length >= 4 ? 0.34 : label.length >= 3 ? 0.42 : label.length >= 2 ? 0.5 : 0.6;
       const size = Math.max(8, s * fit);
       ctx.save();
@@ -1479,7 +1479,7 @@ export class Die {
       const point = rotate(best.point, ...this.rot);
       const perspective = 4 / (4 - point[2]);
       const at = [point[0] * s * perspective, point[1] * s * perspective];
-      const label = String(this.value);
+      const label = String(this.displayLabel ?? this.value);
       const fit = label.length > 2 ? 0.28 : label.length > 1 ? 0.35 : 0.44;
       const size = Math.max(7, s * fit * (0.72 + 0.28 * bestFacing));
       const grown = size * (0.88 + 0.12 * alpha);
@@ -1621,7 +1621,7 @@ export class Die {
       return;
     }
 
-    const label = String(this.value);
+    const label = String(this.displayLabel ?? this.value);
     // Long labels (d100 can show 3 digits) need to shrink to stay on the face.
     const fit = label.length > 2 ? 0.34 : label.length > 1 ? 0.42 : 0.52;
     const size = Math.max(7, s * fit * (0.55 + 0.45 * bestFacing));

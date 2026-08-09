@@ -54,7 +54,7 @@ const ALWAYS_REVALIDATE = new Set(['/sw.js', '/', '/index.html', '/manifest.webm
 // and starts in that system. Assets under the shell resolve to the root because
 // index.html carries <base href="/">, so a slug never breaks a relative link.
 // Anything not listed still 404s — a slug map, not a catch-all SPA rewrite.
-const SYSTEM_SLUGS = new Set(['/vtm', '/fate', '/genesys', '/daggerheart', '/cthulhutech', '/force', '/feat', '/pbta', '/mist']);
+const SYSTEM_SLUGS = new Set(['/vtm', '/fate', '/genesys', '/daggerheart', '/cthulhutech', '/force', '/feat', '/pbta', '/mist', '/mothership']);
 
 export default {
   async fetch(request, env) {
