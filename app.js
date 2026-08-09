@@ -1575,6 +1575,10 @@ function syncMs({ writeField = true } = {}) {
   msSkillDial.setAttribute('aria-label',
     `Skill tier, current ${msSkillLabel()}${ms.skill ? ' ' + MS_SKILL_BONUS_TEXT[ms.skill] : ''} — tap to raise, hold to lower`);
   for (const b of msAdvButtons) b.setAttribute('aria-pressed', String(ms.advantage === b.dataset.adv));
+  // Only the active roll type is lit, so the tray's staged dice (a percentile
+  // pair or the Panic d20) always match the highlighted tile.
+  msCheckRoll.setAttribute('aria-pressed', String(ms.mode === 'check'));
+  msPanicRoll.setAttribute('aria-pressed', String(ms.mode === 'panic'));
   msStressDial.textContent = String(ms.stress);
   msStressDial.setAttribute('aria-label', `Set Stress, current ${ms.stress}`);
   if (writeField) $('notation').value = msNotation();
@@ -1592,11 +1596,13 @@ msTargetDial.addEventListener('click', () => {
     commit: value => { ms.target = value; syncMs(); },
   });
 });
-// Tap raises a tier (None → Master), hold lowers one; keyboard arrows do the same
-// through bindTapHold, and it clamps at the ends rather than wrapping.
+// Only four tiers, so Skill cycles: a tap advances (None → Trained → Expert →
+// Master → None), a hold (or left/down arrow) steps back the other way. Wrapping
+// means a tap alone can reach any tier without ever needing the long-press.
 bindTapHold(msSkillDial, dir => {
+  const n = MS_SKILL_ORDER.length;
   const i = MS_SKILL_ORDER.indexOf(ms.skill);
-  ms.skill = MS_SKILL_ORDER[Math.max(0, Math.min(MS_SKILL_ORDER.length - 1, i + dir))];
+  ms.skill = MS_SKILL_ORDER[(i + dir + n) % n];
   syncMs();
 });
 msStressDial.addEventListener('click', () => {
@@ -2858,6 +2864,21 @@ function emptyTrayRoll() {
   return (lastNumeric && last.notation) || `d${state.defaultSides}`;
 }
 
+// Re-stage the active system's own pool (its signature dice + notation). Used
+// when a damage pool built on the numeric strip is emptied while in a system mode.
+function restageActiveSystem() {
+  switch (uiSystem) {
+    case 'v5': syncV5(); break;
+    case 'fate': syncFate(); break;
+    case 'genesys': case 'starwars': syncGen(); break;
+    case 'daggerheart': syncDh(); break;
+    case 'cthulhutech': syncCt(); break;
+    case 'onering': syncTor(); break;
+    case 'pbta': case 'mist': syncTwod6(); break;
+    case 'mothership': syncMs(); break;
+  }
+}
+
 // Remove one staged die under the given screen point. Only staged dice can be
 // picked off: once a roll has happened the numbers are a result, not a pool, and
 // quietly editing them would be lying about what was rolled.
@@ -2875,8 +2896,11 @@ function removeDieAt(clientX, clientY) {
   }
   if (!hit) return false;
 
-  // A system die knows which pool it belongs to; its sync re-renders the tray.
-  if (uiSystem !== 'numeric') {
+  // A staged *system* die carries a stageKind and removes through its own pool.
+  // Numeric dice tapped from the strip — the damage pool a Mothership or
+  // Daggerheart player builds — carry none, so they fall through to the numeric
+  // removal below even though the mode is not 'numeric'.
+  if (hit.stageKind) {
     const removed = removeSystemStageKind(hit.stageKind);
     if (removed && navigator.vibrate) navigator.vibrate(8);
     return removed;
@@ -2889,7 +2913,10 @@ function removeDieAt(clientX, clientY) {
   else pool.delete(hit.sides);
 
   if (navigator.vibrate) navigator.vibrate(8);
-  syncPool();
+  // In a system mode, emptying the damage pool returns the tray to that system's
+  // own staged dice (and notation) rather than leaving it blank.
+  if (uiSystem !== 'numeric' && pool.size === 0) restageActiveSystem();
+  else syncPool();
   return true;
 }
 canvas.addEventListener('pointercancel', () => { drag = null; });

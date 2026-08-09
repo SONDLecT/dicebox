@@ -874,7 +874,6 @@ body {
   touch-action: manipulation;
   transition: border-color 140ms ease, color 140ms ease, background 140ms ease, transform 120ms ease;
 }
-.ms-check-roll, .ms-panic-roll { border-color: var(--accent); }
 .ms-role-ico { width: 34px; height: 34px; flex: 0 0 auto; display: block; }
 .ms-percentile-ico { width: 42px; }
 .ms-panic-ico { overflow: visible; }
@@ -961,9 +960,11 @@ body {
   touch-action: manipulation;
   transition: border-color 140ms ease, color 140ms ease, background 140ms ease, transform 120ms ease;
 }
-/* Signature dice are the primary roll actions, so restore their accent treatment
-   after the shared modifier/action geometry above. Cascade order is deliberate. */
-.ms-role-roll {
+/* Only the active roll type carries the accent, so one tile reads as primary at a
+   time — matching the staged dice in the tray. The inactive tile stays neutral
+   like the Advantage/Disadvantage buttons beside it. Cascade order is deliberate:
+   this sits after the shared modifier/action geometry above. */
+.ms-role-roll[aria-pressed="true"] {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
   color: var(--accent);
