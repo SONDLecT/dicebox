@@ -122,6 +122,7 @@ ok('Mothership picker uses compact three-row styling',
    /\.ms-fields-row[^}]*display:\s*flex/.test(css) &&
    /\.ms-action-row[^}]*display:\s*flex/.test(css) &&
    /\.ms-mode-btn\s*\{[^}]*padding:\s*5px 10px/.test(css) &&
+   /\.ms-fields-row \.spin-chip\s*\{[^}]*min-height:\s*44px/.test(css) &&
    /\.ms-adv, \.ms-roll\s*\{[^}]*padding:\s*5px 4px 4px/.test(css));
 
 // --- classes must be styled ---
