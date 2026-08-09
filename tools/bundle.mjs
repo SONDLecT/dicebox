@@ -51,7 +51,7 @@ const SYSTEM_EXPORTS = [
   'rollStarWars', 'describeStarWars', 'starWarsHeadline', 'parseStarWars',
   'rollOneRing', 'describeOneRing', 'oneRingHeadline', 'parseOneRing',
   'rollPbta', 'rollMist', 'twod6Headline', 'describe2d6', 'parsePbta', 'parseMist',
-  'rollMothership', 'describeMothership', 'mothershipHeadline', 'parseMothership',
+  'rollMothership', 'describeMothership', 'mothershipHeadline', 'parseMothership', 'resolveMothershipStress',
 ];
 const RENDER_EXPORTS = ['Die', 'Surface', 'separate', 'beginFrame', 'solidFor', 'UNDER_30_GAP'];
 const ROOM_CRYPTO_EXPORTS = [

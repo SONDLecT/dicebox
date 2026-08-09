@@ -613,6 +613,17 @@ function rollD100() {
   return { tens, ones, value: tens + ones, double: tens / 10 === ones };
 }
 
+// Apply gained Stress without silently dropping the PSG consequence above 20.
+// Dicebox is not a character sheet, so the caller surfaces `overflow` as the
+// number of points by which the relevant Stat or Save must be reduced.
+export function resolveMothershipStress(current, delta) {
+  const total = Number(current) + Number(delta);
+  return {
+    stress: Math.max(2, Math.min(20, total)),
+    overflow: Math.max(0, total - 20),
+  };
+}
+
 export function rollMothership(src) {
   const { mode, target, skill, advantage } = parseMothership(src);
   // Advantage/disadvantage rolls the whole check twice and keeps one; the other
@@ -624,10 +635,17 @@ export function rollMothership(src) {
   if (mode === 'panic') {
     const rolls = [randInt(20)];
     if (advantage) rolls.push(randInt(20));
-    // Panic wants a HIGH roll (over Stress), so advantage keeps the higher.
-    const keep = advantage === 'dis'
-      ? Math.min(...rolls)
-      : advantage === 'adv' ? Math.max(...rolls) : rolls[0];
+    // Choose the best/worst resolved Panic result. Holding steady is always
+    // better than Panicking; among failed Panic rolls, the lower table result is
+    // better. Among steady rolls, the higher roll is the stronger result.
+    const panicQuality = value => summarizeMothershipPanic(value, target).panicked === false ? 1 : 0;
+    const keep = rolls.reduce((a, b) => {
+      const aq = panicQuality(a), bq = panicQuality(b);
+      if (aq !== bq) return advantage === 'dis' ? (bq < aq ? b : a) : (bq > aq ? b : a);
+      const bothPanicked = aq === 0;
+      const preferLower = bothPanicked ? advantage !== 'dis' : advantage === 'dis';
+      return preferLower ? (b < a ? b : a) : (b > a ? b : a);
+    });
     let kept = false;
     for (const v of rolls) {
       const isKept = !kept && v === keep;
@@ -681,12 +699,12 @@ export function summarizeMothershipCheck(roll, target, skill = null, advantage =
   // target comparison. Without a target the roll cannot pass or fail, so it is
   // reported unresolved — a bare number, no Stress moves.
   let outcome;
-  if (effective === null) {
-    outcome = 'unresolved';
-  } else if (value === 0) {
+  if (value === 0) {
     outcome = 'crit-success';
   } else if (value === 99) {
     outcome = 'crit-failure';
+  } else if (effective === null) {
+    outcome = 'unresolved';
   } else if (value >= 90) {
     outcome = 'failure';           // 90-99 always fails, doubles or not
   } else {
@@ -774,7 +792,10 @@ export function describeMothership(result) {
     parts.push(`under ${s.effective}${skillNote}`);
   }
   if (s.advantage) parts.push(s.advantage === 'adv' ? 'advantage' : 'disadvantage');
-  if (s.stressDelta) parts.push('+1 Stress');
+  if (s.stressOverflow) {
+    const amount = s.stressOverflow;
+    parts.push(`Stress at 20 — reduce the relevant Stat or Save by ${amount}`);
+  } else if (s.stressDelta) parts.push('+1 Stress');
   if (s.forcesPanic) parts.push('Panic Check');
   return parts.join(' · ');
 }

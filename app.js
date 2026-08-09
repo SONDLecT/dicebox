@@ -7,7 +7,7 @@ import { rollFate, describeFate, fateHeadline, fateFace, parseFate } from './sys
 import { rollGenesys, describeGenesys, genesysHeadline, parseGenesys } from './system-dice.js';
 import { rollDaggerheart, describeDaggerheart, daggerheartHeadline, parseDaggerheart } from './system-dice.js';
 import { rollCthulhuTech, describeCthulhuTech, cthulhutechHeadline, parseCthulhuTech } from './system-dice.js';
-import { rollMothership, describeMothership, mothershipHeadline, parseMothership } from './system-dice.js';
+import { rollMothership, describeMothership, mothershipHeadline, parseMothership, resolveMothershipStress } from './system-dice.js';
 import { rollStarWars, describeStarWars, starWarsHeadline, parseStarWars } from './system-dice.js';
 import { rollOneRing, describeOneRing, oneRingHeadline, parseOneRing } from './system-dice.js';
 import { rollPbta, rollMist, twod6Headline, describe2d6, parsePbta, parseMist } from './system-dice.js';
@@ -259,12 +259,12 @@ const SYSTEM_THEMES = {
   // the constant; only the steel neutrals flip for light.
   mothership: {
     dark: {
-      '--paper': '#0C0E10', '--face': '#15181C', '--line': '#DCE2E6', '--muted': '#6A757C',
+      '--paper': '#0C0E10', '--face': '#15181C', '--line': '#DCE2E6', '--muted': '#7D8991',
       '--hair': '#232a30', '--accent': '#C7A93E', '--danger': '#D2603E',
     },
     light: {
-      '--paper': '#E7EAEC', '--face': '#F4F6F7', '--line': '#14181B', '--muted': '#6E787E',
-      '--hair': '#CBD2D6', '--accent': '#8A7018', '--danger': '#9A3E24',
+      '--paper': '#E7EAEC', '--face': '#F4F6F7', '--line': '#14181B', '--muted': '#59656B',
+      '--hair': '#CBD2D6', '--accent': '#6B570F', '--danger': '#9A3E24',
     },
   },
 };
@@ -548,7 +548,9 @@ function doRoll(notation) {
   // is what the next Panic Check rolls against. Only a local roll moves your own
   // Stress — a peer's roll (showRemoteRoll) never touches it.
   if (result.system === 'mothership' && result.summary.stressDelta) {
-    setStress(ms.stress + result.summary.stressDelta, { restage: false });
+    const stressResult = resolveMothershipStress(ms.stress, result.summary.stressDelta);
+    result.summary.stressOverflow = stressResult.overflow;
+    setStress(stressResult.stress, { restage: false });
   }
 
   // The palette follows the selected mode, not this roll's system: a numeric
@@ -907,10 +909,10 @@ const torPicker = $('torPicker');
 // stepper, identical between the two modes.
 const twod6Picker = $('twod6Picker');
 const msPicker = $('msPicker');
-// Numeric's strip lives last in the DOM so that in Daggerheart mode (the only
-// mode that shows two pickers) the duality controls sit above it. In every
-// other mode the other pickers are hidden, so its position is invisible.
-dhPicker.after?.(numPicker);
+// Numeric's strip lives after the final signature picker in the DOM. Daggerheart
+// and Mothership both show their own controls above ordinary damage dice; hidden
+// intervening pickers do not affect layout in either mode.
+msPicker.after?.(numPicker);
 
 function setSystem(system, { roll = false, url = true } = {}) {
   if (!SYSTEMS[system]) system = 'numeric';
@@ -1344,6 +1346,13 @@ function bindTapHold(el, step) {
   el.addEventListener('pointerleave', cancel);
   el.addEventListener('click', () => { if (held) { held = false; return; } step(1); });
   el.addEventListener('contextmenu', e => { e.preventDefault(); cancel(); removeOnce(); });
+  el.addEventListener('keydown', e => {
+    if (e.key === 'ArrowUp' || e.key === 'ArrowRight') {
+      e.preventDefault(); step(1);
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') {
+      e.preventDefault(); step(-1);
+    }
+  });
 }
 
 const ct = { dice: 6, difficulty: 3 };

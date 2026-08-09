@@ -13,6 +13,7 @@ import { parseStarWars, rollStarWars, summarizeStarWars, describeStarWars, starW
 import { parseOneRing, rollOneRing, summarizeOneRing, describeOneRing, oneRingHeadline } from '../system-dice.js';
 import { parsePbta, parseMist, rollPbta, rollMist, summarize2d6, describe2d6, twod6Headline } from '../system-dice.js';
 import { parseMothership, rollMothership, summarizeMothershipCheck, summarizeMothershipPanic, describeMothership, mothershipHeadline } from '../system-dice.js';
+import * as systemModule from '../system-dice.js';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, extra = '') => {
@@ -597,6 +598,10 @@ ok('negative modifier drops the band', summarize2d6(4, 4, -3, 'pbta').band === '
 }
 
 // ---- Mothership 1e ----
+ok('Stress overflow resolves to a Stat/Save reduction instead of disappearing',
+   typeof systemModule.resolveMothershipStress === 'function' &&
+   eq(systemModule.resolveMothershipStress(20, 1), { stress: 20, overflow: 1 }) &&
+   eq(systemModule.resolveMothershipStress(19, 1), { stress: 20, overflow: 0 }));
 // A check summary from an explicit tens/ones pair, so outcomes are deterministic.
 const msc = (tens, ones, target, skill = null, adv = null) =>
   summarizeMothershipCheck({ tens, ones, value: tens + ones, double: tens / 10 === ones }, target, skill, adv);
@@ -626,6 +631,10 @@ for (const bad of ['ms:', 'ms:x@5', 'ms:c@100', 'ms:p@5e', 'ms:p@1', 'ms:p@21', 
   ok('failed check gains 1 Stress', msc(40, 2, 35).stressDelta === 1);
   ok('success gains no Stress', msc(20, 0, 35).stressDelta === 0);
   ok('no target → unresolved', msc(40, 2, null).outcome === 'unresolved' && msc(40, 2, null).success === null);
+  ok('bare 00 remains an absolute Critical Success',
+     msc(0, 0, null).outcome === 'crit-success' && msc(0, 0, null).stressDelta === 0);
+  ok('bare 99 remains an absolute Critical Failure with Stress and Panic',
+     msc(90, 9, null).outcome === 'crit-failure' && msc(90, 9, null).stressDelta === 1 && msc(90, 9, null).forcesPanic === true);
 }
 // skill tier folds into the effective roll-under
 {
@@ -673,6 +682,13 @@ for (const bad of ['ms:', 'ms:x@5', 'ms:c@100', 'ms:p@5e', 'ms:p@1', 'ms:p@21', 
   ok('ms disadvantage prefers Critical Failure 88 over ordinary Failure 89',
      dis.summary.value === 88 && dis.summary.forcesPanic === true &&
      eq(dis.groups[0].dice.map(d => d.kept), [true, true, false, false]));
+  // When both Panic rolls fail, the lower Panic Table result is better.
+  const panicAdv = withRandom([2, 4], () => rollMothership('ms:p@8adv'));
+  ok('ms Panic advantage keeps lower failed result 3 over 5',
+     panicAdv.summary.value === 3 && eq(panicAdv.groups[0].dice.map(d => d.kept), [true, false]));
+  const panicDis = withRandom([2, 4], () => rollMothership('ms:p@8dis'));
+  ok('ms Panic disadvantage keeps higher failed result 5 over 3',
+     panicDis.summary.value === 5 && eq(panicDis.groups[0].dice.map(d => d.kept), [false, true]));
 }
 // headline + describe
 {
@@ -685,6 +701,10 @@ for (const bad of ['ms:', 'ms:x@5', 'ms:c@100', 'ms:p@5e', 'ms:p@1', 'ms:p@21', 
   ok('ms describe shows percentile read', /rolled 42 \(40 \+ 2\)/.test(txt));
   ok('ms describe shows the effective target + skill', /under 50 \(35 \+15 Expert\)/.test(txt));
   ok('ms describe formats percentile zero as 00', /rolled 00 \(00 \+ 0\)/.test(describeMothership({ summary: msc(0, 0, 35) })));
+  const overflowSummary = { ...msc(40, 2, 35), stressOverflow: 1 };
+  const overflowText = describeMothership({ summary: overflowSummary });
+  ok('ms Stress 20 overflow tells the player to reduce a Stat or Save',
+     /Stress at 20.*reduce the relevant Stat or Save by 1/.test(overflowText) && !/\+1 Stress/.test(overflowText));
   const panicTxt = describeMothership({ summary: summarizeMothershipPanic(5, 8) });
   ok('ms panic describe says look up the number', /look up 5 on the Panic Table/.test(panicTxt));
   ok('ms panic describe reproduces no table text', !/Coward|Nervous|Adrenaline/.test(panicTxt));

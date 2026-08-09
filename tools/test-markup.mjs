@@ -49,6 +49,52 @@ const ids = [...js.matchAll(/\$\('([^']+)'\)/g)].map(m => m[1]);
 const missing = [...new Set(ids)].filter(id => !html.includes(`id="${id}"`));
 ok('every getElementById target exists', missing.length === 0, missing.join(', '));
 
+// Mothership Stress above 20 must not disappear behind the tracker's clamp: the
+// app resolves the overflow and stamps it onto the displayed/shared summary.
+ok('Mothership failed rolls surface Stress overflow consequences',
+   /import \{[^}]*resolveMothershipStress[^}]*\} from '.\/system-dice\.js'/.test(js) &&
+   /resolveMothershipStress\(ms\.stress, result\.summary\.stressDelta\)/.test(js) &&
+   /result\.summary\.stressOverflow\s*=/.test(js));
+
+// Tap/hold controls still need a complete keyboard path: up increments and down
+// decrements, with the shortcuts discoverable on the two Mothership steppers.
+ok('Mothership Target and Stress support keyboard decrement',
+   /addEventListener\('keydown'[^]*ArrowUp[^]*ArrowDown/.test(js) &&
+   /id="msTargetChip"[^>]*aria-keyshortcuts="ArrowUp ArrowDown"/.test(html) &&
+   /id="msStressChip"[^>]*aria-keyshortcuts="ArrowUp ArrowDown"/.test(html));
+
+// Both Daggerheart and Mothership show their signature picker together with the
+// ordinary numeric strip; moving the strip after the final signature picker keeps
+// those system-specific controls above damage dice in either mode.
+ok('numeric strip follows the Mothership signature picker',
+   /msPicker\.after\?\.\(numPicker\)/.test(js) && !/dhPicker\.after\?\.\(numPicker\)/.test(js));
+
+// WCAG AA for the new theme's small 10–13px labels. Test the exact CSS-variable
+// combinations used by inactive text and the tinted Roll control.
+const msTheme = /mothership:\s*\{\s*dark:\s*\{([^}]*)\},\s*light:\s*\{([^}]*)\}/.exec(js);
+const themeColor = (block, name) => new RegExp(`'--${name}':\\s*'(#[0-9A-Fa-f]{6})'`).exec(block)?.[1];
+const rgb = hex => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255);
+const luminance = hex => {
+  const [r, g, b] = rgb(hex).map(c => c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const contrast = (a, b) => {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+};
+const mix = (fg, bg, amount = 0.12) => {
+  const channels = rgb(fg).map((v, i) => Math.round((v * amount + rgb(bg)[i] * (1 - amount)) * 255));
+  return `#${channels.map(v => v.toString(16).padStart(2, '0')).join('')}`;
+};
+let contrastPass = !!msTheme;
+if (msTheme) for (const block of msTheme.slice(1)) {
+  const paper = themeColor(block, 'paper'), face = themeColor(block, 'face');
+  const muted = themeColor(block, 'muted'), accent = themeColor(block, 'accent');
+  contrastPass &&= [paper, face].every(bg => contrast(muted, bg) >= 4.5);
+  contrastPass &&= [paper, face].every(bg => contrast(accent, mix(accent, bg)) >= 4.5);
+}
+ok('Mothership small text meets WCAG AA contrast in both themes', contrastPass);
+
 // --- classes must be styled ---
 const htmlClasses = [...html.matchAll(/class="([^"]+)"/g)].flatMap(m => m[1].split(/\s+/));
 const jsClasses = [...js.matchAll(/className\s*=\s*'([^']+)'/g)].flatMap(m => m[1].split(/\s+/));
