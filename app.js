@@ -8,6 +8,7 @@ import { rollGenesys, describeGenesys, genesysHeadline, parseGenesys } from './s
 import { rollDaggerheart, describeDaggerheart, daggerheartHeadline, parseDaggerheart } from './system-dice.js';
 import { rollCthulhuTech, describeCthulhuTech, cthulhutechHeadline, parseCthulhuTech } from './system-dice.js';
 import { rollMothership, describeMothership, mothershipHeadline, parseMothership, resolveMothershipStress } from './system-dice.js';
+import { parseCards, newDeckOrder, summarizeCards, cardsHeadline, describeCards } from './system-dice.js';
 import { rollStarWars, describeStarWars, starWarsHeadline, parseStarWars } from './system-dice.js';
 import { rollOneRing, describeOneRing, oneRingHeadline, parseOneRing } from './system-dice.js';
 import { rollPbta, rollMist, twod6Headline, describe2d6, parsePbta, parseMist } from './system-dice.js';
@@ -254,6 +255,18 @@ const SYSTEM_THEMES = {
       '--hair': '#CBDDDC', '--accent': '#227E7F', '--danger': '#9A443C',
     },
   },
+  // Cards — card-table felt: a deep baize green, darker and greener than
+  // CthulhuTech's minty sea-glass, under ivory cards.
+  cards: {
+    dark: {
+      '--paper': '#0A0F0C', '--face': '#121A15', '--line': '#DDE5DF', '--muted': '#6E7F74',
+      '--hair': '#1D2B23', '--accent': '#2F8B57', '--danger': '#C0453F',
+    },
+    light: {
+      '--paper': '#E7EDE8', '--face': '#F4F8F5', '--line': '#14201A', '--muted': '#5F7266',
+      '--hair': '#CDD9D0', '--accent': '#1E6B41', '--danger': '#8C3A2E',
+    },
+  },
   // Mothership — a hazard-label palette: reactor-warning chartreuse over cold
   // gunmetal steel, the industrial radiation-caution look that sets it apart from
   // the four gold systems. The acid green is the constant; only the steel
@@ -363,6 +376,22 @@ new ResizeObserver(resize).observe(canvas.parentElement);
 // place; dice at rest move immediately.
 function layoutSettled() {
   if (!state.dice.length) return;
+
+  // Cards keep their own table: re-run the deck layout instead of the dice
+  // grid, which would stack the shoe in with the draws.
+  if (state.dice[0].isCard) {
+    const cards = state.dice.filter(d => d.isCard && !d.isStack && !d.gone);
+    const { stack, slots } = deckLayout(cards.length);
+    for (const d of state.dice) {
+      if (d.isStack) { d.x = stack.x; d.y = stack.y; d.size = stack.w; }
+    }
+    cards.forEach((d, i) => {
+      d.x = d.to.x = slots[i].x;
+      d.y = d.to.y = slots[i].y;
+      d.size = slots[i].w;
+    });
+    return;
+  }
 
   // Compute slots for the whole tray, then apply them without teleporting dice
   // that are still in flight — those get their destination updated instead.
@@ -526,8 +555,11 @@ function doRoll(notation) {
   let result;
   try {
     // An explicit system token ("v5:…", "4dF") routes to that system's roller;
-    // anything else stays on the numeric engine untouched.
+    // anything else stays on the numeric engine untouched. Cards go their own
+    // way first: a draw is async (the art module loads on demand) and animates
+    // through its own dealer rather than the dice thrower.
     const sys = detectSystem(notation);
+    if (sys === 'cards') { dealFromNotation(notation); return; }
     result = sys === 'v5' ? rollV5(notation)
       : sys === 'fate' ? rollFate(notation)
       : sys === 'genesys' ? rollGenesys(notation)
@@ -631,6 +663,7 @@ function resultHeadline(result) {
   if (result.system === 'onering') return oneRingHeadline(result);
   if (result.system === 'pbta' || result.system === 'mist') return twod6Headline(result);
   if (result.system === 'mothership') return mothershipHeadline(result);
+  if (result.system === 'cards') return cardsHeadline(result);
   return { kind: 'number', text: String(result.total) };
 }
 function resultDetail(result) {
@@ -643,6 +676,7 @@ function resultDetail(result) {
   if (result.system === 'onering') return describeOneRing(result);
   if (result.system === 'pbta' || result.system === 'mist') return describe2d6(result);
   if (result.system === 'mothership') return describeMothership(result);
+  if (result.system === 'cards') return describeCards(result);
   return describe(result.groups);
 }
 
@@ -805,6 +839,7 @@ $('notation').addEventListener('input', () => {
   if (typedSystem === 'pbta') { pbtaCtl.fromField(); return; }
   if (typedSystem === 'mist') { mistCtl.fromField(); return; }
   if (typedSystem === 'mothership') { syncMsFromField(); return; }
+  if (typedSystem === 'cards') { syncCardsFromField(); return; }
   pool = parsePool($('notation').value);
   // Typing an unusual die earns it a button too, so the row always accounts for
   // everything in the pool.
@@ -863,6 +898,7 @@ const SYSTEMS = {
   // Community shorthand, matching the picker rows. Numeric shows no badge — the
   // wordmark already says Dicebox.
   numeric: { badge: '' },
+  cards: { badge: 'Cards' },
   v5: { badge: 'VtM V5' },
   fate: { badge: 'Fate' },
   genesys: { badge: 'Genesys' },
@@ -884,6 +920,7 @@ const SYSTEM_HINTS = {
   pbta: { idle: 'Set a modifier, then roll 2d6', placeholder: 'Set a modifier, or type pbta:+2' },
   mist: { idle: 'Set your Power, then roll 2d6', placeholder: 'Set your Power, or type mist:+1' },
   mothership: { idle: 'Set your target, then roll under it', placeholder: 'Set a target, or type ms:c@35' },
+  cards: { idle: 'Tap the deck to draw', placeholder: 'Tap the deck, or type deck:3' },
 };
 function systemHint(system) { return SYSTEM_HINTS[system] || DEFAULT_HINT; }
 
@@ -894,12 +931,12 @@ function systemHint(system) { return SYSTEM_HINTS[system] || DEFAULT_HINT; }
 // URL the app puts in the bar) always uses the canonical shorthand, edition
 // included, matching the picker labels.
 const SLUG_TO_SYSTEM = {
-  vtmv5: 'v5', fate: 'fate', genesys: 'genesys', dh: 'daggerheart', ctech2e: 'cthulhutech',
+  cards: 'cards', vtmv5: 'v5', fate: 'fate', genesys: 'genesys', dh: 'daggerheart', ctech2e: 'cthulhutech',
   swrpg: 'starwars', tor2e: 'onering', pbta: 'pbta', mist: 'mist', mosh1e: 'mothership',
   v5: 'v5', vtm: 'v5', daggerheart: 'daggerheart', cthulhutech: 'cthulhutech', ctech: 'cthulhutech',
   force: 'starwars', feat: 'onering', tor: 'onering', mothership: 'mothership', mosh: 'mothership',
 };
-const SYSTEM_TO_SLUG = { v5: 'vtmv5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', mothership: 'mosh1e' };
+const SYSTEM_TO_SLUG = { cards: 'cards', v5: 'vtmv5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', mothership: 'mosh1e' };
 
 function systemFromPath() {
   const seg = (location.pathname || '/').replace(/^\/+|\/+$/g, '').toLowerCase();
@@ -980,6 +1017,12 @@ function setSystem(system, { roll = false, url = true } = {}) {
   torPicker.hidden = system !== 'onering';
   twod6Picker.hidden = system !== 'pbta' && system !== 'mist';
   msPicker.hidden = system !== 'mothership';
+  cardsPicker.hidden = system !== 'cards';
+  // The deck's art loads on first entry; the stack appears when it lands. The
+  // module is service-worker-precached, so this works offline too.
+  if (system === 'cards') {
+    ensureCardArt().then(() => { if (uiSystem === 'cards') syncCardsUI(); });
+  }
   // Mist calls the 2d6 modifier "Power"; PbtA just "Modifier". The picker is
   // shared, so the label follows the active mode.
   if (system === 'pbta' || system === 'mist') {
@@ -1006,6 +1049,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
   $('helpPbta').hidden = system !== 'pbta';
   $('helpMist').hidden = system !== 'mist';
   $('helpMothership').hidden = system !== 'mothership';
+  $('helpCards').hidden = system !== 'cards';
 
   // The popover's rows reflect the choice.
   for (const row of modeRows) {
@@ -1033,6 +1077,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
     // plain Roll or flick throws it; tapping numeric dice replaces it with a pool.
     if (system === 'daggerheart') $('notation').value = dhNotation();
     if (system === 'mothership') $('notation').value = msNotation();
+    if (system === 'cards') $('notation').value = `deck:${deckState.draw}`;
   }
 }
 
@@ -1678,6 +1723,412 @@ function syncMsFromField() {
   } catch { /* mid-type, not yet valid */ }
 }
 
+// ---- Cards: the Woodcut deck ----
+//
+// A deck is the app's second stateful resource after Mothership's Stress: draws
+// come off a shuffled order WITHOUT replacement (unless the Replace toggle is
+// on), so the order and position persist across reloads. The art is ~1.1MB of
+// traced path data and lives in cards-art.js, pulled with a dynamic import the
+// first time the mode is opened; the service worker precaches it so that first
+// open works offline too.
+const DECK_KEY = 'dicebox:deck:v1';
+const deckState = { order: [], pos: 0, jokers: false, replace: false, draw: 1 };
+{
+  try {
+    const saved = JSON.parse(store.get(DECK_KEY) || 'null');
+    if (saved && Array.isArray(saved.order) && saved.order.every(x => typeof x === 'string')) {
+      Object.assign(deckState, saved, { draw: Math.max(1, Math.min(10, saved.draw || 1)) });
+    }
+  } catch { /* fresh deck */ }
+}
+const persistDeck = () => store.set(DECK_KEY, JSON.stringify(deckState));
+
+const DECK_RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+function deckIds() {
+  const out = [];
+  for (const s of ['S', 'H', 'D', 'C']) for (const r of DECK_RANKS) out.push(r + s);
+  if (deckState.jokers) out.push('J1', 'J2');
+  return out;
+}
+const deckTotal = () => 52 + (deckState.jokers ? 2 : 0);
+const deckRemaining = () => (deckState.replace ? deckTotal() : Math.max(0, deckState.order.length - deckState.pos));
+
+// A uniform index in [0, n), rejection-sampled like the dice rolls.
+function cryptoIndex(n) {
+  const limit = Math.floor(0x100000000 / n) * n;
+  const buf = new Uint32Array(1);
+  let v;
+  do { crypto.getRandomValues(buf); v = buf[0]; } while (v >= limit);
+  return v % n;
+}
+
+function reshuffleDeck() {
+  deckState.order = newDeckOrder(deckIds(), n => cryptoIndex(n) + 1);
+  deckState.pos = 0;
+  persistDeck();
+}
+
+// Draw n cards per the current mode. Without replacement the draw comes off the
+// persisted order; with replacement each card is an independent pick from the
+// full deck (duplicates possible, as at a real table). Requires the art module
+// (for labels) — callers go through dealCardsFlow, which loads it.
+function drawDeckCards(n) {
+  let ids;
+  if (deckState.replace) {
+    const pool = deckIds();
+    ids = Array.from({ length: n }, () => pool[cryptoIndex(pool.length)]);
+  } else {
+    if (deckState.order.length === 0) reshuffleDeck();
+    ids = deckState.order.slice(deckState.pos, deckState.pos + n);
+    deckState.pos += ids.length;
+    persistDeck();
+  }
+  const drawn = ids.map(id => {
+    const m = cardArt.cardMeta(id);
+    return { id, label: m.label, red: !!m.red };
+  });
+  return {
+    schema: 2,
+    system: 'cards',
+    notation: `deck:${n}`,
+    groups: [{ kind: 'cards', count: drawn.length, cards: drawn }],
+    summary: summarizeCards(drawn, deckRemaining(), deckTotal()),
+  };
+}
+
+// The art module, loaded once on demand. In the single-file bundle every module
+// is inlined into the shared __dicebox namespace, so the dynamic import (which
+// a lone local file could not serve) is skipped there.
+let cardArt = null;
+let cardArtLoading = null;
+function ensureCardArt() {
+  if (cardArt) return Promise.resolve(cardArt);
+  if (!cardArtLoading) {
+    /* global __dicebox */
+    cardArtLoading = (typeof __dicebox !== 'undefined' && __dicebox.cardSVG)
+      ? Promise.resolve(__dicebox)
+      : import('./cards-art.js');
+    cardArtLoading = cardArtLoading.then(m => (cardArt = m));
+  }
+  return cardArtLoading;
+}
+
+// Each card is rasterised once per theme from its SVG (at 2x for crisp
+// downscaling) and drawn as an image; the flip and deal are cheap transforms.
+const cardImgCache = new Map();
+function cardImage(id) {
+  const key = `${id}|${isDark() ? 'd' : 'l'}`;
+  let entry = cardImgCache.get(key);
+  if (entry) return entry;
+  const svg = cardArt.cardSVG(id, { dark: isDark() })
+    .replace('<svg ', '<svg width="500" height="700" ');
+  const img = new Image();
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  entry = { img, ready: img.decode ? img.decode().catch(() => {}) : Promise.resolve() };
+  cardImgCache.set(key, entry);
+  return entry;
+}
+
+// ---- card sprites ----
+//
+// Cards share the dice's frame loop (step/draw/settled and x/y/size), so the
+// tray animates them with no changes to the loop itself. A drawn card flies
+// from the deck stack to its slot along a lifted arc, lands, then flips from
+// back to face; in Replace mode the previous draw flies home first.
+const CARD_RATIO = 1.4;
+const DEAL_S = 0.34, FLIP_S = 0.26;
+
+class CardSprite {
+  constructor(id, from, to, { delay = 0, remote = false, mode = 'deal' } = {}) {
+    this.id = id;
+    this.isCard = true;
+    this.from = from; this.to = to;
+    this.x = from.x; this.y = from.y;
+    this.size = to.w;
+    this.delay = delay; this.t = 0; this.flipT = 0;
+    this.phase = 'fly'; // fly -> flip -> idle   (mode 'return' skips the flip)
+    this.mode = mode;
+    this.settled = false; this.settling = true; this.settleT = 1;
+    // trayIdle() reads d.value: null keeps the frame loop live (and the idle
+    // snapshot invalid) exactly like an unrolled die; the id lands with the card.
+    this.value = null;
+    this.remote = remote;
+    this.wobble = (cryptoIndex(100) - 50) / 160;
+  }
+  step(dt) {
+    if (this.phase === 'idle') return;
+    if (this.delay > 0) { this.delay -= dt; return; }
+    if (this.phase === 'fly') {
+      this.t = Math.min(1, this.t + dt / DEAL_S);
+      const e = 1 - Math.pow(1 - this.t, 3);
+      this.x = this.from.x + (this.to.x - this.from.x) * e;
+      this.y = this.from.y + (this.to.y - this.from.y) * e - Math.sin(Math.PI * e) * 24;
+      if (this.t >= 1) {
+        this.x = this.to.x; this.y = this.to.y;
+        if (this.mode === 'return') { this.phase = 'idle'; this.settled = true; this.gone = true; this.value = this.id; }
+        else this.phase = 'flip';
+      }
+    } else if (this.phase === 'flip') {
+      this.flipT = Math.min(1, this.flipT + dt / FLIP_S);
+      if (this.flipT >= 1) { this.phase = 'idle'; this.settled = true; this.value = this.id; }
+    }
+  }
+  draw(ctx) {
+    if (this.gone) return;
+    const w = this.size, h = w * CARD_RATIO;
+    const flip = this.mode === 'return' ? 0 : (this.phase === 'idle' ? 1 : this.flipT);
+    const img = (flip < 0.5 ? cardImage('back') : cardImage(this.id)).img;
+    const sx = this.phase === 'flip' ? Math.abs(Math.cos(Math.PI * flip)) || 0.02 : 1;
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    if (this.phase === 'fly') ctx.rotate(this.wobble * (1 - this.t));
+    ctx.shadowColor = 'rgba(0,0,0,0.35)';
+    ctx.shadowBlur = 9;
+    ctx.shadowOffsetY = 3;
+    ctx.drawImage(img, -(w * sx) / 2, -h / 2, w * sx, h);
+    ctx.restore();
+  }
+  throwWith() {}
+  spinInPlace() {}
+}
+
+// The deck itself, sitting on the tray like a dealer's shoe: a small stack of
+// backs with the remaining count beneath. Tapping the tray draws; the Shuffle
+// button riffles this stack in place.
+class DeckStackSprite {
+  constructor(x, y, w) {
+    this.x = x; this.y = y; this.size = w;
+    this.isCard = true; this.isStack = true;
+    this.stageKind = 'deck-stack';
+    this.settled = true; this.settling = true; this.settleT = 1;
+    this.riffle = 0;
+    this.value = 'deck';
+  }
+  step(dt) {
+    if (this.riffle > 0) {
+      this.riffle = Math.max(0, this.riffle - dt / 0.8);
+      this.value = this.riffle > 0 ? null : 'deck';
+    }
+  }
+  draw(ctx) {
+    const w = this.size, h = w * CARD_RATIO;
+    const img = cardImage('back').img;
+    const empty = deckRemaining() === 0 && !deckState.replace;
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.shadowColor = 'rgba(0,0,0,0.35)';
+    ctx.shadowBlur = 8;
+    ctx.shadowOffsetY = 3;
+    if (this.riffle > 0) {
+      // The shuffle: the stack fans out and snaps back, cards leafing through
+      // one another on the way home.
+      const spread = Math.sin(Math.PI * Math.min(1, this.riffle * 1.15));
+      for (let i = 0; i < 7; i++) {
+        const k = (i - 3) / 3;
+        ctx.save();
+        ctx.rotate(k * 0.5 * spread);
+        ctx.translate(k * w * 0.55 * spread, -Math.abs(k) * 8 * spread + (3 - i) * 1.4);
+        ctx.drawImage(img, -w / 2, -h / 2, w, h);
+        ctx.restore();
+      }
+    } else {
+      for (let i = 2; i >= 0; i--) {
+        if (empty && i > 0) continue;
+        ctx.save();
+        ctx.globalAlpha = empty ? 0.35 : 1;
+        ctx.translate(i * 2.5, i * 2.5 - 2.5);
+        ctx.drawImage(img, -w / 2, -h / 2, w, h);
+        ctx.restore();
+      }
+    }
+    ctx.restore();
+    ctx.save();
+    ctx.shadowColor = 'transparent';
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--muted');
+    ctx.font = '11px ui-monospace, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(deckState.replace ? `${deckTotal()} · replace` : `${deckRemaining()} left`, this.x, this.y + h / 2 + 18);
+    ctx.restore();
+  }
+  throwWith() {}
+  spinInPlace() {}
+}
+
+// Where the stack sits (right of the tray, like a shoe) and where drawn cards
+// land: centred rows in the space to its left.
+function deckLayout(n) {
+  const b = state.bounds;
+  const stackW = Math.min(96, (b.right - b.left) * 0.2);
+  const stack = { x: b.right - stackW / 2 - 14, y: (b.top + b.floor) / 2, w: stackW };
+  const areaL = b.left + 10, areaR = stack.x - stackW / 2 - 26;
+  const cols = n <= 4 ? Math.max(1, n) : Math.ceil(n / 2);
+  const rows = n ? Math.ceil(n / cols) : 1;
+  const w = Math.max(56, Math.min(112, (areaR - areaL) / cols - 12, ((b.floor - b.top) / rows - 16) / CARD_RATIO));
+  const slots = [];
+  for (let i = 0; i < n; i++) {
+    const r = Math.floor(i / cols), inRow = r === rows - 1 ? n - cols * (rows - 1) : cols;
+    const c = i - r * cols;
+    const rowW = inRow * (w + 12) - 12;
+    slots.push({
+      x: areaL + (areaR - areaL) / 2 - rowW / 2 + c * (w + 12) + w / 2,
+      y: b.top + (b.floor - b.top) / 2 + (r - (rows - 1) / 2) * (w * CARD_RATIO + 14),
+      w,
+    });
+  }
+  return { stack, slots };
+}
+
+// The idle tray in Cards mode: just the deck, waiting.
+function stageDeckIdle() {
+  if (!cardArt) return;
+  // A brand-new deck arrives shuffled, like one out of the box should.
+  if (deckState.order.length === 0) reshuffleDeck();
+  const { stack } = deckLayout(0);
+  state.dice = [new DeckStackSprite(stack.x, stack.y, stack.w)];
+  dropIdleCache();
+  $('total').dataset.idle = '1';
+  $('total').dataset.kind = 'number';
+  $('total').textContent = '—';
+  $('breakdown').textContent = systemHint('cards').idle;
+  hideHint();
+}
+
+// Deal a draw (local or a peer's). Loads art and pre-decodes every image so the
+// animation never flashes a half-loaded card.
+async function dealCardsFlow(result, { remote = false } = {}) {
+  await ensureCardArt();
+  await cardImage('back').ready;
+  await Promise.all(result.summary.drawn.map(c => cardImage(c.id).ready));
+
+  const n = result.summary.drawn.length;
+  const { stack, slots } = deckLayout(n);
+  const stackSprite = new DeckStackSprite(stack.x, stack.y, stack.w);
+  const sprites = [stackSprite];
+
+  // In Replace mode the previous draw visibly goes home before the new one
+  // arrives; everywhere else the tray simply moves on, like dice do.
+  let delay0 = 0;
+  if (deckState.replace && !remote) {
+    for (const d of state.dice) {
+      if (d.isCard && !d.isStack && d.phase === 'idle') {
+        const back = new CardSprite(d.id, { x: d.x, y: d.y }, { x: stack.x, y: stack.y, w: d.size }, { mode: 'return' });
+        sprites.push(back);
+        delay0 = 0.22;
+      }
+    }
+  }
+  result.summary.drawn.forEach((c, i) => {
+    sprites.push(new CardSprite(c.id, { x: stack.x, y: stack.y }, slots[i], { delay: delay0 + i * 0.12, remote }));
+  });
+
+  state.dice = sprites;
+  dropIdleCache();
+  $('total').dataset.rolling = '1';
+  const settleMs = (delay0 + n * 0.12 + DEAL_S + FLIP_S) * 1000 + 160;
+  setTimeout(() => finish(result), settleMs);
+  if (!remote && navigator.vibrate) navigator.vibrate([6, 30, 8]);
+  hideHint();
+  return result;
+}
+
+// A peer's draw: same deal, but the readout lands via the remote claim (their
+// history line was already added on arrival, and their draw is never re-shared).
+function dealCardsFlowRemote(result, claim) {
+  const preload = [cardImage('back').ready, ...result.summary.drawn.map(c => cardImage(c.id).ready)];
+  Promise.all(preload).then(() => {
+    if (state.remoteClaim !== claim) return;
+    const n = result.summary.drawn.length;
+    const { stack, slots } = deckLayout(n);
+    const sprites = [new DeckStackSprite(stack.x, stack.y, stack.w)];
+    result.summary.drawn.forEach((c, i) => {
+      sprites.push(new CardSprite(c.id, { x: stack.x, y: stack.y }, slots[i], { delay: i * 0.12, remote: true }));
+    });
+    state.dice = sprites;
+    dropIdleCache();
+    $('total').dataset.rolling = '1';
+    setTimeout(() => {
+      if (state.remoteClaim !== claim) return;
+      delete $('total').dataset.rolling;
+      delete $('total').dataset.idle;
+      setTotal(cardsHeadline(result));
+      $('breakdown').textContent = describeCards(result);
+    }, (n * 0.12 + DEAL_S + FLIP_S) * 1000 + 160);
+  });
+}
+
+// The sync entry point doRoll routes to; errors surface like any bad notation.
+function dealFromNotation(notation) {
+  let draw;
+  try { draw = parseCards(notation).draw; } catch (err) { showError(err.message); return; }
+  clearError();
+  state.remoteClaim = null;
+  ensureCardArt()
+    .then(() => dealCardsFlow(drawDeckCards(draw)))
+    .then(res => {
+      state.last = res;
+      $('notation').value = res.notation;
+      syncCardsUI({ writeField: false, restage: false });
+    })
+    .catch(err => showError(String((err && err.message) || err)));
+}
+
+// ---- the cards picker ----
+const cardsPicker = $('cardsPicker');
+const deckCountVal = $('deckCount');
+const deckRemainVal = $('deckRemain');
+const deckFlagButtons = [...document.querySelectorAll('.deck-flag')];
+
+function syncCardsUI({ writeField = true, restage = true } = {}) {
+  deckCountVal.textContent = String(deckState.draw);
+  deckRemainVal.textContent = deckState.replace ? `${deckTotal()}∞` : `${deckRemaining()}/${deckTotal()}`;
+  for (const b of deckFlagButtons) {
+    const on = b.dataset.flag === 'jokers' ? deckState.jokers : deckState.replace;
+    b.setAttribute('aria-pressed', String(on));
+  }
+  if (writeField && uiSystem === 'cards') $('notation').value = `deck:${deckState.draw}`;
+  if (restage && uiSystem === 'cards' && !$('total').dataset.rolling) stageDeckIdle();
+}
+
+bindTapHold($('deckCountChip'), dir => {
+  deckState.draw = Math.max(1, Math.min(10, deckState.draw + dir));
+  persistDeck();
+  syncCardsUI({ restage: false });
+});
+$('deckDraw').addEventListener('click', () => doRoll(`deck:${deckState.draw}`));
+$('deckShuffle').addEventListener('click', () => {
+  reshuffleDeck();
+  ensureCardArt().then(() => {
+    stageDeckIdle();
+    const stack = state.dice.find(d => d.isStack);
+    if (stack) { stack.riffle = 1; stack.value = null; dropIdleCache(); }
+    if (navigator.vibrate) navigator.vibrate([5, 25, 5, 25, 8]);
+    syncCardsUI({ restage: false });
+  });
+});
+for (const b of deckFlagButtons) {
+  b.addEventListener('click', () => {
+    if (b.dataset.flag === 'jokers') {
+      // Changing what the deck contains means a fresh shuffle — you cannot slip
+      // jokers into a half-dealt deck at a real table either.
+      deckState.jokers = !deckState.jokers;
+      reshuffleDeck();
+    } else {
+      deckState.replace = !deckState.replace;
+      persistDeck();
+    }
+    syncCardsUI();
+  });
+}
+
+function syncCardsFromField() {
+  try {
+    const { draw } = parseCards($('notation').value);
+    deckState.draw = draw;
+    persistDeck();
+    syncCardsUI({ writeField: false, restage: false });
+  } catch { /* mid-type */ }
+}
+
 // ---- the pool ----
 //
 // Tapping dice builds a pool: tap d20 twice and d6 once and you have 2d20+1d6,
@@ -2023,6 +2474,9 @@ function clearPool() {
       case 'onering': resetOneRing(); syncTor(); break;
       case 'pbta': case 'mist': resetTwod6(); syncTwod6(); break;
       case 'mothership': resetMothership(); syncMs(); break;
+      // The deck persists (it is the character's deck, like Stress); clearing
+      // just returns the tray to the idle stack.
+      case 'cards': ensureCardArt().then(() => { if (uiSystem === 'cards') syncCardsUI(); }); break;
     }
     return;
   }
@@ -2896,6 +3350,7 @@ function emptyTrayRoll() {
   if (uiSystem === 'pbta') return pbtaCtl.notation();
   if (uiSystem === 'mist') return mistCtl.notation();
   if (uiSystem === 'mothership') return msNotation();
+  if (uiSystem === 'cards') return `deck:${deckState.draw}`;
   const last = state.last;
   const lastNumeric = last && (last.system === 'numeric' || last.system === undefined);
   return (lastNumeric && last.notation) || `d${state.defaultSides}`;
@@ -2993,6 +3448,11 @@ let loopFaults = 0;
 // they make trayIdle() false: a tray being *built* is never frozen, and every
 // newly added die draws immediately. Only a thrown, settled, valued tray idles.
 let idleCanvas = null, idleSize = null, idleSince = null;
+
+// The idle snapshot is keyed off trayIdle(), which a swap from one settled
+// scene to another never trips. The card stagers call this so a fresh stack
+// (or a peer's deal) never renders under a stale picture of the old one.
+function dropIdleCache() { idleCanvas = null; idleSize = null; idleSince = null; }
 const REVEAL_MS = 450;
 function trayIdle() {
   return state.dice.length > 0
@@ -3051,8 +3511,10 @@ function drawFrame(dt) {
   }
 
   // Spin-in-place dice never move, so the grid spacing already holds — running
-  // O(n^2) separation over 100+ of them every frame would be pure waste.
-  if (state.dice.length > 1 && state.dice.length <= THROW_LIMIT) {
+  // O(n^2) separation over 100+ of them every frame would be pure waste. Cards
+  // fly along fixed paths to fixed slots, so pushing them apart mid-flight
+  // would only bend the deal.
+  if (state.dice.length > 1 && state.dice.length <= THROW_LIMIT && !state.dice[0].isCard) {
     separate(state.dice, state.bounds);
   }
 
@@ -3294,6 +3756,22 @@ function showRemoteRoll(roll) {
     summary: roll.summary,
   };
   addHistory(result, roll.name);
+
+  // A peer's draw deals through the card dealer, exactly like their own tray:
+  // stack, flight, flip — remote only steers the haptics away. finish() is
+  // called by the dealer's own timer; addHistory ran above, and finish adds
+  // again, so the dealer path for remote skips it via the claim below not
+  // being ours... simpler: cards route renders and sets the readout directly.
+  if (result.system === 'cards') {
+    if ($('total').dataset.rolling && !state.remoteClaim) return;
+    const claim = {};
+    state.remoteClaim = claim;
+    ensureCardArt().then(() => {
+      if (state.remoteClaim !== claim) return;
+      dealCardsFlowRemote(result, claim);
+    });
+    return;
+  }
 
   // Yield to a throw of your own, but not to another remote roll. Testing
   // dataset.rolling alone treated both the same, so once remote rolls started

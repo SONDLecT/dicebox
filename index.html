@@ -150,6 +150,11 @@
             <path d="M4 12.5c2-1.6 4-1.6 6 0s4 1.6 6 0"/>
             <path d="M6 16.5c2-1.6 4-1.6 6 0s3 1.2 4 0.4"/>
           </g>
+          <!-- Cards: a single card face showing a spade. -->
+          <g class="mode-ico" data-for="cards">
+            <rect x="5.5" y="3" width="13" height="18" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M12 8.2 C14.4 10.2 13.4 12.6 12.2 12.6 C13 13.6 13.4 14.2 13.6 14.8 L10.4 14.8 C10.6 14.2 11 13.6 11.8 12.6 C10.6 12.6 9.6 10.2 12 8.2 Z" fill="currentColor"/>
+          </g>
           <!-- Mothership: a spacesuit helmet — dome and curved visor. -->
           <g class="mode-ico" data-for="mothership" fill="none" stroke="currentColor"
              stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">
@@ -391,6 +396,22 @@
       </p>
       </div>
 
+      <div id="helpCards" hidden>
+      <dl class="syntax">
+        <dt>deck:1</dt>  <dd>draw a card</dd>
+        <dt>deck:3</dt>  <dd>draw three</dd>
+      </dl>
+      <p class="note">
+        A standard 52-card deck (jokers optional), drawn <b>without
+        replacement</b> — the deck remembers what's gone until you
+        <b>Shuffle</b>. Flip on <b>Replace</b> and every draw goes back,
+        making each one an independent 1-in-52. The cards are the
+        <a href="https://github.com/SONDLecT/woodcut-cards" target="_blank"
+           rel="noopener noreferrer">Woodcut deck</a> — courts traced from
+        public-domain decks of the 1650s–1860s.
+      </p>
+      </div>
+
       <p class="note install" id="installNote">
         <button type="button" class="install-button" id="install" hidden>Install as an app</button>
         <span id="installHint">Add this to your home screen and it works offline, with no
@@ -432,6 +453,14 @@
         </svg>
         <span class="mode-row-name">Dicebox</span>
         <span class="mode-row-sub">any dice &middot; full notation</span>
+      </button>
+      <button type="button" class="mode-row mode-cards" data-system="cards" aria-pressed="false">
+        <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="5.5" y="3" width="13" height="18" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M12 8.2 C14.4 10.2 13.4 12.6 12.2 12.6 C13 13.6 13.4 14.2 13.6 14.8 L10.4 14.8 C10.6 14.2 11 13.6 11.8 12.6 C10.6 12.6 9.6 10.2 12 8.2 Z" fill="currentColor"/>
+        </svg>
+        <span class="mode-row-name">Cards</span>
+        <span class="mode-row-sub">the Woodcut deck &middot; 52 + jokers</span>
       </button>
       <button type="button" class="mode-row mode-cthulhutech" data-system="cthulhutech" aria-pressed="false">
         <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true">
@@ -980,6 +1009,38 @@
         <span class="ms-adv-label">Disadvantage</span>
       </button>
     </div>
+  </section>
+
+  <!-- Cards: the Woodcut deck. The deck itself sits on the tray (tap it to
+       draw); the rail sets how many, riffles the stack, and flips the deck's
+       two settings. The deck persists like Mothership's Stress. -->
+  <section class="picker cards-picker" id="cardsPicker" aria-label="Card deck" hidden>
+    <button type="button" class="deck-draw" id="deckDraw" aria-label="Draw cards">
+      <svg viewBox="0 0 30 30" aria-hidden="true">
+        <rect x="4" y="5" width="14" height="20" rx="2.4" transform="rotate(-8 11 15)"/>
+        <rect x="12" y="5" width="14" height="20" rx="2.4" transform="rotate(8 19 15)"/>
+      </svg>
+      <span class="deck-draw-label">Draw</span>
+    </button>
+    <button type="button" class="spin-chip" id="deckCountChip" aria-label="Cards per draw — tap to raise, hold to lower">
+      <span class="spin-chip-label">Cards</span>
+      <span class="spin-chip-val" id="deckCount">1</span>
+    </button>
+    <button type="button" class="deck-shuffle" id="deckShuffle" aria-label="Shuffle the deck">
+      <svg viewBox="0 0 30 30" aria-hidden="true">
+        <path d="M4 10 C10 10 12 20 18 20 L22 20 M4 20 C10 20 12 10 18 10 L22 10 M20 7.5 24 10 20 12.5 M20 17.5 24 20 20 22.5"/>
+      </svg>
+      <span class="deck-shuffle-label">Shuffle</span>
+    </button>
+    <button type="button" class="tor-flag deck-flag" data-flag="jokers" aria-pressed="false" aria-label="Include the two jokers (reshuffles)">
+      <span class="deck-flag-name">Jokers</span>
+      <span class="deck-flag-sub">54 cards</span>
+    </button>
+    <button type="button" class="tor-flag deck-flag" data-flag="replace" aria-pressed="false" aria-label="Draw with replacement — cards return to the deck">
+      <span class="deck-flag-name">Replace</span>
+      <span class="deck-flag-sub">put back</span>
+    </button>
+    <span class="deck-remain" id="deckRemain" aria-label="Cards remaining">52/52</span>
   </section>
 
   <form class="entry" id="entry">

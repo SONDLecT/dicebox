@@ -436,6 +436,7 @@ body {
 #modeToggle[data-system="pbta"] .mode-ico[data-for="pbta"] { display: block; }
 #modeToggle[data-system="mist"] .mode-ico[data-for="mist"] { display: block; }
 #modeToggle[data-system="mothership"] .mode-ico[data-for="mothership"] { display: block; }
+#modeToggle[data-system="cards"] .mode-ico[data-for="cards"] { display: block; }
 /* A named system's mark carries its own accent so the header reads as that mode
    at a glance; the numeric default stays with the quiet chrome colour. */
 #modeToggle[data-system="v5"],
@@ -447,7 +448,8 @@ body {
 #modeToggle[data-system="onering"],
 #modeToggle[data-system="pbta"],
 #modeToggle[data-system="mist"],
-#modeToggle[data-system="mothership"] { color: var(--accent); }
+#modeToggle[data-system="mothership"],
+#modeToggle[data-system="cards"] { color: var(--accent); }
 
 /* ---- Vampire dice tray ---- */
 
@@ -1013,6 +1015,51 @@ body {
 
 /* The mode sheet is a touch narrower than the modifier sheet: two cards want a
    compact shelf, not the full width. */
+/* ---- Cards: the deck rail ---- */
+/* One row: the accent Draw action, the count chip, Shuffle, the two deck
+   toggles, and the live remaining count. */
+.cards-picker { display: flex; gap: 8px; justify-content: center; align-items: stretch; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; }
+.deck-draw, .deck-shuffle {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 74px;
+  padding: 6px 12px 5px;
+  border: 1px solid var(--hair);
+  border-radius: 12px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: border-color 140ms ease, background 140ms ease, transform 120ms ease;
+}
+.deck-draw { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
+.deck-draw svg { width: 30px; height: 30px; }
+.deck-draw svg rect { fill: color-mix(in srgb, currentColor 10%, transparent); stroke: currentColor; stroke-width: 1.8; }
+.deck-draw-label { font-size: 10.5px; font-weight: 650; color: var(--line); white-space: nowrap; }
+.deck-shuffle svg { width: 30px; height: 30px; }
+.deck-shuffle svg path { fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.deck-shuffle-label { font-size: 10.5px; color: var(--muted); white-space: nowrap; }
+.deck-draw:active, .deck-shuffle:active { transform: scale(0.95); }
+.deck-flag { gap: 1px; padding: 7px 10px; }
+.deck-flag-name { font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+.deck-flag-sub { font-size: 10px; color: var(--muted); white-space: nowrap; }
+.deck-flag[aria-pressed="true"] .deck-flag-sub { color: var(--line); }
+.deck-remain {
+  align-self: center;
+  font: 600 12px ui-monospace, monospace;
+  color: var(--muted);
+  padding: 0 4px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+/* A single red card's label in the big readout keeps its suit's colour. */
+#total[data-variant="card-red"] { color: #C74B3F; }
+
 /* ---- system picker popover ---- */
 /* A corner menu anchored under the header's mode button (openMode positions it
    from the button's rect). One-line rows: mark, shorthand, dice. */
@@ -1072,6 +1119,7 @@ body {
   text-overflow: ellipsis;
 }
 /* Each system's row wears the colour its mode paints the app with. */
+.mode-cards { --sys: #2F8B57; }
 .mode-v5 { --sys: #C3212E; }
 .mode-fate { --sys: #6E96BE; }
 .mode-genesys { --sys: #BFA766; }

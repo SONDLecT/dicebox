@@ -560,6 +560,19 @@ const sampleSystemRoll = {
     groups: [{ kind: 'dice', count: 1, subtotal: 0, dice: [{ value: 5, sides: 20, role: 'panic', kept: true }] }],
   }));
 
+  // Card draws carry ids and labels, not die values.
+  ok('a card draw validates', validateSystemRoll({
+    system: 'cards', notation: 'deck:3',
+    summary: { drawn: [{ id: 'KS', label: 'K♠', red: false }], remaining: 49, total: 52 },
+    groups: [{ kind: 'cards', count: 3, cards: [
+      { id: 'KS', label: 'K♠', red: false }, { id: '10H', label: '10♥', red: true }, { id: 'J1', label: 'Joker (Le Fov)', red: false },
+    ] }],
+  }));
+  ok('an oversized card draw is rejected', !validateSystemRoll({
+    system: 'cards', notation: 'deck:3', summary: {},
+    groups: [{ kind: 'cards', count: 13, cards: Array(13).fill({ id: 'KS', label: 'K♠' }) }],
+  }));
+
   ok('a wildly out-of-range die value is rejected', !validateSystemRoll({
     ...sampleSystemRoll,
     groups: [{ kind: 'dice', sides: 10, count: 1, subtotal: 0, dice: [{ value: 1e9, kept: true }] }],
