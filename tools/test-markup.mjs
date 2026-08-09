@@ -119,6 +119,9 @@ ok('Mothership advantage choices show kept and dropped dice',
    (msMarkup.match(/class="drop"/g) || []).length >= 2 &&
    (msMarkup.match(/class="keep"/g) || []).length >= 2 &&
    />Advantage</.test(msMarkup) && />Disadvantage</.test(msMarkup));
+ok('Mothership long-press die sheets are count-only, without generic modifiers',
+   /function modifiersFor\(sides\)\s*\{[^]{0,500}if \(uiSystem === 'mothership'\) return \[\];/.test(js));
+
 ok('Mothership Advantage and Disadvantage visibly stage the second roll',
    /case 'mothership':[^]*const copies = ms\.advantage \? 2 : 1;[^]*add\(copies, \{ sides: 20[^]*add\(copies, \{ sides: 10[^]*add\(copies, \{ sides: 10/.test(js));
 ok('Mothership Check and Panic tiles roll directly between advantage choices',

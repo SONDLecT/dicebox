@@ -10232,6 +10232,12 @@ const sheet = $('sheet');
 const sheetOptions = $('sheetOptions');
 
 function modifiersFor(sides) {
+  // Mothership's manual rail is for plain damage and table dice. Its
+  // Advantage/Disadvantage mechanic compares two complete rolls and is handled
+  // by the rules-aware controls above; generic keep/drop/explode/reroll suffixes
+  // are either wrong for a multi-die Mothership roll or are not core mechanics.
+  if (uiSystem === 'mothership') return [];
+
   const mods = [];
   if (sides >= 4) {
     mods.push(
