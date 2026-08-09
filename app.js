@@ -857,17 +857,19 @@ help.querySelectorAll('.syntax dt').forEach(dt => {
 // picks how a result reads. It never touches the meaning of typed notation.
 
 const SYSTEMS = {
+  // Community shorthand, matching the picker rows. Numeric shows no badge — the
+  // wordmark already says Dicebox.
   numeric: { badge: '' },
-  v5: { badge: 'Vampire' },
+  v5: { badge: 'V5' },
   fate: { badge: 'Fate' },
   genesys: { badge: 'Genesys' },
-  daggerheart: { badge: 'Daggerheart' },
-  cthulhutech: { badge: 'CthulhuTech' },
-  starwars: { badge: 'Force Dice' },
-  onering: { badge: 'Feat Dice' },
+  daggerheart: { badge: 'DH' },
+  cthulhutech: { badge: 'CTech 2e' },
+  starwars: { badge: 'SWRPG' },
+  onering: { badge: 'TOR 2e' },
   pbta: { badge: 'PbtA' },
-  mist: { badge: 'Mist Engine' },
-  mothership: { badge: 'Mothership' },
+  mist: { badge: 'Mist' },
+  mothership: { badge: 'MoSh 1e' },
 };
 
 // Empty-tray copy. Most modes build a pool by tapping dice, so the default
@@ -994,9 +996,9 @@ function setSystem(system, { roll = false, url = true } = {}) {
   $('helpMist').hidden = system !== 'mist';
   $('helpMothership').hidden = system !== 'mothership';
 
-  // The sheet's cards reflect the choice.
-  for (const card of modeCards) {
-    card.setAttribute('aria-pressed', String(card.dataset.system === system));
+  // The popover's rows reflect the choice.
+  for (const row of modeRows) {
+    row.setAttribute('aria-pressed', String(row.dataset.system === system));
   }
 
   // Switching modes clears the tray to a fresh start: the old pool's notation
@@ -1023,9 +1025,9 @@ function setSystem(system, { roll = false, url = true } = {}) {
   }
 }
 
-// ---- mode sheet ----
+// ---- mode popover ----
 
-const modeCards = [...$('modeCards').querySelectorAll('.mode-card')];
+const modeRows = [...modeSheet.querySelectorAll('.mode-row')];
 
 function openMode() {
   setHelp(false);
@@ -1033,6 +1035,11 @@ function openMode() {
   closeDial();
   closeHistory();
   closeRoom();
+  // Anchor the popover under the mode button's corner. The app column is
+  // centred, so the button's rect — not the viewport edge — is the anchor.
+  const r = modeToggle.getBoundingClientRect();
+  modeSheet.style.top = `${Math.round(r.bottom + 8)}px`;
+  modeSheet.style.right = `${Math.round(window.innerWidth - r.right)}px`;
   modeSheet.hidden = false;
   modeToggle.setAttribute('aria-expanded', 'true');
   hideHint();
@@ -1047,11 +1054,24 @@ modeToggle.addEventListener('click', () => {
 });
 // The badge is the second way in: it names the mode, and tapping it changes it.
 systemBadge.addEventListener('click', openMode);
-$('modeClose').addEventListener('click', closeMode);
+// A popover has no close button: it closes on a pick, a tap anywhere outside,
+// Escape, or a resize (which would leave it anchored to a stale corner).
+document.addEventListener('pointerdown', e => {
+  if (modeSheet.hidden) return;
+  if (modeSheet.contains(e.target) || modeToggle.contains(e.target) || systemBadge.contains(e.target)) return;
+  closeMode();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !modeSheet.hidden) {
+    closeMode();
+    modeToggle.focus();
+  }
+});
+window.addEventListener('resize', () => { if (!modeSheet.hidden) closeMode(); });
 
-for (const card of modeCards) {
-  card.addEventListener('click', () => {
-    setSystem(card.dataset.system);
+for (const row of modeRows) {
+  row.addEventListener('click', () => {
+    setSystem(row.dataset.system);
     closeMode();
   });
 }

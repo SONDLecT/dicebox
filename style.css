@@ -982,86 +982,75 @@ body {
 
 /* The mode sheet is a touch narrower than the modifier sheet: two cards want a
    compact shelf, not the full width. */
-.modes-sheet .sheet-panel { max-width: 360px; }
-
-/* The fang on the Vampire card — filled from the card's own crimson, which the
-   inline currentColor already carries; this only pins the join style. */
-.mode-fang { stroke-linejoin: round; }
-
-.mode-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 10px;
-  margin-bottom: 4px;
-}
-
-.mode-card {
-  appearance: none;
+/* ---- system picker popover ---- */
+/* A corner menu anchored under the header's mode button (openMode positions it
+   from the button's rect). One-line rows: mark, shorthand, dice. */
+.mode-pop {
+  position: fixed;
+  z-index: 40;
+  width: 252px;
+  max-height: min(72vh, 500px);
+  overflow-y: auto;
+  background: var(--face);
+  border: 1px solid var(--hair);
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  padding: 6px;
   display: flex;
   flex-direction: column;
+  gap: 1px;
+}
+.mode-row {
+  appearance: none;
+  display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 16px 12px;
-  border: 1px solid var(--hair);
-  border-radius: 12px;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 9px;
   background: none;
   color: var(--line);
   font: inherit;
+  text-align: left;
   cursor: pointer;
-  transition: border-color 160ms ease, background 160ms ease;
+  transition: background 120ms ease;
 }
-
-.mode-card .mode-glyph { color: var(--muted); transition: color 160ms ease; }
-.mode-card[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
-.mode-card[aria-pressed="true"] .mode-glyph { color: var(--accent); }
-
-/* The Vampire card carries its own crimson so it reads as blood on the shelf,
-   before it is ever chosen — the glyph and rule stay red in either theme. */
-.mode-v5 .mode-glyph { color: #b21e2b; }
-.mode-v5[aria-pressed="true"] { border-color: #b21e2b; background: color-mix(in srgb, #b21e2b 10%, transparent); }
-.mode-v5[aria-pressed="true"] .mode-glyph { color: #b21e2b; }
-
-/* The Fate card carries its own slate, the same way. */
-.mode-fate .mode-glyph { color: #4f79a3; }
-.mode-fate[aria-pressed="true"] { border-color: #4f79a3; background: color-mix(in srgb, #4f79a3 12%, transparent); }
-.mode-fate[aria-pressed="true"] .mode-glyph { color: #4f79a3; }
-
-/* The Genesys card's glyph is already multicolour (its own die hues); pressed,
-   it takes the narrative-gold accent border like the others. */
-.mode-genesys[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
-
-/* Daggerheart's card is gold + violet; pressed, it takes its gold. */
-.mode-daggerheart[aria-pressed="true"] { border-color: #C9A227; background: color-mix(in srgb, #C9A227 12%, transparent); }
-
-/* CthulhuTech's card carries its eldritch green. */
-.mode-cthulhutech .mode-glyph { color: #57B591; }
-.mode-cthulhutech[aria-pressed="true"] { border-color: #57B591; background: color-mix(in srgb, #57B591 12%, transparent); }
-
-/* Star Wars' card is multicolour (its own die hues); pressed, it takes the
-   starfield blue. */
-.mode-starwars[aria-pressed="true"] { border-color: #5B9BD5; background: color-mix(in srgb, #5B9BD5 12%, transparent); }
-
-/* The One Ring's card is bronze. */
-.mode-onering[aria-pressed="true"] { border-color: #B5893C; background: color-mix(in srgb, #B5893C 12%, transparent); }
-
-/* PbtA runs ember-orange, Mist Engine misty teal. */
-.mode-pbta[aria-pressed="true"] { border-color: #D97A3C; background: color-mix(in srgb, #D97A3C 12%, transparent); }
-.mode-mist[aria-pressed="true"] { border-color: #3F9FA0; background: color-mix(in srgb, #3F9FA0 12%, transparent); }
-
-/* Mothership's card carries its hazard amber. */
-.mode-mothership .mode-glyph { color: #AEC93C; }
-.mode-mothership[aria-pressed="true"] { border-color: #AEC93C; background: color-mix(in srgb, #AEC93C 12%, transparent); }
-
-.mode-name {
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
+.mode-row:hover { background: color-mix(in srgb, var(--line) 7%, transparent); }
+.mode-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* The active system holds its own colour, matching the tray it recolours. */
+.mode-row[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--sys, var(--accent)) 13%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sys, var(--accent)) 50%, transparent);
 }
-.mode-sub {
-  font-size: 11px;
+/* Dicebox itself sits pinned above the alphabetical systems. */
+.mode-row-pinned {
+  border-bottom: 1px solid var(--hair);
+  border-radius: 9px 9px 0 0;
+  margin-bottom: 3px;
+  padding-bottom: 9px;
+}
+.mode-row-ico { width: 20px; height: 20px; flex: 0 0 auto; color: var(--sys, var(--muted)); }
+.mode-row-name { font-size: 13px; font-weight: 650; letter-spacing: 0.01em; white-space: nowrap; }
+.mode-row-sub {
+  margin-left: auto;
+  font-size: 10.5px;
   color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.mode-note { margin-top: 12px; }
+/* Each system's row wears the colour its mode paints the app with. */
+.mode-v5 { --sys: #C3212E; }
+.mode-fate { --sys: #6E96BE; }
+.mode-genesys { --sys: #BFA766; }
+.mode-daggerheart { --sys: #C9A227; }
+.mode-cthulhutech { --sys: #57B591; }
+.mode-starwars { --sys: #5B9BD5; }
+.mode-onering { --sys: #B5893C; }
+.mode-pbta { --sys: #D97A3C; }
+.mode-mist { --sys: #3F9FA0; }
+.mode-mothership { --sys: #AEC93C; }
 
 /* How many dice each tap adds. Typing a number here and tapping d6 is how you
    get 100d6 without tapping a hundred times. */

@@ -167,6 +167,25 @@ ok('Mothership numeric rail is limited to rules dice plus d-question',
    /diceButtons\.classList\.toggle\('mothership-only', system === 'mothership'\)/.test(js) &&
    /\.dice-buttons\.mothership-only \.dbtn:not\(\.custom\):not\(\[data-sides="5"\]\):not\(\[data-sides="10"\]\):not\(\[data-sides="20"\]\):not\(\[data-sides="100"\]\):not\(\[data-custom\]\)/.test(css));
 
+// --- the system picker popover ---
+{
+  const pop = html.slice(html.indexOf('class="mode-pop"'), html.indexOf('</div>', html.lastIndexOf('data-system="v5"')));
+  const order = [...pop.matchAll(/data-system="([a-z0-9]+)"/g)].map(m => m[1]);
+  ok('picker is a popover: Dicebox pinned first, then systems alphabetical by label',
+     /class="mode-pop"/.test(pop) &&
+     order.join(',') === 'numeric,cthulhutech,daggerheart,fate,genesys,mist,mothership,pbta,starwars,onering,v5' &&
+     /class="mode-row mode-row-pinned" data-system="numeric"[^]*?>Dicebox</.test(pop));
+  ok('picker rows carry the community shorthand',
+     ['CTech 2e', 'DH', 'Fate', 'Genesys', 'Mist', 'MoSh 1e', 'PbtA', 'SWRPG', 'TOR 2e', 'V5']
+       .every(nm => pop.includes(`<span class="mode-row-name">${nm}</span>`)));
+  ok('popover anchors to the mode button and closes on outside tap / Escape / resize',
+     /modeToggle\.getBoundingClientRect\(\)/.test(js) &&
+     /modeSheet\.style\.right = /.test(js) &&
+     /document\.addEventListener\('pointerdown', e => \{\s*if \(modeSheet\.hidden\) return;/.test(js) &&
+     /e\.key === 'Escape' && !modeSheet\.hidden/.test(js) &&
+     /addEventListener\('resize', \(\) => \{ if \(!modeSheet\.hidden\) closeMode\(\); \}\)/.test(js));
+}
+
 // --- classes must be styled ---
 const htmlClasses = [...html.matchAll(/class="([^"]+)"/g)].flatMap(m => m[1].split(/\s+/));
 const jsClasses = [...js.matchAll(/className\s*=\s*'([^']+)'/g)].flatMap(m => m[1].split(/\s+/));

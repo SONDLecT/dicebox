@@ -1014,86 +1014,75 @@ body {
 
 /* The mode sheet is a touch narrower than the modifier sheet: two cards want a
    compact shelf, not the full width. */
-.modes-sheet .sheet-panel { max-width: 360px; }
-
-/* The fang on the Vampire card — filled from the card's own crimson, which the
-   inline currentColor already carries; this only pins the join style. */
-.mode-fang { stroke-linejoin: round; }
-
-.mode-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 10px;
-  margin-bottom: 4px;
-}
-
-.mode-card {
-  appearance: none;
+/* ---- system picker popover ---- */
+/* A corner menu anchored under the header's mode button (openMode positions it
+   from the button's rect). One-line rows: mark, shorthand, dice. */
+.mode-pop {
+  position: fixed;
+  z-index: 40;
+  width: 252px;
+  max-height: min(72vh, 500px);
+  overflow-y: auto;
+  background: var(--face);
+  border: 1px solid var(--hair);
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  padding: 6px;
   display: flex;
   flex-direction: column;
+  gap: 1px;
+}
+.mode-row {
+  appearance: none;
+  display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 16px 12px;
-  border: 1px solid var(--hair);
-  border-radius: 12px;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 9px;
   background: none;
   color: var(--line);
   font: inherit;
+  text-align: left;
   cursor: pointer;
-  transition: border-color 160ms ease, background 160ms ease;
+  transition: background 120ms ease;
 }
-
-.mode-card .mode-glyph { color: var(--muted); transition: color 160ms ease; }
-.mode-card[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
-.mode-card[aria-pressed="true"] .mode-glyph { color: var(--accent); }
-
-/* The Vampire card carries its own crimson so it reads as blood on the shelf,
-   before it is ever chosen — the glyph and rule stay red in either theme. */
-.mode-v5 .mode-glyph { color: #b21e2b; }
-.mode-v5[aria-pressed="true"] { border-color: #b21e2b; background: color-mix(in srgb, #b21e2b 10%, transparent); }
-.mode-v5[aria-pressed="true"] .mode-glyph { color: #b21e2b; }
-
-/* The Fate card carries its own slate, the same way. */
-.mode-fate .mode-glyph { color: #4f79a3; }
-.mode-fate[aria-pressed="true"] { border-color: #4f79a3; background: color-mix(in srgb, #4f79a3 12%, transparent); }
-.mode-fate[aria-pressed="true"] .mode-glyph { color: #4f79a3; }
-
-/* The Genesys card's glyph is already multicolour (its own die hues); pressed,
-   it takes the narrative-gold accent border like the others. */
-.mode-genesys[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
-
-/* Daggerheart's card is gold + violet; pressed, it takes its gold. */
-.mode-daggerheart[aria-pressed="true"] { border-color: #C9A227; background: color-mix(in srgb, #C9A227 12%, transparent); }
-
-/* CthulhuTech's card carries its eldritch green. */
-.mode-cthulhutech .mode-glyph { color: #57B591; }
-.mode-cthulhutech[aria-pressed="true"] { border-color: #57B591; background: color-mix(in srgb, #57B591 12%, transparent); }
-
-/* Star Wars' card is multicolour (its own die hues); pressed, it takes the
-   starfield blue. */
-.mode-starwars[aria-pressed="true"] { border-color: #5B9BD5; background: color-mix(in srgb, #5B9BD5 12%, transparent); }
-
-/* The One Ring's card is bronze. */
-.mode-onering[aria-pressed="true"] { border-color: #B5893C; background: color-mix(in srgb, #B5893C 12%, transparent); }
-
-/* PbtA runs ember-orange, Mist Engine misty teal. */
-.mode-pbta[aria-pressed="true"] { border-color: #D97A3C; background: color-mix(in srgb, #D97A3C 12%, transparent); }
-.mode-mist[aria-pressed="true"] { border-color: #3F9FA0; background: color-mix(in srgb, #3F9FA0 12%, transparent); }
-
-/* Mothership's card carries its hazard amber. */
-.mode-mothership .mode-glyph { color: #AEC93C; }
-.mode-mothership[aria-pressed="true"] { border-color: #AEC93C; background: color-mix(in srgb, #AEC93C 12%, transparent); }
-
-.mode-name {
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
+.mode-row:hover { background: color-mix(in srgb, var(--line) 7%, transparent); }
+.mode-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* The active system holds its own colour, matching the tray it recolours. */
+.mode-row[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--sys, var(--accent)) 13%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sys, var(--accent)) 50%, transparent);
 }
-.mode-sub {
-  font-size: 11px;
+/* Dicebox itself sits pinned above the alphabetical systems. */
+.mode-row-pinned {
+  border-bottom: 1px solid var(--hair);
+  border-radius: 9px 9px 0 0;
+  margin-bottom: 3px;
+  padding-bottom: 9px;
+}
+.mode-row-ico { width: 20px; height: 20px; flex: 0 0 auto; color: var(--sys, var(--muted)); }
+.mode-row-name { font-size: 13px; font-weight: 650; letter-spacing: 0.01em; white-space: nowrap; }
+.mode-row-sub {
+  margin-left: auto;
+  font-size: 10.5px;
   color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.mode-note { margin-top: 12px; }
+/* Each system's row wears the colour its mode paints the app with. */
+.mode-v5 { --sys: #C3212E; }
+.mode-fate { --sys: #6E96BE; }
+.mode-genesys { --sys: #BFA766; }
+.mode-daggerheart { --sys: #C9A227; }
+.mode-cthulhutech { --sys: #57B591; }
+.mode-starwars { --sys: #5B9BD5; }
+.mode-onering { --sys: #B5893C; }
+.mode-pbta { --sys: #D97A3C; }
+.mode-mist { --sys: #3F9FA0; }
+.mode-mothership { --sys: #AEC93C; }
 
 /* How many dice each tap adds. Typing a number here and tapping d6 is how you
    get 100d6 without tapping a hundred times. */
@@ -2460,172 +2449,134 @@ body {
          each card is a mode. Numeric is the default and needs no explanation;
          the rest are named systems that recolour the app and swap the dice row.
          Purely a UI preset — nothing here reinterprets notation you type. -->
-    <div class="sheet modes-sheet" id="modeSheet" hidden role="dialog"
-         aria-labelledby="modeTitle">
-      <div class="sheet-panel">
-        <p class="sheet-title">
-          <span id="modeTitle">Dice system</span>
-          <button type="button" class="sheet-close" id="modeClose"
-                  aria-label="Close">✕</button>
-        </p>
-        <div class="mode-cards" id="modeCards" role="group" aria-label="Dice system">
-          <button type="button" class="mode-card" data-system="numeric" aria-pressed="true">
-            <svg class="mode-glyph" viewBox="0 0 24 24" width="44" height="44" aria-hidden="true">
-              <!-- The Dicebox mark (brand/d20.svg), matching the header button. -->
-              <g fill="none" stroke="currentColor" stroke-width="1.5"
-                 stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 2.4 20.3 7v10L12 21.6 3.7 17V7z"/>
-                <path d="M12 2.4 16.4 9.6 12 12.2 7.6 9.6z"/>
-                <path d="M7.6 9.6 12 12.2v9.4M16.4 9.6 12 12.2M7.6 9.6 3.7 7m12.7 2.6L20.3 7"/>
-              </g>
-            </svg>
-            <span class="mode-name">Numeric</span>
-            <span class="mode-sub">The classic roller</span>
-          </button>
-          <button type="button" class="mode-card mode-v5" data-system="v5" aria-pressed="false">
-            <svg class="mode-glyph" viewBox="0 0 44 44" width="44" height="44" aria-hidden="true">
-              <!-- A blood die: the d10 silhouette in crimson with an ankh on its
-                   face — the success mark the mode rolls. -->
-              <g fill="none" stroke="currentColor" stroke-width="1.6"
-                 stroke-linecap="round" stroke-linejoin="round">
-                <path d="M22 4l13 7.5v10L22 39 9 21.5v-10z"/>
-                <circle class="mode-fang" cx="22" cy="17.5" r="3.1"/>
-                <path class="mode-fang" d="M22 20.4v11.4M17.6 23.2h8.8"/>
-              </g>
-            </svg>
-            <span class="mode-name">Vampire</span>
-            <span class="mode-sub">The Masquerade · V5</span>
-          </button>
-          <button type="button" class="mode-card mode-fate" data-system="fate" aria-pressed="false">
-            <svg class="mode-glyph" viewBox="0 0 44 44" width="44" height="44" aria-hidden="true">
-              <!-- Three tumbling Fudge dice — the plus, blank, and minus faces
-                   that a 4dF roll is built from. -->
-              <g fill="none" stroke="currentColor" stroke-width="2"
-                 stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="3.5" width="13" height="13" rx="3"/>
-                <path d="M9.5 7V13M6.5 10H12.5"/>
-                <rect x="15.5" y="15.5" width="13" height="13" rx="3"/>
-                <rect x="28" y="27.5" width="13" height="13" rx="3"/>
-                <path d="M31.5 34H37.5"/>
-              </g>
-            </svg>
-            <span class="mode-name">Fate</span>
-            <span class="mode-sub">Fudge · 4dF</span>
-          </button>
-          <button type="button" class="mode-card mode-genesys" data-system="genesys" aria-pressed="false">
-            <svg class="mode-glyph" viewBox="0 0 44 44" width="44" height="44" aria-hidden="true">
-              <!-- The multicolour narrative dice, shown as three of their symbols:
-                   a green success, a gold triumph, a purple threat. -->
-              <path d="M14 15l4.2 7.3H9.8z" fill="#4E9E60"/>
-              <path d="M31 9l1.7 3.6 4 .45-2.95 2.7.82 3.9L31 15.7l-3.6 2 .82-3.9-2.95-2.7 4-.45z" fill="#C39A2E"/>
-              <g stroke="#8A5CC0" stroke-width="2.4" stroke-linecap="round">
-                <path d="M25 27l7 7M25 34l7-7"/>
-              </g>
-            </svg>
-            <span class="mode-name">Genesys</span>
-            <span class="mode-sub">Narrative dice</span>
-          </button>
-          <button type="button" class="mode-card mode-daggerheart" data-system="daggerheart" aria-pressed="false">
-            <svg class="mode-glyph" viewBox="0 0 44 44" width="44" height="44" aria-hidden="true">
-              <!-- The Duality Dice: a gold Hope die and a violet Fear die. -->
-              <path d="M15 8 24 13v10l-9 5-9-5V13z" fill="none" stroke="#C9A227" stroke-width="1.9" stroke-linejoin="round"/>
-              <path d="M29 16 38 21v10l-9 5-9-5V21z" fill="none" stroke="#7E6BB5" stroke-width="1.9" stroke-linejoin="round"/>
-            </svg>
-            <span class="mode-name">Daggerheart</span>
-            <span class="mode-sub">Duality Dice</span>
-          </button>
-          <button type="button" class="mode-card mode-cthulhutech" data-system="cthulhutech" aria-pressed="false">
-            <svg class="mode-glyph" viewBox="0 0 44 44" width="44" height="44" aria-hidden="true">
-              <!-- An eldritch eye trailing tentacles — the mythos the mode wears
-                   over its even/odd d10 pool. -->
-              <g fill="none" stroke="#57B591" stroke-width="2"
-                 stroke-linecap="round" stroke-linejoin="round">
-                <path d="M8 17 C15 9 29 9 36 17 C29 25 15 25 8 17 Z"/>
-                <path d="M14 23 q-2 4 0 8 q1 2 -1 4"/>
-                <path d="M22 24 q2 3 0 6 q-2 3 0 6"/>
-                <path d="M30 23 q2 4 0 8 q-1 2 1 4"/>
-              </g>
-              <circle cx="22" cy="17" r="3" fill="#57B591"/>
-            </svg>
-            <span class="mode-name">CthulhuTech</span>
-            <span class="mode-sub">Even = hit · 2e</span>
-          </button>
-          <button type="button" class="mode-card mode-starwars" data-system="starwars" aria-pressed="false">
-            <svg class="mode-glyph" viewBox="0 0 44 44" width="44" height="44" aria-hidden="true">
-              <!-- A TIE fighter: a round cockpit between two hexagonal wing
-                   panels — the panels doubling as die facets. -->
-              <g fill="none" stroke="#5B9BD5" stroke-width="2.2" stroke-linejoin="round">
-                <path d="M9 7 L14.5 13 L14.5 31 L9 37 L3.5 31 L3.5 13 Z"/>
-                <path d="M35 7 L40.5 13 L40.5 31 L35 37 L29.5 31 L29.5 13 Z"/>
-              </g>
-              <g fill="#5B9BD5">
-                <rect x="14" y="20.5" width="3.5" height="3"/>
-                <rect x="26.5" y="20.5" width="3.5" height="3"/>
-                <circle cx="22" cy="22" r="5"/>
-              </g>
-            </svg>
-            <span class="mode-name">Force Dice</span>
-            <span class="mode-sub">Narrative + Force</span>
-          </button>
-          <button type="button" class="mode-card mode-onering" data-system="onering" aria-pressed="false">
-            <svg class="mode-glyph" viewBox="0 0 44 44" width="44" height="44" aria-hidden="true">
-              <!-- A ring, in bronze. -->
-              <circle cx="22" cy="22" r="15" fill="none" stroke="#B5893C" stroke-width="2.2"/>
-              <circle cx="22" cy="22" r="8.4" fill="none" stroke="#B5893C" stroke-width="1.8"/>
-            </svg>
-            <span class="mode-name">Feat Dice</span>
-            <span class="mode-sub">Feat &amp; Success dice</span>
-          </button>
-          <button type="button" class="mode-card mode-pbta" data-system="pbta" aria-pressed="false">
-            <svg class="mode-glyph" viewBox="0 0 44 44" width="44" height="44" aria-hidden="true">
-              <!-- Two pipped d6 reading 4 and 6 — a total of ten, a Strong Hit. -->
-              <g fill="none" stroke="#D97A3C" stroke-width="2" stroke-linejoin="round">
-                <rect x="3" y="19" width="18" height="18" rx="4"/>
-                <rect x="23" y="5" width="18" height="18" rx="4"/>
-              </g>
-              <g fill="#D97A3C">
-                <circle cx="8" cy="24" r="1.8"/><circle cx="16" cy="24" r="1.8"/>
-                <circle cx="8" cy="32" r="1.8"/><circle cx="16" cy="32" r="1.8"/>
-                <circle cx="28" cy="9" r="1.8"/><circle cx="36" cy="9" r="1.8"/>
-                <circle cx="28" cy="14" r="1.8"/><circle cx="36" cy="14" r="1.8"/>
-                <circle cx="28" cy="19" r="1.8"/><circle cx="36" cy="19" r="1.8"/>
-              </g>
-            </svg>
-            <span class="mode-name">PbtA</span>
-            <span class="mode-sub">2d6 · hit / partial / miss</span>
-          </button>
-          <button type="button" class="mode-card mode-mist" data-system="mist" aria-pressed="false">
-            <svg class="mode-glyph" viewBox="0 0 44 44" width="44" height="44" aria-hidden="true">
-              <!-- Fog rolling in over water. -->
-              <g fill="none" stroke="#3F9FA0" stroke-width="2.2" stroke-linecap="round">
-                <path d="M8 15c3.5-2.8 7-2.8 10.5 0s7 2.8 10.5 0 5-1.4 7-0.4"/>
-                <path d="M8 23c3.5-2.8 7-2.8 10.5 0s7 2.8 10.5 0 5-1.4 7-0.4"/>
-                <path d="M12 31c3.5-2.8 7-2.8 10.5 0s5 2 8 0.8"/>
-              </g>
-            </svg>
-            <span class="mode-name">Mist Engine</span>
-            <span class="mode-sub">2d6 · success / consequence</span>
-          </button>
-          <button type="button" class="mode-card mode-mothership" data-system="mothership" aria-pressed="false">
-            <svg class="mode-glyph" viewBox="0 0 44 44" width="44" height="44" aria-hidden="true">
-              <!-- A spacesuit helmet — dome and curved visor — the space-horror
-                   mode over its roll-under d100. -->
-              <g fill="none" stroke="#AEC93C" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round">
-                <path d="M22 6c-7.5 0-12.5 5.5-12.5 12.8v6.2c0 2.9 2.3 5.2 5.1 5.2h14.8c2.8 0 5.1-2.3 5.1-5.2V18.8C34.5 11.5 29.5 6 22 6Z"/>
-                <path d="M22 13.2c-4.8 0-7.9 3.1-7.9 7.1 0 2.9 2.2 5.1 5 5.1h5.8c2.8 0 5-2.2 5-5.1 0-4-3.1-7.1-7.9-7.1Z"/>
-                <path d="M17.3 17.8c1.2-1.1 2.7-1.7 4.7-1.7"/>
-              </g>
-            </svg>
-            <span class="mode-name">Mothership</span>
-            <span class="mode-sub">d100 · roll under</span>
-          </button>
-        </div>
-        <p class="note mode-note">
-          The system recolours the app and changes the dice you tap. Typed
-          notation still means what it says — <b>4d6</b> is four six-sided dice
-          in any mode.
-        </p>
-      </div>
+    <!-- The system picker: a compact popover anchored under the header's mode
+         button — a corner menu, not a modal sheet. Dicebox (numeric) is pinned
+         first because it is the app itself; the ten systems follow
+         alphabetically by label, each one row: the system's mark in its own
+         colour, its community shorthand, and the dice it rolls. -->
+    <div class="mode-pop" id="modeSheet" hidden role="group" aria-label="Dice system">
+      <button type="button" class="mode-row mode-row-pinned" data-system="numeric" aria-pressed="true">
+        <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true">
+          <g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2.4 20.3 7v10L12 21.6 3.7 17V7z"/>
+            <path d="M12 2.4 16.4 9.6 12 12.2 7.6 9.6z"/>
+            <path d="M7.6 9.6 12 12.2v9.4M16.4 9.6 12 12.2M7.6 9.6 3.7 7m12.7 2.6L20.3 7"/>
+          </g>
+        </svg>
+        <span class="mode-row-name">Dicebox</span>
+        <span class="mode-row-sub">any dice &middot; full notation</span>
+      </button>
+      <button type="button" class="mode-row mode-cthulhutech" data-system="cthulhutech" aria-pressed="false">
+        <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true">
+          <g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 10 C8 5 16 5 20 10 C16 15 8 15 4 10 Z"/>
+            <path d="M8 14 q-1 3 0 6"/><path d="M12 15 v6"/><path d="M16 14 q1 3 0 6"/>
+            <circle cx="12" cy="10" r="1.9" fill="currentColor" stroke="none"/>
+          </g>
+        </svg>
+        <span class="mode-row-name">CTech 2e</span>
+        <span class="mode-row-sub">d10 pool &middot; even = hit</span>
+      </button>
+      <button type="button" class="mode-row mode-daggerheart" data-system="daggerheart" aria-pressed="false">
+        <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true">
+          <g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">
+            <path d="M12 2.6 20 7v10l-8 4.4L4 17V7z"/>
+            <path d="M12 2.6v18.8"/>
+          </g>
+        </svg>
+        <span class="mode-row-name">DH</span>
+        <span class="mode-row-sub">Duality Dice</span>
+      </button>
+      <button type="button" class="mode-row mode-fate" data-system="fate" aria-pressed="false">
+        <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true">
+          <g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="4" y="4" width="16" height="16" rx="3.4"/>
+            <path d="M9 9V15M6 12H12"/><path d="M13 12H18"/>
+          </g>
+        </svg>
+        <span class="mode-row-name">Fate</span>
+        <span class="mode-row-sub">4dF &plusmn; modifier</span>
+      </button>
+      <button type="button" class="mode-row mode-genesys" data-system="genesys" aria-pressed="false">
+        <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 2.6 20 7v10l-8 4.4L4 17V7z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+          <path d="M12 8l1.35 2.9 3.15.35-2.35 2.15.65 3.1L12 14.9 9.2 16.5l.65-3.1L7.5 11.25l3.15-.35z" fill="currentColor"/>
+        </svg>
+        <span class="mode-row-name">Genesys</span>
+        <span class="mode-row-sub">narrative dice</span>
+      </button>
+      <button type="button" class="mode-row mode-mist" data-system="mist" aria-pressed="false">
+        <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true">
+          <g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+            <path d="M4 8.5c2-1.6 4-1.6 6 0s4 1.6 6 0"/>
+            <path d="M4 12.5c2-1.6 4-1.6 6 0s4 1.6 6 0"/>
+            <path d="M6 16.5c2-1.6 4-1.6 6 0s3 1.2 4 0.4"/>
+          </g>
+        </svg>
+        <span class="mode-row-name">Mist</span>
+        <span class="mode-row-sub">2d6 &middot; success / consequence</span>
+      </button>
+      <button type="button" class="mode-row mode-mothership" data-system="mothership" aria-pressed="false">
+        <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true">
+          <g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">
+            <path d="M12 3.2c-4.1 0-6.8 3-6.8 7v3.4c0 1.6 1.2 2.9 2.8 2.9h8c1.6 0 2.8-1.3 2.8-2.9V10.2c0-4-2.7-7-6.8-7Z"/>
+            <path d="M12 7.1c-2.6 0-4.3 1.7-4.3 3.9 0 1.6 1.2 2.8 2.8 2.8h3c1.6 0 2.8-1.2 2.8-2.8 0-2.2-1.7-3.9-4.3-3.9Z"/>
+            <path d="M9.4 9.6c.7-.6 1.5-.9 2.6-.9"/>
+          </g>
+        </svg>
+        <span class="mode-row-name">MoSh 1e</span>
+        <span class="mode-row-sub">d100 &middot; roll under</span>
+      </button>
+      <button type="button" class="mode-row mode-pbta" data-system="pbta" aria-pressed="false">
+        <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true">
+          <g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
+            <rect x="2.5" y="10" width="11" height="11" rx="2.4"/>
+            <rect x="12" y="3" width="11" height="11" rx="2.4"/>
+          </g>
+          <g fill="currentColor">
+            <circle cx="5.3" cy="12.8" r="1"/><circle cx="10.7" cy="12.8" r="1"/>
+            <circle cx="5.3" cy="18.2" r="1"/><circle cx="10.7" cy="18.2" r="1"/>
+            <circle cx="15" cy="6" r="1"/><circle cx="20" cy="11" r="1"/>
+          </g>
+        </svg>
+        <span class="mode-row-name">PbtA</span>
+        <span class="mode-row-sub">2d6 &middot; hit / partial / miss</span>
+      </button>
+      <button type="button" class="mode-row mode-starwars" data-system="starwars" aria-pressed="false">
+        <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true">
+          <g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
+            <path d="M5 4 L8 7.3 L8 16.7 L5 20 L2 16.7 L2 7.3 Z"/>
+            <path d="M19 4 L22 7.3 L22 16.7 L19 20 L16 16.7 L16 7.3 Z"/>
+          </g>
+          <g fill="currentColor">
+            <rect x="7.6" y="11" width="2.2" height="2"/>
+            <rect x="14.2" y="11" width="2.2" height="2"/>
+            <circle cx="12" cy="12" r="2.7"/>
+          </g>
+        </svg>
+        <span class="mode-row-name">SWRPG</span>
+        <span class="mode-row-sub">narrative + Force</span>
+      </button>
+      <button type="button" class="mode-row mode-onering" data-system="onering" aria-pressed="false">
+        <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true">
+          <g fill="none" stroke="currentColor">
+            <circle cx="12" cy="12" r="8.4" stroke-width="1.6"/>
+            <circle cx="12" cy="12" r="4.6" stroke-width="1.4"/>
+          </g>
+        </svg>
+        <span class="mode-row-name">TOR 2e</span>
+        <span class="mode-row-sub">Feat &amp; Success dice</span>
+      </button>
+      <button type="button" class="mode-row mode-v5" data-system="v5" aria-pressed="false">
+        <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true">
+          <g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="7.4" r="3.2"/>
+            <path d="M12 10.6V20M7.6 13.1h8.8"/>
+          </g>
+        </svg>
+        <span class="mode-row-name">V5</span>
+        <span class="mode-row-sub">d10 pool + Hunger</span>
+      </button>
     </div>
 
     <!-- Opened by holding a die. Sits on the tray like the help panel, so the
@@ -2981,7 +2932,7 @@ body {
        dice, the Target Number, and the favoured/ill-favoured & Weary states. -->
   <!-- The Feat die always rolls (shown in the tray); you build the Success pool
        with the d6 button, set the Target, and toggle the conditions. -->
-  <section class="picker tor-picker" id="torPicker" aria-label="Feat Dice roll" hidden>
+  <section class="picker tor-picker" id="torPicker" aria-label="TOR 2e roll" hidden>
     <div class="tor-controls-row">
       <button type="button" class="die-btn tor-success-btn" id="torAddSuccess" aria-label="Add a Success die; hold to remove">
         <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true"><rect x="5" y="5" width="20" height="20" rx="4.5"/></svg>
@@ -8709,17 +8660,19 @@ help.querySelectorAll('.syntax dt').forEach(dt => {
 // picks how a result reads. It never touches the meaning of typed notation.
 
 const SYSTEMS = {
+  // Community shorthand, matching the picker rows. Numeric shows no badge — the
+  // wordmark already says Dicebox.
   numeric: { badge: '' },
-  v5: { badge: 'Vampire' },
+  v5: { badge: 'V5' },
   fate: { badge: 'Fate' },
   genesys: { badge: 'Genesys' },
-  daggerheart: { badge: 'Daggerheart' },
-  cthulhutech: { badge: 'CthulhuTech' },
-  starwars: { badge: 'Force Dice' },
-  onering: { badge: 'Feat Dice' },
+  daggerheart: { badge: 'DH' },
+  cthulhutech: { badge: 'CTech 2e' },
+  starwars: { badge: 'SWRPG' },
+  onering: { badge: 'TOR 2e' },
   pbta: { badge: 'PbtA' },
-  mist: { badge: 'Mist Engine' },
-  mothership: { badge: 'Mothership' },
+  mist: { badge: 'Mist' },
+  mothership: { badge: 'MoSh 1e' },
 };
 
 // Empty-tray copy. Most modes build a pool by tapping dice, so the default
@@ -8846,9 +8799,9 @@ function setSystem(system, { roll = false, url = true } = {}) {
   $('helpMist').hidden = system !== 'mist';
   $('helpMothership').hidden = system !== 'mothership';
 
-  // The sheet's cards reflect the choice.
-  for (const card of modeCards) {
-    card.setAttribute('aria-pressed', String(card.dataset.system === system));
+  // The popover's rows reflect the choice.
+  for (const row of modeRows) {
+    row.setAttribute('aria-pressed', String(row.dataset.system === system));
   }
 
   // Switching modes clears the tray to a fresh start: the old pool's notation
@@ -8875,9 +8828,9 @@ function setSystem(system, { roll = false, url = true } = {}) {
   }
 }
 
-// ---- mode sheet ----
+// ---- mode popover ----
 
-const modeCards = [...$('modeCards').querySelectorAll('.mode-card')];
+const modeRows = [...modeSheet.querySelectorAll('.mode-row')];
 
 function openMode() {
   setHelp(false);
@@ -8885,6 +8838,11 @@ function openMode() {
   closeDial();
   closeHistory();
   closeRoom();
+  // Anchor the popover under the mode button's corner. The app column is
+  // centred, so the button's rect — not the viewport edge — is the anchor.
+  const r = modeToggle.getBoundingClientRect();
+  modeSheet.style.top = `${Math.round(r.bottom + 8)}px`;
+  modeSheet.style.right = `${Math.round(window.innerWidth - r.right)}px`;
   modeSheet.hidden = false;
   modeToggle.setAttribute('aria-expanded', 'true');
   hideHint();
@@ -8899,11 +8857,24 @@ modeToggle.addEventListener('click', () => {
 });
 // The badge is the second way in: it names the mode, and tapping it changes it.
 systemBadge.addEventListener('click', openMode);
-$('modeClose').addEventListener('click', closeMode);
+// A popover has no close button: it closes on a pick, a tap anywhere outside,
+// Escape, or a resize (which would leave it anchored to a stale corner).
+document.addEventListener('pointerdown', e => {
+  if (modeSheet.hidden) return;
+  if (modeSheet.contains(e.target) || modeToggle.contains(e.target) || systemBadge.contains(e.target)) return;
+  closeMode();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !modeSheet.hidden) {
+    closeMode();
+    modeToggle.focus();
+  }
+});
+window.addEventListener('resize', () => { if (!modeSheet.hidden) closeMode(); });
 
-for (const card of modeCards) {
-  card.addEventListener('click', () => {
-    setSystem(card.dataset.system);
+for (const row of modeRows) {
+  row.addEventListener('click', () => {
+    setSystem(row.dataset.system);
     closeMode();
   });
 }
