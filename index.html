@@ -762,6 +762,25 @@
   </output>
 
   <section class="picker" id="numPicker" aria-label="Dice">
+    <div class="ms-fields-row" id="msFieldsRow" hidden>
+      <label class="ms-direct-field" for="msTargetInput">
+        <span>Target</span>
+        <input id="msTargetInput" type="number" inputmode="numeric" min="1" max="99" value="30" aria-label="Target number">
+      </label>
+      <label class="ms-direct-field" for="msStressInput">
+        <span>Stress</span>
+        <input id="msStressInput" type="number" inputmode="numeric" min="2" max="20" value="2" aria-label="Current Stress">
+      </label>
+      <label class="ms-direct-field" for="msSkillSelect">
+        <span>Skill</span>
+        <select id="msSkillSelect" aria-label="Skill tier">
+          <option value="">None</option>
+          <option value="t">Trained +10</option>
+          <option value="e">Expert +15</option>
+          <option value="m">Master +20</option>
+        </select>
+      </label>
+    </div>
     <div class="counter" title="How many dice each tap adds">
       <button class="step" id="countDown" aria-label="One fewer die per tap">−</button>
       <input id="count" class="count" type="text" inputmode="numeric"
@@ -971,61 +990,38 @@
     </button>
   </section>
 
-  <!-- Mothership 1e: the signature dice are the controls. The percentile pair and
-       Panic d20 choose the roll; compact Target, Skill, and Stress pills hold its
-       numbers; keep-better / keep-worse dice flank the primary Roll tile. Ordinary
-       damage and wound dice remain in the numeric strip below. -->
+  <!-- Mothership 1e in two tactile rows: Advantage / direct d100 roll / direct
+       Panic roll / Disadvantage, followed by direct character fields and the
+       rules-grounded damage/table dice. The second rail scrolls on phones. -->
   <section class="picker ms-picker" id="msPicker" aria-label="Mothership roll" hidden>
-    <div class="ms-dice-row" role="group" aria-label="Roll type">
-      <button type="button" class="ms-mode-btn" data-mode="check" aria-pressed="true" aria-label="Choose Check or Save — roll percentile dice">
-        <svg class="ms-role-ico ms-percentile-ico" viewBox="0 0 54 32" aria-hidden="true">
-          <g class="rear"><path d="M17 3 26 9v8L17 29 8 17V9Z"/><path class="facet" d="M8 9 17 15 26 9M17 15v14"/></g>
-          <g><path d="M37 3 46 9v8L37 29 28 17V9Z"/><path class="facet" d="M28 9 37 15 46 9M37 15v14"/></g>
-        </svg>
-        <span class="ms-role-label">Check / Save</span><span class="ms-role-die">d100</span>
-      </button>
-      <button type="button" class="ms-mode-btn" data-mode="panic" aria-pressed="false" aria-label="Choose Panic — roll a d20">
-        <svg class="ms-role-ico ms-panic-ico" viewBox="0 0 54 32" aria-hidden="true">
-          <path d="M27 2 45 10 42 25 27 30 12 25 9 10Z"/>
-          <path class="facet" d="M27 2 19 13 9 10M27 2l8 11 10-3M19 13l8 17 8-17M12 25l7-12h16l7 12"/>
-        </svg>
-        <span class="ms-role-label">Panic</span><span class="ms-role-die">d20</span>
-      </button>
-    </div>
-    <div class="ms-fields-row">
-      <button type="button" class="spin-chip ms-check-only" id="msTargetChip" aria-label="Target — tap or Arrow Up to raise; hold or Arrow Down to lower" aria-keyshortcuts="ArrowUp ArrowDown">
-        <span class="spin-chip-label">Target</span><span class="spin-chip-val" id="msTarget">30</span>
-      </button>
-      <button type="button" class="spin-chip ms-check-only" id="msSkillChip" aria-label="Skill — tap or Arrow Up for the next tier; hold or Arrow Down for the previous tier" aria-keyshortcuts="ArrowUp ArrowDown">
-        <span class="spin-chip-label" id="msSkillLabel">Skill</span><span class="spin-chip-val" id="msSkillBonus">—</span>
-      </button>
-      <button type="button" class="spin-chip ms-stress-chip" id="msStressChip" aria-label="Stress — tap or Arrow Up to raise; hold or Arrow Down to lower" aria-keyshortcuts="ArrowUp ArrowDown">
-        <span class="spin-chip-label">Stress</span><span class="spin-chip-val" id="msStress">2</span>
-      </button>
-    </div>
     <div class="ms-action-row">
       <button type="button" class="ms-adv" data-adv="adv" aria-pressed="false" aria-label="Advantage — roll twice, keep the better resolved result">
         <svg class="ms-keep-dice" viewBox="0 0 40 40" aria-hidden="true">
           <path class="drop" d="M14 15 23 21v8L14 37 5 29v-8Z"/><path class="keep" d="M26 3 35 9v8l-9 8-9-8V9Z"/>
           <g class="chev"><path d="m22 14 4-4 4 4"/><path d="m22 18 4-4 4 4"/></g>
         </svg>
-        <span class="ms-adv-label">Keep better</span>
+        <span class="ms-adv-label">Advantage</span>
       </button>
-      <button type="button" class="ms-roll" id="msRoll" aria-label="Roll Check or Save">
-        <svg class="ms-roll-ico ms-roll-check" viewBox="0 0 42 30" aria-hidden="true">
-          <path class="rear" d="M13 3 21 8v7l-8 12-8-12V8Z"/><path d="M29 3 37 8v7l-8 12-8-12V8Z"/>
+      <button type="button" class="ms-role-roll ms-check-roll" id="msCheckRoll" aria-label="Roll Check or Save with percentile dice">
+        <svg class="ms-role-ico ms-percentile-ico" viewBox="0 0 40 40" aria-hidden="true">
+          <g class="rear"><path d="M12 3 24 10v10L12 37 0 20V10Z"/><path class="facet" d="M0 10 12 18 24 10M12 18v19"/></g>
+          <g><path d="M28 3 40 10v10L28 37 16 20V10Z"/><path class="facet" d="M16 10 28 18 40 10M28 18v19"/></g>
         </svg>
-        <svg class="ms-roll-ico ms-roll-panic" viewBox="0 0 42 30" aria-hidden="true">
-          <path d="M21 2 36 9l-3 15-12 4-12-4L6 9Z"/><path class="facet" d="m21 2-7 11-8-4m15-7 7 11 8-4M14 13l7 15 7-15M9 24l5-11h14l5 11"/>
+        <span class="ms-role-label">Check / Save</span><span class="ms-role-die">d100</span>
+      </button>
+      <button type="button" class="ms-role-roll ms-panic-roll" id="msPanicRoll" aria-label="Roll Panic Check with a d20">
+        <svg class="ms-role-ico ms-panic-ico" viewBox="0 0 40 40" aria-hidden="true">
+          <path d="M20 2 36 10 33 30 20 38 7 30 4 10Z"/>
+          <path class="facet" d="M20 2 13 16 4 10M20 2l7 14 9-6M13 16l7 22 7-22M7 30l6-14h14l6 14"/>
         </svg>
-        <span class="ms-roll-label" id="msRollLabel">Roll Check</span>
+        <span class="ms-role-label">Panic</span><span class="ms-role-die">d20</span>
       </button>
       <button type="button" class="ms-adv" data-adv="dis" aria-pressed="false" aria-label="Disadvantage — roll twice, keep the worse resolved result">
         <svg class="ms-keep-dice" viewBox="0 0 40 40" aria-hidden="true">
           <path class="drop" d="M26 3 35 9v8l-9 8-9-8V9Z"/><path class="keep" d="M14 15 23 21v8L14 37 5 29v-8Z"/>
           <g class="chev"><path d="m10 24 4 4 4-4"/><path d="m10 28 4 4 4-4"/></g>
         </svg>
-        <span class="ms-adv-label">Keep worse</span>
+        <span class="ms-adv-label">Disadvantage</span>
       </button>
     </div>
   </section>

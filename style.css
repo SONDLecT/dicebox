@@ -716,6 +716,9 @@ body {
 /* Daggerheart's strip carries only the standard dice — hide the DCC oddities,
    keep the custom-die picker and any dice the player made themselves. */
 .dice-buttons.standard-only .dbtn:not([data-std]):not(.custom):not([data-custom]) { display: none; }
+/* The owned PSG/WOM use only d5, d10, d20 and d100. Keep d? and a custom die
+   created through it, but hide Dicebox's broader DCC/novelty catalog here. */
+.dice-buttons.mothership-only .dbtn:not(.custom):not([data-sides="5"]):not([data-sides="10"]):not([data-sides="20"]):not([data-sides="100"]):not([data-custom]) { display: none; }
 
 /* The total tinted by the duality tone. */
 .total[data-variant="hope"] { color: #C9A227; }
@@ -793,53 +796,99 @@ body {
 .tor-flag:active { transform: scale(0.96); }
 
 /* ---- Mothership ---- */
-/* Three compact rows reuse Dicebox's established language: role-die tiles,
-   number pills, then keep/drop dice around the signature Roll action. */
+/* Signature dice are direct roll actions; modifiers flank them in one tactile row. */
 .ms-picker { flex-direction: column; align-items: stretch; gap: 6px; }
 .ms-dice-row, .ms-fields-row, .ms-action-row { display: flex; align-items: stretch; gap: 6px; }
-/* The signature dice choose the roll. Keeping the silhouette large and the words
-   subordinate makes these read like the Genesys rack, not form tabs. */
-.ms-mode-btn {
+/* The second and final visual row is a single horizontal rail: character setup,
+   dice-per-tap, then the five rules-grounded dice. It scrolls instead of wrapping. */
+.picker.mothership-rail {
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.picker.mothership-rail::-webkit-scrollbar { display: none; }
+.mothership-rail .ms-fields-row, .mothership-rail .counter, .mothership-rail .dice-scroll { flex: 0 0 auto; }
+.mothership-rail .dice-scroll { min-width: max-content; }
+.mothership-rail .dice-scroll { order: 2; }
+.mothership-rail .counter { order: 3; }
+.mothership-rail .dice-buttons { overflow: visible; }
+.mothership-rail .nudge { display: none; }
+.mothership-rail .counter .step, .mothership-rail .count, .mothership-rail .dbtn { min-height: 44px; }
+.mothership-rail .ms-direct-field {
+  width: 72px;
+  box-sizing: border-box;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  padding: 0 4px;
+}
+.mothership-rail .ms-direct-field span { font-size: 9px; line-height: 1; }
+.mothership-rail .ms-direct-field select { width: 62px; font-size: 12px; }
+.mothership-rail .counter .step { width: 22px; }
+.mothership-rail .counter .count { width: 28px; }
+.mothership-rail .dbtn { min-width: 38px; padding-inline: 5px; }
+/* Square SVG viewports prevent the percentile pair and d20 from inheriting the
+   old wide-card distortion that made one look thin and the other look fat. */
+.ms-role-roll {
   flex: 1 1 0;
   min-width: 0;
-  display: grid;
-  grid-template-columns: 54px auto;
-  grid-template-rows: auto auto;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  column-gap: 8px;
-  padding: 5px 10px;
+  justify-content: center;
+  gap: 1px;
+  padding: 4px;
   border: 1px solid var(--hair);
   border-radius: 12px;
-  background: none;
-  color: var(--muted);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
   font: inherit;
-  text-align: left;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
   transition: border-color 140ms ease, color 140ms ease, background 140ms ease, transform 120ms ease;
 }
-.ms-role-ico { grid-row: 1 / 3; width: 54px; height: 32px; display: block; }
+.ms-check-roll, .ms-panic-roll { border-color: var(--accent); }
+.ms-role-ico { width: 34px; height: 34px; display: block; }
 .ms-panic-ico { overflow: visible; }
 .ms-role-ico path { fill: currentColor; fill-opacity: 0.1; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; }
 .ms-role-ico .facet { fill: none; stroke-width: 1.05; opacity: 0.72; }
 .ms-percentile-ico .rear { opacity: 0.6; }
-.ms-role-label { align-self: end; color: var(--line); font-size: 11.5px; font-weight: 650; white-space: nowrap; }
-.ms-role-die { align-self: start; color: var(--muted); font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase; }
-.ms-mode-btn[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
-.ms-mode-btn[aria-pressed="true"] .ms-role-ico path { fill-opacity: 0.23; }
-.ms-mode-btn:active { transform: scale(0.97); }
-/* Target, Skill tier, and Stress are numbers rather than dice, so they use the
-   same compact pills as Daggerheart's modifier and difficulty. */
+.ms-role-label { color: var(--line); font-size: 10.5px; font-weight: 650; white-space: nowrap; }
+.ms-role-die { color: var(--muted); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; }
+.ms-role-roll:active { transform: scale(0.97); }
+/* Target, Skill tier, and Stress are direct controls: tap once and type/select
+   the actual character value instead of stepping through it one point at a time. */
 .ms-fields-row { justify-content: center; align-items: center; }
-.ms-fields-row .spin-chip { min-height: 44px; padding: 7px 11px; gap: 6px; }
-.ms-fields-row .spin-chip-val { font-size: 15px; }
-.ms-stress-chip { align-items: center; }
-#msSkillChip .spin-chip-label { max-width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ms-direct-field {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid var(--hair);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.ms-direct-field input, .ms-direct-field select {
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: none;
+  color: var(--line);
+  font: 600 15px/1 system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+.ms-direct-field input { width: 42px; text-align: center; }
+.ms-direct-field select { width: 94px; cursor: pointer; }
+.ms-direct-field:focus-within { border-color: var(--accent); }
 /* Advantage and Disadvantage borrow One Ring's visual explanation: the outlined
    die is discarded and the accent die is kept. This remains accurate because
    Mothership compares resolved outcomes, not merely high or low numbers. */
-.ms-adv, .ms-roll {
+.ms-adv, .ms-role-roll {
   flex: 1 1 0;
   min-width: 0;
   display: flex;
@@ -862,7 +911,7 @@ body {
 .ms-keep-dice .drop { fill: none; stroke: var(--muted); stroke-width: 1.8; stroke-linejoin: round; }
 .ms-keep-dice .keep { fill: color-mix(in srgb, var(--accent) 18%, var(--paper)); stroke: var(--accent); stroke-width: 2.1; stroke-linejoin: round; }
 .ms-keep-dice .chev { fill: none; stroke: var(--accent); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.ms-adv-label, .ms-roll-label { font-size: 10.5px; letter-spacing: 0.01em; white-space: nowrap; }
+.ms-adv-label { font-size: 10px; letter-spacing: 0.01em; white-space: nowrap; }
 .ms-adv[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .ms-adv[aria-pressed="true"] .ms-adv-label { color: var(--line); }
 .ms-roll { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
@@ -874,8 +923,7 @@ body {
 .ms-roll-panic { display: none; }
 .ms-panic-mode .ms-roll-check { display: none; }
 .ms-panic-mode .ms-roll-panic { display: block; }
-.ms-adv:active, .ms-roll:active { transform: scale(0.96); }
-.ms-panic-mode .ms-check-only { display: none; }
+.ms-adv:active, .ms-role-roll:active { transform: scale(0.96); }
 
 /* ---- mode sheet ---- */
 

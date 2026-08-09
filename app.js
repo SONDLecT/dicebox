@@ -949,11 +949,13 @@ function setSystem(system, { roll = false, url = true } = {}) {
   // ordinary dice — so its own controls sit above the numeric ones. In that mode
   // the strip is trimmed to the standard polyhedral dice.
   // Daggerheart and Mothership keep the numeric strip too — their signature roll
-  // is separate, but weapons/damage/wounds are ordinary dice. Daggerheart trims
-  // the strip to the standard polyhedrals; Mothership leaves it full, since its
-  // damage uses d5 and d100 as well as d10.
+  // is separate, but weapons/damage/wounds are ordinary dice. Mothership's owned
+  // books use d5, d10, d20 and d100; d? remains available for table-specific dice.
   numPicker.hidden = system !== 'numeric' && system !== 'daggerheart' && system !== 'mothership';
   diceButtons.classList.toggle('standard-only', system === 'daggerheart');
+  diceButtons.classList.toggle('mothership-only', system === 'mothership');
+  numPicker.classList.toggle('mothership-rail', system === 'mothership');
+  msFieldsRow.hidden = system !== 'mothership';
   v5Picker.hidden = system !== 'v5';
   fatePicker.hidden = system !== 'fate';
   // Star Wars reuses the Genesys chip picker; the Force chip only appears there.
@@ -1522,28 +1524,18 @@ const mistCtl = { notation: () => twod6Notation('mist'), reset: resetTwod6, from
 // strip below (plain xd10 / 1d5 / 1d100).
 const MS_STRESS_KEY = 'dicebox:ms:stress';
 const ms = { mode: 'check', target: 30, skill: null, advantage: null, stress: 2 };
-const MS_SKILL_TIERS = [null, 't', 'e', 'm'];
-const MS_SKILL_DISPLAY = {
-  t: ['Trained', '+10'],
-  e: ['Expert', '+15'],
-  m: ['Master', '+20'],
-};
 {
   // Restore the tracked Stress; anything out of the 2-20 band falls back to 2.
   const saved = Number(store.get(MS_STRESS_KEY));
   if (Number.isFinite(saved) && saved >= 2 && saved <= 20) ms.stress = Math.round(saved);
 }
-const msModeButtons = [...document.querySelectorAll('.ms-mode-btn')];
 const msAdvButtons = [...document.querySelectorAll('.ms-adv')];
-const msTargetChip = $('msTargetChip');
-const msTargetVal = $('msTarget');
-const msSkillChip = $('msSkillChip');
-const msSkillLabel = $('msSkillLabel');
-const msSkillBonus = $('msSkillBonus');
-const msStressChip = $('msStressChip');
-const msStressVal = $('msStress');
-const msRoll = $('msRoll');
-const msRollLabel = $('msRollLabel');
+const msFieldsRow = $('msFieldsRow');
+const msTargetInput = $('msTargetInput');
+const msSkillSelect = $('msSkillSelect');
+const msStressInput = $('msStressInput');
+const msCheckRoll = $('msCheckRoll');
+const msPanicRoll = $('msPanicRoll');
 
 function resetMothership() {
   // The roll config resets; Stress does not — it is the character's state.
@@ -1563,58 +1555,51 @@ function msNotation() {
 // a roll drives the bump — there the tray already holds the settling dice, so we
 // only refresh the chip and persist, never re-stage over the result.
 function setStress(n, { restage = true } = {}) {
-  ms.stress = Math.max(2, Math.min(20, n));
+  ms.stress = Math.max(2, Math.min(20, Math.round(n)));
   store.set(MS_STRESS_KEY, String(ms.stress));
   if (restage) syncMs();
-  else msStressVal.textContent = String(ms.stress);
+  else msStressInput.value = String(ms.stress);
 }
 
 function syncMs({ writeField = true } = {}) {
-  for (const b of msModeButtons) b.setAttribute('aria-pressed', String(b.dataset.mode === ms.mode));
-  // Panic hides the Check-only controls (Target, Skill) and rolls against Stress.
-  msPicker.classList.toggle('ms-panic-mode', ms.mode === 'panic');
-  if (ms.target === null) {
-    msTargetVal.textContent = '—'; msTargetVal.dataset.unset = '1'; msTargetChip.classList.remove('is-set');
-  } else {
-    msTargetVal.textContent = String(ms.target); delete msTargetVal.dataset.unset; msTargetChip.classList.add('is-set');
-  }
-  const skillDisplay = MS_SKILL_DISPLAY[ms.skill];
-  msSkillLabel.textContent = skillDisplay ? skillDisplay[0] : 'Skill';
-  msSkillBonus.textContent = skillDisplay ? skillDisplay[1] : '—';
-  msSkillChip.classList.toggle('is-set', Boolean(skillDisplay));
-  msSkillChip.setAttribute('aria-label', skillDisplay
-    ? `${skillDisplay[0]} ${skillDisplay[1]} — tap or Arrow Up for the next tier; hold or Arrow Down for the previous tier`
-    : 'Skill — tap or Arrow Up for the next tier; hold or Arrow Down for the previous tier');
+  msTargetInput.value = ms.target === null ? '' : String(ms.target);
+  msSkillSelect.value = ms.skill || '';
   for (const b of msAdvButtons) b.setAttribute('aria-pressed', String(ms.advantage === b.dataset.adv));
-  msStressVal.textContent = String(ms.stress);
-  msRollLabel.textContent = ms.mode === 'panic' ? 'Roll Panic' : 'Roll Check';
-  msRoll.setAttribute('aria-label', ms.mode === 'panic' ? 'Roll Panic Check' : 'Roll Check or Save');
+  msStressInput.value = String(ms.stress);
   if (writeField) $('notation').value = msNotation();
   if (uiSystem === 'mothership') stageSystemPool();
 }
 
-for (const b of msModeButtons) b.addEventListener('click', () => { ms.mode = b.dataset.mode; syncMs(); });
 // Advantage/Disadvantage are mutually exclusive; tapping the active choice clears it.
 for (const b of msAdvButtons) b.addEventListener('click', () => { ms.advantage = ms.advantage === b.dataset.adv ? null : b.dataset.adv; syncMs(); });
-// Target cycles unset → 1 … 99; holding below 1 returns to unset.
-bindTapHold(msTargetChip, dir => {
-  if (dir > 0) ms.target = ms.target === null ? 1 : Math.min(99, ms.target + 1);
-  else ms.target = ms.target === null || ms.target <= 1 ? null : ms.target - 1;
+// Character values are direct-entry controls: players can replace 30 with 72 in
+// one edit instead of tapping forty-two times. Native number inputs retain arrow
+// keys and mobile numeric keyboards; change clamps to the rules/UI bounds.
+msTargetInput.addEventListener('change', () => {
+  const n = Number(msTargetInput.value);
+  ms.target = msTargetInput.value === '' || !Number.isFinite(n) ? null : Math.max(1, Math.min(99, Math.round(n)));
   syncMs();
 });
-// A single compact pill replaces three full-width tier cards. Tap/ArrowUp walks
-// None → Trained → Expert → Master → None; hold/ArrowDown walks back toward None.
-bindTapHold(msSkillChip, dir => {
-  const current = Math.max(0, MS_SKILL_TIERS.indexOf(ms.skill));
-  const next = dir > 0 ? (current + 1) % MS_SKILL_TIERS.length : Math.max(0, current - 1);
-  ms.skill = MS_SKILL_TIERS[next];
+msSkillSelect.addEventListener('change', () => {
+  ms.skill = msSkillSelect.value || null;
   syncMs();
 });
-// Stress: tap to raise, hold to lower (a Rest reduces it). Bounded 2-20.
-bindTapHold(msStressChip, dir => setStress(ms.stress + dir));
-// A dedicated Roll button throws the current Check/Save or Panic, so you can roll
-// it again after building a damage pool on the numeric strip.
-msRoll.addEventListener('click', () => doRoll(msNotation()));
+msStressInput.addEventListener('change', () => {
+  const n = Number(msStressInput.value);
+  if (Number.isFinite(n)) setStress(n); else syncMs();
+});
+// The illustrated signature dice are the actions themselves. This removes a
+// redundant mode-selection row and a second generic Roll button.
+msCheckRoll.addEventListener('click', () => {
+  ms.mode = 'check';
+  syncMs();
+  doRoll(msNotation());
+});
+msPanicRoll.addEventListener('click', () => {
+  ms.mode = 'panic';
+  syncMs();
+  doRoll(msNotation());
+});
 
 function syncMsFromField() {
   try {

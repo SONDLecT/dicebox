@@ -56,12 +56,13 @@ ok('Mothership failed rolls surface Stress overflow consequences',
    /resolveMothershipStress\(ms\.stress, result\.summary\.stressDelta\)/.test(js) &&
    /result\.summary\.stressOverflow\s*=/.test(js));
 
-// Tap/hold controls still need a complete keyboard path: up increments and down
-// decrements, with the shortcuts discoverable on the two Mothership steppers.
-ok('Mothership Target and Stress support keyboard decrement',
-   /addEventListener\('keydown'[^]*ArrowUp[^]*ArrowDown/.test(js) &&
-   /id="msTargetChip"[^>]*aria-keyshortcuts="ArrowUp ArrowDown"/.test(html) &&
-   /id="msStressChip"[^>]*aria-keyshortcuts="ArrowUp ArrowDown"/.test(html));
+// Large character values must be directly editable; one-tap-per-point steppers
+// are not usable for moving a Target across the normal percentile range.
+ok('Mothership Target and Stress are direct bounded number inputs',
+   /id="msTargetInput"[^>]*type="number"[^>]*min="1"[^>]*max="99"/.test(html) &&
+   /id="msStressInput"[^>]*type="number"[^>]*min="2"[^>]*max="20"/.test(html) &&
+   /msTargetInput\.addEventListener\('change'/.test(js) &&
+   /msStressInput\.addEventListener\('change'/.test(js));
 
 // Both Daggerheart and Mothership show their signature picker together with the
 // ordinary numeric strip; moving the strip after the final signature picker keeps
@@ -98,32 +99,37 @@ ok('Mothership small text meets WCAG AA contrast in both themes', contrastPass);
 // Mothership follows the established tactile picker grammar: illustrated role
 // dice, compact number pills, and keep/drop dice around the primary roll action.
 const msMarkup = html.slice(html.indexOf('id="msPicker"'), html.indexOf('</section>', html.indexOf('id="msPicker"')));
+const numMarkup = html.slice(html.indexOf('id="numPicker"'), html.indexOf('</section>', html.indexOf('id="numPicker"')));
 ok('Mothership uses illustrated percentile and d20 role tiles',
    (msMarkup.match(/class="ms-role-ico/g) || []).length === 2 &&
-   /data-mode="check"[^]*class="ms-role-ico ms-percentile-ico"/.test(msMarkup) &&
-   /data-mode="panic"[^]*class="ms-role-ico ms-panic-ico"/.test(msMarkup));
-ok('Mothership settings are one compact Target Skill Stress row',
-   /class="ms-fields-row"/.test(msMarkup) && /id="msSkillChip"/.test(msMarkup) &&
-   !/class="ms-skill-row"/.test(msMarkup));
-ok('Mothership compact Skill pill cycles the four rules tiers',
-   /const MS_SKILL_TIERS = \[null, 't', 'e', 'm'\]/.test(js) &&
-   /bindTapHold\(msSkillChip,[^]*MS_SKILL_TIERS/.test(js) &&
-   /msSkillLabel\.textContent/.test(js) && /msSkillBonus\.textContent/.test(js));
+   /id="msCheckRoll"[^]*class="ms-role-ico ms-percentile-ico" viewBox="0 0 40 40"/.test(msMarkup) &&
+   /id="msPanicRoll"[^]*class="ms-role-ico ms-panic-ico" viewBox="0 0 40 40"/.test(msMarkup));
+ok('Mothership direct settings share the numeric rail',
+   /id="msFieldsRow"[^]*id="msTargetInput"[^]*id="msStressInput"[^]*id="msSkillSelect"/.test(numMarkup) &&
+   !/class="ms-fields-row"/.test(msMarkup));
+ok('Mothership Skill is a direct four-tier select',
+   /id="msSkillSelect"[^]*value=""[^]*value="t"[^]*value="e"[^]*value="m"/.test(numMarkup) &&
+   /msSkillSelect\.addEventListener\('change'/.test(js));
 ok('Mothership advantage choices show kept and dropped dice',
    (msMarkup.match(/class="ms-keep-dice"/g) || []).length === 2 &&
    (msMarkup.match(/class="drop"/g) || []).length >= 2 &&
-   (msMarkup.match(/class="keep"/g) || []).length >= 2);
-ok('Mothership primary Roll is a die-role tile between advantage choices',
-   /class="ms-action-row"[^]*data-adv="adv"[^]*id="msRoll"[^]*data-adv="dis"/.test(msMarkup) &&
-   /id="msRoll"[^]*class="ms-roll-ico/.test(msMarkup));
-ok('Mothership picker uses compact three-row styling',
-   /\.ms-picker\s*\{[^}]*gap:\s*6px/.test(css) &&
-   /\.ms-dice-row[^}]*display:\s*flex/.test(css) &&
-   /\.ms-fields-row[^}]*display:\s*flex/.test(css) &&
+   (msMarkup.match(/class="keep"/g) || []).length >= 2 &&
+   />Advantage</.test(msMarkup) && />Disadvantage</.test(msMarkup));
+ok('Mothership Check and Panic tiles roll directly between advantage choices',
+   /class="ms-action-row"[^]*data-adv="adv"[^]*id="msCheckRoll"[^]*id="msPanicRoll"[^]*data-adv="dis"/.test(msMarkup) &&
+   /msCheckRoll\.addEventListener\('click'[^]*ms\.mode = 'check'[^]*doRoll/.test(js) &&
+   /msPanicRoll\.addEventListener\('click'[^]*ms\.mode = 'panic'[^]*doRoll/.test(js));
+ok('Mothership picker is two non-wrapping visual rows',
+   !/class="ms-dice-row"/.test(msMarkup) &&
    /\.ms-action-row[^}]*display:\s*flex/.test(css) &&
-   /\.ms-mode-btn\s*\{[^}]*padding:\s*5px 10px/.test(css) &&
-   /\.ms-fields-row \.spin-chip\s*\{[^}]*min-height:\s*44px/.test(css) &&
-   /\.ms-adv, \.ms-roll\s*\{[^}]*padding:\s*5px 4px 4px/.test(css));
+   /\.picker\.mothership-rail\s*\{[^}]*overflow-x:\s*auto[^}]*flex-wrap:\s*nowrap/.test(css) &&
+   /msFieldsRow\.hidden = system !== 'mothership'/.test(js) &&
+   /\.ms-role-roll\s*\{[^}]*padding:\s*4px/.test(css) &&
+   /\.ms-direct-field\s*\{[^}]*min-height:\s*44px/.test(css) &&
+   /\.ms-adv, \.ms-role-roll\s*\{[^}]*padding:\s*5px 4px 4px/.test(css));
+ok('Mothership numeric rail is limited to rules dice plus d-question',
+   /diceButtons\.classList\.toggle\('mothership-only', system === 'mothership'\)/.test(js) &&
+   /\.dice-buttons\.mothership-only \.dbtn:not\(\.custom\):not\(\[data-sides="5"\]\):not\(\[data-sides="10"\]\):not\(\[data-sides="20"\]\):not\(\[data-sides="100"\]\):not\(\[data-custom\]\)/.test(css));
 
 // --- classes must be styled ---
 const htmlClasses = [...html.matchAll(/class="([^"]+)"/g)].flatMap(m => m[1].split(/\s+/));
