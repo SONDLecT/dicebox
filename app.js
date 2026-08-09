@@ -1531,9 +1531,9 @@ const ms = { mode: 'check', target: 30, skill: null, advantage: null, stress: 2 
 }
 const msAdvButtons = [...document.querySelectorAll('.ms-adv')];
 const msFieldsRow = $('msFieldsRow');
-const msTargetInput = $('msTargetInput');
+const msTargetDial = $('msTargetDial');
 const msSkillSelect = $('msSkillSelect');
-const msStressInput = $('msStressInput');
+const msStressDial = $('msStressDial');
 const msCheckRoll = $('msCheckRoll');
 const msPanicRoll = $('msPanicRoll');
 
@@ -1558,35 +1558,41 @@ function setStress(n, { restage = true } = {}) {
   ms.stress = Math.max(2, Math.min(20, Math.round(n)));
   store.set(MS_STRESS_KEY, String(ms.stress));
   if (restage) syncMs();
-  else msStressInput.value = String(ms.stress);
+  else msStressDial.textContent = String(ms.stress);
 }
 
 function syncMs({ writeField = true } = {}) {
-  msTargetInput.value = ms.target === null ? '' : String(ms.target);
+  msTargetDial.textContent = ms.target === null ? '—' : String(ms.target);
+  msTargetDial.setAttribute('aria-label', `Set Target, current ${ms.target === null ? 'unset' : ms.target}`);
   msSkillSelect.value = ms.skill || '';
   for (const b of msAdvButtons) b.setAttribute('aria-pressed', String(ms.advantage === b.dataset.adv));
-  msStressInput.value = String(ms.stress);
+  msStressDial.textContent = String(ms.stress);
+  msStressDial.setAttribute('aria-label', `Set Stress, current ${ms.stress}`);
   if (writeField) $('notation').value = msNotation();
   if (uiSystem === 'mothership') stageSystemPool();
 }
 
 // Advantage/Disadvantage are mutually exclusive; tapping the active choice clears it.
 for (const b of msAdvButtons) b.addEventListener('click', () => { ms.advantage = ms.advantage === b.dataset.adv ? null : b.dataset.adv; syncMs(); });
-// Character values are direct-entry controls: players can replace 30 with 72 in
-// one edit instead of tapping forty-two times. Native number inputs retain arrow
-// keys and mobile numeric keyboards; change clamps to the rules/UI bounds.
-msTargetInput.addEventListener('change', () => {
-  const n = Number(msTargetInput.value);
-  ms.target = msTargetInput.value === '' || !Number.isFinite(n) ? null : Math.max(1, Math.min(99, Math.round(n)));
-  syncMs();
+// Target and Stress launch the same tactile wheel + direct jump control as d?.
+// The resting rail stays two rows; the larger interaction exists only while used.
+msTargetDial.addEventListener('click', () => {
+  openNumberDial({
+    title: 'Target', value: ms.target ?? 30, min: 1, max: 99,
+    actionLabel: 'Set Target', inputLabel: 'Target number',
+    commit: value => { ms.target = value; syncMs(); },
+  });
 });
 msSkillSelect.addEventListener('change', () => {
   ms.skill = msSkillSelect.value || null;
   syncMs();
 });
-msStressInput.addEventListener('change', () => {
-  const n = Number(msStressInput.value);
-  if (Number.isFinite(n)) setStress(n); else syncMs();
+msStressDial.addEventListener('click', () => {
+  openNumberDial({
+    title: 'Stress', value: ms.stress, min: 2, max: 20,
+    actionLabel: 'Set Stress', inputLabel: 'Current Stress',
+    commit: setStress,
+  });
 });
 // The illustrated signature dice are the actions themselves. This removes a
 // redundant mode-selection row and a second generic Roll button.
@@ -1851,16 +1857,19 @@ function systemStageDescriptors() {
     case 'mist':
       add(2, { sides: 6, kind: '2d6' });
       break;
-    case 'mothership':
-      // A Check/Save previews the percentile pair (tens + ones); a Panic Check
-      // previews the single d20. Both are fixed rolls, shown on entry.
+    case 'mothership': {
+      // Advantage/Disadvantage rolls the complete check twice. Stage both
+      // percentile pairs (four physical d10s) or both Panic d20s so the tray
+      // visibly matches the selected notation before the roll.
+      const copies = ms.advantage ? 2 : 1;
       if (ms.mode === 'panic') {
-        out.push({ sides: 20, genColor: MS_COLORS.panic, kind: 'ms-panic' });
+        add(copies, { sides: 20, genColor: MS_COLORS.panic, kind: 'ms-panic' });
       } else {
-        out.push({ sides: 10, genColor: MS_COLORS.tens, kind: 'ms-check' });
-        out.push({ sides: 10, genColor: MS_COLORS.ones, kind: 'ms-check' });
+        add(copies, { sides: 10, genColor: MS_COLORS.tens, kind: 'ms-check' });
+        add(copies, { sides: 10, genColor: MS_COLORS.ones, kind: 'ms-check' });
       }
       break;
+    }
   }
   return out;
 }
@@ -2258,17 +2267,25 @@ $('historyClear').addEventListener('click', () => {
   openHistory();
 });
 
-// ---- custom die ----
+// ---- tactile number dial ----
 //
-// A scroll wheel, the way a phone's timer picker works: flick through the
-// numbers and one snaps under the marker. Scroll-snap does the physics, so
-// there is no momentum code to write and it feels native on both platforms.
-// The field beside it is for jumping straight to a number like 57.
+// The d? scroll wheel also sets bounded character values. It keeps the tactile
+// phone-timer interaction the user liked while the field beside it still permits
+// a direct jump such as Target 73. Only its title, range, prefix and commit action
+// change; all three launchers share the same accessible dialog.
 
 const MAX_SIDES = 1000;
 const dial = $('dial');
 const wheel = $('wheel');
 const dialInput = $('dialInput');
+const dialTitle = $('dialTitle');
+const dialPrefix = $('dialPrefix');
+const dialAdd = $('dialAdd');
+let customSides = 20;
+let dialConfig = {
+  title: 'Custom die', value: customSides, min: 1, max: MAX_SIDES, prefix: 'd',
+  actionLabel: 'Add to tray', inputLabel: 'Number of sides', commit: () => {},
+};
 
 for (let n = 1; n <= MAX_SIDES; n++) {
   const item = document.createElement('div');
@@ -2283,7 +2300,10 @@ const wheelItem = n => wheel.children[n - 1];
 
 function dialValue() {
   const n = parseInt(dialInput.value, 10);
-  return Number.isFinite(n) && n >= 1 ? Math.min(n, MAX_SIDES) : 20;
+  const fallback = Math.max(dialConfig.min, Math.min(dialConfig.max, dialConfig.value));
+  return Number.isFinite(n)
+    ? Math.max(dialConfig.min, Math.min(dialConfig.max, n))
+    : fallback;
 }
 
 function centreWheel(n, smooth = false) {
@@ -2296,10 +2316,10 @@ function centreWheel(n, smooth = false) {
 }
 
 function setDial(n, { scroll = true, focusField = false } = {}) {
-  const value = Math.max(1, Math.min(MAX_SIDES, n));
+  const value = Math.max(dialConfig.min, Math.min(dialConfig.max, Math.round(n)));
   dialInput.value = String(value);
   for (const item of wheel.children) {
-    item.setAttribute('aria-selected', String(Number(item.dataset.value) === value));
+    item.setAttribute('aria-selected', String(!item.hidden && Number(item.dataset.value) === value));
   }
   if (scroll) centreWheel(value);
   if (focusField) dialInput.select();
@@ -2311,8 +2331,9 @@ wheel.addEventListener('scroll', () => {
   clearTimeout(wheelSettle);
   wheelSettle = setTimeout(() => {
     const middle = wheel.scrollTop + wheel.clientHeight / 2;
-    let closest = 1, best = Infinity;
+    let closest = dialConfig.min, best = Infinity;
     for (const item of wheel.children) {
+      if (item.hidden) continue;
       const d = Math.abs(item.offsetTop + item.offsetHeight / 2 - middle);
       if (d < best) { best = d; closest = Number(item.dataset.value); }
     }
@@ -2335,31 +2356,55 @@ wheel.addEventListener('keydown', e => {
 
 dialInput.addEventListener('input', () => {
   const n = parseInt(dialInput.value, 10);
-  if (Number.isFinite(n) && n >= 1 && n <= MAX_SIDES) setDial(n, { scroll: true });
+  if (Number.isFinite(n) && n >= dialConfig.min && n <= dialConfig.max) setDial(n, { scroll: true });
 });
 dialInput.addEventListener('focus', () => dialInput.select());
 
-function openDial() {
+function openNumberDial(config) {
+  dialConfig = { prefix: '', ...config };
+  dialTitle.textContent = dialConfig.title;
+  dialPrefix.textContent = dialConfig.prefix;
+  dialPrefix.hidden = !dialConfig.prefix;
+  dialInput.setAttribute('aria-label', dialConfig.inputLabel);
+  wheel.setAttribute('aria-label', dialConfig.inputLabel);
+  dialAdd.textContent = dialConfig.actionLabel;
+  for (const item of wheel.children) {
+    const value = Number(item.dataset.value);
+    item.hidden = value < dialConfig.min || value > dialConfig.max;
+    item.textContent = `${dialConfig.prefix}${value}`;
+  }
   setHelp(false);
   closeSheet();
   closeHistory();
   closeRoom();
   closeMode();
   dial.hidden = false;
-  setDial(dialValue());
+  setDial(dialConfig.value);
   hideHint();
+}
+
+function openDial() {
+  openNumberDial({
+    title: 'Custom die', value: customSides, min: 1, max: MAX_SIDES, prefix: 'd',
+    actionLabel: 'Add to tray', inputLabel: 'Number of sides',
+    commit: sides => {
+      customSides = sides;
+      const button = ensureDieButton(sides);
+      addToPool(sides, perTap());
+      button.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+    },
+  });
 }
 
 function closeDial() { dial.hidden = true; }
 
 $('customDie').addEventListener('click', openDial);
 $('dialClose').addEventListener('click', closeDial);
-$('dialAdd').addEventListener('click', () => {
-  const sides = dialValue();
+dialAdd.addEventListener('click', () => {
+  const value = dialValue();
+  const commit = dialConfig.commit;
   closeDial();
-  const button = ensureDieButton(sides);
-  addToPool(sides, perTap());
-  button.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+  commit(value);
 });
 
 // ---- modifier sheet ----

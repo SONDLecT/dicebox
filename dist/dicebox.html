@@ -885,16 +885,16 @@ body {
   transition: border-color 140ms ease, color 140ms ease, background 140ms ease, transform 120ms ease;
 }
 .ms-check-roll, .ms-panic-roll { border-color: var(--accent); }
-.ms-role-ico { width: 34px; height: 34px; display: block; }
+.ms-role-ico { width: 34px; height: 34px; flex: 0 0 auto; display: block; }
+.ms-percentile-ico { width: 42px; }
 .ms-panic-ico { overflow: visible; }
-.ms-role-ico path { fill: currentColor; fill-opacity: 0.1; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; }
-.ms-role-ico .facet { fill: none; stroke-width: 1.05; opacity: 0.72; }
-.ms-percentile-ico .rear { opacity: 0.6; }
+.ms-role-ico polygon { fill: color-mix(in srgb, currentColor 10%, transparent); stroke: currentColor; stroke-width: 1.3; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.ms-percentile-ico .rear { opacity: 0.58; }
 .ms-role-label { color: var(--line); font-size: 10.5px; font-weight: 650; white-space: nowrap; }
 .ms-role-die { color: var(--muted); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; }
 .ms-role-roll:active { transform: scale(0.97); }
-/* Target, Skill tier, and Stress are direct controls: tap once and type/select
-   the actual character value instead of stepping through it one point at a time. */
+/* Target and Stress launch the tactile number wheel; Skill remains a direct
+   select. The small ↕ says “flickable dial”, not one-point spinner arrows. */
 .ms-fields-row { justify-content: center; align-items: center; }
 .ms-direct-field {
   min-height: 44px;
@@ -919,6 +919,19 @@ body {
 }
 .ms-direct-field input { width: 42px; text-align: center; }
 .ms-direct-field select { width: 94px; cursor: pointer; }
+.ms-value-dial {
+  min-width: 42px;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--line);
+  font: 600 15px/1 system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.ms-value-dial::after { content: "↕"; margin-left: 4px; color: var(--accent); font-size: 10px; }
+.ms-value-dial:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .ms-direct-field:focus-within { border-color: var(--accent); }
 /* Advantage and Disadvantage borrow One Ring's visual explanation: the outlined
    die is discarded and the accent die is kept. This remains accurate because
@@ -2735,7 +2748,7 @@ body {
 
         <div class="dial-actions">
           <label class="dial-entry">
-            <span>d</span>
+            <span id="dialPrefix">d</span>
             <input id="dialInput" type="text" inputmode="numeric" autocomplete="off"
                    value="20" aria-label="Number of sides">
           </label>
@@ -2752,14 +2765,14 @@ body {
 
   <section class="picker" id="numPicker" aria-label="Dice">
     <div class="ms-fields-row" id="msFieldsRow" hidden>
-      <label class="ms-direct-field" for="msTargetInput">
+      <div class="ms-direct-field">
         <span>Target</span>
-        <input id="msTargetInput" type="number" inputmode="numeric" min="1" max="99" value="30" aria-label="Target number">
-      </label>
-      <label class="ms-direct-field" for="msStressInput">
+        <button type="button" class="ms-value-dial" id="msTargetDial" aria-haspopup="dialog" aria-controls="dial" aria-label="Set Target">30</button>
+      </div>
+      <div class="ms-direct-field">
         <span>Stress</span>
-        <input id="msStressInput" type="number" inputmode="numeric" min="2" max="20" value="2" aria-label="Current Stress">
-      </label>
+        <button type="button" class="ms-value-dial" id="msStressDial" aria-haspopup="dialog" aria-controls="dial" aria-label="Set Stress">2</button>
+      </div>
       <label class="ms-direct-field ms-skill-field" for="msSkillSelect">
         <span>Skill</span>
         <select id="msSkillSelect" aria-label="Skill tier">
@@ -2992,16 +3005,19 @@ body {
         <span class="ms-adv-label">Advantage</span>
       </button>
       <button type="button" class="ms-role-roll ms-check-roll" id="msCheckRoll" aria-label="Roll Check or Save with percentile dice">
-        <svg class="ms-role-ico ms-percentile-ico" viewBox="0 0 40 40" aria-hidden="true">
-          <g class="rear"><path d="M12 3 24 10v10L12 37 0 20V10Z"/><path class="facet" d="M0 10 12 18 24 10M12 18v19"/></g>
-          <g><path d="M28 3 40 10v10L28 37 16 20V10Z"/><path class="facet" d="M16 10 28 18 40 10M28 18v19"/></g>
+        <svg class="ms-role-ico ms-percentile-ico" data-geometry="dicebox-solid-d10" viewBox="0 0 56 40" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+          <g class="rear" transform="translate(0 5) scale(.75)">
+            <polygon points="35.5,25.9 37,23.7 33.4,14.4 23.6,5.2"/><polygon points="16.7,27.1 26.6,31.5 35.5,25.9 23.6,5.2"/><polygon points="3,16.3 6.6,25.6 16.7,27.1 23.6,5.2"/><polygon points="16.4,34.8 26.6,31.5 16.7,27.1 6.6,25.6"/><polygon points="13.4,8.5 4.5,14.1 3,16.3 23.6,5.2"/>
+          </g>
+          <g transform="translate(26 5) scale(.75)">
+            <polygon points="22.3,25.3 30.4,30.3 37,25.4 26.2,4.4"/><polygon points="5.3,15.6 10.9,24.3 22.3,25.3 26.2,4.4"/><polygon points="13.8,35.6 30.4,30.3 22.3,25.3 10.9,24.3"/><polygon points="9.6,9.7 3,14.6 5.3,15.6 26.2,4.4"/><polygon points="13.8,35.6 10.9,24.3 5.3,15.6 3,14.6"/>
+          </g>
         </svg>
         <span class="ms-role-label">Check / Save</span><span class="ms-role-die">d100</span>
       </button>
       <button type="button" class="ms-role-roll ms-panic-roll" id="msPanicRoll" aria-label="Roll Panic Check with a d20">
-        <svg class="ms-role-ico ms-panic-ico" viewBox="0 0 40 40" aria-hidden="true">
-          <path d="M20 2 36 10 33 30 20 38 7 30 4 10Z"/>
-          <path class="facet" d="M20 2 13 16 4 10M20 2l7 14 9-6M13 16l7 22 7-22M7 30l6-14h14l6 14"/>
+        <svg class="ms-role-ico ms-panic-ico" data-geometry="dicebox-solid-d20" viewBox="0 0 40 40" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+          <polygon points="3,18.6 10.2,34.5 15.1,28.1"/><polygon points="15.1,28.1 10.2,34.5 27.9,35.4"/><polygon points="16.3,9.7 3,18.6 15.1,28.1"/><polygon points="12.1,4.6 3,18.6 16.3,9.7"/><polygon points="15.1,28.1 27.9,35.4 31.7,20"/><polygon points="31.7,20 27.9,35.4 37,21.4"/><polygon points="31.7,20 16.3,9.7 15.1,28.1"/><polygon points="12.1,4.6 16.3,9.7 29.8,5.5"/><polygon points="29.8,5.5 16.3,9.7 31.7,20"/><polygon points="29.8,5.5 31.7,20 37,21.4"/>
         </svg>
         <span class="ms-role-label">Panic</span><span class="ms-role-die">d20</span>
       </button>
@@ -9330,9 +9346,9 @@ const ms = { mode: 'check', target: 30, skill: null, advantage: null, stress: 2 
 }
 const msAdvButtons = [...document.querySelectorAll('.ms-adv')];
 const msFieldsRow = $('msFieldsRow');
-const msTargetInput = $('msTargetInput');
+const msTargetDial = $('msTargetDial');
 const msSkillSelect = $('msSkillSelect');
-const msStressInput = $('msStressInput');
+const msStressDial = $('msStressDial');
 const msCheckRoll = $('msCheckRoll');
 const msPanicRoll = $('msPanicRoll');
 
@@ -9357,35 +9373,41 @@ function setStress(n, { restage = true } = {}) {
   ms.stress = Math.max(2, Math.min(20, Math.round(n)));
   store.set(MS_STRESS_KEY, String(ms.stress));
   if (restage) syncMs();
-  else msStressInput.value = String(ms.stress);
+  else msStressDial.textContent = String(ms.stress);
 }
 
 function syncMs({ writeField = true } = {}) {
-  msTargetInput.value = ms.target === null ? '' : String(ms.target);
+  msTargetDial.textContent = ms.target === null ? '—' : String(ms.target);
+  msTargetDial.setAttribute('aria-label', `Set Target, current ${ms.target === null ? 'unset' : ms.target}`);
   msSkillSelect.value = ms.skill || '';
   for (const b of msAdvButtons) b.setAttribute('aria-pressed', String(ms.advantage === b.dataset.adv));
-  msStressInput.value = String(ms.stress);
+  msStressDial.textContent = String(ms.stress);
+  msStressDial.setAttribute('aria-label', `Set Stress, current ${ms.stress}`);
   if (writeField) $('notation').value = msNotation();
   if (uiSystem === 'mothership') stageSystemPool();
 }
 
 // Advantage/Disadvantage are mutually exclusive; tapping the active choice clears it.
 for (const b of msAdvButtons) b.addEventListener('click', () => { ms.advantage = ms.advantage === b.dataset.adv ? null : b.dataset.adv; syncMs(); });
-// Character values are direct-entry controls: players can replace 30 with 72 in
-// one edit instead of tapping forty-two times. Native number inputs retain arrow
-// keys and mobile numeric keyboards; change clamps to the rules/UI bounds.
-msTargetInput.addEventListener('change', () => {
-  const n = Number(msTargetInput.value);
-  ms.target = msTargetInput.value === '' || !Number.isFinite(n) ? null : Math.max(1, Math.min(99, Math.round(n)));
-  syncMs();
+// Target and Stress launch the same tactile wheel + direct jump control as d?.
+// The resting rail stays two rows; the larger interaction exists only while used.
+msTargetDial.addEventListener('click', () => {
+  openNumberDial({
+    title: 'Target', value: ms.target ?? 30, min: 1, max: 99,
+    actionLabel: 'Set Target', inputLabel: 'Target number',
+    commit: value => { ms.target = value; syncMs(); },
+  });
 });
 msSkillSelect.addEventListener('change', () => {
   ms.skill = msSkillSelect.value || null;
   syncMs();
 });
-msStressInput.addEventListener('change', () => {
-  const n = Number(msStressInput.value);
-  if (Number.isFinite(n)) setStress(n); else syncMs();
+msStressDial.addEventListener('click', () => {
+  openNumberDial({
+    title: 'Stress', value: ms.stress, min: 2, max: 20,
+    actionLabel: 'Set Stress', inputLabel: 'Current Stress',
+    commit: setStress,
+  });
 });
 // The illustrated signature dice are the actions themselves. This removes a
 // redundant mode-selection row and a second generic Roll button.
@@ -9650,16 +9672,19 @@ function systemStageDescriptors() {
     case 'mist':
       add(2, { sides: 6, kind: '2d6' });
       break;
-    case 'mothership':
-      // A Check/Save previews the percentile pair (tens + ones); a Panic Check
-      // previews the single d20. Both are fixed rolls, shown on entry.
+    case 'mothership': {
+      // Advantage/Disadvantage rolls the complete check twice. Stage both
+      // percentile pairs (four physical d10s) or both Panic d20s so the tray
+      // visibly matches the selected notation before the roll.
+      const copies = ms.advantage ? 2 : 1;
       if (ms.mode === 'panic') {
-        out.push({ sides: 20, genColor: MS_COLORS.panic, kind: 'ms-panic' });
+        add(copies, { sides: 20, genColor: MS_COLORS.panic, kind: 'ms-panic' });
       } else {
-        out.push({ sides: 10, genColor: MS_COLORS.tens, kind: 'ms-check' });
-        out.push({ sides: 10, genColor: MS_COLORS.ones, kind: 'ms-check' });
+        add(copies, { sides: 10, genColor: MS_COLORS.tens, kind: 'ms-check' });
+        add(copies, { sides: 10, genColor: MS_COLORS.ones, kind: 'ms-check' });
       }
       break;
+    }
   }
   return out;
 }
@@ -10057,17 +10082,25 @@ $('historyClear').addEventListener('click', () => {
   openHistory();
 });
 
-// ---- custom die ----
+// ---- tactile number dial ----
 //
-// A scroll wheel, the way a phone's timer picker works: flick through the
-// numbers and one snaps under the marker. Scroll-snap does the physics, so
-// there is no momentum code to write and it feels native on both platforms.
-// The field beside it is for jumping straight to a number like 57.
+// The d? scroll wheel also sets bounded character values. It keeps the tactile
+// phone-timer interaction the user liked while the field beside it still permits
+// a direct jump such as Target 73. Only its title, range, prefix and commit action
+// change; all three launchers share the same accessible dialog.
 
 const MAX_SIDES = 1000;
 const dial = $('dial');
 const wheel = $('wheel');
 const dialInput = $('dialInput');
+const dialTitle = $('dialTitle');
+const dialPrefix = $('dialPrefix');
+const dialAdd = $('dialAdd');
+let customSides = 20;
+let dialConfig = {
+  title: 'Custom die', value: customSides, min: 1, max: MAX_SIDES, prefix: 'd',
+  actionLabel: 'Add to tray', inputLabel: 'Number of sides', commit: () => {},
+};
 
 for (let n = 1; n <= MAX_SIDES; n++) {
   const item = document.createElement('div');
@@ -10082,7 +10115,10 @@ const wheelItem = n => wheel.children[n - 1];
 
 function dialValue() {
   const n = parseInt(dialInput.value, 10);
-  return Number.isFinite(n) && n >= 1 ? Math.min(n, MAX_SIDES) : 20;
+  const fallback = Math.max(dialConfig.min, Math.min(dialConfig.max, dialConfig.value));
+  return Number.isFinite(n)
+    ? Math.max(dialConfig.min, Math.min(dialConfig.max, n))
+    : fallback;
 }
 
 function centreWheel(n, smooth = false) {
@@ -10095,10 +10131,10 @@ function centreWheel(n, smooth = false) {
 }
 
 function setDial(n, { scroll = true, focusField = false } = {}) {
-  const value = Math.max(1, Math.min(MAX_SIDES, n));
+  const value = Math.max(dialConfig.min, Math.min(dialConfig.max, Math.round(n)));
   dialInput.value = String(value);
   for (const item of wheel.children) {
-    item.setAttribute('aria-selected', String(Number(item.dataset.value) === value));
+    item.setAttribute('aria-selected', String(!item.hidden && Number(item.dataset.value) === value));
   }
   if (scroll) centreWheel(value);
   if (focusField) dialInput.select();
@@ -10110,8 +10146,9 @@ wheel.addEventListener('scroll', () => {
   clearTimeout(wheelSettle);
   wheelSettle = setTimeout(() => {
     const middle = wheel.scrollTop + wheel.clientHeight / 2;
-    let closest = 1, best = Infinity;
+    let closest = dialConfig.min, best = Infinity;
     for (const item of wheel.children) {
+      if (item.hidden) continue;
       const d = Math.abs(item.offsetTop + item.offsetHeight / 2 - middle);
       if (d < best) { best = d; closest = Number(item.dataset.value); }
     }
@@ -10134,31 +10171,55 @@ wheel.addEventListener('keydown', e => {
 
 dialInput.addEventListener('input', () => {
   const n = parseInt(dialInput.value, 10);
-  if (Number.isFinite(n) && n >= 1 && n <= MAX_SIDES) setDial(n, { scroll: true });
+  if (Number.isFinite(n) && n >= dialConfig.min && n <= dialConfig.max) setDial(n, { scroll: true });
 });
 dialInput.addEventListener('focus', () => dialInput.select());
 
-function openDial() {
+function openNumberDial(config) {
+  dialConfig = { prefix: '', ...config };
+  dialTitle.textContent = dialConfig.title;
+  dialPrefix.textContent = dialConfig.prefix;
+  dialPrefix.hidden = !dialConfig.prefix;
+  dialInput.setAttribute('aria-label', dialConfig.inputLabel);
+  wheel.setAttribute('aria-label', dialConfig.inputLabel);
+  dialAdd.textContent = dialConfig.actionLabel;
+  for (const item of wheel.children) {
+    const value = Number(item.dataset.value);
+    item.hidden = value < dialConfig.min || value > dialConfig.max;
+    item.textContent = `${dialConfig.prefix}${value}`;
+  }
   setHelp(false);
   closeSheet();
   closeHistory();
   closeRoom();
   closeMode();
   dial.hidden = false;
-  setDial(dialValue());
+  setDial(dialConfig.value);
   hideHint();
+}
+
+function openDial() {
+  openNumberDial({
+    title: 'Custom die', value: customSides, min: 1, max: MAX_SIDES, prefix: 'd',
+    actionLabel: 'Add to tray', inputLabel: 'Number of sides',
+    commit: sides => {
+      customSides = sides;
+      const button = ensureDieButton(sides);
+      addToPool(sides, perTap());
+      button.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+    },
+  });
 }
 
 function closeDial() { dial.hidden = true; }
 
 $('customDie').addEventListener('click', openDial);
 $('dialClose').addEventListener('click', closeDial);
-$('dialAdd').addEventListener('click', () => {
-  const sides = dialValue();
+dialAdd.addEventListener('click', () => {
+  const value = dialValue();
+  const commit = dialConfig.commit;
   closeDial();
-  const button = ensureDieButton(sides);
-  addToPool(sides, perTap());
-  button.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+  commit(value);
 });
 
 // ---- modifier sheet ----

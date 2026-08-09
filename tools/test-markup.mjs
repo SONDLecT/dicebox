@@ -56,13 +56,15 @@ ok('Mothership failed rolls surface Stress overflow consequences',
    /resolveMothershipStress\(ms\.stress, result\.summary\.stressDelta\)/.test(js) &&
    /result\.summary\.stressOverflow\s*=/.test(js));
 
-// Large character values must be directly editable; one-tap-per-point steppers
-// are not usable for moving a Target across the normal percentile range.
-ok('Mothership Target and Stress are direct bounded number inputs',
-   /id="msTargetInput"[^>]*type="number"[^>]*min="1"[^>]*max="99"/.test(html) &&
-   /id="msStressInput"[^>]*type="number"[^>]*min="2"[^>]*max="20"/.test(html) &&
-   /msTargetInput\.addEventListener\('change'/.test(js) &&
-   /msStressInput\.addEventListener\('change'/.test(js));
+// Character values use the same wheel + direct-jump sheet as d?. This keeps the
+// tactile interaction without restoring one-point steppers to the compact rail.
+ok('Mothership Target and Stress open bounded tactile number dials',
+   /id="msTargetDial"[^>]*aria-haspopup="dialog"[^>]*aria-controls="dial"/.test(html) &&
+   /id="msStressDial"[^>]*aria-haspopup="dialog"[^>]*aria-controls="dial"/.test(html) &&
+   /msTargetDial\.addEventListener\('click'[^]*openNumberDial\(\{[^]*title: 'Target'[^]*min: 1[^]*max: 99[^]*actionLabel: 'Set Target'/.test(js) &&
+   /msStressDial\.addEventListener\('click'[^]*openNumberDial\(\{[^]*title: 'Stress'[^]*min: 2[^]*max: 20[^]*actionLabel: 'Set Stress'/.test(js) &&
+   /function openNumberDial\(config\)/.test(js) &&
+   /\.ms-value-dial::after\s*\{[^}]*content:\s*["']↕["']/.test(css));
 
 // Both Daggerheart and Mothership show their signature picker together with the
 // ordinary numeric strip; moving the strip after the final signature picker keeps
@@ -100,12 +102,14 @@ ok('Mothership small text meets WCAG AA contrast in both themes', contrastPass);
 // dice, compact number pills, and keep/drop dice around the primary roll action.
 const msMarkup = html.slice(html.indexOf('id="msPicker"'), html.indexOf('</section>', html.indexOf('id="msPicker"')));
 const numMarkup = html.slice(html.indexOf('id="numPicker"'), html.indexOf('</section>', html.indexOf('id="numPicker"')));
-ok('Mothership uses illustrated percentile and d20 role tiles',
-   (msMarkup.match(/class="ms-role-ico/g) || []).length === 2 &&
-   /id="msCheckRoll"[^]*class="ms-role-ico ms-percentile-ico" viewBox="0 0 40 40"/.test(msMarkup) &&
-   /id="msPanicRoll"[^]*class="ms-role-ico ms-panic-ico" viewBox="0 0 40 40"/.test(msMarkup));
+ok('Mothership role glyphs use canonical solid projections without CSS distortion',
+   /class="ms-role-ico ms-percentile-ico" data-geometry="dicebox-solid-d10" viewBox="0 0 56 40" preserveAspectRatio="xMidYMid meet"/.test(msMarkup) &&
+   /class="ms-role-ico ms-panic-ico" data-geometry="dicebox-solid-d20" viewBox="0 0 40 40" preserveAspectRatio="xMidYMid meet"/.test(msMarkup) &&
+   (msMarkup.match(/<polygon/g) || []).length >= 20 &&
+   /\.ms-role-ico\s*\{[^}]*height:\s*34px[^}]*flex:\s*0 0 auto/.test(css) &&
+   /\.ms-percentile-ico\s*\{[^}]*width:\s*42px/.test(css));
 ok('Mothership direct settings share the numeric rail',
-   /id="msFieldsRow"[^]*id="msTargetInput"[^]*id="msStressInput"[^]*id="msSkillSelect"/.test(numMarkup) &&
+   /id="msFieldsRow"[^]*id="msTargetDial"[^]*id="msStressDial"[^]*id="msSkillSelect"/.test(numMarkup) &&
    !/class="ms-fields-row"/.test(msMarkup));
 ok('Mothership Skill is a direct four-tier select',
    /id="msSkillSelect"[^]*value=""[^]*value="t"[^]*value="e"[^]*value="m"/.test(numMarkup) &&
@@ -115,6 +119,8 @@ ok('Mothership advantage choices show kept and dropped dice',
    (msMarkup.match(/class="drop"/g) || []).length >= 2 &&
    (msMarkup.match(/class="keep"/g) || []).length >= 2 &&
    />Advantage</.test(msMarkup) && />Disadvantage</.test(msMarkup));
+ok('Mothership Advantage and Disadvantage visibly stage the second roll',
+   /case 'mothership':[^]*const copies = ms\.advantage \? 2 : 1;[^]*add\(copies, \{ sides: 20[^]*add\(copies, \{ sides: 10[^]*add\(copies, \{ sides: 10/.test(js));
 ok('Mothership Check and Panic tiles roll directly between advantage choices',
    /class="ms-action-row"[^]*data-adv="adv"[^]*id="msCheckRoll"[^]*id="msPanicRoll"[^]*data-adv="dis"/.test(msMarkup) &&
    /msCheckRoll\.addEventListener\('click'[^]*ms\.mode = 'check'[^]*doRoll/.test(js) &&
