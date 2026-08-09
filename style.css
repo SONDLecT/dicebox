@@ -1016,17 +1016,17 @@ body {
 /* The mode sheet is a touch narrower than the modifier sheet: two cards want a
    compact shelf, not the full width. */
 /* ---- Cards: the deck rail ---- */
-/* One row: the accent Draw action, the count chip, Shuffle, the two deck
-   toggles, and the live remaining count. */
+/* Compact: count chip, Shuffle, the two icon toggles, and the live count. The
+   draw itself is the entry button (relabelled Draw) and the deck on the tray. */
 .cards-picker { display: flex; gap: 8px; justify-content: center; align-items: stretch; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; }
-.deck-draw, .deck-shuffle {
+.deck-shuffle {
   display: inline-flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 2px;
-  min-width: 74px;
-  padding: 6px 12px 5px;
+  min-width: 64px;
+  padding: 5px 10px 4px;
   border: 1px solid var(--hair);
   border-radius: 12px;
   background: none;
@@ -1037,18 +1037,38 @@ body {
   touch-action: manipulation;
   transition: border-color 140ms ease, background 140ms ease, transform 120ms ease;
 }
-.deck-draw { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
-.deck-draw svg { width: 30px; height: 30px; }
-.deck-draw svg rect { fill: color-mix(in srgb, currentColor 10%, transparent); stroke: currentColor; stroke-width: 1.8; }
-.deck-draw-label { font-size: 10.5px; font-weight: 650; color: var(--line); white-space: nowrap; }
-.deck-shuffle svg { width: 30px; height: 30px; }
+.deck-shuffle svg { width: 26px; height: 26px; }
 .deck-shuffle svg path { fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-.deck-shuffle-label { font-size: 10.5px; color: var(--muted); white-space: nowrap; }
-.deck-draw:active, .deck-shuffle:active { transform: scale(0.95); }
-.deck-flag { gap: 1px; padding: 7px 10px; }
-.deck-flag-name { font-size: 11.5px; font-weight: 600; white-space: nowrap; }
-.deck-flag-sub { font-size: 10px; color: var(--muted); white-space: nowrap; }
-.deck-flag[aria-pressed="true"] .deck-flag-sub { color: var(--line); }
+.deck-shuffle-label { font-size: 10px; color: var(--muted); white-space: nowrap; }
+.deck-shuffle:active { transform: scale(0.94); }
+/* The toggles wear their meaning: a card with a joker star, a card with a
+   return arrow — pressed takes the accent, like every flag in the app. */
+.deck-flag {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-width: 58px;
+  padding: 4px 8px 4px;
+  border: 1px solid var(--hair);
+  border-radius: 12px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: border-color 140ms ease, color 140ms ease, background 140ms ease, transform 120ms ease;
+}
+.deck-flag-ico { width: 26px; height: 26px; display: block; }
+.deck-flag-ico .crd { fill: none; stroke: currentColor; stroke-width: 1.7; }
+.deck-flag-ico .mark { fill: currentColor; }
+.deck-flag-ico .mark2 { fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.deck-flag-name { font-size: 10px; letter-spacing: 0.01em; white-space: nowrap; }
+.deck-flag[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.deck-flag[aria-pressed="true"] .deck-flag-name { color: var(--line); }
+.deck-flag:active { transform: scale(0.94); }
 .deck-remain {
   align-self: center;
   font: 600 12px ui-monospace, monospace;

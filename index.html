@@ -1015,13 +1015,6 @@
        draw); the rail sets how many, riffles the stack, and flips the deck's
        two settings. The deck persists like Mothership's Stress. -->
   <section class="picker cards-picker" id="cardsPicker" aria-label="Card deck" hidden>
-    <button type="button" class="deck-draw" id="deckDraw" aria-label="Draw cards">
-      <svg viewBox="0 0 30 30" aria-hidden="true">
-        <rect x="4" y="5" width="14" height="20" rx="2.4" transform="rotate(-8 11 15)"/>
-        <rect x="12" y="5" width="14" height="20" rx="2.4" transform="rotate(8 19 15)"/>
-      </svg>
-      <span class="deck-draw-label">Draw</span>
-    </button>
     <button type="button" class="spin-chip" id="deckCountChip" aria-label="Cards per draw — tap to raise, hold to lower">
       <span class="spin-chip-label">Cards</span>
       <span class="spin-chip-val" id="deckCount">1</span>
@@ -1032,13 +1025,19 @@
       </svg>
       <span class="deck-shuffle-label">Shuffle</span>
     </button>
-    <button type="button" class="tor-flag deck-flag" data-flag="jokers" aria-pressed="false" aria-label="Include the two jokers (reshuffles)">
+    <button type="button" class="deck-flag" data-flag="jokers" aria-pressed="false" aria-label="Include the two jokers (reshuffles)">
+      <svg class="deck-flag-ico" viewBox="0 0 30 30" aria-hidden="true">
+        <rect class="crd" x="8" y="4" width="14" height="21" rx="2.4"/>
+        <path class="mark" d="M15 9 L16.6 13 L20.6 13.3 L17.5 15.9 L18.5 19.8 L15 17.6 L11.5 19.8 L12.5 15.9 L9.4 13.3 L13.4 13Z"/>
+      </svg>
       <span class="deck-flag-name">Jokers</span>
-      <span class="deck-flag-sub">54 cards</span>
     </button>
-    <button type="button" class="tor-flag deck-flag" data-flag="replace" aria-pressed="false" aria-label="Draw with replacement — cards return to the deck">
+    <button type="button" class="deck-flag" data-flag="replace" aria-pressed="false" aria-label="Draw with replacement — cards return to the deck">
+      <svg class="deck-flag-ico" viewBox="0 0 30 30" aria-hidden="true">
+        <rect class="crd" x="8" y="4" width="14" height="21" rx="2.4"/>
+        <path class="mark2" d="M11.2 14.6 a3.9 3.9 0 1 1 1.1 2.9 M11 20 L11.2 16.9 L14.3 17.2"/>
+      </svg>
       <span class="deck-flag-name">Replace</span>
-      <span class="deck-flag-sub">put back</span>
     </button>
     <span class="deck-remain" id="deckRemain" aria-label="Cards remaining">52/52</span>
   </section>
@@ -1049,7 +1048,7 @@
            placeholder="Tap dice above, or type 3d6+2"
            aria-label="Dice notation">
     <button type="button" class="clear" id="clear" aria-label="Clear the pool">✕</button>
-    <button type="submit" class="roll">Roll</button>
+    <button type="submit" class="roll" id="rollGo">Roll</button>
   </form>
 
   <p class="error" id="error" role="alert" hidden></p>

@@ -96,6 +96,12 @@ syncThemeLabel();
 $('themeToggle').addEventListener('click', () => {
   document.documentElement.dataset.theme = isDark() ? 'light' : 'dark';
   store.set('dicebox:theme', document.documentElement.dataset.theme);
+  // Cards are rasterised per theme; without this they keep the old ink until
+  // the next draw. Preload the new theme's images, then let the frame redraw.
+  if (uiSystem === 'cards' && cardArt) {
+    const ids = [...new Set(state.dice.filter(d => d.isCard).map(d => (d.isStack ? 'back' : d.id)))];
+    Promise.all(ids.map(id => cardImage(id).ready)).then(dropIdleCache);
+  }
   syncThemeLabel();
   updateThemeColor();
   // Re-apply the active system's palette so its dark/light pair follows the
@@ -1018,6 +1024,9 @@ function setSystem(system, { roll = false, url = true } = {}) {
   twod6Picker.hidden = system !== 'pbta' && system !== 'mist';
   msPicker.hidden = system !== 'mothership';
   cardsPicker.hidden = system !== 'cards';
+  // One action, one name: the entry button IS the draw in Cards mode, so the
+  // picker carries no second Draw button.
+  $('rollGo').textContent = system === 'cards' ? 'Draw' : 'Roll';
   // The deck's art loads on first entry; the stack appears when it lands. The
   // module is service-worker-precached, so this works offline too.
   if (system === 'cards') {
@@ -1903,10 +1912,24 @@ class DeckStackSprite {
     this.settled = true; this.settling = true; this.settleT = 1;
     this.riffle = 0;
     this.value = 'deck';
+    this.tween = null; // { fx, fy, fw, tx, ty, tw, t }
+  }
+  moveTo(x, y, w) {
+    this.tween = { fx: this.x, fy: this.y, fw: this.size, tx: x, ty: y, tw: w, t: 0 };
+    this.value = null;
   }
   step(dt) {
+    if (this.tween) {
+      const tw = this.tween;
+      tw.t = Math.min(1, tw.t + dt / 0.3);
+      const e = 1 - Math.pow(1 - tw.t, 3);
+      this.x = tw.fx + (tw.tx - tw.fx) * e;
+      this.y = tw.fy + (tw.ty - tw.fy) * e;
+      this.size = tw.fw + (tw.tw - tw.fw) * e;
+      if (tw.t >= 1) { this.tween = null; if (this.riffle === 0) this.value = 'deck'; }
+    }
     if (this.riffle > 0) {
-      this.riffle = Math.max(0, this.riffle - dt / 0.8);
+      this.riffle = Math.max(0, this.riffle - dt / 1.15);
       this.value = this.riffle > 0 ? null : 'deck';
     }
   }
@@ -1920,15 +1943,52 @@ class DeckStackSprite {
     ctx.shadowBlur = 8;
     ctx.shadowOffsetY = 3;
     if (this.riffle > 0) {
-      // The shuffle: the stack fans out and snaps back, cards leafing through
-      // one another on the way home.
-      const spread = Math.sin(Math.PI * Math.min(1, this.riffle * 1.15));
-      for (let i = 0; i < 7; i++) {
-        const k = (i - 3) / 3;
+      // A three-act shuffle, driven backwards from riffle 1 -> 0:
+      //   split   — the deck cuts into two halves that swing apart;
+      //   riffle  — twelve cards leaf back together, alternating hands,
+      //             each on its own little arc with spin;
+      //   square  — the pile squashes flat with a pulse.
+      const p = 1 - this.riffle; // 0 -> 1 over the animation
+      const SPLIT = 0.22, RIFFLE = 0.78;
+      if (p < SPLIT) {
+        const e = p / SPLIT;
+        const gap = Math.sin(e * Math.PI / 2) * w * 0.72;
+        const tilt = Math.sin(e * Math.PI / 2) * 0.3;
+        for (const side of [-1, 1]) {
+          ctx.save();
+          ctx.translate(side * gap, -Math.sin(e * Math.PI) * h * 0.06);
+          ctx.rotate(side * tilt);
+          for (let i = 2; i >= 0; i--) {
+            ctx.save(); ctx.translate(i * 2, i * 2 - 2); ctx.drawImage(img, -w / 2, -h / 2, w, h); ctx.restore();
+          }
+          ctx.restore();
+        }
+      } else if (p < RIFFLE) {
+        const e = (p - SPLIT) / (RIFFLE - SPLIT);
+        const CARDS = 12;
+        for (let i = 0; i < CARDS; i++) {
+          const side = i % 2 ? 1 : -1;
+          // Each card gets a slice of the phase; later cards start further out.
+          const start = i / CARDS * 0.7;
+          const t = Math.max(0, Math.min(1, (e - start) / 0.3));
+          const ez = 1 - Math.pow(1 - t, 3);
+          const gap = w * 0.72 * (1 - ez);
+          const lift = Math.sin(ez * Math.PI) * h * (0.18 + (i % 3) * 0.05);
+          const spin = side * (1 - ez) * (0.35 + (i % 4) * 0.08);
+          ctx.save();
+          ctx.translate(side * gap, -lift + (CARDS - i) * 0.8 - 5);
+          ctx.rotate(spin);
+          ctx.drawImage(img, -w / 2, -h / 2, w, h);
+          ctx.restore();
+        }
+      } else {
+        const e = (p - RIFFLE) / (1 - RIFFLE);
+        const squash = 1 + Math.sin(e * Math.PI) * 0.06;
         ctx.save();
-        ctx.rotate(k * 0.5 * spread);
-        ctx.translate(k * w * 0.55 * spread, -Math.abs(k) * 8 * spread + (3 - i) * 1.4);
-        ctx.drawImage(img, -w / 2, -h / 2, w, h);
+        ctx.scale(squash, 2 - squash);
+        for (let i = 2; i >= 0; i--) {
+          ctx.save(); ctx.translate(i * 2.5, i * 2.5 - 2.5); ctx.drawImage(img, -w / 2, -h / 2, w, h); ctx.restore();
+        }
         ctx.restore();
       }
     } else {
@@ -1945,33 +2005,56 @@ class DeckStackSprite {
     ctx.save();
     ctx.shadowColor = 'transparent';
     ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--muted');
-    ctx.font = '11px ui-monospace, monospace';
+    ctx.font = `${Math.max(11, Math.round(w * 0.09))}px ui-monospace, monospace`;
     ctx.textAlign = 'center';
-    ctx.fillText(deckState.replace ? `${deckTotal()} · replace` : `${deckRemaining()} left`, this.x, this.y + h / 2 + 18);
+    ctx.fillText(deckState.replace ? `${deckTotal()} · replace` : `${deckRemaining()} left`, this.x, this.y + h / 2 + Math.max(16, w * 0.13));
     ctx.restore();
   }
   throwWith() {}
   spinInPlace() {}
 }
 
-// Where the stack sits (right of the tray, like a shoe) and where drawn cards
-// land: centred rows in the space to its left.
+// Where the deck and the drawn cards sit, by how many were drawn. One card is
+// the whole show — it lands ON the deck, big; a small hand is a large centred
+// row; a big hand becomes a neat grid (like a fistful of dice) with the deck
+// stepping aside to the corner. Idle, the deck fills the stage.
 function deckLayout(n) {
   const b = state.bounds;
-  const stackW = Math.min(96, (b.right - b.left) * 0.2);
-  const stack = { x: b.right - stackW / 2 - 14, y: (b.top + b.floor) / 2, w: stackW };
-  const areaL = b.left + 10, areaR = stack.x - stackW / 2 - 26;
-  const cols = n <= 4 ? Math.max(1, n) : Math.ceil(n / 2);
-  const rows = n ? Math.ceil(n / cols) : 1;
-  const w = Math.max(56, Math.min(112, (areaR - areaL) / cols - 12, ((b.floor - b.top) / rows - 16) / CARD_RATIO));
+  const W_ = b.right - b.left, H_ = b.floor - b.top;
+  const cx = b.left + W_ / 2, cy = b.top + H_ / 2;
+
+  if (n === 0) {
+    const w = Math.min((H_ * 0.72) / CARD_RATIO, W_ * 0.52);
+    return { stack: { x: cx, y: cy, w }, slots: [] };
+  }
+  if (n === 1) {
+    // The drawn card covers the deck, offset just enough that the deck still
+    // reads as underneath it.
+    const w = Math.min((H_ * 0.78) / CARD_RATIO, W_ * 0.6);
+    return {
+      stack: { x: cx - w * 0.16, y: cy - w * 0.12, w: w * 0.94 },
+      slots: [{ x: cx + w * 0.09, y: cy + w * 0.07, w }],
+    };
+  }
+  // The deck steps aside; the hand takes the table.
+  const stackW = Math.max(48, Math.min(78, W_ * 0.15));
+  const stack = { x: b.right - stackW / 2 - 10, y: b.top + (stackW * CARD_RATIO) / 2 + 8, w: stackW };
+  const areaL = b.left + 8, areaR = b.right - 8, areaT = b.top + 8, areaB = b.floor - 10;
+  let best = null;
+  for (let cols = 1; cols <= n; cols++) {
+    const rows = Math.ceil(n / cols);
+    const w = Math.min((areaR - areaL) / cols - 10, ((areaB - areaT) / rows - 12) / CARD_RATIO, 200);
+    if (!best || w > best.w) best = { cols, rows, w };
+  }
+  const { cols, rows, w } = best;
   const slots = [];
   for (let i = 0; i < n; i++) {
     const r = Math.floor(i / cols), inRow = r === rows - 1 ? n - cols * (rows - 1) : cols;
     const c = i - r * cols;
-    const rowW = inRow * (w + 12) - 12;
+    const rowW = inRow * (w + 10) - 10;
     slots.push({
-      x: areaL + (areaR - areaL) / 2 - rowW / 2 + c * (w + 12) + w / 2,
-      y: b.top + (b.floor - b.top) / 2 + (r - (rows - 1) / 2) * (w * CARD_RATIO + 14),
+      x: areaL + (areaR - areaL) / 2 - rowW / 2 + c * (w + 10) + w / 2,
+      y: areaT + (areaB - areaT) / 2 + (r - (rows - 1) / 2) * (w * CARD_RATIO + 12),
       w,
     });
   }
@@ -2002,7 +2085,13 @@ async function dealCardsFlow(result, { remote = false } = {}) {
 
   const n = result.summary.drawn.length;
   const { stack, slots } = deckLayout(n);
-  const stackSprite = new DeckStackSprite(stack.x, stack.y, stack.w);
+  // The deck is continuous: the new stack sprite starts where the old one sat
+  // and glides to its new spot (aside for a hand, underneath for one card).
+  const prev = state.dice.find(d => d.isStack);
+  const stackSprite = new DeckStackSprite(prev ? prev.x : stack.x, prev ? prev.y : stack.y, prev ? prev.size : stack.w);
+  if (prev && (prev.x !== stack.x || prev.size !== stack.w)) stackSprite.moveTo(stack.x, stack.y, stack.w);
+  else { stackSprite.x = stack.x; stackSprite.y = stack.y; stackSprite.size = stack.w; }
+  const dealFrom = { x: prev ? prev.x : stack.x, y: prev ? prev.y : stack.y };
   const sprites = [stackSprite];
 
   // In Replace mode the previous draw visibly goes home before the new one
@@ -2018,7 +2107,7 @@ async function dealCardsFlow(result, { remote = false } = {}) {
     }
   }
   result.summary.drawn.forEach((c, i) => {
-    sprites.push(new CardSprite(c.id, { x: stack.x, y: stack.y }, slots[i], { delay: delay0 + i * 0.12, remote }));
+    sprites.push(new CardSprite(c.id, dealFrom, slots[i], { delay: delay0 + i * 0.12, remote }));
   });
 
   state.dice = sprites;
@@ -2094,14 +2183,13 @@ bindTapHold($('deckCountChip'), dir => {
   persistDeck();
   syncCardsUI({ restage: false });
 });
-$('deckDraw').addEventListener('click', () => doRoll(`deck:${deckState.draw}`));
 $('deckShuffle').addEventListener('click', () => {
   reshuffleDeck();
   ensureCardArt().then(() => {
     stageDeckIdle();
     const stack = state.dice.find(d => d.isStack);
     if (stack) { stack.riffle = 1; stack.value = null; dropIdleCache(); }
-    if (navigator.vibrate) navigator.vibrate([5, 25, 5, 25, 8]);
+    if (navigator.vibrate) navigator.vibrate([6, 40, 6, 40, 6, 40, 10]);
     syncCardsUI({ restage: false });
   });
 });
