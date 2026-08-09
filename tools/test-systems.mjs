@@ -13,6 +13,7 @@ import { parseStarWars, rollStarWars, summarizeStarWars, describeStarWars, starW
 import { parseOneRing, rollOneRing, summarizeOneRing, describeOneRing, oneRingHeadline } from '../system-dice.js';
 import { parsePbta, parseMist, rollPbta, rollMist, summarize2d6, describe2d6, twod6Headline } from '../system-dice.js';
 import { parseMothership, rollMothership, summarizeMothershipCheck, summarizeMothershipPanic, describeMothership, mothershipHeadline } from '../system-dice.js';
+import { parseCards, newDeckOrder, summarizeCards, cardsHeadline, describeCards } from '../system-dice.js';
 import * as systemModule from '../system-dice.js';
 
 let pass = 0, fail = 0;
@@ -708,6 +709,40 @@ for (const bad of ['ms:', 'ms:x@5', 'ms:c@100', 'ms:p@5e', 'ms:p@1', 'ms:p@21', 
   const panicTxt = describeMothership({ summary: summarizeMothershipPanic(5, 8) });
   ok('ms panic describe says look up the number', /look up 5 on the Panic Table/.test(panicTxt));
   ok('ms panic describe reproduces no table text', !/Coward|Nervous|Adrenaline/.test(panicTxt));
+}
+
+// ---- Cards (the Woodcut deck) ----
+// detection / parsing
+ok('detect deck', detectSystem('deck:1') === 'cards');
+ok('deck not numeric', detectSystem('1d52') === 'numeric');
+ok('parse deck:3', eq(parseCards('deck:3'), { draw: 3 }));
+for (const bad of ['deck:', 'deck:0', 'deck:11', 'deck:1x', 'ms:c']) {
+  ok(`reject deck ${bad}`, (() => { try { parseCards(bad); return false; } catch { return true; } })());
+}
+// shuffle: a permutation, not a mutation, honouring an injected rng
+{
+  const ids = ['a', 'b', 'c', 'd', 'e'];
+  const identity = newDeckOrder(ids, () => 1); // rng always picks index 0
+  ok('shuffle returns a permutation', identity.length === 5 && [...identity].sort().join('') === 'abcde');
+  ok('shuffle does not mutate its input', ids.join('') === 'abcde');
+  // Fixed rng ⇒ deterministic order, so tests can pin a deck.
+  ok('shuffle is deterministic under a fixed rng', eq(newDeckOrder(ids, () => 1), newDeckOrder(ids, () => 1)));
+  const crypto1 = newDeckOrder(ids);
+  ok('default rng still permutes', [...crypto1].sort().join('') === 'abcde');
+}
+// summaries + formatters
+{
+  const KS = { id: 'KS', label: 'K♠', red: false }, TH = { id: '10H', label: '10♥', red: true };
+  const one = { summary: summarizeCards([KS], 51, 52) };
+  ok('single draw headline is the card', eq(cardsHeadline(one), { kind: 'text', text: 'K♠', variant: undefined }));
+  ok('red card carries the red variant', cardsHeadline({ summary: summarizeCards([TH], 51, 52) }).variant === 'card-red');
+  const three = { summary: summarizeCards([KS, TH, { id: 'J1', label: 'Joker (Le Fov)', red: false }], 41, 54) };
+  ok('multi draw headline is the count', eq(cardsHeadline(three), { kind: 'number', text: '3' }));
+  ok('describe lists cards and remaining', /K♠ {2}10♥ {2}Joker \(Le Fov\) · 41 of 54 left/.test(describeCards(three)));
+  const empty = { summary: summarizeCards([], 0, 52) };
+  ok('empty deck headline', cardsHeadline(empty).text === 'Deck empty');
+  const last = { summary: summarizeCards([KS], 0, 52) };
+  ok('exhaustion is called out', /deck exhausted — shuffle to continue/.test(describeCards(last)));
 }
 
 console.log(`\nsystem-dice: ${pass} passed, ${fail} failed`);

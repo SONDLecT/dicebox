@@ -40,6 +40,7 @@ export function detectSystem(src) {
   if (/^pbta:/.test(s)) return 'pbta';
   if (/^mist:/.test(s)) return 'mist';
   if (/^ms:/.test(s)) return 'mothership';
+  if (/^deck:/.test(s)) return 'cards';
   if (FATE_REGEX.test(s)) return 'fate';
   return 'numeric';
 }
@@ -797,6 +798,73 @@ export function describeMothership(result) {
     parts.push(`Stress at 20 — reduce the relevant Stat or Save by ${amount}`);
   } else if (s.stressDelta) parts.push('+1 Stress');
   if (s.forcesPanic) parts.push('Panic Check');
+  return parts.join(' · ');
+}
+
+// ---- Cards (the Woodcut deck) ----
+//
+// Not dice: a deck is drawn WITHOUT replacement, so it is stateful in a way no
+// die is. The stateless parts live here — notation, shuffling, and the
+// formatters — while the deck's order and position belong to the app (they
+// persist across reloads the way Mothership's Stress does).
+//
+//   deck:1        draw one card
+//   deck:3        draw three
+//
+// Draws come off the top of a shuffled order; shuffling is an explicit action
+// in the UI, not a notation. A draw larger than what remains takes what is
+// left — the table answer, not an error.
+const DECK_REGEX = /^deck:(\d+)$/;
+
+export function parseCards(src) {
+  const m = DECK_REGEX.exec(String(src || '').trim().toLowerCase());
+  if (!m) throw new Error('Expected a draw like "deck:1" or "deck:3"');
+  const draw = Number(m[1]);
+  if (draw < 1 || draw > 10) throw new Error('Draw 1-10 cards');
+  return { draw };
+}
+
+// A fresh shuffled order over the given card ids. The rng is injectable so
+// tests can fix the order; the default is the same rejection-sampled crypto
+// source the dice use.
+export function newDeckOrder(ids, rng = randInt) {
+  const order = [...ids];
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = rng(i + 1) - 1; // randInt is 1-based
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  return order;
+}
+
+export function summarizeCards(drawn, remaining, total) {
+  return {
+    kind: 'cards',
+    // drawn: [{id, label, red}] — labels are baked in at draw time so a peer
+    // can format the roll without loading the art module.
+    drawn,
+    remaining,
+    total,
+    exhausted: remaining === 0,
+  };
+}
+
+// The big readout: one card shows its own label; a handful shows the count.
+export function cardsHeadline(result) {
+  const s = result.summary;
+  if (s.drawn.length === 0) return { kind: 'text', text: 'Deck empty' };
+  if (s.drawn.length === 1) {
+    return { kind: 'text', text: s.drawn[0].label, variant: s.drawn[0].red ? 'card-red' : undefined };
+  }
+  return { kind: 'number', text: String(s.drawn.length) };
+}
+
+export function describeCards(result) {
+  const s = result.summary;
+  const parts = [];
+  if (s.drawn.length) parts.push(s.drawn.map(c => c.label).join('  '));
+  else parts.push('nothing left to draw');
+  parts.push(`${s.remaining} of ${s.total} left`);
+  if (s.exhausted && s.drawn.length) parts.push('deck exhausted — shuffle to continue');
   return parts.join(' · ');
 }
 
