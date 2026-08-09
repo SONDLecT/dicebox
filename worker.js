@@ -54,11 +54,12 @@ const ALWAYS_REVALIDATE = new Set(['/sw.js', '/', '/index.html', '/manifest.webm
 // and starts in that system. Assets under the shell resolve to the root because
 // index.html carries <base href="/">, so a slug never breaks a relative link.
 // Anything not listed still 404s — a slug map, not a catch-all SPA rewrite.
-// Canonical slugs are the community shorthand the picker shows; the longer
-// originals stay as aliases so links shared before the rename keep working.
+// Canonical slugs are the community shorthand the picker shows, edition and
+// all; the earlier forms stay as aliases so links shared before each rename
+// keep working.
 const SYSTEM_SLUGS = new Set([
-  '/v5', '/fate', '/genesys', '/dh', '/ctech', '/swrpg', '/tor', '/pbta', '/mist', '/mosh',
-  '/vtm', '/daggerheart', '/cthulhutech', '/force', '/feat', '/mothership',
+  '/v5', '/fate', '/genesys', '/dh', '/ctech2e', '/swrpg', '/tor2e', '/pbta', '/mist', '/mosh1e',
+  '/vtm', '/daggerheart', '/cthulhutech', '/force', '/feat', '/mothership', '/ctech', '/tor', '/mosh',
 ]);
 
 export default {

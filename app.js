@@ -821,6 +821,9 @@ const helpToggle = $('helpToggle');
 
 function setHelp(open) {
   if (open) { closeSheet(); closeDial(); closeHistory(); closeRoom(); closeMode(); }
+  // A corner popover under its own button, like the mode picker. anchorPop is a
+  // function declaration further down, hoisted, so it is callable from here.
+  if (open) anchorPop(help, helpToggle);
   help.hidden = !open;
   helpToggle.setAttribute('aria-expanded', String(open));
   helpToggle.setAttribute('aria-label', open ? 'Hide syntax reference' : 'Show syntax reference');
@@ -887,15 +890,16 @@ function systemHint(system) { return SYSTEM_HINTS[system] || DEFAULT_HINT; }
 // Permanent slugs, so a link opens Dicebox already in a system. The Worker
 // rewrites these paths to the app shell; numeric is the bare root. Kept branded
 // (/vtm rather than /v5) since the URL is the shareable name.
-// Reading accepts both the shorthand slugs and the pre-rename aliases; writing
-// (the URL the app puts in the bar) always uses the canonical shorthand.
+// Reading accepts the shorthand slugs and every pre-rename alias; writing (the
+// URL the app puts in the bar) always uses the canonical shorthand, edition
+// included, matching the picker labels.
 const SLUG_TO_SYSTEM = {
-  v5: 'v5', fate: 'fate', genesys: 'genesys', dh: 'daggerheart', ctech: 'cthulhutech',
-  swrpg: 'starwars', tor: 'onering', pbta: 'pbta', mist: 'mist', mosh: 'mothership',
-  vtm: 'v5', daggerheart: 'daggerheart', cthulhutech: 'cthulhutech',
-  force: 'starwars', feat: 'onering', mothership: 'mothership',
+  v5: 'v5', fate: 'fate', genesys: 'genesys', dh: 'daggerheart', ctech2e: 'cthulhutech',
+  swrpg: 'starwars', tor2e: 'onering', pbta: 'pbta', mist: 'mist', mosh1e: 'mothership',
+  vtm: 'v5', daggerheart: 'daggerheart', cthulhutech: 'cthulhutech', ctech: 'cthulhutech',
+  force: 'starwars', feat: 'onering', tor: 'onering', mothership: 'mothership', mosh: 'mothership',
 };
-const SYSTEM_TO_SLUG = { v5: 'v5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech', starwars: 'swrpg', onering: 'tor', pbta: 'pbta', mist: 'mist', mothership: 'mosh' };
+const SYSTEM_TO_SLUG = { v5: 'v5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', mothership: 'mosh1e' };
 
 function systemFromPath() {
   const seg = (location.pathname || '/').replace(/^\/+|\/+$/g, '').toLowerCase();
@@ -1036,17 +1040,22 @@ function setSystem(system, { roll = false, url = true } = {}) {
 
 const modeRows = [...modeSheet.querySelectorAll('.mode-row')];
 
+// Anchor a corner popover under its header button. The app column is centred,
+// so the button's rect — not the viewport edge — is the anchor. Shared by the
+// mode picker, the help panel, and the room panel.
+function anchorPop(pop, btn) {
+  const r = btn.getBoundingClientRect();
+  pop.style.top = `${Math.round(r.bottom + 8)}px`;
+  pop.style.right = `${Math.max(8, Math.round(window.innerWidth - r.right))}px`;
+}
+
 function openMode() {
   setHelp(false);
   closeSheet();
   closeDial();
   closeHistory();
   closeRoom();
-  // Anchor the popover under the mode button's corner. The app column is
-  // centred, so the button's rect — not the viewport edge — is the anchor.
-  const r = modeToggle.getBoundingClientRect();
-  modeSheet.style.top = `${Math.round(r.bottom + 8)}px`;
-  modeSheet.style.right = `${Math.round(window.innerWidth - r.right)}px`;
+  anchorPop(modeSheet, modeToggle);
   modeSheet.hidden = false;
   modeToggle.setAttribute('aria-expanded', 'true');
   hideHint();
@@ -1061,12 +1070,15 @@ modeToggle.addEventListener('click', () => {
 });
 // The badge is the second way in: it names the mode, and tapping it changes it.
 systemBadge.addEventListener('click', openMode);
-// A popover has no close button: it closes on a pick, a tap anywhere outside,
-// Escape, or a resize (which would leave it anchored to a stale corner).
+// The corner popovers (mode, help, room) have no close button: each closes on
+// a tap anywhere outside it (its own toggle handles itself), on Escape (the
+// panel-wide Escape handler), or on a resize, which would leave it anchored to
+// a stale corner. help/roomPanel are consts declared later in the file; the
+// callbacks only run on events, long after everything exists.
 document.addEventListener('pointerdown', e => {
-  if (modeSheet.hidden) return;
-  if (modeSheet.contains(e.target) || modeToggle.contains(e.target) || systemBadge.contains(e.target)) return;
-  closeMode();
+  if (!modeSheet.hidden && !modeSheet.contains(e.target) && !modeToggle.contains(e.target) && !systemBadge.contains(e.target)) closeMode();
+  if (!help.hidden && !help.contains(e.target) && !helpToggle.contains(e.target)) setHelp(false);
+  if (!roomPanel.hidden && !roomPanel.contains(e.target) && !roomToggle.contains(e.target)) closeRoom();
 });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && !modeSheet.hidden) {
@@ -1074,7 +1086,11 @@ document.addEventListener('keydown', e => {
     modeToggle.focus();
   }
 });
-window.addEventListener('resize', () => { if (!modeSheet.hidden) closeMode(); });
+window.addEventListener('resize', () => {
+  if (!modeSheet.hidden) closeMode();
+  if (!help.hidden) setHelp(false);
+  if (!roomPanel.hidden) closeRoom();
+});
 
 for (const row of modeRows) {
   row.addEventListener('click', () => {
@@ -3430,6 +3446,7 @@ function openRoom() {
   closeDial();
   closeHistory();
   closeMode();
+  anchorPop(roomPanel, roomToggle);
   roomPanel.hidden = false;
   roomToggle.setAttribute('aria-expanded', 'true');
   if (!roomNameField.value) roomNameField.value = roomLink.name;
@@ -3449,11 +3466,6 @@ function closeRoom() {
 roomToggle.addEventListener('click', () => {
   if (roomPanel.hidden) openRoom();
   else closeRoom();
-});
-
-$('roomClose').addEventListener('click', closeRoom);
-roomPanel.addEventListener('click', e => {
-  if (e.target === roomPanel) closeRoom();
 });
 
 $('roomCreate').addEventListener('click', () => {

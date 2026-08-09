@@ -162,19 +162,50 @@ body {
 
 /* Fills the tray rather than floating over the page: the tray is already a
    bounded rectangle, so nothing below it shifts when the panel opens. */
+/* The syntax reference is a corner popover under its ? button, the same shape
+   as the mode picker — not a layer over the tray. Tall content scrolls inside. */
 .help {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
+  position: fixed;
+  z-index: 40;
+  width: min(400px, calc(100vw - 20px));
+  max-height: min(74vh, 600px);
   overflow-y: auto;
-  scrollbar-width: none;
-  padding: 4px 2px;
-  /* Opaque, not blurred: the tray is empty behind it anyway, and a frosted
-     layer reads as a different material than the rest of the app. */
-  background: var(--paper);
+  scrollbar-width: thin;
+  padding: 12px 16px;
+  background: var(--face);
+  border: 1px solid var(--hair);
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
   animation: help-in 180ms ease both;
 }
-.help::-webkit-scrollbar { display: none; }
+.help::-webkit-scrollbar { width: 4px; }
+
+/* The room panel: the same corner popover, under the room button. */
+.room-pop {
+  position: fixed;
+  z-index: 40;
+  width: min(340px, calc(100vw - 20px));
+  max-height: min(78vh, 620px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  padding: 12px 16px 14px;
+  background: var(--face);
+  border: 1px solid var(--hair);
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  animation: help-in 180ms ease both;
+}
+.room-pop::-webkit-scrollbar { width: 4px; }
+
+/* A popover's title line — the sheet-title look without its close button. */
+.pop-title {
+  margin: 0 0 8px;
+  font-family: "Iosevka Etoile", ui-monospace, monospace;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
 
 @keyframes help-in {
   from { opacity: 0; transform: translateY(-3px); }

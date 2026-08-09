@@ -592,13 +592,10 @@
          connected, who is here and how to leave. The passphrase is the only
          thing that decides membership, so it is shown plainly rather than
          hidden behind a reveal. -->
-    <div class="sheet" id="roomPanel" hidden role="dialog" aria-labelledby="roomTitle">
-      <div class="sheet-panel">
-        <p class="sheet-title">
-          <span id="roomTitle">Share rolls</span>
-          <button type="button" class="sheet-close" id="roomClose"
-                  aria-label="Close sharing">✕</button>
-        </p>
+    <!-- A corner popover under the room button, like the mode picker — no
+         close button; it dismisses on outside tap, Escape, or resize. -->
+    <div class="room-pop" id="roomPanel" hidden role="dialog" aria-labelledby="roomTitle">
+        <p class="pop-title" id="roomTitle">Share rolls</p>
 
         <!-- Before joining. -->
         <div class="room-setup" id="roomSetup">
@@ -690,7 +687,6 @@
         <!-- Connection state, in prose. Never an alarm: a relay that is down
              costs nothing but sharing, and the dice still roll. -->
         <p class="room-state" id="roomState"></p>
-      </div>
     </div>
 
     <!-- Custom die picker: a scroll wheel for browsing and a field for jumping

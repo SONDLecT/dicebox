@@ -194,19 +194,50 @@ body {
 
 /* Fills the tray rather than floating over the page: the tray is already a
    bounded rectangle, so nothing below it shifts when the panel opens. */
+/* The syntax reference is a corner popover under its ? button, the same shape
+   as the mode picker — not a layer over the tray. Tall content scrolls inside. */
 .help {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
+  position: fixed;
+  z-index: 40;
+  width: min(400px, calc(100vw - 20px));
+  max-height: min(74vh, 600px);
   overflow-y: auto;
-  scrollbar-width: none;
-  padding: 4px 2px;
-  /* Opaque, not blurred: the tray is empty behind it anyway, and a frosted
-     layer reads as a different material than the rest of the app. */
-  background: var(--paper);
+  scrollbar-width: thin;
+  padding: 12px 16px;
+  background: var(--face);
+  border: 1px solid var(--hair);
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
   animation: help-in 180ms ease both;
 }
-.help::-webkit-scrollbar { display: none; }
+.help::-webkit-scrollbar { width: 4px; }
+
+/* The room panel: the same corner popover, under the room button. */
+.room-pop {
+  position: fixed;
+  z-index: 40;
+  width: min(340px, calc(100vw - 20px));
+  max-height: min(78vh, 620px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  padding: 12px 16px 14px;
+  background: var(--face);
+  border: 1px solid var(--hair);
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  animation: help-in 180ms ease both;
+}
+.room-pop::-webkit-scrollbar { width: 4px; }
+
+/* A popover's title line — the sheet-title look without its close button. */
+.pop-title {
+  margin: 0 0 8px;
+  font-family: "Iosevka Etoile", ui-monospace, monospace;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
 
 @keyframes help-in {
   from { opacity: 0; transform: translateY(-3px); }
@@ -2625,13 +2656,10 @@ body {
          connected, who is here and how to leave. The passphrase is the only
          thing that decides membership, so it is shown plainly rather than
          hidden behind a reveal. -->
-    <div class="sheet" id="roomPanel" hidden role="dialog" aria-labelledby="roomTitle">
-      <div class="sheet-panel">
-        <p class="sheet-title">
-          <span id="roomTitle">Share rolls</span>
-          <button type="button" class="sheet-close" id="roomClose"
-                  aria-label="Close sharing">✕</button>
-        </p>
+    <!-- A corner popover under the room button, like the mode picker — no
+         close button; it dismisses on outside tap, Escape, or resize. -->
+    <div class="room-pop" id="roomPanel" hidden role="dialog" aria-labelledby="roomTitle">
+        <p class="pop-title" id="roomTitle">Share rolls</p>
 
         <!-- Before joining. -->
         <div class="room-setup" id="roomSetup">
@@ -2723,7 +2751,6 @@ body {
         <!-- Connection state, in prose. Never an alarm: a relay that is down
              costs nothing but sharing, and the dice still roll. -->
         <p class="room-state" id="roomState"></p>
-      </div>
     </div>
 
     <!-- Custom die picker: a scroll wheel for browsing and a field for jumping
@@ -8624,6 +8651,9 @@ const helpToggle = $('helpToggle');
 
 function setHelp(open) {
   if (open) { closeSheet(); closeDial(); closeHistory(); closeRoom(); closeMode(); }
+  // A corner popover under its own button, like the mode picker. anchorPop is a
+  // function declaration further down, hoisted, so it is callable from here.
+  if (open) anchorPop(help, helpToggle);
   help.hidden = !open;
   helpToggle.setAttribute('aria-expanded', String(open));
   helpToggle.setAttribute('aria-label', open ? 'Hide syntax reference' : 'Show syntax reference');
@@ -8690,15 +8720,16 @@ function systemHint(system) { return SYSTEM_HINTS[system] || DEFAULT_HINT; }
 // Permanent slugs, so a link opens Dicebox already in a system. The Worker
 // rewrites these paths to the app shell; numeric is the bare root. Kept branded
 // (/vtm rather than /v5) since the URL is the shareable name.
-// Reading accepts both the shorthand slugs and the pre-rename aliases; writing
-// (the URL the app puts in the bar) always uses the canonical shorthand.
+// Reading accepts the shorthand slugs and every pre-rename alias; writing (the
+// URL the app puts in the bar) always uses the canonical shorthand, edition
+// included, matching the picker labels.
 const SLUG_TO_SYSTEM = {
-  v5: 'v5', fate: 'fate', genesys: 'genesys', dh: 'daggerheart', ctech: 'cthulhutech',
-  swrpg: 'starwars', tor: 'onering', pbta: 'pbta', mist: 'mist', mosh: 'mothership',
-  vtm: 'v5', daggerheart: 'daggerheart', cthulhutech: 'cthulhutech',
-  force: 'starwars', feat: 'onering', mothership: 'mothership',
+  v5: 'v5', fate: 'fate', genesys: 'genesys', dh: 'daggerheart', ctech2e: 'cthulhutech',
+  swrpg: 'starwars', tor2e: 'onering', pbta: 'pbta', mist: 'mist', mosh1e: 'mothership',
+  vtm: 'v5', daggerheart: 'daggerheart', cthulhutech: 'cthulhutech', ctech: 'cthulhutech',
+  force: 'starwars', feat: 'onering', tor: 'onering', mothership: 'mothership', mosh: 'mothership',
 };
-const SYSTEM_TO_SLUG = { v5: 'v5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech', starwars: 'swrpg', onering: 'tor', pbta: 'pbta', mist: 'mist', mothership: 'mosh' };
+const SYSTEM_TO_SLUG = { v5: 'v5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', mothership: 'mosh1e' };
 
 function systemFromPath() {
   const seg = (location.pathname || '/').replace(/^\/+|\/+$/g, '').toLowerCase();
@@ -8839,17 +8870,22 @@ function setSystem(system, { roll = false, url = true } = {}) {
 
 const modeRows = [...modeSheet.querySelectorAll('.mode-row')];
 
+// Anchor a corner popover under its header button. The app column is centred,
+// so the button's rect — not the viewport edge — is the anchor. Shared by the
+// mode picker, the help panel, and the room panel.
+function anchorPop(pop, btn) {
+  const r = btn.getBoundingClientRect();
+  pop.style.top = `${Math.round(r.bottom + 8)}px`;
+  pop.style.right = `${Math.max(8, Math.round(window.innerWidth - r.right))}px`;
+}
+
 function openMode() {
   setHelp(false);
   closeSheet();
   closeDial();
   closeHistory();
   closeRoom();
-  // Anchor the popover under the mode button's corner. The app column is
-  // centred, so the button's rect — not the viewport edge — is the anchor.
-  const r = modeToggle.getBoundingClientRect();
-  modeSheet.style.top = `${Math.round(r.bottom + 8)}px`;
-  modeSheet.style.right = `${Math.round(window.innerWidth - r.right)}px`;
+  anchorPop(modeSheet, modeToggle);
   modeSheet.hidden = false;
   modeToggle.setAttribute('aria-expanded', 'true');
   hideHint();
@@ -8864,12 +8900,15 @@ modeToggle.addEventListener('click', () => {
 });
 // The badge is the second way in: it names the mode, and tapping it changes it.
 systemBadge.addEventListener('click', openMode);
-// A popover has no close button: it closes on a pick, a tap anywhere outside,
-// Escape, or a resize (which would leave it anchored to a stale corner).
+// The corner popovers (mode, help, room) have no close button: each closes on
+// a tap anywhere outside it (its own toggle handles itself), on Escape (the
+// panel-wide Escape handler), or on a resize, which would leave it anchored to
+// a stale corner. help/roomPanel are consts declared later in the file; the
+// callbacks only run on events, long after everything exists.
 document.addEventListener('pointerdown', e => {
-  if (modeSheet.hidden) return;
-  if (modeSheet.contains(e.target) || modeToggle.contains(e.target) || systemBadge.contains(e.target)) return;
-  closeMode();
+  if (!modeSheet.hidden && !modeSheet.contains(e.target) && !modeToggle.contains(e.target) && !systemBadge.contains(e.target)) closeMode();
+  if (!help.hidden && !help.contains(e.target) && !helpToggle.contains(e.target)) setHelp(false);
+  if (!roomPanel.hidden && !roomPanel.contains(e.target) && !roomToggle.contains(e.target)) closeRoom();
 });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && !modeSheet.hidden) {
@@ -8877,7 +8916,11 @@ document.addEventListener('keydown', e => {
     modeToggle.focus();
   }
 });
-window.addEventListener('resize', () => { if (!modeSheet.hidden) closeMode(); });
+window.addEventListener('resize', () => {
+  if (!modeSheet.hidden) closeMode();
+  if (!help.hidden) setHelp(false);
+  if (!roomPanel.hidden) closeRoom();
+});
 
 for (const row of modeRows) {
   row.addEventListener('click', () => {
@@ -11233,6 +11276,7 @@ function openRoom() {
   closeDial();
   closeHistory();
   closeMode();
+  anchorPop(roomPanel, roomToggle);
   roomPanel.hidden = false;
   roomToggle.setAttribute('aria-expanded', 'true');
   if (!roomNameField.value) roomNameField.value = roomLink.name;
@@ -11252,11 +11296,6 @@ function closeRoom() {
 roomToggle.addEventListener('click', () => {
   if (roomPanel.hidden) openRoom();
   else closeRoom();
-});
-
-$('roomClose').addEventListener('click', closeRoom);
-roomPanel.addEventListener('click', e => {
-  if (e.target === roomPanel) closeRoom();
 });
 
 $('roomCreate').addEventListener('click', () => {

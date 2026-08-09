@@ -178,12 +178,16 @@ ok('Mothership numeric rail is limited to rules dice plus d-question',
   ok('picker rows carry the community shorthand',
      ['CTech 2e', 'DH', 'Fate', 'Genesys', 'Mist', 'MoSh 1e', 'PbtA', 'SWRPG', 'TOR 2e', 'V5']
        .every(nm => pop.includes(`<span class="mode-row-name">${nm}</span>`)));
-  ok('popover anchors to the mode button and closes on outside tap / Escape / resize',
-     /modeToggle\.getBoundingClientRect\(\)/.test(js) &&
-     /modeSheet\.style\.right = /.test(js) &&
-     /document\.addEventListener\('pointerdown', e => \{\s*if \(modeSheet\.hidden\) return;/.test(js) &&
+  ok('corner popovers anchor to their buttons and close on outside tap / Escape / resize',
+     /function anchorPop\(pop, btn\)/.test(js) &&
+     /anchorPop\(modeSheet, modeToggle\)/.test(js) &&
+     /anchorPop\(help, helpToggle\)/.test(js) &&
+     /anchorPop\(roomPanel, roomToggle\)/.test(js) &&
+     /!modeSheet\.hidden && !modeSheet\.contains\(e\.target\)[^\n]*closeMode\(\)/.test(js) &&
+     /!help\.hidden && !help\.contains\(e\.target\)[^\n]*setHelp\(false\)/.test(js) &&
+     /!roomPanel\.hidden && !roomPanel\.contains\(e\.target\)[^\n]*closeRoom\(\)/.test(js) &&
      /e\.key === 'Escape' && !modeSheet\.hidden/.test(js) &&
-     /addEventListener\('resize', \(\) => \{ if \(!modeSheet\.hidden\) closeMode\(\); \}\)/.test(js));
+     /if \(!help\.hidden\) setHelp\(false\);\s*\n\s*if \(!roomPanel\.hidden\) closeRoom\(\);/.test(js));
 }
 
 // --- classes must be styled ---
