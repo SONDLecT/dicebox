@@ -1986,6 +1986,14 @@ function cardImage(id) {
   const img = new Image();
   img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
   entry = { img, ready: img.decode ? img.decode().catch(() => {}) : Promise.resolve() };
+  // A decoded SVG image still costs the rasteriser on draw; a bitmap is a
+  // straight blit. Swap it in once it exists — the entry keeps working either way.
+  if (typeof createImageBitmap === 'function') {
+    entry.ready = entry.ready
+      .then(() => createImageBitmap(img))
+      .then(bmp => { entry.img = bmp; })
+      .catch(() => {});
+  }
   cardImgCache.set(key, entry);
   return entry;
 }
@@ -2686,6 +2694,14 @@ function tarotImage(id) {
   const img = new Image();
   img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
   entry = { img, ready: img.decode ? img.decode().catch(() => {}) : Promise.resolve() };
+  // A decoded SVG image still costs the rasteriser on draw; a bitmap is a
+  // straight blit. Swap it in once it exists — the entry keeps working either way.
+  if (typeof createImageBitmap === 'function') {
+    entry.ready = entry.ready
+      .then(() => createImageBitmap(img))
+      .then(bmp => { entry.img = bmp; })
+      .catch(() => {});
+  }
   tarotImgCache.set(key, entry);
   return entry;
 }
@@ -2992,6 +3008,14 @@ function napImage(id) {
   const img = new Image();
   img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
   entry = { img, ready: img.decode ? img.decode().catch(() => {}) : Promise.resolve() };
+  // A decoded SVG image still costs the rasteriser on draw; a bitmap is a
+  // straight blit. Swap it in once it exists — the entry keeps working either way.
+  if (typeof createImageBitmap === 'function') {
+    entry.ready = entry.ready
+      .then(() => createImageBitmap(img))
+      .then(bmp => { entry.img = bmp; })
+      .catch(() => {});
+  }
   napImgCache.set(key, entry);
   return entry;
 }
