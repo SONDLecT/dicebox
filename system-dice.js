@@ -975,12 +975,15 @@ export function parseUtagaruta(src) {
   if (!m) throw new Error('Expected a draw like "uta:1" or "uta:5"');
   const draw = Number(m[1]);
   if (draw < 1 || draw > 10) throw new Error('Draw 1-10 cards');
-  let replace = false;
+  let replace = false, lang = 'both';
   for (const tok of m[2].split(/[\s+]+/).filter(Boolean)) {
     if (tok === 'replace' || tok === 'rep') replace = true;
-    else throw new Error(`Unknown option "${tok}" — try replace`);
+    else if (tok === 'ja' || tok === 'jp') lang = 'ja';
+    else if (tok === 'en') lang = 'en';
+    else if (tok === 'both') lang = 'both';
+    else throw new Error(`Unknown option "${tok}" — try replace, ja, or en`);
   }
-  return { draw, replace };
+  return { draw, replace, lang };
 }
 
 const tarotCardText = c => c.rev ? `${c.label} (reversed)` : c.label;

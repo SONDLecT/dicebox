@@ -2136,6 +2136,7 @@ const utaView = {
   ratio: 1.56, // shells 250x390, after the book page's own proportion
   image: id => utaImage(id),
   svg: id => utaArt.utaSVG(id, { dark: isDark() }),
+  reading: id => utaReadingHTML(id),
   loaded: () => !!utaArt,
   remaining: () => utaRemaining(),
   total: () => utaTotal(),
@@ -3620,7 +3621,7 @@ function syncHanaFromField() {
 // Mekuri playable off the same deck.
 const UTA_KEY = 'dicebox:uta:v1';
 const utaState = {
-  order: [], pos: 0, replace: false, draw: 1,
+  order: [], pos: 0, replace: false, draw: 1, lang: 'both',
   pile: [], hand: [], handReplace: false,
 };
 {
@@ -3628,6 +3629,7 @@ const utaState = {
     const saved = JSON.parse(store.get(UTA_KEY) || 'null');
     if (saved && Array.isArray(saved.order) && saved.order.every(x => typeof x === 'string')) {
       Object.assign(utaState, saved, { draw: Math.max(1, Math.min(10, saved.draw || 1)) });
+      if (!['both', 'ja', 'en'].includes(utaState.lang)) utaState.lang = 'both';
       if (!Array.isArray(utaState.pile)) utaState.pile = [];
       if (Array.isArray(utaState.hand) && utaState.hand.length && !utaState.handReplace) {
         utaState.pile.push(...utaState.hand);
@@ -3646,12 +3648,14 @@ let lastSweptReplaceUta = false;
 
 function utaNotation() {
   let s = `uta:${utaState.draw}`;
+  if (utaState.lang !== 'both') s += ` ${utaState.lang}`;
   if (utaState.replace) s += ' replace';
   return s;
 }
 
-function applyUtaFlags({ replace }) {
+function applyUtaFlags({ replace, lang }) {
   if (replace !== utaState.replace) { utaState.replace = replace; persistUta(); }
+  if (lang && lang !== utaState.lang) { utaState.lang = lang; persistUta(); }
   return false;
 }
 
@@ -3702,10 +3706,39 @@ function describeUta(result) {
     const m = utaArt.utaMeta(s.drawn[0].id);
     if (m) {
       const left = s.replace ? `${s.remaining}∞` : `${s.remaining} of ${s.total} left`;
-      return `${m.kanji} — “${m.trans}” · ${left}`;
+      const lang = utaState.lang;
+      const poem = lang === 'en' ? `“${m.trans}”`
+        : lang === 'ja' ? m.kanji
+        : `${m.kanji} — “${m.trans}”`;
+      return `${poem} · ${left}`;
     }
   }
   return describeCards(result);
+}
+
+// The reading side of a yomifuda: what the second tap in the close-up turns
+// the card over to. The 1680 calligraphy is kuzushiji — cursive forms most
+// modern readers cannot parse — so the back of the card sets the poem in
+// type: five vertical columns, right to left, one ku each, kana reading and
+// MacCauley's translation beneath.
+function utaReadingHTML(id) {
+  const m = utaArt && utaArt.utaMeta(id);
+  if (!m) return '';
+  const lang = utaState.lang;
+  const kus = m.kanji.split(/\s+/).map(k => `<div>${k}</div>`).join('');
+  const cat = m.cat === 'hime' ? '姫' : m.cat === 'bozu' ? '坊主' : '';
+  return `<div class="uta-read">`
+    + `<div class="uta-read-head">`
+    + `<span class="uta-read-n">${m.n}</span>`
+    + `<span class="uta-read-ja">${m.ja}</span>`
+    + (cat ? `<span class="uta-read-cat">${cat}</span>` : '')
+    + (lang !== 'ja' ? `<span class="uta-read-en">${m.en}</span>` : '')
+    + `</div>`
+    + (lang !== 'en' ? `<div class="uta-read-poem">${kus}</div>` : '')
+    + (lang !== 'en' ? `<div class="uta-read-kana">${m.kana.replace('　', ' · ')}</div>` : '')
+    + (lang === 'en' ? `<div class="uta-read-poem uta-read-solo">“${m.trans}”</div>` : '')
+    + (lang === 'both' ? `<div class="uta-read-trans">“${m.trans}”</div>` : '')
+    + `</div>`;
 }
 
 let utaArt = null;
@@ -3849,7 +3882,11 @@ function dealFromUtaNotation(notation) {
 const utaPicker = $('utaPicker');
 const utaCountVal = $('utaCount');
 const utaRemainVal = $('utaRemain');
-const utaFlagButtons = [...document.querySelectorAll('#utaPicker .deck-flag')];
+const utaFlagButtons = [...document.querySelectorAll('#utaPicker .deck-flag[data-flag]')];
+const utaLangBtn = $('utaLang');
+const utaLangName = $('utaLangName');
+const UTA_LANGS = ['both', 'ja', 'en'];
+const UTA_LANG_LABEL = { both: '和+英', ja: '日本語', en: 'English' };
 
 function syncUtaUI({ writeField = true, restage = true } = {}) {
   utaCountVal.textContent = String(utaState.draw);
@@ -3857,6 +3894,8 @@ function syncUtaUI({ writeField = true, restage = true } = {}) {
   for (const b of utaFlagButtons) {
     b.setAttribute('aria-pressed', String(utaState.replace));
   }
+  utaLangName.textContent = UTA_LANG_LABEL[utaState.lang];
+  utaLangBtn.setAttribute('aria-pressed', String(utaState.lang !== 'both'));
   if (writeField && uiSystem === 'utagaruta') $('notation').value = utaNotation();
   if (restage && uiSystem === 'utagaruta' && !$('total').dataset.rolling) stageUtaIdle();
 }
@@ -3904,6 +3943,17 @@ for (const b of utaFlagButtons) {
     syncUtaUI();
   });
 }
+
+utaLangBtn.addEventListener('click', () => {
+  utaState.lang = UTA_LANGS[(UTA_LANGS.indexOf(utaState.lang) + 1) % UTA_LANGS.length];
+  persistUta();
+  syncUtaUI({ restage: false });
+  // The line under the result and an open close-up both re-speak on the spot.
+  if (uiSystem === 'utagaruta' && state.last && state.last.system === 'utagaruta' && !$('total').dataset.idle) {
+    $('breakdown').textContent = describeUta(state.last);
+  }
+  retintCardOverlays();
+});
 
 function syncUtaFromField() {
   try {
@@ -5103,6 +5153,7 @@ let drag = null;
 // SVG rather than the tray raster, so the woodcut is pin-sharp at any size,
 // and a reversed tarot card stays upside down — that is what was dealt.
 const cardFocusEl = $('cardFocus');
+const cardFocusHint = $('cardFocusHint');
 const cardFocusArt = $('cardFocusArt');
 let cardHoldTimer = null;
 let cardHoldFired = false;
@@ -5142,7 +5193,11 @@ function focusCard(id, rev, view, from) {
   const h = w * ratio;
   cardFocusArt.style.width = `${Math.round(w)}px`;
   cardFocusArt.style.height = `${Math.round(h)}px`;
-  cardFocusArt.innerHTML = view.svg(id);
+  // The reading side scales with the card, so everything inside is set in em.
+  cardFocusArt.style.fontSize = `${(w * 0.052).toFixed(1)}px`;
+  cardFocusArt.innerHTML = buildFocusContent(id, view, false);
+  cardFocusHint.hidden = !view.reading;
+  if (view.reading) cardFocusHint.textContent = 'Tap the card to turn it over';
   cardFocusCard = { id, rev, view };
 
   // Rise from where the card was: same FLIP move the eye makes.
@@ -5160,6 +5215,27 @@ function focusCard(id, rev, view, from) {
   }));
 }
 
+// A deck with a reading side gets a two-faced close-up: the art, and the
+// typeset reading behind it. Tapping the raised card turns it over — the
+// same physical grammar as picking it up and flicking it away.
+function buildFocusContent(id, view, flipped) {
+  if (!view.reading) return view.svg(id);
+  return `<div class="cf-flip${flipped ? ' flipped' : ''}">`
+    + `<div class="cf-face">${view.svg(id)}</div>`
+    + `<div class="cf-face cf-back">${view.reading(id)}</div>`
+    + `</div>`;
+}
+
+cardFocusArt.addEventListener('click', e => {
+  const flip = cardFocusArt.querySelector('.cf-flip');
+  if (!flip) return; // no reading side: bubble up, the overlay closes
+  e.stopPropagation();
+  if (performance.now() - cardFocusShownAt < GHOST_CLICK_MS) return;
+  flip.classList.toggle('flipped');
+  cardFocusHint.textContent = flip.classList.contains('flipped')
+    ? 'Tap to turn it back' : 'Tap the card to turn it over';
+});
+
 function openCardFocus(d) {
   const cr = canvas.getBoundingClientRect();
   focusCard(d.id, !!d.rev, d.view, { cx: cr.left + d.x, cy: cr.top + d.y, w: d.size });
@@ -5172,6 +5248,7 @@ function closeCardFocus() {
   cardFocusCard = null;
   cardFocusArt.style.transform = from || 'scale(0.2)';
   cardFocusArt.style.opacity = '0';
+  cardFocusHint.hidden = true;
   setTimeout(() => {
     cardFocusEl.hidden = true;
     cardFocusArt.style.opacity = '';
@@ -5260,7 +5337,8 @@ function closeDiscardPanel() {
 // so re-render whichever is open with the new-theme art.
 function retintCardOverlays() {
   if (!cardFocusEl.hidden && cardFocusCard) {
-    cardFocusArt.innerHTML = cardFocusCard.view.svg(cardFocusCard.id);
+    const flipped = !!cardFocusArt.querySelector('.cf-flip.flipped');
+    cardFocusArt.innerHTML = buildFocusContent(cardFocusCard.id, cardFocusCard.view, flipped);
   }
   if (!discardPanel.hidden && discardPanelView) {
     for (const cell of discardGrid.children) {

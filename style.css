@@ -1165,6 +1165,123 @@ body {
   border-radius: 12px;
   box-shadow: 0 20px 52px rgba(0, 0, 0, 0.45);
 }
+/* The two-faced close-up: decks with a reading side (uta-garuta) flip over.
+   The front is the traced art, the back a typeset reading of the poem. */
+.card-focus-art { perspective: 1400px; }
+.cf-flip {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 460ms cubic-bezier(0.3, 0.7, 0.3, 1);
+}
+.cf-flip.flipped { transform: rotateY(180deg); }
+.cf-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.cf-back { transform: rotateY(180deg); }
+.uta-read {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--face);
+  border: 1.5px solid var(--hair);
+  border-radius: 12px;
+  box-shadow: 0 20px 52px rgba(0, 0, 0, 0.45);
+  color: var(--line);
+  padding: 0.9em 0.9em 0.8em;
+  overflow: hidden;
+}
+.uta-read::before {
+  content: '';
+  position: absolute;
+  inset: 0.55em;
+  border: 1px solid var(--accent);
+  opacity: 0.5;
+  border-radius: 8px;
+  pointer-events: none;
+}
+.uta-read-head { text-align: center; line-height: 1.35; margin-top: 0.35em; }
+.uta-read-n {
+  font-family: Iosevka Etoile, Georgia, serif;
+  color: var(--accent);
+  font-size: 0.72em;
+  letter-spacing: 0.08em;
+  display: block;
+}
+.uta-read-ja { font-size: 1.05em; letter-spacing: 0.12em; display: block; }
+.uta-read-cat { font-size: 0.62em; color: var(--muted); letter-spacing: 0.2em; display: block; }
+.uta-read-en {
+  font-family: Iosevka Etoile, Georgia, serif;
+  font-size: 0.62em;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  display: block;
+}
+/* The poem proper: five ku, five vertical columns, right to left. Each ku is
+   its own column (row-reverse puts the first on the right), so a column can
+   never break in the middle of a verse. */
+.uta-read-poem {
+  flex: 1;
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55em;
+  margin: 0.4em 0;
+  font-family: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
+  font-size: 0.92em;
+  line-height: 1.7;
+  letter-spacing: 0.1em;
+}
+.uta-read-poem > div { writing-mode: vertical-rl; }
+.uta-read-solo {
+  writing-mode: horizontal-tb;
+  font-family: Iosevka Etoile, Georgia, serif;
+  font-style: italic;
+  font-size: 0.8em;
+  line-height: 1.6;
+  text-align: center;
+  letter-spacing: 0.01em;
+  padding: 0 0.6em;
+}
+.uta-read-kana {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.56em;
+  line-height: 1.5;
+  margin-bottom: 0.5em;
+}
+.uta-read-trans {
+  text-align: center;
+  font-family: Iosevka Etoile, Georgia, serif;
+  font-style: italic;
+  font-size: 0.66em;
+  line-height: 1.5;
+  opacity: 0.92;
+  margin-bottom: 0.6em;
+}
+.card-focus-hint {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: max(14px, env(safe-area-inset-bottom));
+  margin: 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12.5px;
+  letter-spacing: 0.06em;
+  pointer-events: none;
+}
+.uta-lang { min-width: 64px; }
+@media (prefers-reduced-motion: reduce) {
+  .cf-flip { transition: none; }
+}
+
 /* A reversed tarot card reads in the mode's violet rather than an alarm red —
    reversal is a meaning, not a failure. */
 #total[data-variant="tarot-rev"] { color: var(--accent); }

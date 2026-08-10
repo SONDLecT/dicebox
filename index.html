@@ -771,6 +771,7 @@
          close look, covering everything below the top bar. A tap puts it back. -->
     <div id="cardFocus" hidden role="dialog" aria-label="Card close-up">
       <div class="card-focus-art" id="cardFocusArt"></div>
+      <p class="card-focus-hint" id="cardFocusHint" hidden></p>
     </div>
 
     <!-- Opened by holding a die. Sits on the tray like the help panel, so the
@@ -1341,6 +1342,9 @@
         <path class="mark2" d="M11.2 14.6 a3.9 3.9 0 1 1 1.1 2.9 M11 20 L11.2 16.9 L14.3 17.2"/>
       </svg>
       <span class="deck-flag-name">Replace</span>
+    </button>
+    <button type="button" class="deck-flag uta-lang" id="utaLang" aria-label="Reading language — both, Japanese only, or English only">
+      <span class="deck-flag-name" id="utaLangName">和+英</span>
     </button>
     <span class="deck-remain" id="utaRemain" aria-label="Cards remaining">100/100</span>
   </section>
