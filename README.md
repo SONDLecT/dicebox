@@ -92,6 +92,10 @@ them, each with its own dice, symbols and reading of the result. Pick one from
 the switcher in the top bar — the icon beside the wordmark — and the tray, the
 picker and the notation all change to match.
 
+<p align="center">
+  <img src="docs/modes.png" alt="A grid of every Dicebox mode — numeric, Vampire V5, Fate, Genesys, Star Wars, Daggerheart, CthulhuTech, The One Ring, PbtA, Mist Engine, Mothership, Cards and Tarot — each with its own dice and colour palette" width="820">
+</p>
+
 | System | Notation | What it rolls |
 | --- | --- | --- |
 | **Vampire V5** | `v5:8h3` | a d10 pool with Hunger, successes and messy criticals |
@@ -121,6 +125,10 @@ dealer's shoe: tap it to draw, and the cards deal, flip and settle the way the
 dice tumble. Draws come off a real shuffled order and the deck remembers what is
 gone until you shuffle; a discard pile builds up beside it, and holding a drawn
 card lifts it for a closer look.
+
+<p align="center">
+  <img src="docs/cards.png" alt="The Woodcut Tarot and the Woodcut playing-card deck — trumps, courts, an ace, a joker and the card back, all traced from antique woodcuts" width="820">
+</p>
 
 **Cards** is a 52-card French-suited deck, jokers optional. **Tarot** is the
 full 78-card Tarot de Marseille, with reversals and a majors-only option.
