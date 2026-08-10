@@ -15,6 +15,7 @@ import { parsePbta, parseMist, rollPbta, rollMist, summarize2d6, describe2d6, tw
 import { parseMothership, rollMothership, summarizeMothershipCheck, summarizeMothershipPanic, describeMothership, mothershipHeadline } from '../system-dice.js';
 import { parseCards, newDeckOrder, summarizeCards, cardsHeadline, describeCards } from '../system-dice.js';
 import { parseTarot, summarizeTarot, tarotHeadline, describeTarot } from '../system-dice.js';
+import { parseNapoletane } from '../system-dice.js';
 import * as systemModule from '../system-dice.js';
 
 let pass = 0, fail = 0;
@@ -780,6 +781,16 @@ for (const bad of ['tarot:', 'tarot:0', 'tarot:11', 'tarot:1x', 'tarot:1 wild', 
   ok('empty tarot deck headline', tarotHeadline(empty).text === 'Deck empty');
   const last = { summary: summarizeTarot([FOOL], 0, 78) };
   ok('tarot exhaustion is called out', /deck exhausted — shuffle to continue/.test(describeTarot(last)));
+}
+
+// ---- Carte napoletane ----
+ok('detect ita', detectSystem('ita:1') === 'napoletane');
+ok('nap: stays an alias', detectSystem('nap:1') === 'napoletane');
+ok('parse ita:3', eq(parseNapoletane('ita:3'), { draw: 3, replace: false }));
+ok('parse via alias', eq(parseNapoletane('nap:3'), { draw: 3, replace: false }));
+ok('parse ita:1 replace', eq(parseNapoletane('ita:1 replace'), { draw: 1, replace: true }));
+for (const bad of ['ita:', 'ita:0', 'ita:11', 'ita:1 jokers', 'deck:1']) {
+  ok(`reject ita ${bad}`, (() => { try { parseNapoletane(bad); return false; } catch { return true; } })());
 }
 
 console.log(`\nsystem-dice: ${pass} passed, ${fail} failed`);

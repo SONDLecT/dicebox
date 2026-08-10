@@ -429,6 +429,7 @@ body {
 #modeToggle[data-system="v5"] .mode-ico[data-for="v5"] { display: block; }
 #modeToggle[data-system="fate"] .mode-ico[data-for="fate"] { display: block; }
 #modeToggle[data-system="tarot"] .mode-ico[data-for="tarot"] { display: block; }
+#modeToggle[data-system="napoletane"] .mode-ico[data-for="napoletane"] { display: block; }
 #modeToggle[data-system="genesys"] .mode-ico[data-for="genesys"] { display: block; }
 #modeToggle[data-system="daggerheart"] .mode-ico[data-for="daggerheart"] { display: block; }
 #modeToggle[data-system="cthulhutech"] .mode-ico[data-for="cthulhutech"] { display: block; }
@@ -1231,6 +1232,7 @@ body {
 /* Each system's row wears the colour its mode paints the app with. */
 .mode-cards { --sys: #2F8B57; }
 .mode-tarot { --sys: #8B76D6; }
+.mode-napoletane { --sys: #12A0D7; }
 .mode-v5 { --sys: #C3212E; }
 .mode-fate { --sys: #6E96BE; }
 .mode-genesys { --sys: #BFA766; }

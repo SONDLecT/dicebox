@@ -8,7 +8,7 @@ import { rollGenesys, describeGenesys, genesysHeadline, parseGenesys } from './s
 import { rollDaggerheart, describeDaggerheart, daggerheartHeadline, parseDaggerheart } from './system-dice.js';
 import { rollCthulhuTech, describeCthulhuTech, cthulhutechHeadline, parseCthulhuTech } from './system-dice.js';
 import { rollMothership, describeMothership, mothershipHeadline, parseMothership, resolveMothershipStress } from './system-dice.js';
-import { parseCards, newDeckOrder, summarizeCards, cardsHeadline, describeCards, parseTarot, summarizeTarot, tarotHeadline, describeTarot } from './system-dice.js';
+import { parseCards, newDeckOrder, summarizeCards, cardsHeadline, describeCards, parseTarot, summarizeTarot, tarotHeadline, describeTarot, parseNapoletane } from './system-dice.js';
 import { rollStarWars, describeStarWars, starWarsHeadline, parseStarWars } from './system-dice.js';
 import { rollOneRing, describeOneRing, oneRingHeadline, parseOneRing } from './system-dice.js';
 import { rollPbta, rollMist, twod6Headline, describe2d6, parsePbta, parseMist } from './system-dice.js';
@@ -107,6 +107,11 @@ $('themeToggle').addEventListener('click', () => {
     const ids = [...new Set(state.dice.filter(d => d.isCard).map(d => (d.isStack || d.isDiscard ? 'back' : d.id)))];
     if (tarotState.pile.length) ids.push(tarotState.pile[tarotState.pile.length - 1].id);
     Promise.all(ids.map(id => tarotImage(id).ready)).then(dropIdleCache);
+  }
+  if (uiSystem === 'napoletane' && napArt) {
+    const ids = [...new Set(state.dice.filter(d => d.isCard).map(d => (d.isStack || d.isDiscard ? 'back' : d.id)))];
+    if (napState.pile.length) ids.push(napState.pile[napState.pile.length - 1]);
+    Promise.all(ids.map(id => napImage(id).ready)).then(dropIdleCache);
   }
   // A card held up for a look, or a discard fanned open, retints too.
   retintCardOverlays();
@@ -291,6 +296,18 @@ const SYSTEM_THEMES = {
     light: {
       '--paper': '#EAE7F0', '--face': '#F6F4FA', '--line': '#1A1524', '--muted': '#665E7D',
       '--hair': '#D3CDE0', '--accent': '#5D48B5', '--danger': '#8C3A2E',
+    },
+  },
+  // Napoletane — azzurro: the sky-and-bay cyan of Naples itself, bright where
+  // Star Wars' steel blue is muted, over a deep harbour-water dark.
+  napoletane: {
+    dark: {
+      '--paper': '#0A1116', '--face': '#101B23', '--line': '#DCE6EC', '--muted': '#64808F',
+      '--hair': '#1B2B36', '--accent': '#12A0D7', '--danger': '#C0453F',
+    },
+    light: {
+      '--paper': '#E4EDF2', '--face': '#F2F7FA', '--line': '#10202A', '--muted': '#4F6C7C',
+      '--hair': '#C8DAE4', '--accent': '#0C7CB0', '--danger': '#8C3A2E',
     },
   },
   // Mothership — a hazard-label palette: reactor-warning chartreuse over cold
@@ -589,6 +606,7 @@ function doRoll(notation) {
     const sys = detectSystem(notation);
     if (sys === 'cards') { dealFromNotation(notation); return; }
     if (sys === 'tarot') { dealFromTarotNotation(notation); return; }
+    if (sys === 'napoletane') { dealFromNapNotation(notation); return; }
     result = sys === 'v5' ? rollV5(notation)
       : sys === 'fate' ? rollFate(notation)
       : sys === 'genesys' ? rollGenesys(notation)
@@ -694,6 +712,7 @@ function resultHeadline(result) {
   if (result.system === 'mothership') return mothershipHeadline(result);
   if (result.system === 'cards') return cardsHeadline(result);
   if (result.system === 'tarot') return tarotHeadline(result);
+  if (result.system === 'napoletane') return cardsHeadline(result);
   return { kind: 'number', text: String(result.total) };
 }
 function resultDetail(result) {
@@ -708,6 +727,7 @@ function resultDetail(result) {
   if (result.system === 'mothership') return describeMothership(result);
   if (result.system === 'cards') return describeCards(result);
   if (result.system === 'tarot') return describeTarot(result);
+  if (result.system === 'napoletane') return describeCards(result);
   return describe(result.groups);
 }
 
@@ -872,6 +892,7 @@ $('notation').addEventListener('input', () => {
   if (typedSystem === 'mothership') { syncMsFromField(); return; }
   if (typedSystem === 'cards') { syncCardsFromField(); return; }
   if (typedSystem === 'tarot') { syncTarotFromField(); return; }
+  if (typedSystem === 'napoletane') { syncNapFromField(); return; }
   pool = parsePool($('notation').value);
   // Typing an unusual die earns it a button too, so the row always accounts for
   // everything in the pool.
@@ -932,6 +953,7 @@ const SYSTEMS = {
   numeric: { badge: '' },
   cards: { badge: 'Cards' },
   tarot: { badge: 'Tarot' },
+  napoletane: { badge: 'Italiane' },
   v5: { badge: 'VtM V5' },
   fate: { badge: 'Fate' },
   genesys: { badge: 'Genesys' },
@@ -955,6 +977,7 @@ const SYSTEM_HINTS = {
   mothership: { idle: 'Set your target, then roll under it', placeholder: 'Set a target, or type ms:c@35' },
   cards: { idle: 'Tap the deck to draw', placeholder: 'Tap the deck, or type deck:3' },
   tarot: { idle: 'Tap the deck to draw', placeholder: 'Tap the deck, or type tarot:3' },
+  napoletane: { idle: 'Tocca il mazzo per pescare', placeholder: 'Tocca il mazzo, o scrivi ita:3' },
 };
 function systemHint(system) { return SYSTEM_HINTS[system] || DEFAULT_HINT; }
 
@@ -965,12 +988,12 @@ function systemHint(system) { return SYSTEM_HINTS[system] || DEFAULT_HINT; }
 // URL the app puts in the bar) always uses the canonical shorthand, edition
 // included, matching the picker labels.
 const SLUG_TO_SYSTEM = {
-  cards: 'cards', tarot: 'tarot', vtmv5: 'v5', fate: 'fate', genesys: 'genesys', dh: 'daggerheart', ctech2e: 'cthulhutech',
+  cards: 'cards', tarot: 'tarot', italiane: 'napoletane', napoletane: 'napoletane', scopa: 'napoletane', vtmv5: 'v5', fate: 'fate', genesys: 'genesys', dh: 'daggerheart', ctech2e: 'cthulhutech',
   swrpg: 'starwars', tor2e: 'onering', pbta: 'pbta', mist: 'mist', mosh1e: 'mothership',
   v5: 'v5', vtm: 'v5', daggerheart: 'daggerheart', cthulhutech: 'cthulhutech', ctech: 'cthulhutech',
   force: 'starwars', feat: 'onering', tor: 'onering', mothership: 'mothership', mosh: 'mothership',
 };
-const SYSTEM_TO_SLUG = { cards: 'cards', tarot: 'tarot', v5: 'vtmv5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', mothership: 'mosh1e' };
+const SYSTEM_TO_SLUG = { cards: 'cards', tarot: 'tarot', napoletane: 'italiane', v5: 'vtmv5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', mothership: 'mosh1e' };
 
 function systemFromPath() {
   const seg = (location.pathname || '/').replace(/^\/+|\/+$/g, '').toLowerCase();
@@ -1056,9 +1079,10 @@ function setSystem(system, { roll = false, url = true } = {}) {
   msPicker.hidden = system !== 'mothership';
   cardsPicker.hidden = system !== 'cards';
   tarotPicker.hidden = system !== 'tarot';
+  napPicker.hidden = system !== 'napoletane';
   // One action, one name: the entry button IS the draw in the deck modes, so
   // the pickers carry no second Draw button.
-  $('rollGo').textContent = system === 'cards' || system === 'tarot' ? 'Draw' : 'Roll';
+  $('rollGo').textContent = system === 'cards' || system === 'tarot' || system === 'napoletane' ? 'Draw' : 'Roll';
   // The deck's art loads on first entry; the stack appears when it lands. The
   // modules are service-worker-precached, so this works offline too.
   if (system === 'cards') {
@@ -1095,6 +1119,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
   $('helpMothership').hidden = system !== 'mothership';
   $('helpCards').hidden = system !== 'cards';
   $('helpTarot').hidden = system !== 'tarot';
+  $('helpNapoletane').hidden = system !== 'napoletane';
 
   // The popover's rows reflect the choice.
   for (const row of modeRows) {
@@ -1124,6 +1149,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
     if (system === 'mothership') $('notation').value = msNotation();
     if (system === 'cards') $('notation').value = deckNotation();
     if (system === 'tarot') $('notation').value = tarotNotation();
+    if (system === 'napoletane') $('notation').value = napNotation();
   }
 }
 
@@ -1979,6 +2005,17 @@ const cardsView = {
   discardTop: () => (deckState.pile.length ? { id: deckState.pile[deckState.pile.length - 1], rev: false } : null),
   pile: () => deckState.pile.map(id => ({ id, rev: false })),
 };
+const napView = {
+  ratio: 1.552, // the 1902 deck's own 8.2 x 5.3 cm
+  image: id => napImage(id),
+  svg: id => napArt.napSVG(id, { dark: isDark() }),
+  remaining: () => napRemaining(),
+  total: () => napTotal(),
+  replace: () => napState.replace,
+  discard: () => napState.pile.length,
+  discardTop: () => (napState.pile.length ? { id: napState.pile[napState.pile.length - 1], rev: false } : null),
+  pile: () => napState.pile.map(id => ({ id, rev: false })),
+};
 const tarotView = {
   ratio: 1.72,
   image: id => tarotImage(id),
@@ -2813,6 +2850,288 @@ function syncTarotFromField() {
   } catch { /* mid-type */ }
 }
 
+// ---- le carte napoletane ----
+//
+// The 40-card Neapolitan deck — the third deck on the same engine. Four
+// Italian suits (denari, coppe, spade, bastoni: the same enseignes as the
+// tarot's minors), ranks Asso-Sette plus Fante, Cavallo, Re. No jokers, no
+// reversals; the one flag is Replace. The art is traced from a deck printed
+// in Naples itself in 1902 (nap-art.js, lazy like the others).
+const NAP_KEY = 'dicebox:nap:v1';
+const napState = {
+  order: [], pos: 0, replace: false, draw: 1,
+  pile: [], hand: [], handReplace: false,
+};
+{
+  try {
+    const saved = JSON.parse(store.get(NAP_KEY) || 'null');
+    if (saved && Array.isArray(saved.order) && saved.order.every(x => typeof x === 'string')) {
+      Object.assign(napState, saved, { draw: Math.max(1, Math.min(10, saved.draw || 1)) });
+      if (!Array.isArray(napState.pile)) napState.pile = [];
+      if (Array.isArray(napState.hand) && napState.hand.length && !napState.handReplace) {
+        napState.pile.push(...napState.hand);
+      }
+      napState.hand = [];
+    }
+  } catch { /* fresh deck */ }
+}
+const persistNap = () => store.set(NAP_KEY, JSON.stringify(napState));
+
+function napDeckIds() {
+  const ids = [];
+  for (const s of ['d', 'c', 's', 'b']) {
+    for (const r of ['01', '02', '03', '04', '05', '06', '07', 'F', 'C', 'R']) ids.push(s + r);
+  }
+  return ids;
+}
+const napTotal = () => 40;
+const napRemaining = () => Math.max(0, napState.order.length - napState.pos);
+
+let lastSweptReplaceNap = false;
+
+function napNotation() {
+  let s = `ita:${napState.draw}`;
+  if (napState.replace) s += ' replace';
+  return s;
+}
+
+function applyNapFlags({ replace }) {
+  if (replace !== napState.replace) { napState.replace = replace; persistNap(); }
+  return false; // nothing here changes what the deck contains
+}
+
+function reshuffleNap() {
+  napState.order = newDeckOrder(napDeckIds(), n => cryptoIndex(n) + 1);
+  napState.pos = 0;
+  napState.pile = [];
+  napState.hand = [];
+  persistNap();
+}
+
+function drawNapCards(n) {
+  let ids;
+  napState.draw = n;
+  if (napState.order.length === 0) reshuffleNap();
+  if (napState.replace) {
+    const pool = napState.order.slice(napState.pos);
+    ids = pool.length ? Array.from({ length: n }, () => pool[cryptoIndex(pool.length)]) : [];
+  } else {
+    ids = napState.order.slice(napState.pos, napState.pos + n);
+    napState.pos += ids.length;
+    persistNap();
+  }
+  lastSweptReplaceNap = napState.handReplace;
+  if (napState.hand.length && !napState.handReplace) {
+    napState.pile.push(...napState.hand);
+  }
+  napState.hand = ids.slice();
+  napState.handReplace = napState.replace;
+  persistNap();
+  const drawn = ids.map(id => ({ id, label: napArt.napMeta(id).label, red: false }));
+  return {
+    schema: 2,
+    system: 'napoletane',
+    notation: napNotation(),
+    groups: [{ kind: 'cards', count: drawn.length, cards: drawn }],
+    summary: summarizeCards(drawn, napRemaining(), napTotal()),
+  };
+}
+
+let napArt = null;
+let napArtLoading = null;
+function ensureNapArt() {
+  if (napArt) return Promise.resolve(napArt);
+  if (!napArtLoading) {
+    /* global __dicebox */
+    napArtLoading = (typeof __dicebox !== 'undefined' && __dicebox.napSVG)
+      ? Promise.resolve(__dicebox)
+      : import('./nap-art.js');
+    napArtLoading = napArtLoading.then(m => (napArt = m));
+  }
+  return napArtLoading;
+}
+
+const napImgCache = new Map();
+function napImage(id) {
+  const key = `${id}|${isDark() ? 'd' : 'l'}`;
+  let entry = napImgCache.get(key);
+  if (entry) return entry;
+  const svg = napArt.napSVG(id, { dark: isDark() })
+    .replace('<svg ', '<svg width="750" height="1164" ');
+  const img = new Image();
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  entry = { img, ready: img.decode ? img.decode().catch(() => {}) : Promise.resolve() };
+  napImgCache.set(key, entry);
+  return entry;
+}
+
+function stageNapIdle() {
+  if (!napArt) return;
+  if (napState.order.length === 0) reshuffleNap();
+  const { stack, discard } = deckLayout(0, napView);
+  state.dice = [new DeckStackSprite(stack.x, stack.y, stack.w, napView)];
+  if (napState.pile.length > 0) state.dice.push(new DiscardPileSprite(discard.x, discard.y, discard.w, napView));
+  dropIdleCache();
+  $('total').dataset.idle = '1';
+  $('total').dataset.kind = 'number';
+  $('total').textContent = '—';
+  $('breakdown').textContent = systemHint('napoletane').idle;
+  hideHint();
+}
+
+async function dealNapFlow(result, { remote = false } = {}) {
+  await ensureNapArt();
+  await napImage('back').ready;
+  await Promise.all(result.summary.drawn.map(c => napImage(c.id).ready));
+
+  const n = result.summary.drawn.length;
+  const { stack, slots, discard } = deckLayout(n, napView);
+  const prev = state.dice.find(d => d.isStack);
+  const stackSprite = new DeckStackSprite(prev ? prev.x : stack.x, prev ? prev.y : stack.y, prev ? prev.size : stack.w, napView);
+  if (prev && (prev.x !== stack.x || prev.size !== stack.w)) stackSprite.moveTo(stack.x, stack.y, stack.w);
+  else { stackSprite.x = stack.x; stackSprite.y = stack.y; stackSprite.size = stack.w; }
+  const dealFrom = { x: prev ? prev.x : stack.x, y: prev ? prev.y : stack.y };
+  const sprites = [stackSprite];
+
+  let delay0 = 0;
+  if (!remote) {
+    for (const d of state.dice) {
+      if (d.isCard && !d.isStack && !d.isDiscard && d.phase === 'idle' && !d.gone) {
+        const dest = lastSweptReplaceNap
+          ? { to: { x: stack.x, y: stack.y, w: d.size }, mode: 'return' }
+          : { to: { x: discard.x, y: discard.y, w: discard.w }, mode: 'discard' };
+        sprites.push(new CardSprite(d.id, { x: d.x, y: d.y }, dest.to, { mode: dest.mode, view: napView }));
+        delay0 = 0.24;
+      }
+    }
+  }
+  if (!remote && napState.pile.length > 0) {
+    sprites.push(new DiscardPileSprite(discard.x, discard.y, discard.w, napView));
+  }
+  result.summary.drawn.forEach((c, i) => {
+    sprites.push(new CardSprite(c.id, dealFrom, slots[i], { delay: delay0 + i * 0.12, remote, view: napView }));
+  });
+
+  state.dice = sprites;
+  dropIdleCache();
+  $('total').dataset.rolling = '1';
+  const settleMs = (delay0 + n * 0.12 + DEAL_S + FLIP_S) * 1000 + 160;
+  setTimeout(() => finish(result), settleMs);
+  if (!remote && navigator.vibrate) navigator.vibrate([6, 30, 8]);
+  hideHint();
+  return result;
+}
+
+function dealNapFlowRemote(result, claim) {
+  const preload = [napImage('back').ready, ...result.summary.drawn.map(c => napImage(c.id).ready)];
+  Promise.all(preload).then(() => {
+    if (state.remoteClaim !== claim) return;
+    const n = result.summary.drawn.length;
+    const { stack, slots } = deckLayout(n, napView);
+    const sprites = [new DeckStackSprite(stack.x, stack.y, stack.w, napView)];
+    result.summary.drawn.forEach((c, i) => {
+      sprites.push(new CardSprite(c.id, { x: stack.x, y: stack.y }, slots[i], { delay: i * 0.12, remote: true, view: napView }));
+    });
+    state.dice = sprites;
+    dropIdleCache();
+    $('total').dataset.rolling = '1';
+    setTimeout(() => {
+      if (state.remoteClaim !== claim) return;
+      delete $('total').dataset.rolling;
+      delete $('total').dataset.idle;
+      setTotal(cardsHeadline(result));
+      $('breakdown').textContent = describeCards(result);
+    }, (n * 0.12 + DEAL_S + FLIP_S) * 1000 + 160);
+  });
+}
+
+function dealFromNapNotation(notation) {
+  let parsed;
+  try { parsed = parseNapoletane(notation); } catch (err) { showError(err.message); return; }
+  clearError();
+  state.remoteClaim = null;
+  ensureNapArt()
+    .then(() => {
+      applyNapFlags(parsed);
+      return dealNapFlow(drawNapCards(parsed.draw));
+    })
+    .then(res => {
+      state.last = res;
+      $('notation').value = res.notation;
+      syncNapUI({ writeField: false, restage: false });
+    })
+    .catch(err => showError(String((err && err.message) || err)));
+}
+
+// ---- the napoletane picker ----
+const napPicker = $('napPicker');
+const napCountVal = $('napCount');
+const napRemainVal = $('napRemain');
+const napFlagButtons = [...document.querySelectorAll('#napPicker .deck-flag')];
+
+function syncNapUI({ writeField = true, restage = true } = {}) {
+  napCountVal.textContent = String(napState.draw);
+  napRemainVal.textContent = napState.replace ? `${napRemaining()}∞` : `${napRemaining()}/${napTotal()}`;
+  for (const b of napFlagButtons) {
+    b.setAttribute('aria-pressed', String(napState.replace));
+  }
+  if (writeField && uiSystem === 'napoletane') $('notation').value = napNotation();
+  if (restage && uiSystem === 'napoletane' && !$('total').dataset.rolling) stageNapIdle();
+}
+
+bindTapHold($('napCountChip'), dir => {
+  napState.draw = Math.max(1, Math.min(10, napState.draw + dir));
+  persistNap();
+  syncNapUI({ restage: false });
+});
+$('napShuffle').addEventListener('click', () => {
+  ensureNapArt().then(() => {
+    const prevCards = state.dice.filter(d => d.isCard && !d.isStack && !d.isDiscard && !d.gone && d.phase === 'idle');
+    const hadDiscard = napState.pile.length > 0;
+    const discardTop = napState.pile[napState.pile.length - 1];
+    const prevDiscardSprite = state.dice.find(d => d.isDiscard);
+    reshuffleNap();
+    const { stack } = deckLayout(0, napView);
+    const stackSprite = new DeckStackSprite(stack.x, stack.y, stack.w, napView);
+    const sprites = [stackSprite];
+    for (const d of prevCards) {
+      sprites.push(new CardSprite(d.id, { x: d.x, y: d.y }, { x: stack.x, y: stack.y, w: d.size }, { mode: 'return', view: napView }));
+    }
+    if (hadDiscard && discardTop && prevDiscardSprite) {
+      for (let i = 0; i < 3; i++) {
+        sprites.push(new CardSprite(discardTop, { x: prevDiscardSprite.x, y: prevDiscardSprite.y },
+          { x: stack.x, y: stack.y, w: prevDiscardSprite.size }, { mode: 'return', delay: i * 0.07, view: napView }));
+      }
+    }
+    const sweeping = sprites.length > 1;
+    stackSprite.riffleAfter = sweeping ? 0.34 : 0.001;
+    state.dice = sprites;
+    dropIdleCache();
+    $('total').dataset.idle = '1';
+    $('total').dataset.kind = 'number';
+    $('total').textContent = '—';
+    $('breakdown').textContent = systemHint('napoletane').idle;
+    if (navigator.vibrate) navigator.vibrate([6, 40, 6, 40, 6, 40, 10]);
+    syncNapUI({ restage: false });
+  });
+});
+for (const b of napFlagButtons) {
+  b.addEventListener('click', () => {
+    napState.replace = !napState.replace;
+    persistNap();
+    syncNapUI();
+  });
+}
+
+function syncNapFromField() {
+  try {
+    const { draw } = parseNapoletane($('notation').value);
+    napState.draw = draw;
+    persistNap();
+    syncNapUI({ writeField: false, restage: false });
+  } catch { /* mid-type */ }
+}
+
 // ---- the pool ----
 //
 // Tapping dice builds a pool: tap d20 twice and d6 once and you have 2d20+1d6,
@@ -3162,6 +3481,7 @@ function clearPool() {
       // just returns the tray to the idle stack.
       case 'cards': ensureCardArt().then(() => { if (uiSystem === 'cards') syncCardsUI(); }); break;
       case 'tarot': ensureTarotArt().then(() => { if (uiSystem === 'tarot') syncTarotUI(); }); break;
+      case 'napoletane': ensureNapArt().then(() => { if (uiSystem === 'napoletane') syncNapUI(); }); break;
     }
     return;
   }
@@ -4225,6 +4545,7 @@ function emptyTrayRoll() {
   if (uiSystem === 'mothership') return msNotation();
   if (uiSystem === 'cards') return deckNotation();
   if (uiSystem === 'tarot') return tarotNotation();
+  if (uiSystem === 'napoletane') return napNotation();
   const last = state.last;
   const lastNumeric = last && (last.system === 'numeric' || last.system === undefined);
   return (lastNumeric && last.notation) || `d${state.defaultSides}`;
@@ -4642,12 +4963,12 @@ function showRemoteRoll(roll) {
   // called by the dealer's own timer; addHistory ran above, and finish adds
   // again, so the dealer path for remote skips it via the claim below not
   // being ours... simpler: cards route renders and sets the readout directly.
-  if (result.system === 'cards' || result.system === 'tarot') {
+  if (result.system === 'cards' || result.system === 'tarot' || result.system === 'napoletane') {
     if ($('total').dataset.rolling && !state.remoteClaim) return;
     const claim = {};
     state.remoteClaim = claim;
-    const ensure = result.system === 'tarot' ? ensureTarotArt : ensureCardArt;
-    const deal = result.system === 'tarot' ? dealTarotFlowRemote : dealCardsFlowRemote;
+    const ensure = result.system === 'tarot' ? ensureTarotArt : result.system === 'napoletane' ? ensureNapArt : ensureCardArt;
+    const deal = result.system === 'tarot' ? dealTarotFlowRemote : result.system === 'napoletane' ? dealNapFlowRemote : dealCardsFlowRemote;
     ensure().then(() => {
       if (state.remoteClaim !== claim) return;
       deal(result, claim);

@@ -591,6 +591,14 @@ const sampleSystemRoll = {
     system: 'tarot', notation: 'tarot:1', summary: {},
     groups: [{ kind: 'cards', count: 1, cards: [{ id: 'T00', label: 'X'.repeat(25) }] }],
   }));
+  ok('a napoletane draw validates', validateSystemRoll({
+    system: 'napoletane', notation: 'nap:2',
+    summary: { drawn: [{ id: 'd07', label: 'Sette di Denari', red: false }], remaining: 38, total: 40 },
+    groups: [{ kind: 'cards', count: 2, cards: [
+      { id: 'd07', label: 'Sette di Denari', red: false },
+      { id: 'bC', label: 'Cavallo di Bastoni', red: false },
+    ] }],
+  }));
 
   ok('a wildly out-of-range die value is rejected', !validateSystemRoll({
     ...sampleSystemRoll,

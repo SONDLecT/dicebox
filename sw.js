@@ -26,6 +26,7 @@ const ASSETS = [
   // here is what keeps that first open working offline.
   './cards-art.js',
   './tarot-art.js',
+  './nap-art.js',
   './room.js',
   './room-crypto.js',
   './manifest.webmanifest',

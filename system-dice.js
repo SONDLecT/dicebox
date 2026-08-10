@@ -42,6 +42,7 @@ export function detectSystem(src) {
   if (/^ms:/.test(s)) return 'mothership';
   if (/^deck:/.test(s)) return 'cards';
   if (/^tarot:/.test(s)) return 'tarot';
+  if (/^(?:ita|nap):/.test(s)) return 'napoletane';
   if (FATE_REGEX.test(s)) return 'fate';
   return 'numeric';
 }
@@ -917,6 +918,28 @@ export function summarizeTarot(drawn, remaining, total) {
     total,
     exhausted: remaining === 0,
   };
+}
+
+// ---- Carte napoletane ----
+//
+// The 40-card Italian deck (Neapolitan pattern): 1-7 plus Fante, Cavallo, Re
+// in each of the four Italian suits (denari, coppe, spade, bastoni). Same draw
+// engine as the other decks; the one flag is replace. It shares the cards
+// summary/formatters — a draw is a draw, whichever deck it came off. `ita:` is
+// the notation; `nap:` is accepted as an alias.
+const NAP_REGEX = /^(?:ita|nap):(\d+)\s*(.*)$/;
+
+export function parseNapoletane(src) {
+  const m = NAP_REGEX.exec(String(src || '').trim().toLowerCase());
+  if (!m) throw new Error('Expected a draw like "ita:1" or "ita:3"');
+  const draw = Number(m[1]);
+  if (draw < 1 || draw > 10) throw new Error('Draw 1-10 cards');
+  let replace = false;
+  for (const tok of m[2].split(/[\s+]+/).filter(Boolean)) {
+    if (tok === 'replace' || tok === 'rep') replace = true;
+    else throw new Error(`Unknown option "${tok}" — try replace`);
+  }
+  return { draw, replace };
 }
 
 const tarotCardText = c => c.rev ? `${c.label} (reversed)` : c.label;

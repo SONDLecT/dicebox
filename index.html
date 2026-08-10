@@ -160,6 +160,12 @@
             <rect x="5.5" y="3" width="13" height="18" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.5"/>
             <path d="M12 7.2 L13.2 10.8 L16.8 10.8 L13.9 13 L15 16.6 L12 14.4 L9 16.6 L10.1 13 L7.2 10.8 L10.8 10.8 Z" fill="currentColor"/>
           </g>
+          <!-- Napoletane: a card carrying a denari coin. -->
+          <g class="mode-ico" data-for="napoletane">
+            <rect x="5.5" y="3" width="13" height="18" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.5"/>
+            <circle cx="12" cy="12" r="4.6" fill="none" stroke="currentColor" stroke-width="1.5"/>
+            <circle cx="12" cy="12" r="1.6" fill="currentColor"/>
+          </g>
           <!-- Mothership: a spacesuit helmet — dome and curved visor. -->
           <g class="mode-ico" data-for="mothership" fill="none" stroke="currentColor"
              stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">
@@ -461,6 +467,28 @@
       </p>
       </div>
 
+      <div id="helpNapoletane" hidden>
+      <dl class="syntax">
+        <dt>ita:1</dt>          <dd>pesca una carta</dd>
+        <dt>ita:3</dt>          <dd>pescane tre</dd>
+        <dt>ita:1 replace</dt>  <dd>pesca con reinserimento</dd>
+      </dl>
+      <p class="note">
+        Il mazzo italiano di 40 carte — dall'Asso al Sette, pi&ugrave; Fante,
+        Cavallo e Re in <b>denari, coppe, spade e bastoni</b> — pescate
+        <b>senza reinserimento</b> finch&eacute; non si <b>mescola</b>: il
+        mazzo di Scopa e Briscola. <b>Tieni premuta</b> una carta pescata per
+        vederla da vicino; tocca la pila degli scarti per sfogliarla.
+      </p>
+      <p class="note">
+        Le carte sono ricalcate da un mazzo <b>stampato a Napoli nel 1902</b>
+        (Biblioth&egrave;que nationale de France) — l'Asso di Denari porta
+        ancora il bollo del Regno d'Italia e l'indirizzo dello stampatore
+        all'angolo di via S. Tommaso d'Aquino. I semi sono le stesse insegne
+        italiane degli arcani minori dei tarocchi.
+      </p>
+      </div>
+
       <p class="note install" id="installNote">
         <button type="button" class="install-button" id="install" hidden>Install as an app</button>
         <span id="installHint">Add this to your home screen and it works offline, with no
@@ -629,6 +657,15 @@
         </svg>
         <span class="mode-row-name">Tarot</span>
         <span class="mode-row-sub">the Woodcut Tarot &middot; all 78</span>
+      </button>
+      <button type="button" class="mode-row mode-napoletane" data-system="napoletane" aria-pressed="false">
+        <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="5.5" y="3" width="13" height="18" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <circle cx="12" cy="12" r="4.6" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <circle cx="12" cy="12" r="1.6" fill="currentColor"/>
+        </svg>
+        <span class="mode-row-name">Italiane</span>
+        <span class="mode-row-sub">carte italiane &middot; 40</span>
       </button>
     </div>
 
@@ -1152,6 +1189,31 @@
       <span class="deck-flag-name">Replace</span>
     </button>
     <span class="deck-remain" id="tarotRemain" aria-label="Cards remaining">78/78</span>
+  </section>
+
+  <!-- Italiane: the 40-card Italian deck (Neapolitan pattern). Same
+       deck-on-the-tray experience; no jokers, no reversals — just the deck,
+       Mescola, and Reinserisci, the way a Scopa table would have it. The mode
+       speaks Italian, for the players who would reach for this deck. -->
+  <section class="picker cards-picker" id="napPicker" aria-label="Carte italiane" hidden>
+    <button type="button" class="spin-chip" id="napCountChip" aria-label="Carte per pescata — tocca per aumentare, tieni premuto per diminuire">
+      <span class="spin-chip-label">Carte</span>
+      <span class="spin-chip-val" id="napCount">1</span>
+    </button>
+    <button type="button" class="deck-shuffle" id="napShuffle" aria-label="Mescola il mazzo">
+      <svg viewBox="0 0 30 30" aria-hidden="true">
+        <path d="M4 10 C10 10 12 20 18 20 L22 20 M4 20 C10 20 12 10 18 10 L22 10 M20 7.5 24 10 20 12.5 M20 17.5 24 20 20 22.5"/>
+      </svg>
+      <span class="deck-shuffle-label">Mescola</span>
+    </button>
+    <button type="button" class="deck-flag" data-flag="replace" aria-pressed="false" aria-label="Pesca con reinserimento — le carte tornano nel mazzo">
+      <svg class="deck-flag-ico" viewBox="0 0 30 30" aria-hidden="true">
+        <rect class="crd" x="8" y="4" width="14" height="21" rx="2.4"/>
+        <path class="mark2" d="M11.2 14.6 a3.9 3.9 0 1 1 1.1 2.9 M11 20 L11.2 16.9 L14.3 17.2"/>
+      </svg>
+      <span class="deck-flag-name">Reinserisci</span>
+    </button>
+    <span class="deck-remain" id="napRemain" aria-label="Carte rimanenti">40/40</span>
   </section>
 
   <form class="entry" id="entry">
