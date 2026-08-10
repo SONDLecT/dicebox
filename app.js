@@ -2073,7 +2073,14 @@ const napView = {
 const hanaView = {
   ratio: 1.639, // the set's own 976x1600
   image: id => hanaImage(id),
-  svg: id => hanaArt.hanaSVG(id),
+  // Not inline SVG like the woodcut decks: these cards carry their colour in
+  // style attributes (resolved from the exports' class rules), and the site's
+  // CSP has no style-src 'unsafe-inline' — inlined in the page, every style
+  // attribute is blocked and every path falls back to black fill: a black
+  // card. A data-URI <img> renders as its own SVG document, where the page's
+  // CSP doesn't reach, and img-src data: is already allowed.
+  svg: id => '<img alt="" draggable="false" src="data:image/svg+xml;charset=utf-8,'
+    + encodeURIComponent(hanaArt.hanaSVG(id)) + '">',
   loaded: () => !!hanaArt,
   remaining: () => hanaRemaining(),
   total: () => hanaTotal(),
