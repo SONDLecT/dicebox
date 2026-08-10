@@ -1046,7 +1046,19 @@ const modeRows = [...modeSheet.querySelectorAll('.mode-row')];
 function anchorPop(pop, btn) {
   const r = btn.getBoundingClientRect();
   pop.style.top = `${Math.round(r.bottom + 8)}px`;
-  pop.style.right = `${Math.max(8, Math.round(window.innerWidth - r.right))}px`;
+  // Right-anchored to the button, but never past the left edge of the screen:
+  // a wide panel (help is 400px) under a mid-bar button on a narrow phone
+  // would otherwise render partly off-screen. Hidden elements have no box, so
+  // measure through a visibility flicker when needed.
+  const wasHidden = pop.hidden;
+  if (wasHidden) { pop.style.visibility = 'hidden'; pop.hidden = false; }
+  const w = pop.offsetWidth;
+  if (wasHidden) { pop.hidden = true; pop.style.visibility = ''; }
+  const right = Math.min(
+    Math.max(8, Math.round(window.innerWidth - r.right)),
+    Math.max(8, window.innerWidth - w - 8),
+  );
+  pop.style.right = `${right}px`;
 }
 
 function openMode() {
