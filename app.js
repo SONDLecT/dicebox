@@ -2003,6 +2003,7 @@ function cardImage(id) {
   const svg = cardArt.cardSVG(id, { dark: isDark() })
     .replace('<svg ', '<svg width="750" height="1050" ');
   const img = new Image();
+  img.addEventListener('error', () => cardImgCache.delete(key));
   img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
   entry = { img, ready: img.decode ? img.decode().catch(() => {}) : Promise.resolve() };
   // A decoded SVG image still costs the rasteriser on draw; a bitmap is a
@@ -2029,6 +2030,18 @@ const DEAL_S = 0.34, FLIP_S = 0.26;
 // a dealt card starts from exactly that angle, so the pickup reads as picking
 // up the card that was already sitting there.
 const DECK_ASKEW = 0.045;
+
+// drawImage THROWS on an HTMLImageElement whose decode failed, and three
+// thrown frames trip the loop's crash guard and clear the whole tray — which
+// is what one flaky SVG decode on a phone turned into. A broken card instead
+// skips a frame; its cache entry has already evicted itself (the caches
+// listen for error), so the very next frame quietly retries the load.
+function liveCardImage(entry) {
+  const im = entry.img;
+  if (typeof HTMLImageElement !== 'undefined' && im instanceof HTMLImageElement
+      && im.complete && im.naturalWidth === 0) return null;
+  return im;
+}
 
 // The sprites and layout serve two decks — playing cards and tarot — through a
 // small view: which art to draw, the card aspect, and where the live counts
@@ -2155,7 +2168,8 @@ class CardSprite {
     if (this.gone) return;
     const w = this.size, h = w * this.view.ratio;
     const flip = this.mode === 'return' ? 0 : this.mode === 'discard' ? 1 : (this.phase === 'idle' ? 1 : this.flipT);
-    const img = (flip < 0.5 ? this.view.image('back') : this.view.image(this.id)).img;
+    const img = liveCardImage(flip < 0.5 ? this.view.image('back') : this.view.image(this.id));
+    if (!img) return;
     const sx = this.phase === 'flip' ? Math.abs(Math.cos(Math.PI * flip)) || 0.02 : 1;
     ctx.save();
     ctx.translate(this.x, this.y);
@@ -2213,7 +2227,8 @@ class DeckStackSprite {
   }
   draw(ctx) {
     const w = this.size, h = w * this.view.ratio;
-    const img = this.view.image('back').img;
+    const img = liveCardImage(this.view.image('back'));
+    if (!img) return;
     const empty = this.view.remaining() === 0;
     ctx.save();
     ctx.translate(this.x, this.y);
@@ -2321,7 +2336,8 @@ class DiscardPileSprite {
     const count = this.hold ? this.hold.count : this.view.discard();
     if (count === 0 || !top) return;
     const w = this.size, h = w * this.view.ratio;
-    const img = this.view.image(top.id).img;
+    const img = liveCardImage(this.view.image(top.id));
+    if (!img) return;
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.shadowColor = 'rgba(0,0,0,0.35)';
@@ -2333,7 +2349,8 @@ class DiscardPileSprite {
       ctx.rotate(i % 2 ? 0.05 : -0.04);
       ctx.translate(-i * 2, -i * 2);
       ctx.globalAlpha = 0.55;
-      ctx.drawImage(this.view.image('back').img, -w / 2, -h / 2, w, h);
+      const back = liveCardImage(this.view.image('back'));
+      if (back) ctx.drawImage(back, -w / 2, -h / 2, w, h);
       ctx.restore();
     }
     ctx.rotate(top.rev ? Math.PI - 0.03 : -0.03);
@@ -2759,6 +2776,7 @@ function tarotImage(id) {
   const svg = tarotArt.tarotSVG(id, { dark: isDark() })
     .replace('<svg ', '<svg width="750" height="1290" ');
   const img = new Image();
+  img.addEventListener('error', () => tarotImgCache.delete(key));
   img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
   entry = { img, ready: img.decode ? img.decode().catch(() => {}) : Promise.resolve() };
   // A decoded SVG image still costs the rasteriser on draw; a bitmap is a
@@ -3073,6 +3091,7 @@ function napImage(id) {
   const svg = napArt.napSVG(id, { dark: isDark() })
     .replace('<svg ', '<svg width="750" height="1164" ');
   const img = new Image();
+  img.addEventListener('error', () => napImgCache.delete(key));
   img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
   entry = { img, ready: img.decode ? img.decode().catch(() => {}) : Promise.resolve() };
   // A decoded SVG image still costs the rasteriser on draw; a bitmap is a
@@ -3365,6 +3384,7 @@ function hanaImage(id) {
   const svg = hanaArt.hanaSVG(id)
     .replace('<svg ', '<svg width="732" height="1200" ');
   const img = new Image();
+  img.addEventListener('error', () => hanaImgCache.delete(id));
   img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
   entry = { img, ready: img.decode ? img.decode().catch(() => {}) : Promise.resolve() };
   if (typeof createImageBitmap === 'function') {
@@ -5236,7 +5256,9 @@ function frame(now) {
     if (loopFaults >= 3) {
       state.dice = [];
       loopFaults = 0;
-      showError('Something went wrong drawing that roll. The tray was cleared.');
+      // Name the fault: a screenshot of this line is a bug report.
+      const why = String((err && err.message) || err).slice(0, 90);
+      showError(`Something went wrong drawing that roll. The tray was cleared. (${why})`);
     }
   }
 }
