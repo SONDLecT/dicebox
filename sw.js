@@ -27,6 +27,7 @@ const ASSETS = [
   './cards-art.js',
   './tarot-art.js',
   './nap-art.js',
+  './hana-art.js',
   './room.js',
   './room-crypto.js',
   './manifest.webmanifest',

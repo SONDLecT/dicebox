@@ -166,6 +166,12 @@
             <circle cx="12" cy="12" r="4.6" fill="none" stroke="currentColor" stroke-width="1.5"/>
             <circle cx="12" cy="12" r="1.6" fill="currentColor"/>
           </g>
+          <!-- Hanafuda: a card carrying the August full moon over its hill. -->
+          <g class="mode-ico" data-for="hanafuda">
+            <rect x="5.5" y="3" width="13" height="18" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.5"/>
+            <circle cx="12" cy="9.6" r="3.1" fill="currentColor"/>
+            <path d="M6.6 18.2 C8.4 14.6 15.6 14.6 17.4 18.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </g>
           <!-- Mothership: a spacesuit helmet — dome and curved visor. -->
           <g class="mode-ico" data-for="mothership" fill="none" stroke="currentColor"
              stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">
@@ -494,6 +500,29 @@
       </p>
       </div>
 
+      <div id="helpHanafuda" hidden>
+      <dl class="syntax">
+        <dt>hana:1</dt>          <dd>draw a card</dd>
+        <dt>hana:8</dt>          <dd>deal a koi-koi hand</dd>
+        <dt>hana:1 replace</dt>  <dd>draw with replacement</dd>
+      </dl>
+      <p class="note">
+        The 48-card Japanese flower deck — twelve months, each a flower, each
+        holding four cards: <b>brights</b> (光), <b>animals</b> (タネ),
+        <b>ribbons</b> (短冊) and <b>chaff</b> (カス). Cards draw <b>without
+        replacement</b> until you <b>shuffle</b>: the deck of Koi-Koi and
+        Hachi-Hachi. <b>Tap</b> a drawn card to pick it up for a close look,
+        <b>flick</b> it to the discard without drawing, and tap the deck or
+        table to draw; tap the discard pile to page back through it.
+        <code>koi:</code> works as an alias.
+      </p>
+      <p class="note">
+        Card art by <b>Louie Mantia, Jr.</b> and <b>すけじょ</b>, in the
+        deck's traditional colours (CC BY-SA 4.0, via Wikimedia Commons) —
+        the one deck in the box drawn by other hands.
+      </p>
+      </div>
+
       <p class="note install" id="installNote">
         <button type="button" class="install-button" id="install" hidden>Install as an app</button>
         <span id="installHint">Add this to your home screen and it works offline, with no
@@ -671,6 +700,15 @@
         </svg>
         <span class="mode-row-name">Napoletane</span>
         <span class="mode-row-sub">carte napoletane &middot; 40</span>
+      </button>
+      <button type="button" class="mode-row mode-hanafuda" data-system="hanafuda" aria-pressed="false">
+        <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="5.5" y="3" width="13" height="18" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <circle cx="12" cy="9.6" r="3.1" fill="currentColor"/>
+          <path d="M6.6 18.2 C8.4 14.6 15.6 14.6 17.4 18.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <span class="mode-row-name">Hanafuda</span>
+        <span class="mode-row-sub">花札 &middot; 48</span>
       </button>
     </div>
 
@@ -1219,6 +1257,27 @@
       <span class="deck-flag-name">Reinserisci</span>
     </button>
     <span class="deck-remain" id="napRemain" aria-label="Carte rimanenti">40/40</span>
+  </section>
+
+  <section class="picker cards-picker" id="hanaPicker" aria-label="Hanafuda" hidden>
+    <button type="button" class="spin-chip" id="hanaCountChip" aria-label="Cards per draw — tap to raise, hold to lower">
+      <span class="spin-chip-label">Cards</span>
+      <span class="spin-chip-val" id="hanaCount">1</span>
+    </button>
+    <button type="button" class="deck-shuffle" id="hanaShuffle" aria-label="Shuffle the deck">
+      <svg viewBox="0 0 30 30" aria-hidden="true">
+        <path d="M4 10 C10 10 12 20 18 20 L22 20 M4 20 C10 20 12 10 18 10 L22 10 M20 7.5 24 10 20 12.5 M20 17.5 24 20 20 22.5"/>
+      </svg>
+      <span class="deck-shuffle-label">Shuffle</span>
+    </button>
+    <button type="button" class="deck-flag" data-flag="replace" aria-pressed="false" aria-label="Draw with replacement — cards return to the deck">
+      <svg class="deck-flag-ico" viewBox="0 0 30 30" aria-hidden="true">
+        <rect class="crd" x="8" y="4" width="14" height="21" rx="2.4"/>
+        <path class="mark2" d="M11.2 14.6 a3.9 3.9 0 1 1 1.1 2.9 M11 20 L11.2 16.9 L14.3 17.2"/>
+      </svg>
+      <span class="deck-flag-name">Replace</span>
+    </button>
+    <span class="deck-remain" id="hanaRemain" aria-label="Cards remaining">48/48</span>
   </section>
 
   <form class="entry" id="entry">

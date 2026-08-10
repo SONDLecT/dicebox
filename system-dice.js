@@ -43,6 +43,7 @@ export function detectSystem(src) {
   if (/^deck:/.test(s)) return 'cards';
   if (/^tarot:/.test(s)) return 'tarot';
   if (/^(?:ita|nap):/.test(s)) return 'napoletane';
+  if (/^(?:hana|koi|hf):/.test(s)) return 'hanafuda';
   if (FATE_REGEX.test(s)) return 'fate';
   return 'numeric';
 }
@@ -932,6 +933,26 @@ const NAP_REGEX = /^(?:ita|nap):(\d+)\s*(.*)$/;
 export function parseNapoletane(src) {
   const m = NAP_REGEX.exec(String(src || '').trim().toLowerCase());
   if (!m) throw new Error('Expected a draw like "ita:1" or "ita:3"');
+  const draw = Number(m[1]);
+  if (draw < 1 || draw > 10) throw new Error('Draw 1-10 cards');
+  let replace = false;
+  for (const tok of m[2].split(/[\s+]+/).filter(Boolean)) {
+    if (tok === 'replace' || tok === 'rep') replace = true;
+    else throw new Error(`Unknown option "${tok}" — try replace`);
+  }
+  return { draw, replace };
+}
+
+// ---- Hanafuda ----
+//
+// The 48-card Japanese flower deck: twelve months of four cards each. Same
+// draw engine and formatters as the other decks; the one flag is replace.
+// `hana:` is the notation; `koi:` and `hf:` are accepted as aliases.
+const HANA_REGEX = /^(?:hana|koi|hf):(\d+)\s*(.*)$/;
+
+export function parseHanafuda(src) {
+  const m = HANA_REGEX.exec(String(src || '').trim().toLowerCase());
+  if (!m) throw new Error('Expected a draw like "hana:1" or "hana:8"');
   const draw = Number(m[1]);
   if (draw < 1 || draw > 10) throw new Error('Draw 1-10 cards');
   let replace = false;

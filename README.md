@@ -120,11 +120,12 @@ Every mode has its own short URL — `dicebox.trollskull.cc/dh`,
 
 ## Card decks
 
-Two of the modes deal cards instead of dice. The deck sits on the tray like a
+Four of the modes deal cards instead of dice. The deck sits on the tray like a
 dealer's shoe: tap it to draw, and the cards deal, flip and settle the way the
 dice tumble. Draws come off a real shuffled order and the deck remembers what is
-gone until you shuffle; a discard pile builds up beside it, and holding a drawn
-card lifts it for a closer look.
+gone until you shuffle. The cards are physical things: tap a drawn card to pick
+it up for a closer look, flick it to send it to the discard pile without
+drawing, and tap the discard pile to page back through everything in it.
 
 <p align="center">
   <img src="docs/cards.png" alt="The Woodcut Tarot and the Woodcut playing-card deck — trumps, courts, an ace, a joker and the card back, all traced from antique woodcuts" width="820">
@@ -132,18 +133,27 @@ card lifts it for a closer look.
 
 **Cards** is a 52-card French-suited deck, jokers optional. **Tarot** is the
 full 78-card Tarot de Marseille, with reversals and a majors-only option.
-Everything the pickers do is typeable too — `deck:3 jokers replace`,
-`tarot:3 majors upright` — so the notation still describes the whole draw.
+**Napoletane** is the 40-card Italian deck of Scopa and Briscola, in full
+stencil colour from a deck printed in Naples in 1902 — a mode that speaks
+Italian, from the picker to the help panel. **Hanafuda** is the 48-card
+Japanese flower deck of Koi-Koi, in Louie Mantia, Jr. and すけじょ's
+traditional-colour set (CC BY-SA 4.0, via Wikimedia Commons) — the one deck
+in the box drawn by other hands. Everything the pickers do is typeable too —
+`deck:3 jokers replace`, `tarot:3 majors upright`, `nap:3`, `hana:8` — so the
+notation still describes the whole draw.
 
-The art is not clip-art. Both decks are traced by hand from public-domain
-17th–19th-century woodcut cards held by the Bibliothèque nationale de France and
-redrawn as single-colour vector line, so they retint cleanly for light and dark.
+The woodcut art is not clip-art. Those decks are traced by hand from
+public-domain woodcut cards held by the Bibliothèque nationale de France —
+as single-colour vector line that retints cleanly for light and dark, and in
+full stencil colour with each deck's own palette measured from the scans.
 They are released as their own CC0 repositories, usable well outside Dicebox:
 
 - **[woodcut-cards](https://github.com/SONDLecT/woodcut-cards)** — the 52-card
   deck, two jokers and the back
 - **[woodcut-tarot](https://github.com/SONDLecT/woodcut-tarot)** — all 78 cards
   of the tarot
+- **[woodcut-napoletane](https://github.com/SONDLecT/woodcut-napoletane)** —
+  the 40 carte napoletane, keyline and colour
 
 ## How the rolls work
 

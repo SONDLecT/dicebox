@@ -8,7 +8,7 @@ import { rollGenesys, describeGenesys, genesysHeadline, parseGenesys } from './s
 import { rollDaggerheart, describeDaggerheart, daggerheartHeadline, parseDaggerheart } from './system-dice.js';
 import { rollCthulhuTech, describeCthulhuTech, cthulhutechHeadline, parseCthulhuTech } from './system-dice.js';
 import { rollMothership, describeMothership, mothershipHeadline, parseMothership, resolveMothershipStress } from './system-dice.js';
-import { parseCards, newDeckOrder, summarizeCards, cardsHeadline, describeCards, parseTarot, summarizeTarot, tarotHeadline, describeTarot, parseNapoletane } from './system-dice.js';
+import { parseCards, newDeckOrder, summarizeCards, cardsHeadline, describeCards, parseTarot, summarizeTarot, tarotHeadline, describeTarot, parseNapoletane, parseHanafuda } from './system-dice.js';
 import { rollStarWars, describeStarWars, starWarsHeadline, parseStarWars } from './system-dice.js';
 import { rollOneRing, describeOneRing, oneRingHeadline, parseOneRing } from './system-dice.js';
 import { rollPbta, rollMist, twod6Headline, describe2d6, parsePbta, parseMist } from './system-dice.js';
@@ -300,6 +300,16 @@ const SYSTEM_THEMES = {
   },
   // Napoletane — azzurro: the sky-and-bay cyan of Naples itself, bright where
   // Star Wars' steel blue is muted, over a deep harbour-water dark.
+  hanafuda: {
+    dark: {
+      '--paper': '#120D0C', '--face': '#1C1311', '--line': '#EFE0D6', '--muted': '#93756A',
+      '--hair': '#2E1D19', '--accent': '#E8483B', '--danger': '#C0453F',
+    },
+    light: {
+      '--paper': '#F2E9E2', '--face': '#FAF4EE', '--line': '#26140F', '--muted': '#7C5A4F',
+      '--hair': '#E2CFC4', '--accent': '#B5311F', '--danger': '#8C3A2E',
+    },
+  },
   napoletane: {
     dark: {
       '--paper': '#0A1116', '--face': '#101B23', '--line': '#DCE6EC', '--muted': '#64808F',
@@ -610,6 +620,7 @@ function doRoll(notation) {
     if (sys === 'cards') { dealFromNotation(notation); return; }
     if (sys === 'tarot') { dealFromTarotNotation(notation); return; }
     if (sys === 'napoletane') { dealFromNapNotation(notation); return; }
+    if (sys === 'hanafuda') { dealFromHanaNotation(notation); return; }
     result = sys === 'v5' ? rollV5(notation)
       : sys === 'fate' ? rollFate(notation)
       : sys === 'genesys' ? rollGenesys(notation)
@@ -716,6 +727,7 @@ function resultHeadline(result) {
   if (result.system === 'cards') return cardsHeadline(result);
   if (result.system === 'tarot') return tarotHeadline(result);
   if (result.system === 'napoletane') return cardsHeadline(result);
+  if (result.system === 'hanafuda') return cardsHeadline(result);
   return { kind: 'number', text: String(result.total) };
 }
 function resultDetail(result) {
@@ -731,6 +743,7 @@ function resultDetail(result) {
   if (result.system === 'cards') return describeCards(result);
   if (result.system === 'tarot') return describeTarot(result);
   if (result.system === 'napoletane') return describeCards(result);
+  if (result.system === 'hanafuda') return describeCards(result);
   return describe(result.groups);
 }
 
@@ -896,6 +909,7 @@ $('notation').addEventListener('input', () => {
   if (typedSystem === 'cards') { syncCardsFromField(); return; }
   if (typedSystem === 'tarot') { syncTarotFromField(); return; }
   if (typedSystem === 'napoletane') { syncNapFromField(); return; }
+  if (typedSystem === 'hanafuda') { syncHanaFromField(); return; }
   pool = parsePool($('notation').value);
   // Typing an unusual die earns it a button too, so the row always accounts for
   // everything in the pool.
@@ -957,6 +971,7 @@ const SYSTEMS = {
   cards: { badge: 'Cards' },
   tarot: { badge: 'Tarot' },
   napoletane: { badge: 'Napoletane' },
+  hanafuda: { badge: 'Hanafuda' },
   v5: { badge: 'VtM V5' },
   fate: { badge: 'Fate' },
   genesys: { badge: 'Genesys' },
@@ -981,6 +996,7 @@ const SYSTEM_HINTS = {
   cards: { idle: 'Tap the deck to draw', placeholder: 'Tap the deck, or type deck:3' },
   tarot: { idle: 'Tap the deck to draw', placeholder: 'Tap the deck, or type tarot:3' },
   napoletane: { idle: 'Tocca il mazzo per pescare', placeholder: 'Tocca il mazzo, o scrivi nap:3' },
+  hanafuda: { idle: '山札をタップして引く — tap the deck to draw', placeholder: 'Tap the deck, or type hana:2' },
 };
 function systemHint(system) { return SYSTEM_HINTS[system] || DEFAULT_HINT; }
 
@@ -991,12 +1007,12 @@ function systemHint(system) { return SYSTEM_HINTS[system] || DEFAULT_HINT; }
 // URL the app puts in the bar) always uses the canonical shorthand, edition
 // included, matching the picker labels.
 const SLUG_TO_SYSTEM = {
-  cards: 'cards', tarot: 'tarot', italiane: 'napoletane', napoletane: 'napoletane', scopa: 'napoletane', vtmv5: 'v5', fate: 'fate', genesys: 'genesys', dh: 'daggerheart', ctech2e: 'cthulhutech',
+  cards: 'cards', tarot: 'tarot', italiane: 'napoletane', napoletane: 'napoletane', scopa: 'napoletane', hanafuda: 'hanafuda', koikoi: 'hanafuda', hana: 'hanafuda', vtmv5: 'v5', fate: 'fate', genesys: 'genesys', dh: 'daggerheart', ctech2e: 'cthulhutech',
   swrpg: 'starwars', tor2e: 'onering', pbta: 'pbta', mist: 'mist', mosh1e: 'mothership',
   v5: 'v5', vtm: 'v5', daggerheart: 'daggerheart', cthulhutech: 'cthulhutech', ctech: 'cthulhutech',
   force: 'starwars', feat: 'onering', tor: 'onering', mothership: 'mothership', mosh: 'mothership',
 };
-const SYSTEM_TO_SLUG = { cards: 'cards', tarot: 'tarot', napoletane: 'napoletane', v5: 'vtmv5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', mothership: 'mosh1e' };
+const SYSTEM_TO_SLUG = { cards: 'cards', tarot: 'tarot', napoletane: 'napoletane', hanafuda: 'hanafuda', v5: 'vtmv5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', mothership: 'mosh1e' };
 
 function systemFromPath() {
   const seg = (location.pathname || '/').replace(/^\/+|\/+$/g, '').toLowerCase();
@@ -1083,9 +1099,10 @@ function setSystem(system, { roll = false, url = true } = {}) {
   cardsPicker.hidden = system !== 'cards';
   tarotPicker.hidden = system !== 'tarot';
   napPicker.hidden = system !== 'napoletane';
+  hanaPicker.hidden = system !== 'hanafuda';
   // One action, one name: the entry button IS the draw in the deck modes, so
   // the pickers carry no second Draw button.
-  $('rollGo').textContent = system === 'cards' || system === 'tarot' || system === 'napoletane' ? 'Draw' : 'Roll';
+  $('rollGo').textContent = system === 'cards' || system === 'tarot' || system === 'napoletane' || system === 'hanafuda' ? 'Draw' : 'Roll';
   // The deck's art loads on first entry; the stack appears when it lands. The
   // modules are service-worker-precached, so this works offline too.
   if (system === 'cards') {
@@ -1123,6 +1140,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
   $('helpCards').hidden = system !== 'cards';
   $('helpTarot').hidden = system !== 'tarot';
   $('helpNapoletane').hidden = system !== 'napoletane';
+  $('helpHanafuda').hidden = system !== 'hanafuda';
 
   // The popover's rows reflect the choice.
   for (const row of modeRows) {
@@ -1153,6 +1171,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
     if (system === 'cards') $('notation').value = deckNotation();
     if (system === 'tarot') $('notation').value = tarotNotation();
     if (system === 'napoletane') $('notation').value = napNotation();
+    if (system === 'hanafuda') $('notation').value = hanaNotation();
   }
 }
 
@@ -2051,6 +2070,24 @@ const napView = {
     persistNap();
   },
 };
+const hanaView = {
+  ratio: 1.639, // the set's own 976x1600
+  image: id => hanaImage(id),
+  svg: id => hanaArt.hanaSVG(id),
+  loaded: () => !!hanaArt,
+  remaining: () => hanaRemaining(),
+  total: () => hanaTotal(),
+  replace: () => hanaState.replace,
+  discard: () => hanaState.pile.length,
+  discardTop: () => (hanaState.pile.length ? { id: hanaState.pile[hanaState.pile.length - 1], rev: false } : null),
+  pile: () => hanaState.pile.map(id => ({ id, rev: false })),
+  discardFromHand: (id) => {
+    const i = hanaState.hand.indexOf(id);
+    if (i >= 0) hanaState.hand.splice(i, 1);
+    hanaState.pile.push(id);
+    persistHana();
+  },
+};
 const tarotView = {
   ratio: 1.72,
   image: id => tarotImage(id),
@@ -2362,7 +2399,7 @@ function deckLayout(n, view = cardsView) {
 function stageDeckIdle() {
   if (!cardArt) return;
   // A brand-new deck arrives shuffled, like one out of the box should.
-  if (deckState.order.length === 0) reshuffleDeck();
+  if (deckState.order.length === 0) { reshuffleDeck(); syncCardsUI({ writeField: false, restage: false }); }
   const { stack, discard } = deckLayout(0);
   state.dice = [new DeckStackSprite(stack.x, stack.y, stack.w)];
   if (deckState.pile.length > 0) state.dice.push(new DiscardPileSprite(discard.x, discard.y, discard.w));
@@ -2656,7 +2693,7 @@ function reshuffleTarot() {
 function drawTarotCards(n) {
   let picks;
   tarotState.draw = n;
-  if (tarotState.order.length === 0) reshuffleTarot();
+  if (tarotState.order.length === 0) { reshuffleTarot(); syncTarotUI({ writeField: false, restage: false }); }
   if (tarotState.replace) {
     // Independent picks from what is still in the deck; the discard stays out
     // until a shuffle, and each pick keeps its shuffled orientation.
@@ -3045,7 +3082,7 @@ function napImage(id) {
 
 function stageNapIdle() {
   if (!napArt) return;
-  if (napState.order.length === 0) reshuffleNap();
+  if (napState.order.length === 0) { reshuffleNap(); syncNapUI({ writeField: false, restage: false }); }
   const { stack, discard } = deckLayout(0, napView);
   state.dice = [new DeckStackSprite(stack.x, stack.y, stack.w, napView)];
   if (napState.pile.length > 0) state.dice.push(new DiscardPileSprite(discard.x, discard.y, discard.w, napView));
@@ -3211,6 +3248,296 @@ function syncNapFromField() {
     napState.draw = draw;
     persistNap();
     syncNapUI({ writeField: false, restage: false });
+  } catch { /* mid-type */ }
+}
+
+// ---- hanafuda ----
+//
+// The 48-card Japanese flower deck: twelve months, each a flower, each holding
+// four cards — brights, animals, ribbons and chaff (hikari, tane, tanzaku,
+// kasu). Same draw engine as the other decks; the one flag is replace. The art
+// is Louie Mantia and すけじょ's traditional-colour set (hana-art.js, CC
+// BY-SA 4.0 — the one deck in the box that isn't ours, credited in the help).
+const HANA_KEY = 'dicebox:hana:v1';
+const hanaState = {
+  order: [], pos: 0, replace: false, draw: 1,
+  pile: [], hand: [], handReplace: false,
+};
+{
+  try {
+    const saved = JSON.parse(store.get(HANA_KEY) || 'null');
+    if (saved && Array.isArray(saved.order) && saved.order.every(x => typeof x === 'string')) {
+      Object.assign(hanaState, saved, { draw: Math.max(1, Math.min(10, saved.draw || 1)) });
+      if (!Array.isArray(hanaState.pile)) hanaState.pile = [];
+      if (Array.isArray(hanaState.hand) && hanaState.hand.length && !hanaState.handReplace) {
+        hanaState.pile.push(...hanaState.hand);
+      }
+      hanaState.hand = [];
+    }
+  } catch { /* fresh deck */ }
+}
+const persistHana = () => store.set(HANA_KEY, JSON.stringify(hanaState));
+
+// The id list lives in the art module; every caller that shuffles has already
+// awaited ensureHanaArt, so this never races the import.
+function hanaDeckIds() { return hanaArt.HANA_IDS.slice(); }
+const hanaTotal = () => 48;
+const hanaRemaining = () => Math.max(0, hanaState.order.length - hanaState.pos);
+
+let lastSweptReplaceHana = false;
+
+function hanaNotation() {
+  let s = `hana:${hanaState.draw}`;
+  if (hanaState.replace) s += ' replace';
+  return s;
+}
+
+function applyHanaFlags({ replace }) {
+  if (replace !== hanaState.replace) { hanaState.replace = replace; persistHana(); }
+  return false; // nothing here changes what the deck contains
+}
+
+function reshuffleHana() {
+  hanaState.order = newDeckOrder(hanaDeckIds(), n => cryptoIndex(n) + 1);
+  hanaState.pos = 0;
+  hanaState.pile = [];
+  hanaState.hand = [];
+  persistHana();
+}
+
+function drawHanaCards(n) {
+  let ids;
+  hanaState.draw = n;
+  if (hanaState.order.length === 0) reshuffleHana();
+  if (hanaState.replace) {
+    const pool = hanaState.order.slice(hanaState.pos);
+    ids = pool.length ? Array.from({ length: n }, () => pool[cryptoIndex(pool.length)]) : [];
+  } else {
+    ids = hanaState.order.slice(hanaState.pos, hanaState.pos + n);
+    hanaState.pos += ids.length;
+    persistHana();
+  }
+  lastSweptReplaceHana = hanaState.handReplace;
+  lastSweptPrevPile = { count: hanaState.pile.length, top: hanaState.pile.length ? hanaState.pile[hanaState.pile.length - 1] : null };
+  if (hanaState.hand.length && !hanaState.handReplace) {
+    hanaState.pile.push(...hanaState.hand);
+  }
+  hanaState.hand = ids.slice();
+  hanaState.handReplace = hanaState.replace;
+  persistHana();
+  const drawn = ids.map(id => ({ id, label: hanaArt.hanaMeta(id).label, red: false }));
+  return {
+    schema: 2,
+    system: 'hanafuda',
+    notation: hanaNotation(),
+    groups: [{ kind: 'cards', count: drawn.length, cards: drawn }],
+    summary: summarizeCards(drawn, hanaRemaining(), hanaTotal()),
+  };
+}
+
+let hanaArt = null;
+let hanaArtLoading = null;
+function ensureHanaArt() {
+  if (hanaArt) return Promise.resolve(hanaArt);
+  if (!hanaArtLoading) {
+    /* global __dicebox */
+    hanaArtLoading = (typeof __dicebox !== 'undefined' && __dicebox.hanaSVG)
+      ? Promise.resolve(__dicebox)
+      : import('./hana-art.js');
+    hanaArtLoading = hanaArtLoading.then(m => (hanaArt = m));
+  }
+  return hanaArtLoading;
+}
+
+// The Mantia set carries its own colour on both grounds, so the cache is not
+// keyed by theme the way the retinting woodcut decks are.
+const hanaImgCache = new Map();
+function hanaImage(id) {
+  let entry = hanaImgCache.get(id);
+  if (entry) return entry;
+  const svg = hanaArt.hanaSVG(id)
+    .replace('<svg ', '<svg width="732" height="1200" ');
+  const img = new Image();
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  entry = { img, ready: img.decode ? img.decode().catch(() => {}) : Promise.resolve() };
+  if (typeof createImageBitmap === 'function') {
+    entry.ready = entry.ready
+      .then(() => createImageBitmap(img))
+      .then(bmp => { entry.img = bmp; })
+      .catch(() => {});
+  }
+  hanaImgCache.set(id, entry);
+  return entry;
+}
+
+function stageHanaIdle() {
+  if (!hanaArt) return;
+  if (hanaState.order.length === 0) { reshuffleHana(); syncHanaUI({ writeField: false, restage: false }); }
+  const { stack, discard } = deckLayout(0, hanaView);
+  state.dice = [new DeckStackSprite(stack.x, stack.y, stack.w, hanaView)];
+  if (hanaState.pile.length > 0) state.dice.push(new DiscardPileSprite(discard.x, discard.y, discard.w, hanaView));
+  dropIdleCache();
+  $('total').dataset.idle = '1';
+  $('total').dataset.kind = 'number';
+  $('total').textContent = '—';
+  $('breakdown').textContent = systemHint('hanafuda').idle;
+  hideHint();
+}
+
+async function dealHanaFlow(result, { remote = false } = {}) {
+  await ensureHanaArt();
+  await hanaImage('back').ready;
+  await Promise.all(result.summary.drawn.map(c => hanaImage(c.id).ready));
+
+  const n = result.summary.drawn.length;
+  const { stack, slots, discard } = deckLayout(n, hanaView);
+  const prev = state.dice.find(d => d.isStack);
+  const stackSprite = new DeckStackSprite(prev ? prev.x : stack.x, prev ? prev.y : stack.y, prev ? prev.size : stack.w, hanaView);
+  if (prev && (prev.x !== stack.x || prev.size !== stack.w)) stackSprite.moveTo(stack.x, stack.y, stack.w);
+  else { stackSprite.x = stack.x; stackSprite.y = stack.y; stackSprite.size = stack.w; }
+  const dealFrom = { x: prev ? prev.x : stack.x, y: prev ? prev.y : stack.y };
+  const sprites = [stackSprite];
+
+  let delay0 = 0;
+  if (!remote) {
+    for (const d of state.dice) {
+      if (d.isCard && !d.isStack && !d.isDiscard && d.phase === 'idle' && !d.gone) {
+        const dest = lastSweptReplaceHana
+          ? { to: { x: stack.x, y: stack.y, w: d.size }, mode: 'return' }
+          : { to: { x: discard.x, y: discard.y, w: discard.w }, mode: 'discard' };
+        sprites.push(new CardSprite(d.id, { x: d.x, y: d.y }, dest.to, { mode: dest.mode, view: hanaView }));
+        delay0 = DEAL_S + 0.12;
+      }
+    }
+  }
+  if (!remote && hanaState.pile.length > 0) {
+    const prev = lastSweptPrevPile;
+    const hold = delay0 > 0 && prev
+      ? { count: prev.count, top: prev.top ? { id: prev.top, rev: false } : null, for: delay0 + DEAL_S + 0.08 }
+      : null;
+    sprites.push(new DiscardPileSprite(discard.x, discard.y, discard.w, hanaView, hold));
+  }
+  result.summary.drawn.forEach((c, i) => {
+    sprites.push(new CardSprite(c.id, dealFrom, slots[i], { delay: delay0 + i * 0.12, remote, view: hanaView }));
+  });
+
+  state.dice = sprites;
+  dropIdleCache();
+  $('total').dataset.rolling = '1';
+  const settleMs = (delay0 + n * 0.12 + DEAL_S + FLIP_S) * 1000 + 160;
+  setTimeout(() => finish(result), settleMs);
+  if (!remote && navigator.vibrate) navigator.vibrate([6, 30, 8]);
+  hideHint();
+  return result;
+}
+
+function dealHanaFlowRemote(result, claim) {
+  const preload = [hanaImage('back').ready, ...result.summary.drawn.map(c => hanaImage(c.id).ready)];
+  Promise.all(preload).then(() => {
+    if (state.remoteClaim !== claim) return;
+    const n = result.summary.drawn.length;
+    const { stack, slots } = deckLayout(n, hanaView);
+    const sprites = [new DeckStackSprite(stack.x, stack.y, stack.w, hanaView)];
+    result.summary.drawn.forEach((c, i) => {
+      sprites.push(new CardSprite(c.id, { x: stack.x, y: stack.y }, slots[i], { delay: i * 0.12, remote: true, view: hanaView }));
+    });
+    state.dice = sprites;
+    dropIdleCache();
+    $('total').dataset.rolling = '1';
+    setTimeout(() => {
+      if (state.remoteClaim !== claim) return;
+      delete $('total').dataset.rolling;
+      delete $('total').dataset.idle;
+      setTotal(cardsHeadline(result));
+      $('breakdown').textContent = describeCards(result);
+    }, (n * 0.12 + DEAL_S + FLIP_S) * 1000 + 160);
+  });
+}
+
+function dealFromHanaNotation(notation) {
+  let parsed;
+  try { parsed = parseHanafuda(notation); } catch (err) { showError(err.message); return; }
+  clearError();
+  state.remoteClaim = null;
+  ensureHanaArt()
+    .then(() => {
+      applyHanaFlags(parsed);
+      return dealHanaFlow(drawHanaCards(parsed.draw));
+    })
+    .then(res => {
+      state.last = res;
+      $('notation').value = res.notation;
+      syncHanaUI({ writeField: false, restage: false });
+    })
+    .catch(err => showError(String((err && err.message) || err)));
+}
+
+// ---- the hanafuda picker ----
+const hanaPicker = $('hanaPicker');
+const hanaCountVal = $('hanaCount');
+const hanaRemainVal = $('hanaRemain');
+const hanaFlagButtons = [...document.querySelectorAll('#hanaPicker .deck-flag')];
+
+function syncHanaUI({ writeField = true, restage = true } = {}) {
+  hanaCountVal.textContent = String(hanaState.draw);
+  hanaRemainVal.textContent = hanaState.replace ? `${hanaRemaining()}∞` : `${hanaRemaining()}/${hanaTotal()}`;
+  for (const b of hanaFlagButtons) {
+    b.setAttribute('aria-pressed', String(hanaState.replace));
+  }
+  if (writeField && uiSystem === 'hanafuda') $('notation').value = hanaNotation();
+  if (restage && uiSystem === 'hanafuda' && !$('total').dataset.rolling) stageHanaIdle();
+}
+
+bindTapHold($('hanaCountChip'), dir => {
+  hanaState.draw = Math.max(1, Math.min(10, hanaState.draw + dir));
+  persistHana();
+  syncHanaUI({ restage: false });
+});
+$('hanaShuffle').addEventListener('click', () => {
+  ensureHanaArt().then(() => {
+    const prevCards = state.dice.filter(d => d.isCard && !d.isStack && !d.isDiscard && !d.gone && d.phase === 'idle');
+    const hadDiscard = hanaState.pile.length > 0;
+    const discardTop = hanaState.pile[hanaState.pile.length - 1];
+    const prevDiscardSprite = state.dice.find(d => d.isDiscard);
+    reshuffleHana();
+    const { stack } = deckLayout(0, hanaView);
+    const stackSprite = new DeckStackSprite(stack.x, stack.y, stack.w, hanaView);
+    const sprites = [stackSprite];
+    for (const d of prevCards) {
+      sprites.push(new CardSprite(d.id, { x: d.x, y: d.y }, { x: stack.x, y: stack.y, w: d.size }, { mode: 'return', view: hanaView }));
+    }
+    if (hadDiscard && discardTop && prevDiscardSprite) {
+      for (let i = 0; i < 3; i++) {
+        sprites.push(new CardSprite(discardTop, { x: prevDiscardSprite.x, y: prevDiscardSprite.y },
+          { x: stack.x, y: stack.y, w: prevDiscardSprite.size }, { mode: 'return', delay: i * 0.07, view: hanaView }));
+      }
+    }
+    const sweeping = sprites.length > 1;
+    stackSprite.riffleAfter = sweeping ? 0.34 : 0.001;
+    state.dice = sprites;
+    dropIdleCache();
+    $('total').dataset.idle = '1';
+    $('total').dataset.kind = 'number';
+    $('total').textContent = '—';
+    $('breakdown').textContent = systemHint('hanafuda').idle;
+    if (navigator.vibrate) navigator.vibrate([6, 40, 6, 40, 6, 40, 10]);
+    syncHanaUI({ restage: false });
+  });
+});
+for (const b of hanaFlagButtons) {
+  b.addEventListener('click', () => {
+    hanaState.replace = !hanaState.replace;
+    persistHana();
+    syncHanaUI();
+  });
+}
+
+function syncHanaFromField() {
+  try {
+    const { draw } = parseHanafuda($('notation').value);
+    hanaState.draw = draw;
+    persistHana();
+    syncHanaUI({ writeField: false, restage: false });
   } catch { /* mid-type */ }
 }
 
@@ -3564,6 +3891,7 @@ function clearPool() {
       case 'cards': ensureCardArt().then(() => { if (uiSystem === 'cards') syncCardsUI(); }); break;
       case 'tarot': ensureTarotArt().then(() => { if (uiSystem === 'tarot') syncTarotUI(); }); break;
       case 'napoletane': ensureNapArt().then(() => { if (uiSystem === 'napoletane') syncNapUI(); }); break;
+      case 'hanafuda': ensureHanaArt().then(() => { if (uiSystem === 'hanafuda') syncHanaUI(); }); break;
     }
     return;
   }
@@ -4679,6 +5007,7 @@ function emptyTrayRoll() {
   if (uiSystem === 'cards') return deckNotation();
   if (uiSystem === 'tarot') return tarotNotation();
   if (uiSystem === 'napoletane') return napNotation();
+  if (uiSystem === 'hanafuda') return hanaNotation();
   const last = state.last;
   const lastNumeric = last && (last.system === 'numeric' || last.system === undefined);
   return (lastNumeric && last.notation) || `d${state.defaultSides}`;
@@ -5096,12 +5425,12 @@ function showRemoteRoll(roll) {
   // called by the dealer's own timer; addHistory ran above, and finish adds
   // again, so the dealer path for remote skips it via the claim below not
   // being ours... simpler: cards route renders and sets the readout directly.
-  if (result.system === 'cards' || result.system === 'tarot' || result.system === 'napoletane') {
+  if (result.system === 'cards' || result.system === 'tarot' || result.system === 'napoletane' || result.system === 'hanafuda') {
     if ($('total').dataset.rolling && !state.remoteClaim) return;
     const claim = {};
     state.remoteClaim = claim;
-    const ensure = result.system === 'tarot' ? ensureTarotArt : result.system === 'napoletane' ? ensureNapArt : ensureCardArt;
-    const deal = result.system === 'tarot' ? dealTarotFlowRemote : result.system === 'napoletane' ? dealNapFlowRemote : dealCardsFlowRemote;
+    const ensure = result.system === 'tarot' ? ensureTarotArt : result.system === 'napoletane' ? ensureNapArt : result.system === 'hanafuda' ? ensureHanaArt : ensureCardArt;
+    const deal = result.system === 'tarot' ? dealTarotFlowRemote : result.system === 'napoletane' ? dealNapFlowRemote : result.system === 'hanafuda' ? dealHanaFlowRemote : dealCardsFlowRemote;
     ensure().then(() => {
       if (state.remoteClaim !== claim) return;
       deal(result, claim);

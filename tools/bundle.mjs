@@ -54,11 +54,12 @@ const SYSTEM_EXPORTS = [
   'rollMothership', 'describeMothership', 'mothershipHeadline', 'parseMothership', 'resolveMothershipStress',
   'parseCards', 'newDeckOrder', 'summarizeCards', 'cardsHeadline', 'describeCards',
   'parseTarot', 'summarizeTarot', 'tarotHeadline', 'describeTarot',
-  'parseNapoletane',
+  'parseNapoletane', 'parseHanafuda',
 ];
 const CARDS_ART_EXPORTS = ['cardSVG', 'CARD_IDS', 'cardMeta', 'SUIT_NAMES', 'RANKS'];
 const TAROT_ART_EXPORTS = ['tarotSVG', 'TAROT_IDS', 'tarotMeta', 'TAROT_SUITS'];
 const NAP_ART_EXPORTS = ['napSVG', 'NAP_IDS', 'napMeta'];
+const HANA_ART_EXPORTS = ['hanaSVG', 'HANA_IDS', 'hanaMeta'];
 const RENDER_EXPORTS = ['Die', 'Surface', 'separate', 'beginFrame', 'solidFor', 'UNDER_30_GAP'];
 const ROOM_CRYPTO_EXPORTS = [
   'deriveRoom', 'newSender', 'encryptMessage', 'decryptMessage',
@@ -78,11 +79,12 @@ const script = [
   moduleScope('cards-art.js'),
   moduleScope('tarot-art.js'),
   moduleScope('nap-art.js'),
+  moduleScope('hana-art.js'),
   moduleScope('render.js', ['UNDER_30_GAP']),
   moduleScope('room-crypto.js'),
   moduleScope('room.js', ROOM_CRYPTO_EXPORTS),
   moduleScope('app.js', [
-    ...DICE_EXPORTS, ...SYSTEM_EXPORTS, ...CARDS_ART_EXPORTS, ...TAROT_ART_EXPORTS, ...NAP_ART_EXPORTS, ...RENDER_EXPORTS, ...ROOM_CRYPTO_EXPORTS, ...ROOM_EXPORTS,
+    ...DICE_EXPORTS, ...SYSTEM_EXPORTS, ...CARDS_ART_EXPORTS, ...TAROT_ART_EXPORTS, ...NAP_ART_EXPORTS, ...HANA_ART_EXPORTS, ...RENDER_EXPORTS, ...ROOM_CRYPTO_EXPORTS, ...ROOM_EXPORTS,
   ]),
 ].join('\n\n');
 

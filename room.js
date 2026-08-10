@@ -192,7 +192,7 @@ export function validateRoll(msg) {
 // trusted for display only (the room is end-to-end encrypted among people who
 // share the passphrase); the receiver still renders it inside a try/catch.
 const SYSTEM_ROLL_KINDS = new Set([
-  'v5', 'fate', 'genesys', 'daggerheart', 'cthulhutech', 'starwars', 'onering', 'pbta', 'mist', 'mothership', 'cards', 'tarot', 'napoletane',
+  'v5', 'fate', 'genesys', 'daggerheart', 'cthulhutech', 'starwars', 'onering', 'pbta', 'mist', 'mothership', 'cards', 'tarot', 'napoletane', 'hanafuda',
 ]);
 
 export function validateSystemRoll(msg) {
