@@ -12,6 +12,10 @@ demo instance, not a service. To keep a copy of your own, see
 [Getting it offline](#getting-it-offline): download it as a single file, install
 it from the browser, or host it yourself.
 
+Out of the box it does more than plain dice: ten [game-system modes](#game-systems)
+— Vampire, Daggerheart, Mothership and the rest — and two hand-traced
+[card decks](#card-decks), all of it local and offline.
+
 It stays a local dice roller unless you ask for more. Optionally it will also
 share rolls with a table over an [end-to-end encrypted room](#rooms), and there
 is an [Owlbear Rodeo panel](#in-owlbear-rodeo) that joins one as an ordinary
@@ -80,6 +84,58 @@ choose there gets a button of its own.
 Sides are arbitrary from 1 to 10000, so Mothership's `d100`, DCC's `d14`/`d24`,
 and anything else all work. Dropped dice stay visible in parentheses rather than
 disappearing.
+
+## Game systems
+
+Plenty of games do not roll a plain sum. Dicebox has a mode for a number of
+them, each with its own dice, symbols and reading of the result. Pick one from
+the switcher in the top bar — the icon beside the wordmark — and the tray, the
+picker and the notation all change to match.
+
+| System | Notation | What it rolls |
+| --- | --- | --- |
+| **Vampire V5** | `v5:8h3` | a d10 pool with Hunger, successes and messy criticals |
+| **Daggerheart** | `dh:+2@15` | the Hope and Fear duality dice |
+| **Fate / Fudge** | `4dF+2` | the four +/blank/− dice and the ladder |
+| **Genesys** | `gen:2A+1P+2D` | the narrative dice, symbols cancelling out |
+| **Star Wars** | `sw:2A+2D+1F` | the same narrative dice, plus the Force die |
+| **Mist Engine** | `mist:+1` | 2d6 + Power — City of Mist, Legend in the Mist |
+| **PbtA** | `pbta:+1` | 2d6 + stat, the 10+ / 7–9 / 6− ladder |
+| **The One Ring 2e** | `tor:3@14` | the Feat die and a pool of Success dice |
+| **CthulhuTech 2e** | `ct:8@4` | a d10 pool counting even-face hits |
+| **Mothership 1e** | `ms:c@35` | d100 roll-under, Panic, and tracked Stress |
+
+Each mode has a picker built for its own dice — tap to build the pool, hold to
+adjust — and a help panel (the **?** in the top bar) with its full rules and
+notation. Symbols are drawn the way the official dice show them, and the plain
+numbers they landed on are always in the line under the result. Ordinary dice
+still roll in any mode, so weapon damage or a stray d20 needs no mode change.
+
+Every mode has its own short URL — `dicebox.trollskull.cc/dh`,
+`/mosh1e`, `/vtmv5` and so on — which opens Dicebox straight into it.
+
+## Card decks
+
+Two of the modes deal cards instead of dice. The deck sits on the tray like a
+dealer's shoe: tap it to draw, and the cards deal, flip and settle the way the
+dice tumble. Draws come off a real shuffled order and the deck remembers what is
+gone until you shuffle; a discard pile builds up beside it, and holding a drawn
+card lifts it for a closer look.
+
+**Cards** is a 52-card French-suited deck, jokers optional. **Tarot** is the
+full 78-card Tarot de Marseille, with reversals and a majors-only option.
+Everything the pickers do is typeable too — `deck:3 jokers replace`,
+`tarot:3 majors upright` — so the notation still describes the whole draw.
+
+The art is not clip-art. Both decks are traced by hand from public-domain
+17th–19th-century woodcut cards held by the Bibliothèque nationale de France and
+redrawn as single-colour vector line, so they retint cleanly for light and dark.
+They are released as their own CC0 repositories, usable well outside Dicebox:
+
+- **[woodcut-cards](https://github.com/SONDLecT/woodcut-cards)** — the 52-card
+  deck, two jokers and the back
+- **[woodcut-tarot](https://github.com/SONDLecT/woodcut-tarot)** — all 78 cards
+  of the tarot
 
 ## How the rolls work
 
