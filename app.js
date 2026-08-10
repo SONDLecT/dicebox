@@ -4406,6 +4406,13 @@ let cardHoldTimer = null;
 let cardHoldFired = false;
 let cardFocusFrom = null; // the transform it rose from, for the way back down
 let cardFocusCard = null; // {id, rev, view} of the card held up, for retinting
+// After a touch tap, the browser synthesises a click AFTER pointerup and
+// hit-tests it against the page as it is THEN — the just-opened overlay
+// covers the fingertip, so the ghost click lands on it and would close it
+// in the same breath. Openings ignore clicks for a beat.
+let cardFocusShownAt = 0;
+let discardShownAt = 0;
+const GHOST_CLICK_MS = 450;
 
 function drawnCardAt(clientX, clientY) {
   const r = canvas.getBoundingClientRect();
@@ -4443,6 +4450,7 @@ function focusCard(id, rev, view, from) {
   cardFocusFrom = `translate(${Math.round(dx)}px, ${Math.round(dy)}px) scale(${(from.w / w).toFixed(3)})${revT}`;
   cardFocusArt.style.transition = 'none';
   cardFocusArt.style.transform = cardFocusFrom;
+  cardFocusShownAt = performance.now();
   cardFocusEl.hidden = false;
   requestAnimationFrame(() => requestAnimationFrame(() => {
     cardFocusArt.style.transition = '';
@@ -4469,7 +4477,10 @@ function closeCardFocus() {
   }, 240);
 }
 
-cardFocusEl.addEventListener('click', closeCardFocus);
+cardFocusEl.addEventListener('click', () => {
+  if (performance.now() - cardFocusShownAt < GHOST_CLICK_MS) return;
+  closeCardFocus();
+});
 
 // Flick a drawn card off the table and into the scarti — no draw involved.
 // The pile sprite holds its old face until the flight lands.
@@ -4524,12 +4535,14 @@ function openDiscardPanel(view) {
     cell.innerHTML = view.svg(entry.id);
     cell.addEventListener('click', ev => {
       ev.stopPropagation();
+      if (performance.now() - discardShownAt < GHOST_CLICK_MS) return;
       const r = cell.getBoundingClientRect();
       focusCard(entry.id, !!entry.rev, view, { cx: r.left + r.width / 2, cy: r.top + r.height / 2, w: r.width });
     });
     discardGrid.appendChild(cell);
   }
   discardPanelView = view;
+  discardShownAt = performance.now();
   discardPanel.hidden = false;
 }
 
@@ -4554,7 +4567,10 @@ function retintCardOverlays() {
   }
 }
 
-discardPanel.addEventListener('click', closeDiscardPanel);
+discardPanel.addEventListener('click', () => {
+  if (performance.now() - discardShownAt < GHOST_CLICK_MS) return;
+  closeDiscardPanel();
+});
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   if (!cardFocusEl.hidden) closeCardFocus();
