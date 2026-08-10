@@ -610,6 +610,17 @@
       </button>
     </div>
 
+    <!-- Opened by tapping the discard pile: the pile fans open into a
+         scrollable spread, newest first. Tapping a card there lifts it into
+         the close-up; tapping anywhere else sets the pile back down. -->
+    <div id="discardPanel" hidden role="dialog" aria-label="Discard pile">
+      <header class="discard-head">
+        <span class="discard-title" id="discardTitle">Discard</span>
+        <span class="discard-hint">newest first &middot; tap a card for a close look</span>
+      </header>
+      <div class="discard-grid" id="discardGrid"></div>
+    </div>
+
     <!-- Opened by holding a drawn card: the card rises off the table for a
          close look, covering everything below the top bar. A tap puts it back. -->
     <div id="cardFocus" hidden role="dialog" aria-label="Card close-up">

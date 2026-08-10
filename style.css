@@ -1081,6 +1081,55 @@ body {
 /* A single red card's label in the big readout keeps its suit's colour. */
 #total[data-variant="card-red"] { color: #C74B3F; }
 
+/* ---- discard browser ---- */
+/* The pile fanned open: same frost as the close-up, one layer beneath it, so
+   a card tapped here rises above the spread it came from. */
+#discardPanel {
+  position: fixed;
+  z-index: 29;
+  left: 0; right: 0; bottom: 0;
+  /* top is set from the real bar height when it opens */
+  overflow-y: auto;
+  background: color-mix(in srgb, var(--paper) 82%, transparent);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  cursor: zoom-out;
+  padding: 10px 14px 20px;
+}
+.discard-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 4px 4px 10px;
+}
+.discard-title { font: 650 14px/1.2 inherit; letter-spacing: 0.02em; color: var(--line); }
+.discard-hint { font-size: 11px; color: var(--muted); }
+.discard-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+}
+.discard-card {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  background: none;
+  width: clamp(84px, 17vw, 132px);
+  cursor: zoom-in;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 120ms ease;
+}
+.discard-card:active { transform: scale(0.96); }
+.discard-card svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+}
+.discard-card.rev svg { transform: rotate(180deg); }
+
 /* ---- card close-up ---- */
 /* Everything below the top bar frosts over and the held card rises into it.
    The bar stays clear (and above, z-wise), so the corner menus keep working

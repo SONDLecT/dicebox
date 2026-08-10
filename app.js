@@ -100,12 +100,12 @@ $('themeToggle').addEventListener('click', () => {
   // the next draw. Preload the new theme's images, then let the frame redraw.
   if (uiSystem === 'cards' && cardArt) {
     const ids = [...new Set(state.dice.filter(d => d.isCard).map(d => (d.isStack || d.isDiscard ? 'back' : d.id)))];
-    if (deckState.discardTop) ids.push(deckState.discardTop);
+    if (deckState.pile.length) ids.push(deckState.pile[deckState.pile.length - 1]);
     Promise.all(ids.map(id => cardImage(id).ready)).then(dropIdleCache);
   }
   if (uiSystem === 'tarot' && tarotArt) {
     const ids = [...new Set(state.dice.filter(d => d.isCard).map(d => (d.isStack || d.isDiscard ? 'back' : d.id)))];
-    if (tarotState.discardTop) ids.push(tarotState.discardTop.id);
+    if (tarotState.pile.length) ids.push(tarotState.pile[tarotState.pile.length - 1].id);
     Promise.all(ids.map(id => tarotImage(id).ready)).then(dropIdleCache);
   }
   syncThemeLabel();
@@ -1001,8 +1001,9 @@ function setSystem(system, { roll = false, url = true } = {}) {
   if (!SYSTEMS[system]) system = 'numeric';
   const changed = system !== uiSystem;
   uiSystem = system;
-  // A card held up for a look belongs to the table it came from.
-  if (changed) closeCardFocus();
+  // A card held up for a look — and a discard fanned open — belong to the
+  // table they came from.
+  if (changed) { closeCardFocus(); closeDiscardPanel(); }
 
   // Reflect the mode into the address so the current view is shareable and the
   // browser's back button returns to the previous system. Guarded because some
@@ -1191,6 +1192,7 @@ window.addEventListener('resize', () => {
   if (!help.hidden) setHelp(false);
   if (!roomPanel.hidden) closeRoom();
   closeCardFocus();
+  closeDiscardPanel();
 });
 
 for (const row of modeRows) {
@@ -1790,21 +1792,29 @@ function syncMsFromField() {
 const DECK_KEY = 'dicebox:deck:v1';
 const deckState = {
   order: [], pos: 0, jokers: false, replace: false, draw: 1,
-  // The discard pile: how many dealt cards lie face-up beside the deck, and
-  // which one is on top. The hand currently on the table is tracked so it can
-  // be swept into the discard by the next draw (or folded in after a reload).
-  discard: 0, discardTop: null, hand: [], handReplace: false,
+  // The discard pile holds the dealt cards themselves, in the order they were
+  // swept in (newest last) — the count and the face-up top card both read off
+  // it, and it is what the discard browser opens. The hand currently on the
+  // table is tracked so it can be swept into the pile by the next draw (or
+  // folded in after a reload).
+  pile: [], hand: [], handReplace: false,
 };
 {
   try {
     const saved = JSON.parse(store.get(DECK_KEY) || 'null');
     if (saved && Array.isArray(saved.order) && saved.order.every(x => typeof x === 'string')) {
       Object.assign(deckState, saved, { draw: Math.max(1, Math.min(10, saved.draw || 1)) });
+      // States saved before the pile held its contents knew only a count and a
+      // top card; the top card is all that can be carried over.
+      if (!Array.isArray(deckState.pile)) {
+        deckState.pile = typeof saved.discardTop === 'string' ? [saved.discardTop] : [];
+      }
+      delete deckState.discard;
+      delete deckState.discardTop;
       // A hand left on the table when the page closed is a dealt hand: it
       // belongs to the discard now, exactly as if the next draw had swept it.
       if (Array.isArray(deckState.hand) && deckState.hand.length && !deckState.handReplace) {
-        deckState.discard += deckState.hand.length;
-        deckState.discardTop = deckState.hand[deckState.hand.length - 1];
+        deckState.pile.push(...deckState.hand);
       }
       deckState.hand = [];
     }
@@ -1842,8 +1852,7 @@ function cryptoIndex(n) {
 function reshuffleDeck() {
   deckState.order = newDeckOrder(deckIds(), n => cryptoIndex(n) + 1);
   deckState.pos = 0;
-  deckState.discard = 0;
-  deckState.discardTop = null;
+  deckState.pile = [];
   deckState.hand = [];
   persistDeck();
 }
@@ -1870,8 +1879,7 @@ function drawDeckCards(n) {
   // dealer, which animates the sweep after this state has already moved on.
   lastSweptReplace = deckState.handReplace;
   if (deckState.hand.length && !deckState.handReplace) {
-    deckState.discard += deckState.hand.length;
-    deckState.discardTop = deckState.hand[deckState.hand.length - 1];
+    deckState.pile.push(...deckState.hand);
   }
   deckState.hand = ids.slice();
   deckState.handReplace = deckState.replace;
@@ -1944,8 +1952,9 @@ const cardsView = {
   remaining: () => deckRemaining(),
   total: () => deckTotal(),
   replace: () => deckState.replace,
-  discard: () => deckState.discard,
-  discardTop: () => (deckState.discardTop ? { id: deckState.discardTop, rev: false } : null),
+  discard: () => deckState.pile.length,
+  discardTop: () => (deckState.pile.length ? { id: deckState.pile[deckState.pile.length - 1], rev: false } : null),
+  pile: () => deckState.pile.map(id => ({ id, rev: false })),
 };
 const tarotView = {
   ratio: 1.72,
@@ -1954,8 +1963,9 @@ const tarotView = {
   remaining: () => tarotRemaining(),
   total: () => tarotTotal(),
   replace: () => tarotState.replace,
-  discard: () => tarotState.discard,
-  discardTop: () => tarotState.discardTop,
+  discard: () => tarotState.pile.length,
+  discardTop: () => (tarotState.pile.length ? tarotState.pile[tarotState.pile.length - 1] : null),
+  pile: () => tarotState.pile.slice(),
 };
 
 class CardSprite {
@@ -2241,7 +2251,7 @@ function stageDeckIdle() {
   if (deckState.order.length === 0) reshuffleDeck();
   const { stack, discard } = deckLayout(0);
   state.dice = [new DeckStackSprite(stack.x, stack.y, stack.w)];
-  if (deckState.discard > 0) state.dice.push(new DiscardPileSprite(discard.x, discard.y, discard.w));
+  if (deckState.pile.length > 0) state.dice.push(new DiscardPileSprite(discard.x, discard.y, discard.w));
   dropIdleCache();
   $('total').dataset.idle = '1';
   $('total').dataset.kind = 'number';
@@ -2282,7 +2292,7 @@ async function dealCardsFlow(result, { remote = false } = {}) {
       }
     }
   }
-  if (!remote && deckState.discard > 0) {
+  if (!remote && deckState.pile.length > 0) {
     sprites.push(new DiscardPileSprite(discard.x, discard.y, discard.w));
   }
   result.summary.drawn.forEach((c, i) => {
@@ -2367,8 +2377,8 @@ $('deckShuffle').addEventListener('click', () => {
     // Everything on the table and in the discard visibly flows back into the
     // deck, and the riffle starts once they arrive.
     const prevCards = state.dice.filter(d => d.isCard && !d.isStack && !d.isDiscard && !d.gone && d.phase === 'idle');
-    const hadDiscard = deckState.discard > 0;
-    const discardTop = deckState.discardTop;
+    const hadDiscard = deckState.pile.length > 0;
+    const discardTop = deckState.pile[deckState.pile.length - 1];
     const prevDiscardSprite = state.dice.find(d => d.isDiscard);
     reshuffleDeck();
     const { stack } = deckLayout(0);
@@ -2432,7 +2442,8 @@ function syncCardsFromField() {
 const TAROT_KEY = 'dicebox:tarot:v1';
 const tarotState = {
   order: [], revs: [], pos: 0, reversals: true, replace: false, majors: false, draw: 1,
-  discard: 0, discardTop: null, hand: [], handReplace: false,
+  // pile entries are {id, rev}, newest last, same contract as the cards pile.
+  pile: [], hand: [], handReplace: false,
 };
 {
   try {
@@ -2442,11 +2453,16 @@ const tarotState = {
       if (!Array.isArray(tarotState.revs) || tarotState.revs.length !== tarotState.order.length) {
         tarotState.revs = tarotState.order.map(() => false);
       }
+      // States saved before the pile held its contents carry over just the top.
+      if (!Array.isArray(tarotState.pile)) {
+        tarotState.pile = saved.discardTop && typeof saved.discardTop.id === 'string' ? [saved.discardTop] : [];
+      }
+      delete tarotState.discard;
+      delete tarotState.discardTop;
       // A hand left on the table when the page closed folds into the discard,
       // exactly as the cards deck does.
       if (Array.isArray(tarotState.hand) && tarotState.hand.length && !tarotState.handReplace) {
-        tarotState.discard += tarotState.hand.length;
-        tarotState.discardTop = tarotState.hand[tarotState.hand.length - 1];
+        tarotState.pile.push(...tarotState.hand);
       }
       tarotState.hand = [];
     }
@@ -2478,8 +2494,7 @@ function reshuffleTarot() {
   // non-destructive: flipping it never resets the deck.
   tarotState.revs = tarotState.order.map(() => cryptoIndex(2) === 1);
   tarotState.pos = 0;
-  tarotState.discard = 0;
-  tarotState.discardTop = null;
+  tarotState.pile = [];
   tarotState.hand = [];
   persistTarot();
 }
@@ -2507,8 +2522,7 @@ function drawTarotCards(n) {
   }
   lastSweptReplaceTarot = tarotState.handReplace;
   if (tarotState.hand.length && !tarotState.handReplace) {
-    tarotState.discard += tarotState.hand.length;
-    tarotState.discardTop = tarotState.hand[tarotState.hand.length - 1];
+    tarotState.pile.push(...tarotState.hand);
   }
   tarotState.hand = picks.slice();
   tarotState.handReplace = tarotState.replace;
@@ -2557,7 +2571,7 @@ function stageTarotIdle() {
   if (tarotState.order.length === 0) reshuffleTarot();
   const { stack, discard } = deckLayout(0, tarotView);
   state.dice = [new DeckStackSprite(stack.x, stack.y, stack.w, tarotView)];
-  if (tarotState.discard > 0) state.dice.push(new DiscardPileSprite(discard.x, discard.y, discard.w, tarotView));
+  if (tarotState.pile.length > 0) state.dice.push(new DiscardPileSprite(discard.x, discard.y, discard.w, tarotView));
   dropIdleCache();
   $('total').dataset.idle = '1';
   $('total').dataset.kind = 'number';
@@ -2592,7 +2606,7 @@ async function dealTarotFlow(result, { remote = false } = {}) {
       }
     }
   }
-  if (!remote && tarotState.discard > 0) {
+  if (!remote && tarotState.pile.length > 0) {
     sprites.push(new DiscardPileSprite(discard.x, discard.y, discard.w, tarotView));
   }
   result.summary.drawn.forEach((c, i) => {
@@ -2674,8 +2688,8 @@ bindTapHold($('tarotCountChip'), dir => {
 $('tarotShuffle').addEventListener('click', () => {
   ensureTarotArt().then(() => {
     const prevCards = state.dice.filter(d => d.isCard && !d.isStack && !d.isDiscard && !d.gone && d.phase === 'idle');
-    const hadDiscard = tarotState.discard > 0;
-    const discardTop = tarotState.discardTop;
+    const hadDiscard = tarotState.pile.length > 0;
+    const discardTop = tarotState.pile[tarotState.pile.length - 1];
     const prevDiscardSprite = state.dice.find(d => d.isDiscard);
     reshuffleTarot();
     const { stack } = deckLayout(0, tarotView);
@@ -3940,33 +3954,39 @@ function drawnCardAt(clientX, clientY) {
   return hit;
 }
 
-function openCardFocus(d) {
-  const art = d.view === tarotView ? tarotArt : cardArt;
+// The close-up proper: a card id + orientation rises from wherever it was —
+// its sprite on the table, or its cell in the fanned-open discard.
+function focusCard(id, rev, view, from) {
+  const art = view === tarotView ? tarotArt : cardArt;
   if (!art || !cardFocusEl.hidden) return;
   const barBottom = Math.round(document.querySelector('header.bar').getBoundingClientRect().bottom);
   cardFocusEl.style.top = `${barBottom}px`;
 
   const areaW = window.innerWidth, areaH = window.innerHeight - barBottom;
-  const ratio = d.view.ratio;
+  const ratio = view.ratio;
   const w = Math.min(areaW - 36, (areaH - 36) / ratio);
   const h = w * ratio;
   cardFocusArt.style.width = `${Math.round(w)}px`;
   cardFocusArt.style.height = `${Math.round(h)}px`;
-  cardFocusArt.innerHTML = d.view.svg(d.id);
+  cardFocusArt.innerHTML = view.svg(id);
 
-  // Rise from where the card lies on the table: same FLIP move the eye makes.
-  const cr = canvas.getBoundingClientRect();
-  const dx = (cr.left + d.x) - areaW / 2;
-  const dy = (cr.top + d.y) - (barBottom + areaH / 2);
-  const rev = d.rev ? ' rotate(180deg)' : '';
-  cardFocusFrom = `translate(${Math.round(dx)}px, ${Math.round(dy)}px) scale(${(d.size / w).toFixed(3)})${rev}`;
+  // Rise from where the card was: same FLIP move the eye makes.
+  const dx = from.cx - areaW / 2;
+  const dy = from.cy - (barBottom + areaH / 2);
+  const revT = rev ? ' rotate(180deg)' : '';
+  cardFocusFrom = `translate(${Math.round(dx)}px, ${Math.round(dy)}px) scale(${(from.w / w).toFixed(3)})${revT}`;
   cardFocusArt.style.transition = 'none';
   cardFocusArt.style.transform = cardFocusFrom;
   cardFocusEl.hidden = false;
   requestAnimationFrame(() => requestAnimationFrame(() => {
     cardFocusArt.style.transition = '';
-    cardFocusArt.style.transform = rev.trim() || 'none';
+    cardFocusArt.style.transform = revT.trim() || 'none';
   }));
+}
+
+function openCardFocus(d) {
+  const cr = canvas.getBoundingClientRect();
+  focusCard(d.id, !!d.rev, d.view, { cx: cr.left + d.x, cy: cr.top + d.y, w: d.size });
 }
 
 function closeCardFocus() {
@@ -3983,8 +4003,49 @@ function closeCardFocus() {
 }
 
 cardFocusEl.addEventListener('click', closeCardFocus);
+
+// ---- the discard, fanned open ----
+//
+// Tapping the pile on the tray spreads it out, newest first, every card
+// face-up (reversed tarot cards stay upside down). A tap on any card lifts it
+// into the close-up above the spread; a tap anywhere else sets the pile back.
+const discardPanel = $('discardPanel');
+const discardGrid = $('discardGrid');
+
+function openDiscardPanel(view) {
+  const pile = view.pile();
+  if (!pile.length || (view === tarotView ? !tarotArt : !cardArt)) return;
+  const barBottom = Math.round(document.querySelector('header.bar').getBoundingClientRect().bottom);
+  discardPanel.style.top = `${barBottom}px`;
+  $('discardTitle').textContent = `Discard · ${pile.length}`;
+  discardGrid.innerHTML = '';
+  for (let i = pile.length - 1; i >= 0; i--) {
+    const entry = pile[i];
+    const cell = document.createElement('button');
+    cell.type = 'button';
+    cell.className = 'discard-card' + (entry.rev ? ' rev' : '');
+    cell.innerHTML = view.svg(entry.id);
+    cell.addEventListener('click', ev => {
+      ev.stopPropagation();
+      const r = cell.getBoundingClientRect();
+      focusCard(entry.id, !!entry.rev, view, { cx: r.left + r.width / 2, cy: r.top + r.height / 2, w: r.width });
+    });
+    discardGrid.appendChild(cell);
+  }
+  discardPanel.hidden = false;
+}
+
+function closeDiscardPanel() {
+  if (discardPanel.hidden) return;
+  discardPanel.hidden = true;
+  discardGrid.innerHTML = '';
+}
+
+discardPanel.addEventListener('click', closeDiscardPanel);
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && !cardFocusEl.hidden) closeCardFocus();
+  if (e.key !== 'Escape') return;
+  if (!cardFocusEl.hidden) closeCardFocus();
+  else if (!discardPanel.hidden) closeDiscardPanel();
 });
 
 canvas.addEventListener('pointerdown', e => {
@@ -4025,6 +4086,15 @@ canvas.addEventListener('pointerup', e => {
   const speed = Math.hypot(vx, vy);
   const travelled = Math.hypot(e.clientX - drag.x, e.clientY - drag.y);
   drag = null;
+
+  // Tapping the discard pile fans it open instead of drawing.
+  if (speed < 120 && travelled < 10) {
+    const r = canvas.getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    const pileSprite = state.dice.find(d => d.isDiscard
+      && Math.abs(x - d.x) <= d.size / 2 && Math.abs(y - d.y) <= (d.size * d.view.ratio) / 2);
+    if (pileSprite && pileSprite.view.discard() > 0) { openDiscardPanel(pileSprite.view); return; }
+  }
 
   // Tapping a staged die takes it back off the tray, which is how you drop one
   // die from a handful without clearing everything or editing the text.
