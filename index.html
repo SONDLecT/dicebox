@@ -427,6 +427,8 @@
         All 78 cards, drawn <b>without replacement</b> until you
         <b>Shuffle</b>. With <b>Reversals</b> on, each card's orientation is
         fixed when the deck is shuffled and a reversed card lands upside down.
+        <b>Majors</b> trims the deck to the 22 trumps for a quick
+        majors-only reading.
         The art is traced from the <b>Jean Noblet tarot</b> (Paris, c.&nbsp;1650,
         Biblioth&egrave;que nationale de France) — the oldest surviving
         Tarot de Marseille — with the five batons pips missing from the BnF's
@@ -1101,6 +1103,13 @@
         <path class="mark" d="M15 20.5 L13.6 16.9 L10 16.8 L12.9 14.6 L11.9 11 L15 13.2 L18.1 11 L17.1 14.6 L20 16.8 L16.4 16.9 Z"/>
       </svg>
       <span class="deck-flag-name">Reversals</span>
+    </button>
+    <button type="button" class="deck-flag" data-flag="majors" aria-pressed="false" aria-label="Majors only — just the 22 trumps (reshuffles)">
+      <svg class="deck-flag-ico" viewBox="0 0 30 30" aria-hidden="true">
+        <rect class="crd" x="8" y="4" width="14" height="21" rx="2.4"/>
+        <path class="mark2" d="M11 18.5 V11.2 L15 15 L19 11.2 V18.5"/>
+      </svg>
+      <span class="deck-flag-name">Majors</span>
     </button>
     <button type="button" class="deck-flag" data-flag="replace" aria-pressed="false" aria-label="Draw with replacement — cards return to the deck">
       <svg class="deck-flag-ico" viewBox="0 0 30 30" aria-hidden="true">

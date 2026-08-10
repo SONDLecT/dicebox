@@ -2431,7 +2431,7 @@ function syncCardsFromField() {
 // upside down on the tray. The art is its own lazy module (tarot-art.js).
 const TAROT_KEY = 'dicebox:tarot:v1';
 const tarotState = {
-  order: [], revs: [], pos: 0, reversals: true, replace: false, draw: 1,
+  order: [], revs: [], pos: 0, reversals: true, replace: false, majors: false, draw: 1,
   discard: 0, discardTop: null, hand: [], handReplace: false,
 };
 {
@@ -2459,12 +2459,14 @@ const persistTarot = () => store.set(TAROT_KEY, JSON.stringify(tarotState));
 function tarotDeckIds() {
   const ids = [];
   for (let i = 0; i < 22; i++) ids.push('T' + String(i).padStart(2, '0'));
+  // Majors-only: just the 22 trumps — the common quick-reading deck.
+  if (tarotState.majors) return ids;
   for (const s of ['b', 'c', 's', 'd']) {
     for (const r of ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', 'P', 'N', 'Q', 'K']) ids.push(s + r);
   }
   return ids;
 }
-const tarotTotal = () => 78;
+const tarotTotal = () => (tarotState.majors ? 22 : 78);
 const tarotRemaining = () => Math.max(0, tarotState.order.length - tarotState.pos);
 
 let lastSweptReplaceTarot = false;
@@ -2655,7 +2657,9 @@ function syncTarotUI({ writeField = true, restage = true } = {}) {
   tarotCountVal.textContent = String(tarotState.draw);
   tarotRemainVal.textContent = tarotState.replace ? `${tarotRemaining()}∞` : `${tarotRemaining()}/${tarotTotal()}`;
   for (const b of tarotFlagButtons) {
-    const on = b.dataset.flag === 'rev' ? tarotState.reversals : tarotState.replace;
+    const on = b.dataset.flag === 'rev' ? tarotState.reversals
+      : b.dataset.flag === 'majors' ? tarotState.majors
+      : tarotState.replace;
     b.setAttribute('aria-pressed', String(on));
   }
   if (writeField && uiSystem === 'tarot') $('notation').value = `tarot:${tarotState.draw}`;
@@ -2710,6 +2714,11 @@ for (const b of tarotFlagButtons) {
         for (let i = tarotState.pos; i < tarotState.revs.length; i++) tarotState.revs[i] = cryptoIndex(2) === 1;
       }
       persistTarot();
+    } else if (b.dataset.flag === 'majors') {
+      // Changing what the deck contains means a fresh shuffle — the same rule
+      // as the jokers toggle over in Cards.
+      tarotState.majors = !tarotState.majors;
+      reshuffleTarot();
     } else {
       tarotState.replace = !tarotState.replace;
       persistTarot();
