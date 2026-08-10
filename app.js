@@ -108,6 +108,8 @@ $('themeToggle').addEventListener('click', () => {
     if (tarotState.pile.length) ids.push(tarotState.pile[tarotState.pile.length - 1].id);
     Promise.all(ids.map(id => tarotImage(id).ready)).then(dropIdleCache);
   }
+  // A card held up for a look, or a discard fanned open, retints too.
+  retintCardOverlays();
   syncThemeLabel();
   updateThemeColor();
   // Re-apply the active system's palette so its dark/light pair follows the
@@ -4001,6 +4003,7 @@ const cardFocusArt = $('cardFocusArt');
 let cardHoldTimer = null;
 let cardHoldFired = false;
 let cardFocusFrom = null; // the transform it rose from, for the way back down
+let cardFocusCard = null; // {id, rev, view} of the card held up, for retinting
 
 function drawnCardAt(clientX, clientY) {
   const r = canvas.getBoundingClientRect();
@@ -4030,6 +4033,7 @@ function focusCard(id, rev, view, from) {
   cardFocusArt.style.width = `${Math.round(w)}px`;
   cardFocusArt.style.height = `${Math.round(h)}px`;
   cardFocusArt.innerHTML = view.svg(id);
+  cardFocusCard = { id, rev, view };
 
   // Rise from where the card was: same FLIP move the eye makes.
   const dx = from.cx - areaW / 2;
@@ -4054,6 +4058,7 @@ function closeCardFocus() {
   if (cardFocusEl.hidden) return;
   const from = cardFocusFrom;
   cardFocusFrom = null;
+  cardFocusCard = null;
   cardFocusArt.style.transform = from || 'scale(0.2)';
   cardFocusArt.style.opacity = '0';
   setTimeout(() => {
@@ -4072,6 +4077,7 @@ cardFocusEl.addEventListener('click', closeCardFocus);
 // into the close-up above the spread; a tap anywhere else sets the pile back.
 const discardPanel = $('discardPanel');
 const discardGrid = $('discardGrid');
+let discardPanelView = null; // the view whose pile is fanned open, for retinting
 
 function openDiscardPanel(view) {
   const pile = view.pile();
@@ -4085,6 +4091,7 @@ function openDiscardPanel(view) {
     const cell = document.createElement('button');
     cell.type = 'button';
     cell.className = 'discard-card' + (entry.rev ? ' rev' : '');
+    cell.dataset.cardId = entry.id;
     cell.innerHTML = view.svg(entry.id);
     cell.addEventListener('click', ev => {
       ev.stopPropagation();
@@ -4093,13 +4100,29 @@ function openDiscardPanel(view) {
     });
     discardGrid.appendChild(cell);
   }
+  discardPanelView = view;
   discardPanel.hidden = false;
 }
 
 function closeDiscardPanel() {
   if (discardPanel.hidden) return;
   discardPanel.hidden = true;
+  discardPanelView = null;
   discardGrid.innerHTML = '';
+}
+
+// The close-up and the fanned-open discard are DOM SVGs, baked at the theme
+// they were opened in; a theme toggle repaints the tray canvas but not these,
+// so re-render whichever is open with the new-theme art.
+function retintCardOverlays() {
+  if (!cardFocusEl.hidden && cardFocusCard) {
+    cardFocusArt.innerHTML = cardFocusCard.view.svg(cardFocusCard.id);
+  }
+  if (!discardPanel.hidden && discardPanelView) {
+    for (const cell of discardGrid.children) {
+      cell.innerHTML = discardPanelView.svg(cell.dataset.cardId);
+    }
+  }
 }
 
 discardPanel.addEventListener('click', closeDiscardPanel);
