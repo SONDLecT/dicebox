@@ -953,7 +953,7 @@ const SYSTEMS = {
   numeric: { badge: '' },
   cards: { badge: 'Cards' },
   tarot: { badge: 'Tarot' },
-  napoletane: { badge: 'Italiane' },
+  napoletane: { badge: 'Napoletane' },
   v5: { badge: 'VtM V5' },
   fate: { badge: 'Fate' },
   genesys: { badge: 'Genesys' },
@@ -977,7 +977,7 @@ const SYSTEM_HINTS = {
   mothership: { idle: 'Set your target, then roll under it', placeholder: 'Set a target, or type ms:c@35' },
   cards: { idle: 'Tap the deck to draw', placeholder: 'Tap the deck, or type deck:3' },
   tarot: { idle: 'Tap the deck to draw', placeholder: 'Tap the deck, or type tarot:3' },
-  napoletane: { idle: 'Tocca il mazzo per pescare', placeholder: 'Tocca il mazzo, o scrivi ita:3' },
+  napoletane: { idle: 'Tocca il mazzo per pescare', placeholder: 'Tocca il mazzo, o scrivi nap:3' },
 };
 function systemHint(system) { return SYSTEM_HINTS[system] || DEFAULT_HINT; }
 
@@ -993,7 +993,7 @@ const SLUG_TO_SYSTEM = {
   v5: 'v5', vtm: 'v5', daggerheart: 'daggerheart', cthulhutech: 'cthulhutech', ctech: 'cthulhutech',
   force: 'starwars', feat: 'onering', tor: 'onering', mothership: 'mothership', mosh: 'mothership',
 };
-const SYSTEM_TO_SLUG = { cards: 'cards', tarot: 'tarot', napoletane: 'italiane', v5: 'vtmv5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', mothership: 'mosh1e' };
+const SYSTEM_TO_SLUG = { cards: 'cards', tarot: 'tarot', napoletane: 'napoletane', v5: 'vtmv5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', mothership: 'mosh1e' };
 
 function systemFromPath() {
   const seg = (location.pathname || '/').replace(/^\/+|\/+$/g, '').toLowerCase();
@@ -2890,7 +2890,7 @@ const napRemaining = () => Math.max(0, napState.order.length - napState.pos);
 let lastSweptReplaceNap = false;
 
 function napNotation() {
-  let s = `ita:${napState.draw}`;
+  let s = `nap:${napState.draw}`;
   if (napState.replace) s += ' replace';
   return s;
 }
