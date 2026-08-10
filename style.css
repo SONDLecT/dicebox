@@ -1129,7 +1129,9 @@ body {
   border-radius: 8px;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
 }
-.discard-card.rev svg { transform: rotate(180deg); }
+/* Explicit origin: SVG elements can default transform-origin to their top-left
+   corner, which spins the card clean out of its cell and leaves it blank. */
+.discard-card.rev svg { transform: rotate(180deg); transform-origin: 50% 50%; transform-box: fill-box; }
 
 /* ---- card close-up ---- */
 /* Everything below the top bar frosts over and the held card rises into it.

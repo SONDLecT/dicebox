@@ -424,7 +424,10 @@ function layoutSettled() {
   // grid, which would stack the shoe in with the draws.
   if (state.dice[0].isCard) {
     const view = state.dice[0].view || cardsView;
-    const cards = state.dice.filter(d => d.isCard && !d.isStack && !d.isDiscard && !d.gone);
+    // Only cards actually resting on the table count. A resize firing during a
+    // shuffle or deal would otherwise count the in-flight sweep sprites as a
+    // hand and park the deck small in the corner as though one were out.
+    const cards = state.dice.filter(d => d.isCard && !d.isStack && !d.isDiscard && !d.gone && d.phase === 'idle');
     const { stack, slots, discard } = deckLayout(cards.length, view);
     for (const d of state.dice) {
       if (d.isStack) { d.x = stack.x; d.y = stack.y; d.size = stack.w; }
@@ -1868,6 +1871,11 @@ const deckRemaining = () => Math.max(0, deckState.order.length - deckState.pos);
 // re-pointed deckState.hand at the new draw.
 let lastSweptReplace = false;
 
+// The pile as it stood before the current deal's sweep — {count, top} — read
+// by the dealers so the pile sprite can hold the old face until the flight
+// lands. Cards store bare ids in their pile; normalise at use.
+let lastSweptPrevPile = null;
+
 // A uniform index in [0, n), rejection-sampled like the dice rolls.
 function cryptoIndex(n) {
   const limit = Math.floor(0x100000000 / n) * n;
@@ -1927,6 +1935,7 @@ function drawDeckCards(n) {
   // the deck instead and never count). Its provenance is stashed for the
   // dealer, which animates the sweep after this state has already moved on.
   lastSweptReplace = deckState.handReplace;
+  lastSweptPrevPile = { count: deckState.pile.length, top: deckState.pile.length ? deckState.pile[deckState.pile.length - 1] : null };
   if (deckState.hand.length && !deckState.handReplace) {
     deckState.pile.push(...deckState.hand);
   }
@@ -2213,18 +2222,29 @@ class DeckStackSprite {
 // slightly askew the way a real pile ends up. Grows as hands are swept in,
 // vanishes into the deck on a shuffle.
 class DiscardPileSprite {
-  constructor(x, y, w, view = cardsView) {
+  // `hold` = {count, top, for}: what the pile looked like before this deal's
+  // sweep, shown until the swept cards' flight lands. Without it the pile
+  // would flash the incoming card on top while that card is still visibly
+  // travelling towards it.
+  constructor(x, y, w, view = cardsView, hold = null) {
     this.x = x; this.y = y; this.size = w;
     this.view = view;
+    this.hold = hold && hold.for > 0 ? hold : null;
     this.isCard = true; this.isDiscard = true;
     this.stageKind = 'deck-discard';
     this.settled = true; this.settling = true; this.settleT = 1;
-    this.value = 'discard';
+    this.value = this.hold ? null : 'discard';
   }
-  step() {}
+  step(dt) {
+    if (this.hold) {
+      this.hold.for -= dt;
+      if (this.hold.for <= 0) { this.hold = null; this.value = 'discard'; }
+    }
+  }
   draw(ctx) {
-    const top = this.view.discardTop();
-    if (this.view.discard() === 0 || !top) return;
+    const top = this.hold ? this.hold.top : this.view.discardTop();
+    const count = this.hold ? this.hold.count : this.view.discard();
+    if (count === 0 || !top) return;
     const w = this.size, h = w * this.view.ratio;
     const img = this.view.image(top.id).img;
     ctx.save();
@@ -2232,7 +2252,7 @@ class DiscardPileSprite {
     ctx.shadowColor = 'rgba(0,0,0,0.35)';
     ctx.shadowBlur = 7;
     ctx.shadowOffsetY = 3;
-    const under = Math.min(2, this.view.discard() - 1);
+    const under = Math.min(2, count - 1);
     for (let i = under; i >= 1; i--) {
       ctx.save();
       ctx.rotate(i % 2 ? 0.05 : -0.04);
@@ -2249,7 +2269,7 @@ class DiscardPileSprite {
     ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--muted');
     ctx.font = `${Math.max(10, Math.round(w * 0.13))}px ui-monospace, monospace`;
     ctx.textAlign = 'center';
-    ctx.fillText(`${this.view.discard()} dealt`, this.x, this.y + h / 2 + Math.max(14, w * 0.18));
+    ctx.fillText(`${count} dealt`, this.x, this.y + h / 2 + Math.max(14, w * 0.18));
     ctx.restore();
   }
   throwWith() {}
@@ -2356,7 +2376,11 @@ async function dealCardsFlow(result, { remote = false } = {}) {
     }
   }
   if (!remote && deckState.pile.length > 0) {
-    sprites.push(new DiscardPileSprite(discard.x, discard.y, discard.w));
+    const prev = lastSweptPrevPile;
+    const hold = delay0 > 0 && prev
+      ? { count: prev.count, top: prev.top ? { id: prev.top, rev: false } : null, for: delay0 + DEAL_S + 0.08 }
+      : null;
+    sprites.push(new DiscardPileSprite(discard.x, discard.y, discard.w, cardsView, hold));
   }
   result.summary.drawn.forEach((c, i) => {
     sprites.push(new CardSprite(c.id, dealFrom, slots[i], { delay: delay0 + i * 0.12, remote }));
@@ -2621,6 +2645,7 @@ function drawTarotCards(n) {
     persistTarot();
   }
   lastSweptReplaceTarot = tarotState.handReplace;
+  lastSweptPrevPile = { count: tarotState.pile.length, top: tarotState.pile.length ? tarotState.pile[tarotState.pile.length - 1] : null };
   if (tarotState.hand.length && !tarotState.handReplace) {
     tarotState.pile.push(...tarotState.hand);
   }
@@ -2707,7 +2732,9 @@ async function dealTarotFlow(result, { remote = false } = {}) {
     }
   }
   if (!remote && tarotState.pile.length > 0) {
-    sprites.push(new DiscardPileSprite(discard.x, discard.y, discard.w, tarotView));
+    const prev = lastSweptPrevPile;
+    const hold = delay0 > 0 && prev ? { count: prev.count, top: prev.top, for: delay0 + DEAL_S + 0.08 } : null;
+    sprites.push(new DiscardPileSprite(discard.x, discard.y, discard.w, tarotView, hold));
   }
   result.summary.drawn.forEach((c, i) => {
     sprites.push(new CardSprite(c.id, dealFrom, slots[i], { delay: delay0 + i * 0.12, remote, view: tarotView, rev: !!c.rev }));
@@ -2924,6 +2951,7 @@ function drawNapCards(n) {
     persistNap();
   }
   lastSweptReplaceNap = napState.handReplace;
+  lastSweptPrevPile = { count: napState.pile.length, top: napState.pile.length ? napState.pile[napState.pile.length - 1] : null };
   if (napState.hand.length && !napState.handReplace) {
     napState.pile.push(...napState.hand);
   }
@@ -3009,7 +3037,11 @@ async function dealNapFlow(result, { remote = false } = {}) {
     }
   }
   if (!remote && napState.pile.length > 0) {
-    sprites.push(new DiscardPileSprite(discard.x, discard.y, discard.w, napView));
+    const prev = lastSweptPrevPile;
+    const hold = delay0 > 0 && prev
+      ? { count: prev.count, top: prev.top ? { id: prev.top, rev: false } : null, for: delay0 + DEAL_S + 0.08 }
+      : null;
+    sprites.push(new DiscardPileSprite(discard.x, discard.y, discard.w, napView, hold));
   }
   result.summary.drawn.forEach((c, i) => {
     sprites.push(new CardSprite(c.id, dealFrom, slots[i], { delay: delay0 + i * 0.12, remote, view: napView }));
