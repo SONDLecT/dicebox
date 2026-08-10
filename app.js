@@ -4067,7 +4067,8 @@ canvas.addEventListener('pointerdown', e => {
   }
 });
 canvas.addEventListener('pointermove', e => {
-  if (cardHoldTimer && drag && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 12) {
+  const budget = e.pointerType === 'touch' ? 20 : 12;
+  if (cardHoldTimer && drag && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > budget) {
     clearTimeout(cardHoldTimer);
     cardHoldTimer = null;
   }
@@ -4085,20 +4086,31 @@ canvas.addEventListener('pointerup', e => {
   const vy = ((e.clientY - drag.y) / dt) * 1000;
   const speed = Math.hypot(vx, vy);
   const travelled = Math.hypot(e.clientX - drag.x, e.clientY - drag.y);
+  const downX = drag.x, downY = drag.y;
   drag = null;
 
-  // Tapping the discard pile fans it open instead of drawing.
-  if (speed < 120 && travelled < 10) {
+  // What still counts as a tap: a mouse click barely moves, but a fingertip
+  // rolls a few pixels on and off the glass — and over a quick tap's tiny
+  // duration that wobble computes as real speed, which is exactly a flick's
+  // signature. Touch gets budgets sized for fingers, not pointers.
+  const isTouch = e.pointerType === 'touch';
+  const tapSpeed = isTouch ? 300 : 120, tapTravel = isTouch ? 24 : 10;
+  const isTap = speed < tapSpeed && travelled < tapTravel;
+
+  // Tapping the discard pile fans it open instead of drawing. Hit-tested where
+  // the finger LANDED (the aim point), not where it lifted, with a little pad.
+  if (isTap) {
     const r = canvas.getBoundingClientRect();
-    const x = e.clientX - r.left, y = e.clientY - r.top;
+    const x = downX - r.left, y = downY - r.top;
+    const pad = isTouch ? 10 : 0;
     const pileSprite = state.dice.find(d => d.isDiscard
-      && Math.abs(x - d.x) <= d.size / 2 && Math.abs(y - d.y) <= (d.size * d.view.ratio) / 2);
+      && Math.abs(x - d.x) <= d.size / 2 + pad && Math.abs(y - d.y) <= (d.size * d.view.ratio) / 2 + pad);
     if (pileSprite && pileSprite.view.discard() > 0) { openDiscardPanel(pileSprite.view); return; }
   }
 
   // Tapping a staged die takes it back off the tray, which is how you drop one
   // die from a handful without clearing everything or editing the text.
-  if (speed < 120 && travelled < 10 && removeDieAt(e.clientX, e.clientY)) return;
+  if (isTap && removeDieAt(downX, downY)) return;
 
   // Throw whatever is staged; failing that, roll the mode's default. The tray is
   // never a dead surface, so a tap on an empty one still rolls — but it must roll
