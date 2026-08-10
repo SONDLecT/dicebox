@@ -8,7 +8,7 @@ import { rollGenesys, describeGenesys, genesysHeadline, parseGenesys } from './s
 import { rollDaggerheart, describeDaggerheart, daggerheartHeadline, parseDaggerheart } from './system-dice.js';
 import { rollCthulhuTech, describeCthulhuTech, cthulhutechHeadline, parseCthulhuTech } from './system-dice.js';
 import { rollMothership, describeMothership, mothershipHeadline, parseMothership, resolveMothershipStress } from './system-dice.js';
-import { parseCards, newDeckOrder, summarizeCards, cardsHeadline, describeCards, parseTarot, summarizeTarot, tarotHeadline, describeTarot, parseNapoletane, parseHanafuda } from './system-dice.js';
+import { parseCards, newDeckOrder, summarizeCards, cardsHeadline, describeCards, parseTarot, summarizeTarot, tarotHeadline, describeTarot, parseNapoletane, parseHanafuda, parseUtagaruta } from './system-dice.js';
 import { rollStarWars, describeStarWars, starWarsHeadline, parseStarWars } from './system-dice.js';
 import { rollOneRing, describeOneRing, oneRingHeadline, parseOneRing } from './system-dice.js';
 import { rollPbta, rollMist, twod6Headline, describe2d6, parsePbta, parseMist } from './system-dice.js';
@@ -112,6 +112,11 @@ $('themeToggle').addEventListener('click', () => {
     const ids = [...new Set(state.dice.filter(d => d.isCard).map(d => (d.isStack || d.isDiscard ? 'back' : d.id)))];
     if (napState.pile.length) ids.push(napState.pile[napState.pile.length - 1]);
     Promise.all(ids.map(id => napImage(id).ready)).then(dropIdleCache);
+  }
+  if (uiSystem === 'utagaruta' && utaArt) {
+    const ids = [...new Set(state.dice.filter(d => d.isCard).map(d => (d.isStack || d.isDiscard ? 'back' : d.id)))];
+    if (utaState.pile.length) ids.push(utaState.pile[utaState.pile.length - 1]);
+    Promise.all(ids.map(id => utaImage(id).ready)).then(dropIdleCache);
   }
   // A card held up for a look, or a discard fanned open, retints too.
   retintCardOverlays();
@@ -300,6 +305,16 @@ const SYSTEM_THEMES = {
   },
   // Napoletane — azzurro: the sky-and-bay cyan of Naples itself, bright where
   // Star Wars' steel blue is muted, over a deep harbour-water dark.
+  utagaruta: {
+    dark: {
+      '--paper': '#131108', '--face': '#1D1A0E', '--line': '#EEE7D2', '--muted': '#95875D',
+      '--hair': '#2E2914', '--accent': '#C9A227', '--danger': '#C0453F',
+    },
+    light: {
+      '--paper': '#F1EBDA', '--face': '#F9F5E8', '--line': '#231D0C', '--muted': '#77683C',
+      '--hair': '#E0D6B8', '--accent': '#8A6D1F', '--danger': '#8C3A2E',
+    },
+  },
   hanafuda: {
     dark: {
       '--paper': '#120D0C', '--face': '#1C1311', '--line': '#EFE0D6', '--muted': '#93756A',
@@ -621,6 +636,7 @@ function doRoll(notation) {
     if (sys === 'tarot') { dealFromTarotNotation(notation); return; }
     if (sys === 'napoletane') { dealFromNapNotation(notation); return; }
     if (sys === 'hanafuda') { dealFromHanaNotation(notation); return; }
+    if (sys === 'utagaruta') { dealFromUtaNotation(notation); return; }
     result = sys === 'v5' ? rollV5(notation)
       : sys === 'fate' ? rollFate(notation)
       : sys === 'genesys' ? rollGenesys(notation)
@@ -728,6 +744,7 @@ function resultHeadline(result) {
   if (result.system === 'tarot') return tarotHeadline(result);
   if (result.system === 'napoletane') return cardsHeadline(result);
   if (result.system === 'hanafuda') return cardsHeadline(result);
+  if (result.system === 'utagaruta') return cardsHeadline(result);
   return { kind: 'number', text: String(result.total) };
 }
 function resultDetail(result) {
@@ -744,6 +761,7 @@ function resultDetail(result) {
   if (result.system === 'tarot') return describeTarot(result);
   if (result.system === 'napoletane') return describeCards(result);
   if (result.system === 'hanafuda') return describeCards(result);
+  if (result.system === 'utagaruta') return describeUta(result);
   return describe(result.groups);
 }
 
@@ -910,6 +928,7 @@ $('notation').addEventListener('input', () => {
   if (typedSystem === 'tarot') { syncTarotFromField(); return; }
   if (typedSystem === 'napoletane') { syncNapFromField(); return; }
   if (typedSystem === 'hanafuda') { syncHanaFromField(); return; }
+  if (typedSystem === 'utagaruta') { syncUtaFromField(); return; }
   pool = parsePool($('notation').value);
   // Typing an unusual die earns it a button too, so the row always accounts for
   // everything in the pool.
@@ -972,6 +991,7 @@ const SYSTEMS = {
   tarot: { badge: 'Tarot' },
   napoletane: { badge: 'Napoletane' },
   hanafuda: { badge: 'Hanafuda' },
+  utagaruta: { badge: 'Uta-garuta' },
   v5: { badge: 'VtM V5' },
   fate: { badge: 'Fate' },
   genesys: { badge: 'Genesys' },
@@ -997,6 +1017,7 @@ const SYSTEM_HINTS = {
   tarot: { idle: 'Tap the deck to draw', placeholder: 'Tap the deck, or type tarot:3' },
   napoletane: { idle: 'Tocca il mazzo per pescare', placeholder: 'Tocca il mazzo, o scrivi nap:3' },
   hanafuda: { idle: '山札をタップして引く — tap the deck to draw', placeholder: 'Tap the deck, or type hana:2' },
+  utagaruta: { idle: 'Draw a poem — a hundred await', placeholder: 'Tap the deck, or type uta:1' },
 };
 function systemHint(system) { return SYSTEM_HINTS[system] || DEFAULT_HINT; }
 
@@ -1007,12 +1028,12 @@ function systemHint(system) { return SYSTEM_HINTS[system] || DEFAULT_HINT; }
 // URL the app puts in the bar) always uses the canonical shorthand, edition
 // included, matching the picker labels.
 const SLUG_TO_SYSTEM = {
-  cards: 'cards', tarot: 'tarot', italiane: 'napoletane', napoletane: 'napoletane', scopa: 'napoletane', hanafuda: 'hanafuda', koikoi: 'hanafuda', hana: 'hanafuda', vtmv5: 'v5', fate: 'fate', genesys: 'genesys', dh: 'daggerheart', ctech2e: 'cthulhutech',
+  cards: 'cards', tarot: 'tarot', italiane: 'napoletane', napoletane: 'napoletane', scopa: 'napoletane', hanafuda: 'hanafuda', koikoi: 'hanafuda', hana: 'hanafuda', utagaruta: 'utagaruta', karuta: 'utagaruta', hyakunin: 'utagaruta', vtmv5: 'v5', fate: 'fate', genesys: 'genesys', dh: 'daggerheart', ctech2e: 'cthulhutech',
   swrpg: 'starwars', tor2e: 'onering', pbta: 'pbta', mist: 'mist', mosh1e: 'mothership',
   v5: 'v5', vtm: 'v5', daggerheart: 'daggerheart', cthulhutech: 'cthulhutech', ctech: 'cthulhutech',
   force: 'starwars', feat: 'onering', tor: 'onering', mothership: 'mothership', mosh: 'mothership',
 };
-const SYSTEM_TO_SLUG = { cards: 'cards', tarot: 'tarot', napoletane: 'napoletane', hanafuda: 'hanafuda', v5: 'vtmv5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', mothership: 'mosh1e' };
+const SYSTEM_TO_SLUG = { cards: 'cards', tarot: 'tarot', napoletane: 'napoletane', hanafuda: 'hanafuda', utagaruta: 'utagaruta', v5: 'vtmv5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', mothership: 'mosh1e' };
 
 function systemFromPath() {
   const seg = (location.pathname || '/').replace(/^\/+|\/+$/g, '').toLowerCase();
@@ -1100,9 +1121,10 @@ function setSystem(system, { roll = false, url = true } = {}) {
   tarotPicker.hidden = system !== 'tarot';
   napPicker.hidden = system !== 'napoletane';
   hanaPicker.hidden = system !== 'hanafuda';
+  utaPicker.hidden = system !== 'utagaruta';
   // One action, one name: the entry button IS the draw in the deck modes, so
   // the pickers carry no second Draw button.
-  $('rollGo').textContent = system === 'cards' || system === 'tarot' || system === 'napoletane' || system === 'hanafuda' ? 'Draw' : 'Roll';
+  $('rollGo').textContent = system === 'cards' || system === 'tarot' || system === 'napoletane' || system === 'hanafuda' || system === 'utagaruta' ? 'Draw' : 'Roll';
   // The deck's art loads on first entry; the stack appears when it lands. The
   // modules are service-worker-precached, so this works offline too.
   if (system === 'cards') {
@@ -1141,6 +1163,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
   $('helpTarot').hidden = system !== 'tarot';
   $('helpNapoletane').hidden = system !== 'napoletane';
   $('helpHanafuda').hidden = system !== 'hanafuda';
+  $('helpUtagaruta').hidden = system !== 'utagaruta';
 
   // The popover's rows reflect the choice.
   for (const row of modeRows) {
@@ -1172,6 +1195,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
     if (system === 'tarot') $('notation').value = tarotNotation();
     if (system === 'napoletane') $('notation').value = napNotation();
     if (system === 'hanafuda') $('notation').value = hanaNotation();
+    if (system === 'utagaruta') $('notation').value = utaNotation();
   }
 }
 
@@ -2106,6 +2130,24 @@ const hanaView = {
     if (i >= 0) hanaState.hand.splice(i, 1);
     hanaState.pile.push(id);
     persistHana();
+  },
+};
+const utaView = {
+  ratio: 1.56, // shells 250x390, after the book page's own proportion
+  image: id => utaImage(id),
+  svg: id => utaArt.utaSVG(id, { dark: isDark() }),
+  loaded: () => !!utaArt,
+  remaining: () => utaRemaining(),
+  total: () => utaTotal(),
+  replace: () => utaState.replace,
+  discard: () => utaState.pile.length,
+  discardTop: () => (utaState.pile.length ? { id: utaState.pile[utaState.pile.length - 1], rev: false } : null),
+  pile: () => utaState.pile.map(id => ({ id, rev: false })),
+  discardFromHand: (id) => {
+    const i = utaState.hand.indexOf(id);
+    if (i >= 0) utaState.hand.splice(i, 1);
+    utaState.pile.push(id);
+    persistUta();
   },
 };
 const tarotView = {
@@ -3568,6 +3610,310 @@ function syncHanaFromField() {
   } catch { /* mid-type */ }
 }
 
+// ---- uta-garuta ----
+//
+// The 100 yomifuda of the Ogura Hyakunin Isshu: one poet, one poem, in
+// Fujiwara no Teika's order from Emperor Tenji to Emperor Juntoku. Portraits
+// and calligraphy are traced from Hishikawa Moronobu's illustrated edition
+// (Edo, 1680), scanned by the Library of Congress. A single draw reads the
+// whole poem into the breakdown; the categories (hime, bōzu) make Bōzu
+// Mekuri playable off the same deck.
+const UTA_KEY = 'dicebox:uta:v1';
+const utaState = {
+  order: [], pos: 0, replace: false, draw: 1,
+  pile: [], hand: [], handReplace: false,
+};
+{
+  try {
+    const saved = JSON.parse(store.get(UTA_KEY) || 'null');
+    if (saved && Array.isArray(saved.order) && saved.order.every(x => typeof x === 'string')) {
+      Object.assign(utaState, saved, { draw: Math.max(1, Math.min(10, saved.draw || 1)) });
+      if (!Array.isArray(utaState.pile)) utaState.pile = [];
+      if (Array.isArray(utaState.hand) && utaState.hand.length && !utaState.handReplace) {
+        utaState.pile.push(...utaState.hand);
+      }
+      utaState.hand = [];
+    }
+  } catch { /* fresh deck */ }
+}
+const persistUta = () => store.set(UTA_KEY, JSON.stringify(utaState));
+
+function utaDeckIds() { return utaArt.UTA_IDS.slice(); }
+const utaTotal = () => 100;
+const utaRemaining = () => Math.max(0, utaState.order.length - utaState.pos);
+
+let lastSweptReplaceUta = false;
+
+function utaNotation() {
+  let s = `uta:${utaState.draw}`;
+  if (utaState.replace) s += ' replace';
+  return s;
+}
+
+function applyUtaFlags({ replace }) {
+  if (replace !== utaState.replace) { utaState.replace = replace; persistUta(); }
+  return false;
+}
+
+function reshuffleUta() {
+  utaState.order = newDeckOrder(utaDeckIds(), n => cryptoIndex(n) + 1);
+  utaState.pos = 0;
+  utaState.pile = [];
+  utaState.hand = [];
+  persistUta();
+}
+
+function drawUtaCards(n) {
+  let ids;
+  utaState.draw = n;
+  if (utaState.order.length === 0) reshuffleUta();
+  if (utaState.replace) {
+    const pool = utaState.order.slice(utaState.pos);
+    ids = pool.length ? Array.from({ length: n }, () => pool[cryptoIndex(pool.length)]) : [];
+  } else {
+    ids = utaState.order.slice(utaState.pos, utaState.pos + n);
+    utaState.pos += ids.length;
+    persistUta();
+  }
+  lastSweptReplaceUta = utaState.handReplace;
+  lastSweptPrevPile = { count: utaState.pile.length, top: utaState.pile.length ? utaState.pile[utaState.pile.length - 1] : null };
+  if (utaState.hand.length && !utaState.handReplace) {
+    utaState.pile.push(...utaState.hand);
+  }
+  utaState.hand = ids.slice();
+  utaState.handReplace = utaState.replace;
+  persistUta();
+  const drawn = ids.map(id => ({ id, label: utaArt.utaMeta(id).label, red: false }));
+  return {
+    schema: 2,
+    system: 'utagaruta',
+    notation: utaNotation(),
+    groups: [{ kind: 'cards', count: drawn.length, cards: drawn }],
+    summary: summarizeCards(drawn, utaRemaining(), utaTotal()),
+  };
+}
+
+// A drawn poem should be READ: a single card puts the whole verse in the
+// breakdown line — the poet, then MacCauley's translation. A handful of
+// cards falls back to the shared labels-and-remaining line.
+function describeUta(result) {
+  const s = result.summary;
+  if (s.drawn.length === 1 && utaArt) {
+    const m = utaArt.utaMeta(s.drawn[0].id);
+    if (m) {
+      const left = s.replace ? `${s.remaining}∞` : `${s.remaining} of ${s.total} left`;
+      return `${m.kanji} — “${m.trans}” · ${left}`;
+    }
+  }
+  return describeCards(result);
+}
+
+let utaArt = null;
+let utaArtLoading = null;
+function ensureUtaArt() {
+  if (utaArt) return Promise.resolve(utaArt);
+  if (!utaArtLoading) {
+    /* global __dicebox */
+    utaArtLoading = (typeof __dicebox !== 'undefined' && __dicebox.utaSVG)
+      ? Promise.resolve(__dicebox)
+      : import('./uta-art.js');
+    utaArtLoading = utaArtLoading.then(m => (utaArt = m));
+  }
+  return utaArtLoading;
+}
+
+const utaImgCache = new Map();
+function utaImage(id) {
+  const key = `${id}|${isDark() ? 'd' : 'l'}`;
+  let entry = utaImgCache.get(key);
+  if (entry) return entry;
+  const svg = utaArt.utaSVG(id, { dark: isDark() })
+    .replace('<svg ', '<svg width="750" height="1170" ');
+  const img = new Image();
+  img.addEventListener('error', () => utaImgCache.delete(key));
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  entry = { img, ready: img.decode ? img.decode().catch(() => {}) : Promise.resolve() };
+  if (typeof createImageBitmap === 'function') {
+    entry.ready = entry.ready
+      .then(() => createImageBitmap(img))
+      .then(bmp => { entry.img = bmp; })
+      .catch(() => {});
+  }
+  utaImgCache.set(key, entry);
+  return entry;
+}
+
+function stageUtaIdle() {
+  if (!utaArt) return;
+  if (utaState.order.length === 0) { reshuffleUta(); syncUtaUI({ writeField: false, restage: false }); }
+  const { stack, discard } = deckLayout(0, utaView);
+  state.dice = [new DeckStackSprite(stack.x, stack.y, stack.w, utaView)];
+  if (utaState.pile.length > 0) state.dice.push(new DiscardPileSprite(discard.x, discard.y, discard.w, utaView));
+  dropIdleCache();
+  $('total').dataset.idle = '1';
+  $('total').dataset.kind = 'number';
+  $('total').textContent = '—';
+  $('breakdown').textContent = systemHint('utagaruta').idle;
+  hideHint();
+}
+
+async function dealUtaFlow(result, { remote = false } = {}) {
+  await ensureUtaArt();
+  await utaImage('back').ready;
+  await Promise.all(result.summary.drawn.map(c => utaImage(c.id).ready));
+
+  const n = result.summary.drawn.length;
+  const { stack, slots, discard } = deckLayout(n, utaView);
+  const prev = state.dice.find(d => d.isStack);
+  const stackSprite = new DeckStackSprite(prev ? prev.x : stack.x, prev ? prev.y : stack.y, prev ? prev.size : stack.w, utaView);
+  if (prev && (prev.x !== stack.x || prev.size !== stack.w)) stackSprite.moveTo(stack.x, stack.y, stack.w);
+  else { stackSprite.x = stack.x; stackSprite.y = stack.y; stackSprite.size = stack.w; }
+  const dealFrom = { x: prev ? prev.x : stack.x, y: prev ? prev.y : stack.y };
+  const sprites = [stackSprite];
+
+  let delay0 = 0;
+  if (!remote) {
+    for (const d of state.dice) {
+      if (d.isCard && !d.isStack && !d.isDiscard && d.phase === 'idle' && !d.gone) {
+        const dest = lastSweptReplaceUta
+          ? { to: { x: stack.x, y: stack.y, w: d.size }, mode: 'return' }
+          : { to: { x: discard.x, y: discard.y, w: discard.w }, mode: 'discard' };
+        sprites.push(new CardSprite(d.id, { x: d.x, y: d.y }, dest.to, { mode: dest.mode, view: utaView }));
+        delay0 = DEAL_S + 0.12;
+      }
+    }
+  }
+  if (!remote && utaState.pile.length > 0) {
+    const prev = lastSweptPrevPile;
+    const hold = delay0 > 0 && prev
+      ? { count: prev.count, top: prev.top ? { id: prev.top, rev: false } : null, for: delay0 + DEAL_S + 0.08 }
+      : null;
+    sprites.push(new DiscardPileSprite(discard.x, discard.y, discard.w, utaView, hold));
+  }
+  result.summary.drawn.forEach((c, i) => {
+    sprites.push(new CardSprite(c.id, dealFrom, slots[i], { delay: delay0 + i * 0.12, remote, view: utaView }));
+  });
+
+  state.dice = sprites;
+  dropIdleCache();
+  $('total').dataset.rolling = '1';
+  const settleMs = (delay0 + n * 0.12 + DEAL_S + FLIP_S) * 1000 + 160;
+  setTimeout(() => finish(result), settleMs);
+  if (!remote && navigator.vibrate) navigator.vibrate([6, 30, 8]);
+  hideHint();
+  return result;
+}
+
+function dealUtaFlowRemote(result, claim) {
+  const preload = [utaImage('back').ready, ...result.summary.drawn.map(c => utaImage(c.id).ready)];
+  Promise.all(preload).then(() => {
+    if (state.remoteClaim !== claim) return;
+    const n = result.summary.drawn.length;
+    const { stack, slots } = deckLayout(n, utaView);
+    const sprites = [new DeckStackSprite(stack.x, stack.y, stack.w, utaView)];
+    result.summary.drawn.forEach((c, i) => {
+      sprites.push(new CardSprite(c.id, { x: stack.x, y: stack.y }, slots[i], { delay: i * 0.12, remote: true, view: utaView }));
+    });
+    state.dice = sprites;
+    dropIdleCache();
+    $('total').dataset.rolling = '1';
+    setTimeout(() => {
+      if (state.remoteClaim !== claim) return;
+      delete $('total').dataset.rolling;
+      delete $('total').dataset.idle;
+      setTotal(cardsHeadline(result));
+      $('breakdown').textContent = describeUta(result);
+    }, (n * 0.12 + DEAL_S + FLIP_S) * 1000 + 160);
+  });
+}
+
+function dealFromUtaNotation(notation) {
+  let parsed;
+  try { parsed = parseUtagaruta(notation); } catch (err) { showError(err.message); return; }
+  clearError();
+  state.remoteClaim = null;
+  ensureUtaArt()
+    .then(() => {
+      applyUtaFlags(parsed);
+      return dealUtaFlow(drawUtaCards(parsed.draw));
+    })
+    .then(res => {
+      state.last = res;
+      $('notation').value = res.notation;
+      syncUtaUI({ writeField: false, restage: false });
+    })
+    .catch(err => showError(String((err && err.message) || err)));
+}
+
+// ---- the uta-garuta picker ----
+const utaPicker = $('utaPicker');
+const utaCountVal = $('utaCount');
+const utaRemainVal = $('utaRemain');
+const utaFlagButtons = [...document.querySelectorAll('#utaPicker .deck-flag')];
+
+function syncUtaUI({ writeField = true, restage = true } = {}) {
+  utaCountVal.textContent = String(utaState.draw);
+  utaRemainVal.textContent = utaState.replace ? `${utaRemaining()}∞` : `${utaRemaining()}/${utaTotal()}`;
+  for (const b of utaFlagButtons) {
+    b.setAttribute('aria-pressed', String(utaState.replace));
+  }
+  if (writeField && uiSystem === 'utagaruta') $('notation').value = utaNotation();
+  if (restage && uiSystem === 'utagaruta' && !$('total').dataset.rolling) stageUtaIdle();
+}
+
+bindTapHold($('utaCountChip'), dir => {
+  utaState.draw = Math.max(1, Math.min(10, utaState.draw + dir));
+  persistUta();
+  syncUtaUI({ restage: false });
+});
+$('utaShuffle').addEventListener('click', () => {
+  ensureUtaArt().then(() => {
+    const prevCards = state.dice.filter(d => d.isCard && !d.isStack && !d.isDiscard && !d.gone && d.phase === 'idle');
+    const hadDiscard = utaState.pile.length > 0;
+    const discardTop = utaState.pile[utaState.pile.length - 1];
+    const prevDiscardSprite = state.dice.find(d => d.isDiscard);
+    reshuffleUta();
+    const { stack } = deckLayout(0, utaView);
+    const stackSprite = new DeckStackSprite(stack.x, stack.y, stack.w, utaView);
+    const sprites = [stackSprite];
+    for (const d of prevCards) {
+      sprites.push(new CardSprite(d.id, { x: d.x, y: d.y }, { x: stack.x, y: stack.y, w: d.size }, { mode: 'return', view: utaView }));
+    }
+    if (hadDiscard && discardTop && prevDiscardSprite) {
+      for (let i = 0; i < 3; i++) {
+        sprites.push(new CardSprite(discardTop, { x: prevDiscardSprite.x, y: prevDiscardSprite.y },
+          { x: stack.x, y: stack.y, w: prevDiscardSprite.size }, { mode: 'return', delay: i * 0.07, view: utaView }));
+      }
+    }
+    const sweeping = sprites.length > 1;
+    stackSprite.riffleAfter = sweeping ? 0.34 : 0.001;
+    state.dice = sprites;
+    dropIdleCache();
+    $('total').dataset.idle = '1';
+    $('total').dataset.kind = 'number';
+    $('total').textContent = '—';
+    $('breakdown').textContent = systemHint('utagaruta').idle;
+    if (navigator.vibrate) navigator.vibrate([6, 40, 6, 40, 6, 40, 10]);
+    syncUtaUI({ restage: false });
+  });
+});
+for (const b of utaFlagButtons) {
+  b.addEventListener('click', () => {
+    utaState.replace = !utaState.replace;
+    persistUta();
+    syncUtaUI();
+  });
+}
+
+function syncUtaFromField() {
+  try {
+    const { draw } = parseUtagaruta($('notation').value);
+    utaState.draw = draw;
+    persistUta();
+    syncUtaUI({ writeField: false, restage: false });
+  } catch { /* mid-type */ }
+}
+
 // ---- the pool ----
 //
 // Tapping dice builds a pool: tap d20 twice and d6 once and you have 2d20+1d6,
@@ -3919,6 +4265,7 @@ function clearPool() {
       case 'tarot': ensureTarotArt().then(() => { if (uiSystem === 'tarot') syncTarotUI(); }); break;
       case 'napoletane': ensureNapArt().then(() => { if (uiSystem === 'napoletane') syncNapUI(); }); break;
       case 'hanafuda': ensureHanaArt().then(() => { if (uiSystem === 'hanafuda') syncHanaUI(); }); break;
+      case 'utagaruta': ensureUtaArt().then(() => { if (uiSystem === 'utagaruta') syncUtaUI(); }); break;
     }
     return;
   }
@@ -5035,6 +5382,7 @@ function emptyTrayRoll() {
   if (uiSystem === 'tarot') return tarotNotation();
   if (uiSystem === 'napoletane') return napNotation();
   if (uiSystem === 'hanafuda') return hanaNotation();
+  if (uiSystem === 'utagaruta') return utaNotation();
   const last = state.last;
   const lastNumeric = last && (last.system === 'numeric' || last.system === undefined);
   return (lastNumeric && last.notation) || `d${state.defaultSides}`;
@@ -5454,12 +5802,12 @@ function showRemoteRoll(roll) {
   // called by the dealer's own timer; addHistory ran above, and finish adds
   // again, so the dealer path for remote skips it via the claim below not
   // being ours... simpler: cards route renders and sets the readout directly.
-  if (result.system === 'cards' || result.system === 'tarot' || result.system === 'napoletane' || result.system === 'hanafuda') {
+  if (result.system === 'cards' || result.system === 'tarot' || result.system === 'napoletane' || result.system === 'hanafuda' || result.system === 'utagaruta') {
     if ($('total').dataset.rolling && !state.remoteClaim) return;
     const claim = {};
     state.remoteClaim = claim;
-    const ensure = result.system === 'tarot' ? ensureTarotArt : result.system === 'napoletane' ? ensureNapArt : result.system === 'hanafuda' ? ensureHanaArt : ensureCardArt;
-    const deal = result.system === 'tarot' ? dealTarotFlowRemote : result.system === 'napoletane' ? dealNapFlowRemote : result.system === 'hanafuda' ? dealHanaFlowRemote : dealCardsFlowRemote;
+    const ensure = result.system === 'tarot' ? ensureTarotArt : result.system === 'napoletane' ? ensureNapArt : result.system === 'hanafuda' ? ensureHanaArt : result.system === 'utagaruta' ? ensureUtaArt : ensureCardArt;
+    const deal = result.system === 'tarot' ? dealTarotFlowRemote : result.system === 'napoletane' ? dealNapFlowRemote : result.system === 'hanafuda' ? dealHanaFlowRemote : result.system === 'utagaruta' ? dealUtaFlowRemote : dealCardsFlowRemote;
     ensure().then(() => {
       if (state.remoteClaim !== claim) return;
       deal(result, claim);

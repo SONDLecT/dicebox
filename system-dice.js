@@ -44,6 +44,7 @@ export function detectSystem(src) {
   if (/^tarot:/.test(s)) return 'tarot';
   if (/^(?:ita|nap):/.test(s)) return 'napoletane';
   if (/^(?:hana|koi|hf):/.test(s)) return 'hanafuda';
+  if (/^(?:uta|karuta):/.test(s)) return 'utagaruta';
   if (FATE_REGEX.test(s)) return 'fate';
   return 'numeric';
 }
@@ -953,6 +954,25 @@ const HANA_REGEX = /^(?:hana|koi|hf):(\d+)\s*(.*)$/;
 export function parseHanafuda(src) {
   const m = HANA_REGEX.exec(String(src || '').trim().toLowerCase());
   if (!m) throw new Error('Expected a draw like "hana:1" or "hana:8"');
+  const draw = Number(m[1]);
+  if (draw < 1 || draw > 10) throw new Error('Draw 1-10 cards');
+  let replace = false;
+  for (const tok of m[2].split(/[\s+]+/).filter(Boolean)) {
+    if (tok === 'replace' || tok === 'rep') replace = true;
+    else throw new Error(`Unknown option "${tok}" — try replace`);
+  }
+  return { draw, replace };
+}
+
+// ---- Uta-garuta ----
+//
+// The 100 yomifuda of the Ogura Hyakunin Isshu, drawn like any other deck.
+// `uta:` is the notation; `karuta:` is accepted as an alias.
+const UTA_REGEX = /^(?:uta|karuta):(\d+)\s*(.*)$/;
+
+export function parseUtagaruta(src) {
+  const m = UTA_REGEX.exec(String(src || '').trim().toLowerCase());
+  if (!m) throw new Error('Expected a draw like "uta:1" or "uta:5"');
   const draw = Number(m[1]);
   if (draw < 1 || draw > 10) throw new Error('Draw 1-10 cards');
   let replace = false;

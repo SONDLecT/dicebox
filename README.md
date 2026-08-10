@@ -120,7 +120,7 @@ Every mode has its own short URL — `dicebox.trollskull.cc/dh`,
 
 ## Card decks
 
-Four of the modes deal cards instead of dice. The deck sits on the tray like a
+Five of the modes deal cards instead of dice. The deck sits on the tray like a
 dealer's shoe: tap it to draw, and the cards deal, flip and settle the way the
 dice tumble. Draws come off a real shuffled order and the deck remembers what is
 gone until you shuffle. The cards are physical things: tap a drawn card to pick
@@ -140,7 +140,12 @@ Japanese flower deck of Koi-Koi, in Louie Mantia, Jr. and すけじょ's
 traditional-colour set (CC BY-SA 4.0, via Wikimedia Commons) — the one deck
 in the box drawn by other hands. Everything the pickers do is typeable too —
 `deck:3 jokers replace`, `tarot:3 majors upright`, `nap:3`, `hana:8` — so the
-notation still describes the whole draw.
+notation still describes the whole draw. **Uta-garuta** is the 100
+yomifuda of the Ogura Hyakunin Isshu — draw a single card (`uta:1`) and the
+whole poem reads out under the result, with Clay MacCauley's public-domain
+translation; the help panel carries the Bōzu Mekuri rules, and the portraits
+and calligraphy are traced from Hishikawa Moronobu's illustrated edition
+(Edo, 1680), digitised by the Library of Congress.
 
 The woodcut art is not clip-art. Those decks are traced by hand from
 public-domain woodcut cards held by the Bibliothèque nationale de France —

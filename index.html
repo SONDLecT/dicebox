@@ -172,6 +172,12 @@
             <circle cx="12" cy="9.6" r="3.1" fill="currentColor"/>
             <path d="M6.6 18.2 C8.4 14.6 15.6 14.6 17.4 18.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
           </g>
+          <!-- Uta-garuta: a card carrying two falling verse columns. -->
+          <g class="mode-ico" data-for="utagaruta" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+            <rect x="5.5" y="3" width="13" height="18" rx="2.2"/>
+            <path d="M10 6.6 C9.4 8.4 10.4 9.4 9.8 11.2 C9.4 12.6 10 13.6 9.8 15"/>
+            <path d="M14.2 8.4 C13.7 10 14.6 11 14.1 12.7 C13.8 13.9 14.3 15.2 14 16.8"/>
+          </g>
           <!-- Mothership: a spacesuit helmet — dome and curved visor. -->
           <g class="mode-ico" data-for="mothership" fill="none" stroke="currentColor"
              stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">
@@ -523,6 +529,35 @@
       </p>
       </div>
 
+      <div id="helpUtagaruta" hidden>
+      <dl class="syntax">
+        <dt>uta:1</dt>          <dd>draw a poem</dd>
+        <dt>uta:5</dt>          <dd>draw five</dd>
+        <dt>uta:1 replace</dt>  <dd>draw with replacement</dd>
+      </dl>
+      <p class="note">
+        The <b>Ogura Hyakunin Isshu</b> — one hundred poets, one poem each,
+        compiled by Fujiwara no Teika around 1235, from Emperor Tenji to
+        Emperor Juntoku. Draw a single card and the whole poem reads out
+        beneath the result, with Clay MacCauley's translation. <b>Tap</b> a
+        drawn card to read the calligraphy up close, <b>flick</b> it to the
+        discard, tap the deck or table to draw; <code>karuta:</code> works as
+        an alias.
+      </p>
+      <p class="note">
+        For <b>Bōzu Mekuri</b>, draw one card per player in turn: a courtier
+        keeps his card, a <b>monk</b> (13 in the deck) costs you your whole
+        pile, a <b>lady</b> (21 in the deck) wins you everything discarded so
+        far. Largest pile when the deck runs out wins.
+      </p>
+      <p class="note">
+        The portraits and calligraphy are traced from <b>Hishikawa
+        Moronobu's illustrated edition</b> (Edo, 1680) — Moronobu is often
+        counted the first ukiyo-e artist — digitised by the Library of
+        Congress. The deck reads in the book's own order, poet by poet.
+      </p>
+      </div>
+
       <p class="note install" id="installNote">
         <button type="button" class="install-button" id="install" hidden>Install as an app</button>
         <span id="installHint">Add this to your home screen and it works offline, with no
@@ -709,6 +744,15 @@
         </svg>
         <span class="mode-row-name">Hanafuda</span>
         <span class="mode-row-sub">花札 &middot; 48</span>
+      </button>
+      <button type="button" class="mode-row mode-utagaruta" data-system="utagaruta" aria-pressed="false">
+        <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+          <rect x="5.5" y="3" width="13" height="18" rx="2.2"/>
+          <path d="M10 6.6 C9.4 8.4 10.4 9.4 9.8 11.2 C9.4 12.6 10 13.6 9.8 15"/>
+          <path d="M14.2 8.4 C13.7 10 14.6 11 14.1 12.7 C13.8 13.9 14.3 15.2 14 16.8"/>
+        </svg>
+        <span class="mode-row-name">Uta-garuta</span>
+        <span class="mode-row-sub">百人一首 &middot; 100</span>
       </button>
     </div>
 
@@ -1278,6 +1322,27 @@
       <span class="deck-flag-name">Replace</span>
     </button>
     <span class="deck-remain" id="hanaRemain" aria-label="Cards remaining">48/48</span>
+  </section>
+
+  <section class="picker cards-picker" id="utaPicker" aria-label="Uta-garuta" hidden>
+    <button type="button" class="spin-chip" id="utaCountChip" aria-label="Cards per draw — tap to raise, hold to lower">
+      <span class="spin-chip-label">Cards</span>
+      <span class="spin-chip-val" id="utaCount">1</span>
+    </button>
+    <button type="button" class="deck-shuffle" id="utaShuffle" aria-label="Shuffle the deck">
+      <svg viewBox="0 0 30 30" aria-hidden="true">
+        <path d="M4 10 C10 10 12 20 18 20 L22 20 M4 20 C10 20 12 10 18 10 L22 10 M20 7.5 24 10 20 12.5 M20 17.5 24 20 20 22.5"/>
+      </svg>
+      <span class="deck-shuffle-label">Shuffle</span>
+    </button>
+    <button type="button" class="deck-flag" data-flag="replace" aria-pressed="false" aria-label="Draw with replacement — cards return to the deck">
+      <svg class="deck-flag-ico" viewBox="0 0 30 30" aria-hidden="true">
+        <rect class="crd" x="8" y="4" width="14" height="21" rx="2.4"/>
+        <path class="mark2" d="M11.2 14.6 a3.9 3.9 0 1 1 1.1 2.9 M11 20 L11.2 16.9 L14.3 17.2"/>
+      </svg>
+      <span class="deck-flag-name">Replace</span>
+    </button>
+    <span class="deck-remain" id="utaRemain" aria-label="Cards remaining">100/100</span>
   </section>
 
   <form class="entry" id="entry">
