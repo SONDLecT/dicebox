@@ -815,14 +815,25 @@ export function describeMothership(result) {
 // Draws come off the top of a shuffled order; shuffling is an explicit action
 // in the UI, not a notation. A draw larger than what remains takes what is
 // left — the table answer, not an error.
-const DECK_REGEX = /^deck:(\d+)$/;
+//
+// The deck's two settings follow the count as keyword flags, so every button
+// in the picker has a typed equivalent and the field can fully describe the
+// deck: "deck:3 jokers replace". Flags may be space- or plus-separated and are
+// order-free; the field writes back the ones that are on.
+const DECK_REGEX = /^deck:(\d+)\s*(.*)$/;
 
 export function parseCards(src) {
   const m = DECK_REGEX.exec(String(src || '').trim().toLowerCase());
   if (!m) throw new Error('Expected a draw like "deck:1" or "deck:3"');
   const draw = Number(m[1]);
   if (draw < 1 || draw > 10) throw new Error('Draw 1-10 cards');
-  return { draw };
+  let jokers = false, replace = false;
+  for (const tok of m[2].split(/[\s+]+/).filter(Boolean)) {
+    if (tok === 'jokers' || tok === 'joker' || tok === 'j') jokers = true;
+    else if (tok === 'replace' || tok === 'rep') replace = true;
+    else throw new Error(`Unknown card option "${tok}" — try jokers or replace`);
+  }
+  return { draw, jokers, replace };
 }
 
 // A fresh shuffled order over the given card ids. The rng is injectable so
@@ -874,14 +885,26 @@ export function describeCards(result) {
 // The tarot deck is the cards engine at 78: same draw-without-replacement
 // order, same shuffle, plus reversals — each card's orientation is fixed at
 // shuffle time, the way a real deck carries reversals through a spread.
-const TAROT_REGEX = /^tarot:(\d+)$/;
+//
+// Keyword flags follow the count, like the playing deck. Reversals are on by
+// default, so the field carries "upright" to turn them off rather than a token
+// for the default; "majors" and "replace" appear when on:
+// "tarot:3 majors upright".
+const TAROT_REGEX = /^tarot:(\d+)\s*(.*)$/;
 
 export function parseTarot(src) {
   const m = TAROT_REGEX.exec(String(src || '').trim().toLowerCase());
   if (!m) throw new Error('Expected a draw like "tarot:1" or "tarot:3"');
   const draw = Number(m[1]);
   if (draw < 1 || draw > 10) throw new Error('Draw 1-10 cards');
-  return { draw };
+  let reversals = true, majors = false, replace = false;
+  for (const tok of m[2].split(/[\s+]+/).filter(Boolean)) {
+    if (tok === 'upright' || tok === 'up') reversals = false;
+    else if (tok === 'majors' || tok === 'major' || tok === 'maj') majors = true;
+    else if (tok === 'replace' || tok === 'rep') replace = true;
+    else throw new Error(`Unknown tarot option "${tok}" — try majors, upright, or replace`);
+  }
+  return { draw, reversals, majors, replace };
 }
 
 export function summarizeTarot(drawn, remaining, total) {

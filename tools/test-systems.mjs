@@ -716,8 +716,13 @@ for (const bad of ['ms:', 'ms:x@5', 'ms:c@100', 'ms:p@5e', 'ms:p@1', 'ms:p@21', 
 // detection / parsing
 ok('detect deck', detectSystem('deck:1') === 'cards');
 ok('deck not numeric', detectSystem('1d52') === 'numeric');
-ok('parse deck:3', eq(parseCards('deck:3'), { draw: 3 }));
-for (const bad of ['deck:', 'deck:0', 'deck:11', 'deck:1x', 'ms:c']) {
+ok('parse deck:3', eq(parseCards('deck:3'), { draw: 3, jokers: false, replace: false }));
+ok('parse deck:3 jokers', eq(parseCards('deck:3 jokers'), { draw: 3, jokers: true, replace: false }));
+ok('parse deck:1 replace', eq(parseCards('deck:1 replace'), { draw: 1, jokers: false, replace: true }));
+ok('deck flags are order-free and plus-joinable', eq(parseCards('deck:5 replace+jokers'), { draw: 5, jokers: true, replace: true }));
+ok('deck flag short forms', eq(parseCards('deck:2 j rep'), { draw: 2, jokers: true, replace: true }));
+ok('deck flags are case-insensitive', eq(parseCards('DECK:2 Jokers'), { draw: 2, jokers: true, replace: false }));
+for (const bad of ['deck:', 'deck:0', 'deck:11', 'deck:1x', 'deck:1 wild', 'ms:c']) {
   ok(`reject deck ${bad}`, (() => { try { parseCards(bad); return false; } catch { return true; } })());
 }
 // shuffle: a permutation, not a mutation, honouring an injected rng
@@ -750,8 +755,12 @@ for (const bad of ['deck:', 'deck:0', 'deck:11', 'deck:1x', 'ms:c']) {
 // detection / parsing
 ok('detect tarot', detectSystem('tarot:1') === 'tarot');
 ok('tarot not cards', detectSystem('tarot:3') !== 'cards');
-ok('parse tarot:3', eq(parseTarot('tarot:3'), { draw: 3 }));
-for (const bad of ['tarot:', 'tarot:0', 'tarot:11', 'tarot:1x', 'deck:1']) {
+ok('parse tarot:3', eq(parseTarot('tarot:3'), { draw: 3, reversals: true, majors: false, replace: false }));
+ok('parse tarot:3 majors', eq(parseTarot('tarot:3 majors'), { draw: 3, reversals: true, majors: true, replace: false }));
+ok('parse tarot:1 upright turns reversals off', eq(parseTarot('tarot:1 upright'), { draw: 1, reversals: false, majors: false, replace: false }));
+ok('tarot flags combine, order-free', eq(parseTarot('tarot:5 replace majors upright'), { draw: 5, reversals: false, majors: true, replace: true }));
+ok('tarot flag short forms', eq(parseTarot('tarot:2 maj up'), { draw: 2, reversals: false, majors: true, replace: false }));
+for (const bad of ['tarot:', 'tarot:0', 'tarot:11', 'tarot:1x', 'tarot:1 wild', 'deck:1']) {
   ok(`reject tarot ${bad}`, (() => { try { parseTarot(bad); return false; } catch { return true; } })());
 }
 // summaries + formatters (reversals ride on each drawn card)

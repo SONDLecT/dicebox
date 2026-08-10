@@ -1120,8 +1120,8 @@ function setSystem(system, { roll = false, url = true } = {}) {
     // plain Roll or flick throws it; tapping numeric dice replaces it with a pool.
     if (system === 'daggerheart') $('notation').value = dhNotation();
     if (system === 'mothership') $('notation').value = msNotation();
-    if (system === 'cards') $('notation').value = `deck:${deckState.draw}`;
-    if (system === 'tarot') $('notation').value = `tarot:${tarotState.draw}`;
+    if (system === 'cards') $('notation').value = deckNotation();
+    if (system === 'tarot') $('notation').value = tarotNotation();
   }
 }
 
@@ -1861,8 +1861,29 @@ function reshuffleDeck() {
 // persisted order; with replacement each card is an independent pick from the
 // full deck (duplicates possible, as at a real table). Requires the art module
 // (for labels) — callers go through dealCardsFlow, which loads it.
+// The field's full description of the deck: the count plus whichever settings
+// are on, so every picker button has a typed twin and the field round-trips.
+function deckNotation() {
+  let s = `deck:${deckState.draw}`;
+  if (deckState.jokers) s += ' jokers';
+  if (deckState.replace) s += ' replace';
+  return s;
+}
+
+// Bring the deck's settings in line with a parsed notation, the way toggling
+// the buttons would: a change to what the deck contains (jokers) reshuffles;
+// replace just flips. Returns whether a reshuffle happened, so the caller can
+// clear the table to match.
+function applyDeckFlags({ jokers, replace }) {
+  let reshuffled = false;
+  if (jokers !== deckState.jokers) { deckState.jokers = jokers; reshuffleDeck(); reshuffled = true; }
+  if (replace !== deckState.replace) { deckState.replace = replace; persistDeck(); }
+  return reshuffled;
+}
+
 function drawDeckCards(n) {
   let ids;
+  deckState.draw = n;
   if (deckState.order.length === 0) reshuffleDeck();
   if (deckState.replace) {
     // Independent picks from what is still in the deck — not the full 52.
@@ -1891,7 +1912,7 @@ function drawDeckCards(n) {
   return {
     schema: 2,
     system: 'cards',
-    notation: `deck:${n}`,
+    notation: deckNotation(),
     groups: [{ kind: 'cards', count: drawn.length, cards: drawn }],
     summary: summarizeCards(drawn, deckRemaining(), deckTotal()),
   };
@@ -2335,13 +2356,19 @@ function dealCardsFlowRemote(result, claim) {
 }
 
 // The sync entry point doRoll routes to; errors surface like any bad notation.
+// The notation carries the deck's settings too, so a draw first brings the deck
+// in line with them (reshuffling and clearing the table if what the deck holds
+// changed), exactly as if the buttons had been set, then deals.
 function dealFromNotation(notation) {
-  let draw;
-  try { draw = parseCards(notation).draw; } catch (err) { showError(err.message); return; }
+  let parsed;
+  try { parsed = parseCards(notation); } catch (err) { showError(err.message); return; }
   clearError();
   state.remoteClaim = null;
   ensureCardArt()
-    .then(() => dealCardsFlow(drawDeckCards(draw)))
+    .then(() => {
+      if (applyDeckFlags(parsed)) stageDeckIdle();
+      return dealCardsFlow(drawDeckCards(parsed.draw));
+    })
     .then(res => {
       state.last = res;
       $('notation').value = res.notation;
@@ -2363,7 +2390,7 @@ function syncCardsUI({ writeField = true, restage = true } = {}) {
     const on = b.dataset.flag === 'jokers' ? deckState.jokers : deckState.replace;
     b.setAttribute('aria-pressed', String(on));
   }
-  if (writeField && uiSystem === 'cards') $('notation').value = `deck:${deckState.draw}`;
+  if (writeField && uiSystem === 'cards') $('notation').value = deckNotation();
   if (restage && uiSystem === 'cards' && !$('total').dataset.rolling) stageDeckIdle();
 }
 
@@ -2487,6 +2514,36 @@ const tarotRemaining = () => Math.max(0, tarotState.order.length - tarotState.po
 
 let lastSweptReplaceTarot = false;
 
+// The field's full description of the tarot deck. Reversals are on by default,
+// so the field spells out "upright" to say they are off rather than carrying a
+// token for the default; majors and replace show when on.
+function tarotNotation() {
+  let s = `tarot:${tarotState.draw}`;
+  if (!tarotState.reversals) s += ' upright';
+  if (tarotState.majors) s += ' majors';
+  if (tarotState.replace) s += ' replace';
+  return s;
+}
+
+// Bring the tarot deck in line with a parsed notation, like setting the
+// buttons: majors changes what the deck holds and reshuffles; reversals only
+// gates the orientations already dealt (turning it on with none dealt deals
+// them for the undrawn cards, matching the toggle); replace just flips.
+// Returns whether it reshuffled.
+function applyTarotFlags({ reversals, majors, replace }) {
+  let reshuffled = false;
+  if (majors !== tarotState.majors) { tarotState.majors = majors; reshuffleTarot(); reshuffled = true; }
+  if (reversals !== tarotState.reversals) {
+    tarotState.reversals = reversals;
+    if (reversals && !tarotState.revs.some(Boolean)) {
+      for (let i = tarotState.pos; i < tarotState.revs.length; i++) tarotState.revs[i] = cryptoIndex(2) === 1;
+    }
+  }
+  if (replace !== tarotState.replace) tarotState.replace = replace;
+  if (!reshuffled) persistTarot();
+  return reshuffled;
+}
+
 function reshuffleTarot() {
   tarotState.order = newDeckOrder(tarotDeckIds(), n => cryptoIndex(n) + 1);
   // Every shuffle deals orientations, whatever the Reversals flag says; the
@@ -2501,6 +2558,7 @@ function reshuffleTarot() {
 
 function drawTarotCards(n) {
   let picks;
+  tarotState.draw = n;
   if (tarotState.order.length === 0) reshuffleTarot();
   if (tarotState.replace) {
     // Independent picks from what is still in the deck; the discard stays out
@@ -2531,7 +2589,7 @@ function drawTarotCards(n) {
   return {
     schema: 2,
     system: 'tarot',
-    notation: `tarot:${n}`,
+    notation: tarotNotation(),
     groups: [{ kind: 'cards', count: drawn.length, cards: drawn }],
     summary: summarizeTarot(drawn, tarotRemaining(), tarotTotal()),
   };
@@ -2647,12 +2705,15 @@ function dealTarotFlowRemote(result, claim) {
 }
 
 function dealFromTarotNotation(notation) {
-  let draw;
-  try { draw = parseTarot(notation).draw; } catch (err) { showError(err.message); return; }
+  let parsed;
+  try { parsed = parseTarot(notation); } catch (err) { showError(err.message); return; }
   clearError();
   state.remoteClaim = null;
   ensureTarotArt()
-    .then(() => dealTarotFlow(drawTarotCards(draw)))
+    .then(() => {
+      if (applyTarotFlags(parsed)) stageTarotIdle();
+      return dealTarotFlow(drawTarotCards(parsed.draw));
+    })
     .then(res => {
       state.last = res;
       $('notation').value = res.notation;
@@ -2676,7 +2737,7 @@ function syncTarotUI({ writeField = true, restage = true } = {}) {
       : tarotState.replace;
     b.setAttribute('aria-pressed', String(on));
   }
-  if (writeField && uiSystem === 'tarot') $('notation').value = `tarot:${tarotState.draw}`;
+  if (writeField && uiSystem === 'tarot') $('notation').value = tarotNotation();
   if (restage && uiSystem === 'tarot' && !$('total').dataset.rolling) stageTarotIdle();
 }
 
@@ -4139,8 +4200,8 @@ function emptyTrayRoll() {
   if (uiSystem === 'pbta') return pbtaCtl.notation();
   if (uiSystem === 'mist') return mistCtl.notation();
   if (uiSystem === 'mothership') return msNotation();
-  if (uiSystem === 'cards') return `deck:${deckState.draw}`;
-  if (uiSystem === 'tarot') return `tarot:${tarotState.draw}`;
+  if (uiSystem === 'cards') return deckNotation();
+  if (uiSystem === 'tarot') return tarotNotation();
   const last = state.last;
   const lastNumeric = last && (last.system === 'numeric' || last.system === undefined);
   return (lastNumeric && last.notation) || `d${state.defaultSides}`;
