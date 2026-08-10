@@ -2006,6 +2006,10 @@ function cardImage(id) {
 // back to face; in Replace mode the previous draw flies home first.
 const CARD_RATIO = 1.4;
 const DEAL_S = 0.34, FLIP_S = 0.26;
+// The top card of an idle deck lies just off-square — a real stack does — and
+// a dealt card starts from exactly that angle, so the pickup reads as picking
+// up the card that was already sitting there.
+const DECK_ASKEW = 0.045;
 
 // The sprites and layout serve two decks — playing cards and tarot — through a
 // small view: which art to draw, the card aspect, and where the live counts
@@ -2022,6 +2026,12 @@ const cardsView = {
   discard: () => deckState.pile.length,
   discardTop: () => (deckState.pile.length ? { id: deckState.pile[deckState.pile.length - 1], rev: false } : null),
   pile: () => deckState.pile.map(id => ({ id, rev: false })),
+  discardFromHand: (id) => {
+    const i = deckState.hand.indexOf(id);
+    if (i >= 0) deckState.hand.splice(i, 1);
+    deckState.pile.push(id);
+    persistDeck();
+  },
 };
 const napView = {
   ratio: 1.552, // the 1902 deck's own 8.2 x 5.3 cm
@@ -2034,6 +2044,12 @@ const napView = {
   discard: () => napState.pile.length,
   discardTop: () => (napState.pile.length ? { id: napState.pile[napState.pile.length - 1], rev: false } : null),
   pile: () => napState.pile.map(id => ({ id, rev: false })),
+  discardFromHand: (id) => {
+    const i = napState.hand.indexOf(id);
+    if (i >= 0) napState.hand.splice(i, 1);
+    napState.pile.push(id);
+    persistNap();
+  },
 };
 const tarotView = {
   ratio: 1.72,
@@ -2046,6 +2062,12 @@ const tarotView = {
   discard: () => tarotState.pile.length,
   discardTop: () => (tarotState.pile.length ? tarotState.pile[tarotState.pile.length - 1] : null),
   pile: () => tarotState.pile.slice(),
+  discardFromHand: (id, rev) => {
+    const i = tarotState.hand.findIndex(e => e.id === id && !!e.rev === !!rev);
+    if (i >= 0) tarotState.hand.splice(i, 1);
+    tarotState.pile.push({ id, rev: !!rev });
+    persistTarot();
+  },
 };
 
 class CardSprite {
@@ -2065,7 +2087,7 @@ class CardSprite {
     // snapshot invalid) exactly like an unrolled die; the id lands with the card.
     this.value = null;
     this.remote = remote;
-    this.wobble = (cryptoIndex(100) - 50) / 160;
+    this.wobble = DECK_ASKEW + (cryptoIndex(40) - 20) / 900;
   }
   step(dt) {
     if (this.phase === 'idle') return;
@@ -2209,6 +2231,7 @@ class DeckStackSprite {
         ctx.save();
         ctx.globalAlpha = empty ? 0.35 : 1;
         ctx.translate(i * 2.5, i * 2.5 - 2.5);
+        if (i === 0 && !empty) ctx.rotate(DECK_ASKEW);
         ctx.drawImage(img, -w / 2, -h / 2, w, h);
         ctx.restore();
       }
@@ -2379,7 +2402,7 @@ async function dealCardsFlow(result, { remote = false } = {}) {
           ? { to: { x: stack.x, y: stack.y, w: d.size }, mode: 'return' }
           : { to: { x: discard.x, y: discard.y, w: discard.w }, mode: 'discard' };
         sprites.push(new CardSprite(d.id, { x: d.x, y: d.y }, dest.to, { mode: dest.mode }));
-        delay0 = 0.24;
+        delay0 = DEAL_S + 0.12;
       }
     }
   }
@@ -2743,7 +2766,7 @@ async function dealTarotFlow(result, { remote = false } = {}) {
           ? { to: { x: stack.x, y: stack.y, w: d.size }, mode: 'return' }
           : { to: { x: discard.x, y: discard.y, w: discard.w }, mode: 'discard' };
         sprites.push(new CardSprite(d.id, { x: d.x, y: d.y }, dest.to, { mode: dest.mode, view: tarotView, rev: d.rev }));
-        delay0 = 0.24;
+        delay0 = DEAL_S + 0.12;
       }
     }
   }
@@ -3056,7 +3079,7 @@ async function dealNapFlow(result, { remote = false } = {}) {
           ? { to: { x: stack.x, y: stack.y, w: d.size }, mode: 'return' }
           : { to: { x: discard.x, y: discard.y, w: discard.w }, mode: 'discard' };
         sprites.push(new CardSprite(d.id, { x: d.x, y: d.y }, dest.to, { mode: dest.mode, view: napView }));
-        delay0 = 0.24;
+        delay0 = DEAL_S + 0.12;
       }
     }
   }
@@ -4448,6 +4471,34 @@ function closeCardFocus() {
 
 cardFocusEl.addEventListener('click', closeCardFocus);
 
+// Flick a drawn card off the table and into the scarti — no draw involved.
+// The pile sprite holds its old face until the flight lands.
+function discardCardSprite(d) {
+  const view = d.view;
+  const prevCount = view.discard();
+  const prevTop = view.discardTop();
+  view.discardFromHand(d.id, d.rev);
+  const n = state.dice.filter(s => s.isCard && !s.isStack && !s.isDiscard && !s.gone).length;
+  const { discard } = deckLayout(Math.max(0, n - 1), view);
+  d.from = { x: d.x, y: d.y };
+  d.to = { x: discard.x, y: discard.y, w: discard.w };
+  d.mode = 'discard';
+  d.phase = 'fly';
+  d.t = 0;
+  d.delay = 0;
+  d.value = null;
+  if (!state.dice.some(s => s.isDiscard)) {
+    state.dice.push(new DiscardPileSprite(discard.x, discard.y, discard.w, view,
+      prevCount > 0 ? { count: prevCount, top: prevTop, for: DEAL_S + 0.06 } : { count: 0, top: null, for: DEAL_S + 0.06 }));
+  } else {
+    for (const s of state.dice) {
+      if (s.isDiscard) s.hold = { count: prevCount, top: prevTop, for: DEAL_S + 0.06 };
+    }
+  }
+  dropIdleCache();
+  if (navigator.vibrate) navigator.vibrate(8);
+}
+
 // ---- the discard, fanned open ----
 //
 // Tapping the pile on the tray spreads it out, newest first, every card
@@ -4558,6 +4609,14 @@ canvas.addEventListener('pointerup', e => {
   const isTouch = e.pointerType === 'touch';
   const tapSpeed = isTouch ? 300 : 120, tapTravel = isTouch ? 24 : 10;
   const isTap = speed < tapSpeed && travelled < tapTravel;
+
+  // A drawn card is a physical thing: tap it to pick it up for a look,
+  // flick it to send it to the discard. Neither draws.
+  const hitCard = drawnCardAt(downX, downY);
+  if (hitCard) {
+    if (isTap) { openCardFocus(hitCard); return; }
+    if (speed > 260) { discardCardSprite(hitCard); return; }
+  }
 
   // Tapping the discard pile fans it open instead of drawing. Hit-tested where
   // the finger LANDED (the aim point), not where it lifted, with a little pad.
