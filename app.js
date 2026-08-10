@@ -1998,6 +1998,7 @@ const cardsView = {
   ratio: CARD_RATIO,
   image: id => cardImage(id),
   svg: id => cardArt.cardSVG(id, { dark: isDark() }),
+  loaded: () => !!cardArt,
   remaining: () => deckRemaining(),
   total: () => deckTotal(),
   replace: () => deckState.replace,
@@ -2009,6 +2010,7 @@ const napView = {
   ratio: 1.552, // the 1902 deck's own 8.2 x 5.3 cm
   image: id => napImage(id),
   svg: id => napArt.napSVG(id, { dark: isDark() }),
+  loaded: () => !!napArt,
   remaining: () => napRemaining(),
   total: () => napTotal(),
   replace: () => napState.replace,
@@ -2020,6 +2022,7 @@ const tarotView = {
   ratio: 1.72,
   image: id => tarotImage(id),
   svg: id => tarotArt.tarotSVG(id, { dark: isDark() }),
+  loaded: () => !!tarotArt,
   remaining: () => tarotRemaining(),
   total: () => tarotTotal(),
   replace: () => tarotState.replace,
@@ -4341,8 +4344,7 @@ function drawnCardAt(clientX, clientY) {
 // The close-up proper: a card id + orientation rises from wherever it was —
 // its sprite on the table, or its cell in the fanned-open discard.
 function focusCard(id, rev, view, from) {
-  const art = view === tarotView ? tarotArt : cardArt;
-  if (!art || !cardFocusEl.hidden) return;
+  if (!view.loaded() || !cardFocusEl.hidden) return;
   const barBottom = Math.round(document.querySelector('header.bar').getBoundingClientRect().bottom);
   cardFocusEl.style.top = `${barBottom}px`;
 
@@ -4401,7 +4403,7 @@ let discardPanelView = null; // the view whose pile is fanned open, for retintin
 
 function openDiscardPanel(view) {
   const pile = view.pile();
-  if (!pile.length || (view === tarotView ? !tarotArt : !cardArt)) return;
+  if (!pile.length || !view.loaded()) return;
   const barBottom = Math.round(document.querySelector('header.bar').getBoundingClientRect().bottom);
   discardPanel.style.top = `${barBottom}px`;
   $('discardTitle').textContent = `Discard · ${pile.length}`;
