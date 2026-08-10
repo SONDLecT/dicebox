@@ -1153,6 +1153,13 @@ body {
   background: color-mix(in srgb, var(--sys, var(--accent)) 13%, transparent);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sys, var(--accent)) 50%, transparent);
 }
+/* Card decks sit below the dice systems, past their own rule. */
+.mode-row-break {
+  border-top: 1px solid var(--hair);
+  border-radius: 0 0 9px 9px;
+  margin-top: 3px;
+  padding-top: 9px;
+}
 /* Dicebox itself sits pinned above the alphabetical systems. */
 .mode-row-pinned {
   border-bottom: 1px solid var(--hair);
@@ -2586,15 +2593,7 @@ body {
         <span class="mode-row-name">Dicebox</span>
         <span class="mode-row-sub">any dice &middot; full notation</span>
       </button>
-      <button type="button" class="mode-row mode-cards" data-system="cards" aria-pressed="false">
-        <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true">
-          <rect x="5.5" y="3" width="13" height="18" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.5"/>
-          <path d="M12 8.2 C14.4 10.2 13.4 12.6 12.2 12.6 C13 13.6 13.4 14.2 13.6 14.8 L10.4 14.8 C10.6 14.2 11 13.6 11.8 12.6 C10.6 12.6 9.6 10.2 12 8.2 Z" fill="currentColor"/>
-        </svg>
-        <span class="mode-row-name">Cards</span>
-        <span class="mode-row-sub">the Woodcut deck &middot; 52 + jokers</span>
-      </button>
-      <button type="button" class="mode-row mode-cthulhutech" data-system="cthulhutech" aria-pressed="false">
+            <button type="button" class="mode-row mode-cthulhutech" data-system="cthulhutech" aria-pressed="false">
         <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true">
           <g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
             <path d="M4 10 C8 5 16 5 20 10 C16 15 8 15 4 10 Z"/>
@@ -2704,6 +2703,14 @@ body {
         </svg>
         <span class="mode-row-name">VtM V5</span>
         <span class="mode-row-sub">d10 pool + Hunger</span>
+      </button>
+      <button type="button" class="mode-row mode-row-break mode-cards" data-system="cards" aria-pressed="false">
+        <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="5.5" y="3" width="13" height="18" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M12 8.2 C14.4 10.2 13.4 12.6 12.2 12.6 C13 13.6 13.4 14.2 13.6 14.8 L10.4 14.8 C10.6 14.2 11 13.6 11.8 12.6 C10.6 12.6 9.6 10.2 12 8.2 Z" fill="currentColor"/>
+        </svg>
+        <span class="mode-row-name">Cards</span>
+        <span class="mode-row-sub">the Woodcut deck &middot; 52 + jokers</span>
       </button>
     </div>
 
@@ -10180,12 +10187,25 @@ function syncMsFromField() {
 // first time the mode is opened; the service worker precaches it so that first
 // open works offline too.
 const DECK_KEY = 'dicebox:deck:v1';
-const deckState = { order: [], pos: 0, jokers: false, replace: false, draw: 1 };
+const deckState = {
+  order: [], pos: 0, jokers: false, replace: false, draw: 1,
+  // The discard pile: how many dealt cards lie face-up beside the deck, and
+  // which one is on top. The hand currently on the table is tracked so it can
+  // be swept into the discard by the next draw (or folded in after a reload).
+  discard: 0, discardTop: null, hand: [], handReplace: false,
+};
 {
   try {
     const saved = JSON.parse(store.get(DECK_KEY) || 'null');
     if (saved && Array.isArray(saved.order) && saved.order.every(x => typeof x === 'string')) {
       Object.assign(deckState, saved, { draw: Math.max(1, Math.min(10, saved.draw || 1)) });
+      // A hand left on the table when the page closed is a dealt hand: it
+      // belongs to the discard now, exactly as if the next draw had swept it.
+      if (Array.isArray(deckState.hand) && deckState.hand.length && !deckState.handReplace) {
+        deckState.discard += deckState.hand.length;
+        deckState.discardTop = deckState.hand[deckState.hand.length - 1];
+      }
+      deckState.hand = [];
     }
   } catch { /* fresh deck */ }
 }
@@ -10201,6 +10221,11 @@ function deckIds() {
 const deckTotal = () => 52 + (deckState.jokers ? 2 : 0);
 const deckRemaining = () => (deckState.replace ? deckTotal() : Math.max(0, deckState.order.length - deckState.pos));
 
+// Whether the hand being swept off the table was drawn with replacement —
+// read by the dealer for the sweep animation after drawDeckCards has already
+// re-pointed deckState.hand at the new draw.
+let lastSweptReplace = false;
+
 // A uniform index in [0, n), rejection-sampled like the dice rolls.
 function cryptoIndex(n) {
   const limit = Math.floor(0x100000000 / n) * n;
@@ -10213,6 +10238,9 @@ function cryptoIndex(n) {
 function reshuffleDeck() {
   deckState.order = newDeckOrder(deckIds(), n => cryptoIndex(n) + 1);
   deckState.pos = 0;
+  deckState.discard = 0;
+  deckState.discardTop = null;
+  deckState.hand = [];
   persistDeck();
 }
 
@@ -10231,6 +10259,17 @@ function drawDeckCards(n) {
     deckState.pos += ids.length;
     persistDeck();
   }
+  // The previous hand goes to the discard (replace-mode hands went home to
+  // the deck instead and never count). Its provenance is stashed for the
+  // dealer, which animates the sweep after this state has already moved on.
+  lastSweptReplace = deckState.handReplace;
+  if (deckState.hand.length && !deckState.handReplace) {
+    deckState.discard += deckState.hand.length;
+    deckState.discardTop = deckState.hand[deckState.hand.length - 1];
+  }
+  deckState.hand = ids.slice();
+  deckState.handReplace = deckState.replace;
+  persistDeck();
   const drawn = ids.map(id => {
     const m = cardArt.cardMeta(id);
     return { id, label: m.label, red: !!m.red };
@@ -10315,7 +10354,7 @@ class CardSprite {
       this.y = this.from.y + (this.to.y - this.from.y) * e - Math.sin(Math.PI * e) * 24;
       if (this.t >= 1) {
         this.x = this.to.x; this.y = this.to.y;
-        if (this.mode === 'return') { this.phase = 'idle'; this.settled = true; this.gone = true; this.value = this.id; }
+        if (this.mode === 'return' || this.mode === 'discard') { this.phase = 'idle'; this.settled = true; this.gone = true; this.value = this.id; }
         else this.phase = 'flip';
       }
     } else if (this.phase === 'flip') {
@@ -10326,7 +10365,7 @@ class CardSprite {
   draw(ctx) {
     if (this.gone) return;
     const w = this.size, h = w * CARD_RATIO;
-    const flip = this.mode === 'return' ? 0 : (this.phase === 'idle' ? 1 : this.flipT);
+    const flip = this.mode === 'return' ? 0 : this.mode === 'discard' ? 1 : (this.phase === 'idle' ? 1 : this.flipT);
     const img = (flip < 0.5 ? cardImage('back') : cardImage(this.id)).img;
     const sx = this.phase === 'flip' ? Math.abs(Math.cos(Math.PI * flip)) || 0.02 : 1;
     ctx.save();
@@ -10352,6 +10391,7 @@ class DeckStackSprite {
     this.stageKind = 'deck-stack';
     this.settled = true; this.settling = true; this.settleT = 1;
     this.riffle = 0;
+    this.riffleAfter = 0; // seconds until a queued riffle starts
     this.value = 'deck';
     this.tween = null; // { fx, fy, fw, tx, ty, tw, t }
   }
@@ -10360,6 +10400,11 @@ class DeckStackSprite {
     this.value = null;
   }
   step(dt) {
+    if (this.riffleAfter > 0) {
+      this.riffleAfter -= dt;
+      this.value = null;
+      if (this.riffleAfter <= 0) { this.riffleAfter = 0; this.riffle = 1; }
+    }
     if (this.tween) {
       const tw = this.tween;
       tw.t = Math.min(1, tw.t + dt / 0.3);
@@ -10455,6 +10500,51 @@ class DeckStackSprite {
   spinInPlace() {}
 }
 
+// The discard: dealt cards lying face-up beside the deck, top card showing,
+// slightly askew the way a real pile ends up. Grows as hands are swept in,
+// vanishes into the deck on a shuffle.
+class DiscardPileSprite {
+  constructor(x, y, w) {
+    this.x = x; this.y = y; this.size = w;
+    this.isCard = true; this.isDiscard = true;
+    this.stageKind = 'deck-discard';
+    this.settled = true; this.settling = true; this.settleT = 1;
+    this.value = 'discard';
+  }
+  step() {}
+  draw(ctx) {
+    if (deckState.discard === 0 || !deckState.discardTop) return;
+    const w = this.size, h = w * CARD_RATIO;
+    const img = cardImage(deckState.discardTop).img;
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.shadowColor = 'rgba(0,0,0,0.35)';
+    ctx.shadowBlur = 7;
+    ctx.shadowOffsetY = 3;
+    const under = Math.min(2, deckState.discard - 1);
+    for (let i = under; i >= 1; i--) {
+      ctx.save();
+      ctx.rotate(i % 2 ? 0.05 : -0.04);
+      ctx.translate(-i * 2, -i * 2);
+      ctx.globalAlpha = 0.55;
+      ctx.drawImage(cardImage('back').img, -w / 2, -h / 2, w, h);
+      ctx.restore();
+    }
+    ctx.rotate(-0.03);
+    ctx.drawImage(img, -w / 2, -h / 2, w, h);
+    ctx.restore();
+    ctx.save();
+    ctx.shadowColor = 'transparent';
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--muted');
+    ctx.font = `${Math.max(10, Math.round(w * 0.13))}px ui-monospace, monospace`;
+    ctx.textAlign = 'center';
+    ctx.fillText(`${deckState.discard} dealt`, this.x, this.y + h / 2 + Math.max(14, w * 0.18));
+    ctx.restore();
+  }
+  throwWith() {}
+  spinInPlace() {}
+}
+
 // Where the deck and the drawn cards sit, by how many were drawn. One card is
 // the whole show — it lands ON the deck, big; a small hand is a large centred
 // row; a big hand becomes a neat grid (like a fistful of dice) with the deck
@@ -10464,9 +10554,11 @@ function deckLayout(n) {
   const W_ = b.right - b.left, H_ = b.floor - b.top;
   const cx = b.left + W_ / 2, cy = b.top + H_ / 2;
 
+  const discardW = Math.max(44, Math.min(64, W_ * 0.12));
+  const discard = { x: b.right - discardW / 2 - 12, y: b.floor - (discardW * CARD_RATIO) / 2 - 20, w: discardW };
   if (n === 0) {
-    const w = Math.min((H_ * 0.72) / CARD_RATIO, W_ * 0.52);
-    return { stack: { x: cx, y: cy, w }, slots: [] };
+    const w = Math.min((H_ * 0.72) / CARD_RATIO, W_ * 0.5);
+    return { stack: { x: cx - (deckState.discard ? W_ * 0.04 : 0), y: cy, w }, slots: [], discard };
   }
   if (n === 1) {
     // The drawn card covers the deck, offset just enough that the deck still
@@ -10475,6 +10567,7 @@ function deckLayout(n) {
     return {
       stack: { x: cx - w * 0.16, y: cy - w * 0.12, w: w * 0.94 },
       slots: [{ x: cx + w * 0.09, y: cy + w * 0.07, w }],
+      discard,
     };
   }
   // The deck steps aside; the hand takes the table.
@@ -10499,7 +10592,7 @@ function deckLayout(n) {
       w,
     });
   }
-  return { stack, slots };
+  return { stack, slots, discard };
 }
 
 // The idle tray in Cards mode: just the deck, waiting.
@@ -10507,8 +10600,9 @@ function stageDeckIdle() {
   if (!cardArt) return;
   // A brand-new deck arrives shuffled, like one out of the box should.
   if (deckState.order.length === 0) reshuffleDeck();
-  const { stack } = deckLayout(0);
+  const { stack, discard } = deckLayout(0);
   state.dice = [new DeckStackSprite(stack.x, stack.y, stack.w)];
+  if (deckState.discard > 0) state.dice.push(new DiscardPileSprite(discard.x, discard.y, discard.w));
   dropIdleCache();
   $('total').dataset.idle = '1';
   $('total').dataset.kind = 'number';
@@ -10525,7 +10619,7 @@ async function dealCardsFlow(result, { remote = false } = {}) {
   await Promise.all(result.summary.drawn.map(c => cardImage(c.id).ready));
 
   const n = result.summary.drawn.length;
-  const { stack, slots } = deckLayout(n);
+  const { stack, slots, discard } = deckLayout(n);
   // The deck is continuous: the new stack sprite starts where the old one sat
   // and glides to its new spot (aside for a hand, underneath for one card).
   const prev = state.dice.find(d => d.isStack);
@@ -10535,17 +10629,22 @@ async function dealCardsFlow(result, { remote = false } = {}) {
   const dealFrom = { x: prev ? prev.x : stack.x, y: prev ? prev.y : stack.y };
   const sprites = [stackSprite];
 
-  // In Replace mode the previous draw visibly goes home before the new one
-  // arrives; everywhere else the tray simply moves on, like dice do.
+  // The previous hand leaves the table first: home to the deck in Replace
+  // mode, face-up onto the discard pile otherwise.
   let delay0 = 0;
-  if (deckState.replace && !remote) {
+  if (!remote) {
     for (const d of state.dice) {
-      if (d.isCard && !d.isStack && d.phase === 'idle') {
-        const back = new CardSprite(d.id, { x: d.x, y: d.y }, { x: stack.x, y: stack.y, w: d.size }, { mode: 'return' });
-        sprites.push(back);
-        delay0 = 0.22;
+      if (d.isCard && !d.isStack && !d.isDiscard && d.phase === 'idle' && !d.gone) {
+        const dest = lastSweptReplace
+          ? { to: { x: stack.x, y: stack.y, w: d.size }, mode: 'return' }
+          : { to: { x: discard.x, y: discard.y, w: discard.w }, mode: 'discard' };
+        sprites.push(new CardSprite(d.id, { x: d.x, y: d.y }, dest.to, { mode: dest.mode }));
+        delay0 = 0.24;
       }
     }
+  }
+  if (!remote && deckState.discard > 0) {
+    sprites.push(new DiscardPileSprite(discard.x, discard.y, discard.w));
   }
   result.summary.drawn.forEach((c, i) => {
     sprites.push(new CardSprite(c.id, dealFrom, slots[i], { delay: delay0 + i * 0.12, remote }));
@@ -10625,15 +10724,41 @@ bindTapHold($('deckCountChip'), dir => {
   syncCardsUI({ restage: false });
 });
 $('deckShuffle').addEventListener('click', () => {
-  reshuffleDeck();
   ensureCardArt().then(() => {
-    stageDeckIdle();
-    const stack = state.dice.find(d => d.isStack);
-    if (stack) { stack.riffle = 1; stack.value = null; dropIdleCache(); }
+    // Everything on the table and in the discard visibly flows back into the
+    // deck, and the riffle starts once they arrive.
+    const prevCards = state.dice.filter(d => d.isCard && !d.isStack && !d.isDiscard && !d.gone && d.phase === 'idle');
+    const hadDiscard = deckState.discard > 0;
+    const discardTop = deckState.discardTop;
+    const prevDiscardSprite = state.dice.find(d => d.isDiscard);
+    reshuffleDeck();
+    const { stack } = deckLayout(0);
+    const stackSprite = new DeckStackSprite(stack.x, stack.y, stack.w);
+    const sprites = [stackSprite];
+    for (const d of prevCards) {
+      sprites.push(new CardSprite(d.id, { x: d.x, y: d.y }, { x: stack.x, y: stack.y, w: d.size }, { mode: 'return' }));
+    }
+    if (hadDiscard && discardTop && prevDiscardSprite) {
+      // The pile goes home as a few backs peeling off in sequence.
+      for (let i = 0; i < Math.min(3, deckStateDiscardWas(hadDiscard)); i++) {
+        sprites.push(new CardSprite(discardTop, { x: prevDiscardSprite.x, y: prevDiscardSprite.y },
+          { x: stack.x, y: stack.y, w: prevDiscardSprite.size }, { mode: 'return', delay: i * 0.07 }));
+      }
+    }
+    const sweeping = sprites.length > 1;
+    stackSprite.riffleAfter = sweeping ? 0.34 : 0.001;
+    state.dice = sprites;
+    dropIdleCache();
+    $('total').dataset.idle = '1';
+    $('total').dataset.kind = 'number';
+    $('total').textContent = '—';
+    $('breakdown').textContent = systemHint('cards').idle;
     if (navigator.vibrate) navigator.vibrate([6, 40, 6, 40, 6, 40, 10]);
     syncCardsUI({ restage: false });
   });
 });
+// The pile size just before the reshuffle zeroed it — for the sweep visuals.
+function deckStateDiscardWas(had) { return had ? 3 : 0; }
 for (const b of deckFlagButtons) {
   b.addEventListener('click', () => {
     if (b.dataset.flag === 'jokers') {
