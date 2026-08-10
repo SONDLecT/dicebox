@@ -1079,6 +1079,9 @@ body {
 }
 /* A single red card's label in the big readout keeps its suit's colour. */
 #total[data-variant="card-red"] { color: #C74B3F; }
+/* A reversed tarot card reads in the mode's violet rather than an alarm red —
+   reversal is a meaning, not a failure. */
+#total[data-variant="tarot-rev"] { color: var(--accent); }
 
 /* ---- system picker popover ---- */
 /* A corner menu anchored under the header's mode button (openMode positions it
@@ -1147,6 +1150,7 @@ body {
 }
 /* Each system's row wears the colour its mode paints the app with. */
 .mode-cards { --sys: #2F8B57; }
+.mode-tarot { --sys: #8B76D6; }
 .mode-v5 { --sys: #C3212E; }
 .mode-fate { --sys: #6E96BE; }
 .mode-genesys { --sys: #BFA766; }

@@ -53,8 +53,10 @@ const SYSTEM_EXPORTS = [
   'rollPbta', 'rollMist', 'twod6Headline', 'describe2d6', 'parsePbta', 'parseMist',
   'rollMothership', 'describeMothership', 'mothershipHeadline', 'parseMothership', 'resolveMothershipStress',
   'parseCards', 'newDeckOrder', 'summarizeCards', 'cardsHeadline', 'describeCards',
+  'parseTarot', 'summarizeTarot', 'tarotHeadline', 'describeTarot',
 ];
 const CARDS_ART_EXPORTS = ['cardSVG', 'CARD_IDS', 'cardMeta', 'SUIT_NAMES', 'RANKS'];
+const TAROT_ART_EXPORTS = ['tarotSVG', 'TAROT_IDS', 'tarotMeta', 'TAROT_SUITS'];
 const RENDER_EXPORTS = ['Die', 'Surface', 'separate', 'beginFrame', 'solidFor', 'UNDER_30_GAP'];
 const ROOM_CRYPTO_EXPORTS = [
   'deriveRoom', 'newSender', 'encryptMessage', 'decryptMessage',
@@ -72,11 +74,12 @@ const script = [
   moduleScope('under30-gap.js'),
   moduleScope('system-dice.js'),
   moduleScope('cards-art.js'),
+  moduleScope('tarot-art.js'),
   moduleScope('render.js', ['UNDER_30_GAP']),
   moduleScope('room-crypto.js'),
   moduleScope('room.js', ROOM_CRYPTO_EXPORTS),
   moduleScope('app.js', [
-    ...DICE_EXPORTS, ...SYSTEM_EXPORTS, ...CARDS_ART_EXPORTS, ...RENDER_EXPORTS, ...ROOM_CRYPTO_EXPORTS, ...ROOM_EXPORTS,
+    ...DICE_EXPORTS, ...SYSTEM_EXPORTS, ...CARDS_ART_EXPORTS, ...TAROT_ART_EXPORTS, ...RENDER_EXPORTS, ...ROOM_CRYPTO_EXPORTS, ...ROOM_EXPORTS,
   ]),
 ].join('\n\n');
 

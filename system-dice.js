@@ -41,6 +41,7 @@ export function detectSystem(src) {
   if (/^mist:/.test(s)) return 'mist';
   if (/^ms:/.test(s)) return 'mothership';
   if (/^deck:/.test(s)) return 'cards';
+  if (/^tarot:/.test(s)) return 'tarot';
   if (FATE_REGEX.test(s)) return 'fate';
   return 'numeric';
 }
@@ -862,6 +863,54 @@ export function describeCards(result) {
   const s = result.summary;
   const parts = [];
   if (s.drawn.length) parts.push(s.drawn.map(c => c.label).join('  '));
+  else parts.push('nothing left to draw');
+  parts.push(`${s.remaining} of ${s.total} left`);
+  if (s.exhausted && s.drawn.length) parts.push('deck exhausted — shuffle to continue');
+  return parts.join(' · ');
+}
+
+// ---- Tarot ----
+//
+// The tarot deck is the cards engine at 78: same draw-without-replacement
+// order, same shuffle, plus reversals — each card's orientation is fixed at
+// shuffle time, the way a real deck carries reversals through a spread.
+const TAROT_REGEX = /^tarot:(\d+)$/;
+
+export function parseTarot(src) {
+  const m = TAROT_REGEX.exec(String(src || '').trim().toLowerCase());
+  if (!m) throw new Error('Expected a draw like "tarot:1" or "tarot:3"');
+  const draw = Number(m[1]);
+  if (draw < 1 || draw > 10) throw new Error('Draw 1-10 cards');
+  return { draw };
+}
+
+export function summarizeTarot(drawn, remaining, total) {
+  return {
+    kind: 'tarot',
+    // drawn: [{id, label, rev}] — labels baked in at draw time, like cards,
+    // so peers can format the draw without the art module.
+    drawn,
+    remaining,
+    total,
+    exhausted: remaining === 0,
+  };
+}
+
+const tarotCardText = c => c.rev ? `${c.label} (reversed)` : c.label;
+
+export function tarotHeadline(result) {
+  const s = result.summary;
+  if (s.drawn.length === 0) return { kind: 'text', text: 'Deck empty' };
+  if (s.drawn.length === 1) {
+    return { kind: 'text', text: tarotCardText(s.drawn[0]), variant: s.drawn[0].rev ? 'tarot-rev' : undefined };
+  }
+  return { kind: 'number', text: String(s.drawn.length) };
+}
+
+export function describeTarot(result) {
+  const s = result.summary;
+  const parts = [];
+  if (s.drawn.length) parts.push(s.drawn.map(tarotCardText).join('  '));
   else parts.push('nothing left to draw');
   parts.push(`${s.remaining} of ${s.total} left`);
   if (s.exhausted && s.drawn.length) parts.push('deck exhausted — shuffle to continue');

@@ -192,7 +192,7 @@ export function validateRoll(msg) {
 // trusted for display only (the room is end-to-end encrypted among people who
 // share the passphrase); the receiver still renders it inside a try/catch.
 const SYSTEM_ROLL_KINDS = new Set([
-  'v5', 'fate', 'genesys', 'daggerheart', 'cthulhutech', 'starwars', 'onering', 'pbta', 'mist', 'mothership', 'cards',
+  'v5', 'fate', 'genesys', 'daggerheart', 'cthulhutech', 'starwars', 'onering', 'pbta', 'mist', 'mothership', 'cards', 'tarot',
 ]);
 
 export function validateSystemRoll(msg) {
@@ -208,13 +208,15 @@ export function validateSystemRoll(msg) {
       if (!Number.isInteger(g.value)) return false;
       continue;
     }
-    // Card draws carry ids and display labels rather than die values.
+    // Card draws (playing cards and tarot both) carry ids and display labels
+    // rather than die values; tarot cards may add a reversal flag.
     if (g.kind === 'cards') {
       if (!Array.isArray(g.cards) || g.cards.length === 0 || g.cards.length > 12) return false;
       for (const card of g.cards) {
         if (!card || typeof card !== 'object') return false;
         if (typeof card.id !== 'string' || card.id.length > 4) return false;
-        if (typeof card.label !== 'string' || card.label.length > 20) return false;
+        if (typeof card.label !== 'string' || card.label.length > 24) return false;
+        if (card.rev !== undefined && typeof card.rev !== 'boolean') return false;
       }
       continue;
     }

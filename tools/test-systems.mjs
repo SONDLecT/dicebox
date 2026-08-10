@@ -14,6 +14,7 @@ import { parseOneRing, rollOneRing, summarizeOneRing, describeOneRing, oneRingHe
 import { parsePbta, parseMist, rollPbta, rollMist, summarize2d6, describe2d6, twod6Headline } from '../system-dice.js';
 import { parseMothership, rollMothership, summarizeMothershipCheck, summarizeMothershipPanic, describeMothership, mothershipHeadline } from '../system-dice.js';
 import { parseCards, newDeckOrder, summarizeCards, cardsHeadline, describeCards } from '../system-dice.js';
+import { parseTarot, summarizeTarot, tarotHeadline, describeTarot } from '../system-dice.js';
 import * as systemModule from '../system-dice.js';
 
 let pass = 0, fail = 0;
@@ -743,6 +744,33 @@ for (const bad of ['deck:', 'deck:0', 'deck:11', 'deck:1x', 'ms:c']) {
   ok('empty deck headline', cardsHeadline(empty).text === 'Deck empty');
   const last = { summary: summarizeCards([KS], 0, 52) };
   ok('exhaustion is called out', /deck exhausted — shuffle to continue/.test(describeCards(last)));
+}
+
+// ---- Tarot (the Woodcut Tarot) ----
+// detection / parsing
+ok('detect tarot', detectSystem('tarot:1') === 'tarot');
+ok('tarot not cards', detectSystem('tarot:3') !== 'cards');
+ok('parse tarot:3', eq(parseTarot('tarot:3'), { draw: 3 }));
+for (const bad of ['tarot:', 'tarot:0', 'tarot:11', 'tarot:1x', 'deck:1']) {
+  ok(`reject tarot ${bad}`, (() => { try { parseTarot(bad); return false; } catch { return true; } })());
+}
+// summaries + formatters (reversals ride on each drawn card)
+{
+  const FOOL = { id: 'T00', label: 'The Fool', rev: false };
+  const TOWER_R = { id: 'T16', label: 'The Tower', rev: true };
+  const one = { summary: summarizeTarot([FOOL], 77, 78) };
+  ok('single tarot headline is the card', eq(tarotHeadline(one), { kind: 'text', text: 'The Fool', variant: undefined }));
+  const rev = { summary: summarizeTarot([TOWER_R], 77, 78) };
+  ok('reversed card says so and carries the variant',
+     eq(tarotHeadline(rev), { kind: 'text', text: 'The Tower (reversed)', variant: 'tarot-rev' }));
+  const three = { summary: summarizeTarot([FOOL, TOWER_R, { id: 'c07', label: 'Seven of Cups', rev: false }], 69, 78) };
+  ok('multi tarot headline is the count', eq(tarotHeadline(three), { kind: 'number', text: '3' }));
+  ok('describe marks reversals inline',
+     /The Fool {2}The Tower \(reversed\) {2}Seven of Cups · 69 of 78 left/.test(describeTarot(three)));
+  const empty = { summary: summarizeTarot([], 0, 78) };
+  ok('empty tarot deck headline', tarotHeadline(empty).text === 'Deck empty');
+  const last = { summary: summarizeTarot([FOOL], 0, 78) };
+  ok('tarot exhaustion is called out', /deck exhausted — shuffle to continue/.test(describeTarot(last)));
 }
 
 console.log(`\nsystem-dice: ${pass} passed, ${fail} failed`);

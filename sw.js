@@ -21,10 +21,11 @@ const ASSETS = [
   './render.js',
   './under30-gap.js',
   './system-dice.js',
-  // The card deck's art — big (~1.1MB), so the app pulls it with a dynamic
-  // import only when Cards mode is opened; precaching it here is what keeps
-  // that first open working offline.
+  // The deck art modules — big (cards ~1.1MB, tarot ~4.5MB), so the app pulls
+  // each with a dynamic import only when its mode is opened; precaching them
+  // here is what keeps that first open working offline.
   './cards-art.js',
+  './tarot-art.js',
   './room.js',
   './room-crypto.js',
   './manifest.webmanifest',

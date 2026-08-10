@@ -412,6 +412,25 @@
       </p>
       </div>
 
+      <div id="helpTarot" hidden>
+      <dl class="syntax">
+        <dt>tarot:1</dt>  <dd>draw a card</dd>
+        <dt>tarot:3</dt>  <dd>a three-card spread</dd>
+      </dl>
+      <p class="note">
+        All 78 cards, drawn <b>without replacement</b> until you
+        <b>Shuffle</b>. With <b>Reversals</b> on, each card's orientation is
+        fixed when the deck is shuffled and a reversed card lands upside down.
+        The art is traced from the <b>Jean Noblet tarot</b> (Paris, c.&nbsp;1650,
+        Biblioth&egrave;que nationale de France) — the oldest surviving
+        Tarot de Marseille — with the five batons pips missing from the BnF's
+        deck filled from the <b>Jacques Vi&eacute;ville tarot</b> (Paris,
+        c.&nbsp;1650). Sources and pipeline:
+        <a href="https://github.com/SONDLecT/woodcut-cards" target="_blank"
+           rel="noopener noreferrer">woodcut-cards</a>.
+      </p>
+      </div>
+
       <p class="note install" id="installNote">
         <button type="button" class="install-button" id="install" hidden>Install as an app</button>
         <span id="installHint">Add this to your home screen and it works offline, with no
@@ -572,6 +591,14 @@
         </svg>
         <span class="mode-row-name">Cards</span>
         <span class="mode-row-sub">the Woodcut deck &middot; 52 + jokers</span>
+      </button>
+      <button type="button" class="mode-row mode-tarot" data-system="tarot" aria-pressed="false">
+        <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="5.5" y="3" width="13" height="18" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M12 7.2 L13.2 10.8 L16.8 10.8 L13.9 13 L15 16.6 L12 14.4 L9 16.6 L10.1 13 L7.2 10.8 L10.8 10.8 Z" fill="currentColor"/>
+        </svg>
+        <span class="mode-row-name">Tarot</span>
+        <span class="mode-row-sub">the Woodcut Tarot &middot; all 78</span>
       </button>
     </div>
 
@@ -1040,6 +1067,37 @@
       <span class="deck-flag-name">Replace</span>
     </button>
     <span class="deck-remain" id="deckRemain" aria-label="Cards remaining">52/52</span>
+  </section>
+
+  <!-- Tarot: the Woodcut Tarot, all 78. Same deck-on-the-tray experience as
+       Cards; Reversals fixes each card's orientation at shuffle time and a
+       reversed card lands upside down. -->
+  <section class="picker cards-picker" id="tarotPicker" aria-label="Tarot deck" hidden>
+    <button type="button" class="spin-chip" id="tarotCountChip" aria-label="Cards per draw — tap to raise, hold to lower">
+      <span class="spin-chip-label">Cards</span>
+      <span class="spin-chip-val" id="tarotCount">1</span>
+    </button>
+    <button type="button" class="deck-shuffle" id="tarotShuffle" aria-label="Shuffle the deck">
+      <svg viewBox="0 0 30 30" aria-hidden="true">
+        <path d="M4 10 C10 10 12 20 18 20 L22 20 M4 20 C10 20 12 10 18 10 L22 10 M20 7.5 24 10 20 12.5 M20 17.5 24 20 20 22.5"/>
+      </svg>
+      <span class="deck-shuffle-label">Shuffle</span>
+    </button>
+    <button type="button" class="deck-flag" data-flag="rev" aria-pressed="true" aria-label="Allow reversed cards (reshuffles)">
+      <svg class="deck-flag-ico" viewBox="0 0 30 30" aria-hidden="true">
+        <rect class="crd" x="8" y="4" width="14" height="21" rx="2.4"/>
+        <path class="mark" d="M15 20.5 L13.6 16.9 L10 16.8 L12.9 14.6 L11.9 11 L15 13.2 L18.1 11 L17.1 14.6 L20 16.8 L16.4 16.9 Z"/>
+      </svg>
+      <span class="deck-flag-name">Reversals</span>
+    </button>
+    <button type="button" class="deck-flag" data-flag="replace" aria-pressed="false" aria-label="Draw with replacement — cards return to the deck">
+      <svg class="deck-flag-ico" viewBox="0 0 30 30" aria-hidden="true">
+        <rect class="crd" x="8" y="4" width="14" height="21" rx="2.4"/>
+        <path class="mark2" d="M11.2 14.6 a3.9 3.9 0 1 1 1.1 2.9 M11 20 L11.2 16.9 L14.3 17.2"/>
+      </svg>
+      <span class="deck-flag-name">Replace</span>
+    </button>
+    <span class="deck-remain" id="tarotRemain" aria-label="Cards remaining">78/78</span>
   </section>
 
   <form class="entry" id="entry">

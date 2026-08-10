@@ -573,6 +573,25 @@ const sampleSystemRoll = {
     groups: [{ kind: 'cards', count: 13, cards: Array(13).fill({ id: 'KS', label: 'K♠' }) }],
   }));
 
+  // Tarot draws ride the same cards group with a reversal flag.
+  ok('a tarot draw validates', validateSystemRoll({
+    system: 'tarot', notation: 'tarot:3',
+    summary: { drawn: [{ id: 'T00', label: 'The Fool', rev: false }], remaining: 75, total: 78 },
+    groups: [{ kind: 'cards', count: 3, cards: [
+      { id: 'T00', label: 'The Fool', rev: false },
+      { id: 'T10', label: 'The Wheel of Fortune', rev: true },
+      { id: 'c07', label: 'Seven of Cups', rev: false },
+    ] }],
+  }));
+  ok('a non-boolean reversal flag is rejected', !validateSystemRoll({
+    system: 'tarot', notation: 'tarot:1', summary: {},
+    groups: [{ kind: 'cards', count: 1, cards: [{ id: 'T00', label: 'The Fool', rev: 'yes' }] }],
+  }));
+  ok('an over-long card label is rejected', !validateSystemRoll({
+    system: 'tarot', notation: 'tarot:1', summary: {},
+    groups: [{ kind: 'cards', count: 1, cards: [{ id: 'T00', label: 'X'.repeat(25) }] }],
+  }));
+
   ok('a wildly out-of-range die value is rejected', !validateSystemRoll({
     ...sampleSystemRoll,
     groups: [{ kind: 'dice', sides: 10, count: 1, subtotal: 0, dice: [{ value: 1e9, kept: true }] }],

@@ -8,7 +8,7 @@ import { rollGenesys, describeGenesys, genesysHeadline, parseGenesys } from './s
 import { rollDaggerheart, describeDaggerheart, daggerheartHeadline, parseDaggerheart } from './system-dice.js';
 import { rollCthulhuTech, describeCthulhuTech, cthulhutechHeadline, parseCthulhuTech } from './system-dice.js';
 import { rollMothership, describeMothership, mothershipHeadline, parseMothership, resolveMothershipStress } from './system-dice.js';
-import { parseCards, newDeckOrder, summarizeCards, cardsHeadline, describeCards } from './system-dice.js';
+import { parseCards, newDeckOrder, summarizeCards, cardsHeadline, describeCards, parseTarot, summarizeTarot, tarotHeadline, describeTarot } from './system-dice.js';
 import { rollStarWars, describeStarWars, starWarsHeadline, parseStarWars } from './system-dice.js';
 import { rollOneRing, describeOneRing, oneRingHeadline, parseOneRing } from './system-dice.js';
 import { rollPbta, rollMist, twod6Headline, describe2d6, parsePbta, parseMist } from './system-dice.js';
@@ -99,8 +99,14 @@ $('themeToggle').addEventListener('click', () => {
   // Cards are rasterised per theme; without this they keep the old ink until
   // the next draw. Preload the new theme's images, then let the frame redraw.
   if (uiSystem === 'cards' && cardArt) {
-    const ids = [...new Set(state.dice.filter(d => d.isCard).map(d => (d.isStack ? 'back' : d.id)))];
+    const ids = [...new Set(state.dice.filter(d => d.isCard).map(d => (d.isStack || d.isDiscard ? 'back' : d.id)))];
+    if (deckState.discardTop) ids.push(deckState.discardTop);
     Promise.all(ids.map(id => cardImage(id).ready)).then(dropIdleCache);
+  }
+  if (uiSystem === 'tarot' && tarotArt) {
+    const ids = [...new Set(state.dice.filter(d => d.isCard).map(d => (d.isStack || d.isDiscard ? 'back' : d.id)))];
+    if (tarotState.discardTop) ids.push(tarotState.discardTop.id);
+    Promise.all(ids.map(id => tarotImage(id).ready)).then(dropIdleCache);
   }
   syncThemeLabel();
   updateThemeColor();
@@ -273,6 +279,18 @@ const SYSTEM_THEMES = {
       '--hair': '#CDD9D0', '--accent': '#1E6B41', '--danger': '#8C3A2E',
     },
   },
+  // Tarot — candle-lit violet: deep midnight indigo under parchment, the
+  // accent a soft mystic violet against the felt green next door in Cards.
+  tarot: {
+    dark: {
+      '--paper': '#0D0B14', '--face': '#16131F', '--line': '#E0DCE8', '--muted': '#77708C',
+      '--hair': '#241F33', '--accent': '#8B76D6', '--danger': '#C0453F',
+    },
+    light: {
+      '--paper': '#EAE7F0', '--face': '#F6F4FA', '--line': '#1A1524', '--muted': '#665E7D',
+      '--hair': '#D3CDE0', '--accent': '#5D48B5', '--danger': '#8C3A2E',
+    },
+  },
   // Mothership — a hazard-label palette: reactor-warning chartreuse over cold
   // gunmetal steel, the industrial radiation-caution look that sets it apart from
   // the four gold systems. The acid green is the constant; only the steel
@@ -386,10 +404,12 @@ function layoutSettled() {
   // Cards keep their own table: re-run the deck layout instead of the dice
   // grid, which would stack the shoe in with the draws.
   if (state.dice[0].isCard) {
-    const cards = state.dice.filter(d => d.isCard && !d.isStack && !d.gone);
-    const { stack, slots } = deckLayout(cards.length);
+    const view = state.dice[0].view || cardsView;
+    const cards = state.dice.filter(d => d.isCard && !d.isStack && !d.isDiscard && !d.gone);
+    const { stack, slots, discard } = deckLayout(cards.length, view);
     for (const d of state.dice) {
       if (d.isStack) { d.x = stack.x; d.y = stack.y; d.size = stack.w; }
+      if (d.isDiscard) { d.x = discard.x; d.y = discard.y; d.size = discard.w; }
     }
     cards.forEach((d, i) => {
       d.x = d.to.x = slots[i].x;
@@ -566,6 +586,7 @@ function doRoll(notation) {
     // through its own dealer rather than the dice thrower.
     const sys = detectSystem(notation);
     if (sys === 'cards') { dealFromNotation(notation); return; }
+    if (sys === 'tarot') { dealFromTarotNotation(notation); return; }
     result = sys === 'v5' ? rollV5(notation)
       : sys === 'fate' ? rollFate(notation)
       : sys === 'genesys' ? rollGenesys(notation)
@@ -670,6 +691,7 @@ function resultHeadline(result) {
   if (result.system === 'pbta' || result.system === 'mist') return twod6Headline(result);
   if (result.system === 'mothership') return mothershipHeadline(result);
   if (result.system === 'cards') return cardsHeadline(result);
+  if (result.system === 'tarot') return tarotHeadline(result);
   return { kind: 'number', text: String(result.total) };
 }
 function resultDetail(result) {
@@ -683,6 +705,7 @@ function resultDetail(result) {
   if (result.system === 'pbta' || result.system === 'mist') return describe2d6(result);
   if (result.system === 'mothership') return describeMothership(result);
   if (result.system === 'cards') return describeCards(result);
+  if (result.system === 'tarot') return describeTarot(result);
   return describe(result.groups);
 }
 
@@ -846,6 +869,7 @@ $('notation').addEventListener('input', () => {
   if (typedSystem === 'mist') { mistCtl.fromField(); return; }
   if (typedSystem === 'mothership') { syncMsFromField(); return; }
   if (typedSystem === 'cards') { syncCardsFromField(); return; }
+  if (typedSystem === 'tarot') { syncTarotFromField(); return; }
   pool = parsePool($('notation').value);
   // Typing an unusual die earns it a button too, so the row always accounts for
   // everything in the pool.
@@ -905,6 +929,7 @@ const SYSTEMS = {
   // wordmark already says Dicebox.
   numeric: { badge: '' },
   cards: { badge: 'Cards' },
+  tarot: { badge: 'Tarot' },
   v5: { badge: 'VtM V5' },
   fate: { badge: 'Fate' },
   genesys: { badge: 'Genesys' },
@@ -927,6 +952,7 @@ const SYSTEM_HINTS = {
   mist: { idle: 'Set your Power, then roll 2d6', placeholder: 'Set your Power, or type mist:+1' },
   mothership: { idle: 'Set your target, then roll under it', placeholder: 'Set a target, or type ms:c@35' },
   cards: { idle: 'Tap the deck to draw', placeholder: 'Tap the deck, or type deck:3' },
+  tarot: { idle: 'Tap the deck to draw', placeholder: 'Tap the deck, or type tarot:3' },
 };
 function systemHint(system) { return SYSTEM_HINTS[system] || DEFAULT_HINT; }
 
@@ -937,12 +963,12 @@ function systemHint(system) { return SYSTEM_HINTS[system] || DEFAULT_HINT; }
 // URL the app puts in the bar) always uses the canonical shorthand, edition
 // included, matching the picker labels.
 const SLUG_TO_SYSTEM = {
-  cards: 'cards', vtmv5: 'v5', fate: 'fate', genesys: 'genesys', dh: 'daggerheart', ctech2e: 'cthulhutech',
+  cards: 'cards', tarot: 'tarot', vtmv5: 'v5', fate: 'fate', genesys: 'genesys', dh: 'daggerheart', ctech2e: 'cthulhutech',
   swrpg: 'starwars', tor2e: 'onering', pbta: 'pbta', mist: 'mist', mosh1e: 'mothership',
   v5: 'v5', vtm: 'v5', daggerheart: 'daggerheart', cthulhutech: 'cthulhutech', ctech: 'cthulhutech',
   force: 'starwars', feat: 'onering', tor: 'onering', mothership: 'mothership', mosh: 'mothership',
 };
-const SYSTEM_TO_SLUG = { cards: 'cards', v5: 'vtmv5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', mothership: 'mosh1e' };
+const SYSTEM_TO_SLUG = { cards: 'cards', tarot: 'tarot', v5: 'vtmv5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', mothership: 'mosh1e' };
 
 function systemFromPath() {
   const seg = (location.pathname || '/').replace(/^\/+|\/+$/g, '').toLowerCase();
@@ -1024,13 +1050,17 @@ function setSystem(system, { roll = false, url = true } = {}) {
   twod6Picker.hidden = system !== 'pbta' && system !== 'mist';
   msPicker.hidden = system !== 'mothership';
   cardsPicker.hidden = system !== 'cards';
-  // One action, one name: the entry button IS the draw in Cards mode, so the
-  // picker carries no second Draw button.
-  $('rollGo').textContent = system === 'cards' ? 'Draw' : 'Roll';
+  tarotPicker.hidden = system !== 'tarot';
+  // One action, one name: the entry button IS the draw in the deck modes, so
+  // the pickers carry no second Draw button.
+  $('rollGo').textContent = system === 'cards' || system === 'tarot' ? 'Draw' : 'Roll';
   // The deck's art loads on first entry; the stack appears when it lands. The
-  // module is service-worker-precached, so this works offline too.
+  // modules are service-worker-precached, so this works offline too.
   if (system === 'cards') {
     ensureCardArt().then(() => { if (uiSystem === 'cards') syncCardsUI(); });
+  }
+  if (system === 'tarot') {
+    ensureTarotArt().then(() => { if (uiSystem === 'tarot') syncTarotUI(); });
   }
   // Mist calls the 2d6 modifier "Power"; PbtA just "Modifier". The picker is
   // shared, so the label follows the active mode.
@@ -1059,6 +1089,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
   $('helpMist').hidden = system !== 'mist';
   $('helpMothership').hidden = system !== 'mothership';
   $('helpCards').hidden = system !== 'cards';
+  $('helpTarot').hidden = system !== 'tarot';
 
   // The popover's rows reflect the choice.
   for (const row of modeRows) {
@@ -1087,6 +1118,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
     if (system === 'daggerheart') $('notation').value = dhNotation();
     if (system === 'mothership') $('notation').value = msNotation();
     if (system === 'cards') $('notation').value = `deck:${deckState.draw}`;
+    if (system === 'tarot') $('notation').value = `tarot:${tarotState.draw}`;
   }
 }
 
@@ -1881,9 +1913,34 @@ function cardImage(id) {
 const CARD_RATIO = 1.4;
 const DEAL_S = 0.34, FLIP_S = 0.26;
 
+// The sprites and layout serve two decks — playing cards and tarot — through a
+// small view: which art to draw, the card aspect, and where the live counts
+// come from. Each sprite carries the view it was dealt from, so a peer's
+// playing-card draw renders correctly even while your tray sits in Tarot mode.
+const cardsView = {
+  ratio: CARD_RATIO,
+  image: id => cardImage(id),
+  remaining: () => deckRemaining(),
+  total: () => deckTotal(),
+  replace: () => deckState.replace,
+  discard: () => deckState.discard,
+  discardTop: () => (deckState.discardTop ? { id: deckState.discardTop, rev: false } : null),
+};
+const tarotView = {
+  ratio: 1.72,
+  image: id => tarotImage(id),
+  remaining: () => tarotRemaining(),
+  total: () => tarotTotal(),
+  replace: () => tarotState.replace,
+  discard: () => tarotState.discard,
+  discardTop: () => tarotState.discardTop,
+};
+
 class CardSprite {
-  constructor(id, from, to, { delay = 0, remote = false, mode = 'deal' } = {}) {
+  constructor(id, from, to, { delay = 0, remote = false, mode = 'deal', view = cardsView, rev = false } = {}) {
     this.id = id;
+    this.view = view;
+    this.rev = rev;
     this.isCard = true;
     this.from = from; this.to = to;
     this.x = from.x; this.y = from.y;
@@ -1918,13 +1975,15 @@ class CardSprite {
   }
   draw(ctx) {
     if (this.gone) return;
-    const w = this.size, h = w * CARD_RATIO;
+    const w = this.size, h = w * this.view.ratio;
     const flip = this.mode === 'return' ? 0 : this.mode === 'discard' ? 1 : (this.phase === 'idle' ? 1 : this.flipT);
-    const img = (flip < 0.5 ? cardImage('back') : cardImage(this.id)).img;
+    const img = (flip < 0.5 ? this.view.image('back') : this.view.image(this.id)).img;
     const sx = this.phase === 'flip' ? Math.abs(Math.cos(Math.PI * flip)) || 0.02 : 1;
     ctx.save();
     ctx.translate(this.x, this.y);
     if (this.phase === 'fly') ctx.rotate(this.wobble * (1 - this.t));
+    // A reversed tarot card lands upside down: the face rotates in as it flips.
+    if (this.rev && flip >= 0.5) ctx.rotate(Math.PI);
     ctx.shadowColor = 'rgba(0,0,0,0.35)';
     ctx.shadowBlur = 9;
     ctx.shadowOffsetY = 3;
@@ -1939,8 +1998,9 @@ class CardSprite {
 // backs with the remaining count beneath. Tapping the tray draws; the Shuffle
 // button riffles this stack in place.
 class DeckStackSprite {
-  constructor(x, y, w) {
+  constructor(x, y, w, view = cardsView) {
     this.x = x; this.y = y; this.size = w;
+    this.view = view;
     this.isCard = true; this.isStack = true;
     this.stageKind = 'deck-stack';
     this.settled = true; this.settling = true; this.settleT = 1;
@@ -1974,9 +2034,9 @@ class DeckStackSprite {
     }
   }
   draw(ctx) {
-    const w = this.size, h = w * CARD_RATIO;
-    const img = cardImage('back').img;
-    const empty = deckRemaining() === 0 && !deckState.replace;
+    const w = this.size, h = w * this.view.ratio;
+    const img = this.view.image('back').img;
+    const empty = this.view.remaining() === 0 && !this.view.replace();
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.shadowColor = 'rgba(0,0,0,0.35)';
@@ -2047,7 +2107,7 @@ class DeckStackSprite {
     ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--muted');
     ctx.font = `${Math.max(11, Math.round(w * 0.09))}px ui-monospace, monospace`;
     ctx.textAlign = 'center';
-    ctx.fillText(deckState.replace ? `${deckTotal()} · replace` : `${deckRemaining()} left`, this.x, this.y + h / 2 + Math.max(16, w * 0.13));
+    ctx.fillText(this.view.replace() ? `${this.view.total()} · replace` : `${this.view.remaining()} left`, this.x, this.y + h / 2 + Math.max(16, w * 0.13));
     ctx.restore();
   }
   throwWith() {}
@@ -2058,8 +2118,9 @@ class DeckStackSprite {
 // slightly askew the way a real pile ends up. Grows as hands are swept in,
 // vanishes into the deck on a shuffle.
 class DiscardPileSprite {
-  constructor(x, y, w) {
+  constructor(x, y, w, view = cardsView) {
     this.x = x; this.y = y; this.size = w;
+    this.view = view;
     this.isCard = true; this.isDiscard = true;
     this.stageKind = 'deck-discard';
     this.settled = true; this.settling = true; this.settleT = 1;
@@ -2067,24 +2128,25 @@ class DiscardPileSprite {
   }
   step() {}
   draw(ctx) {
-    if (deckState.discard === 0 || !deckState.discardTop) return;
-    const w = this.size, h = w * CARD_RATIO;
-    const img = cardImage(deckState.discardTop).img;
+    const top = this.view.discardTop();
+    if (this.view.discard() === 0 || !top) return;
+    const w = this.size, h = w * this.view.ratio;
+    const img = this.view.image(top.id).img;
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.shadowColor = 'rgba(0,0,0,0.35)';
     ctx.shadowBlur = 7;
     ctx.shadowOffsetY = 3;
-    const under = Math.min(2, deckState.discard - 1);
+    const under = Math.min(2, this.view.discard() - 1);
     for (let i = under; i >= 1; i--) {
       ctx.save();
       ctx.rotate(i % 2 ? 0.05 : -0.04);
       ctx.translate(-i * 2, -i * 2);
       ctx.globalAlpha = 0.55;
-      ctx.drawImage(cardImage('back').img, -w / 2, -h / 2, w, h);
+      ctx.drawImage(this.view.image('back').img, -w / 2, -h / 2, w, h);
       ctx.restore();
     }
-    ctx.rotate(-0.03);
+    ctx.rotate(top.rev ? Math.PI - 0.03 : -0.03);
     ctx.drawImage(img, -w / 2, -h / 2, w, h);
     ctx.restore();
     ctx.save();
@@ -2092,7 +2154,7 @@ class DiscardPileSprite {
     ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--muted');
     ctx.font = `${Math.max(10, Math.round(w * 0.13))}px ui-monospace, monospace`;
     ctx.textAlign = 'center';
-    ctx.fillText(`${deckState.discard} dealt`, this.x, this.y + h / 2 + Math.max(14, w * 0.18));
+    ctx.fillText(`${this.view.discard()} dealt`, this.x, this.y + h / 2 + Math.max(14, w * 0.18));
     ctx.restore();
   }
   throwWith() {}
@@ -2103,21 +2165,22 @@ class DiscardPileSprite {
 // the whole show — it lands ON the deck, big; a small hand is a large centred
 // row; a big hand becomes a neat grid (like a fistful of dice) with the deck
 // stepping aside to the corner. Idle, the deck fills the stage.
-function deckLayout(n) {
+function deckLayout(n, view = cardsView) {
   const b = state.bounds;
+  const RATIO = view.ratio;
   const W_ = b.right - b.left, H_ = b.floor - b.top;
   const cx = b.left + W_ / 2, cy = b.top + H_ / 2;
 
   const discardW = Math.max(44, Math.min(64, W_ * 0.12));
-  const discard = { x: b.right - discardW / 2 - 12, y: b.floor - (discardW * CARD_RATIO) / 2 - 20, w: discardW };
+  const discard = { x: b.right - discardW / 2 - 12, y: b.floor - (discardW * RATIO) / 2 - 20, w: discardW };
   if (n === 0) {
-    const w = Math.min((H_ * 0.72) / CARD_RATIO, W_ * 0.5);
-    return { stack: { x: cx - (deckState.discard ? W_ * 0.04 : 0), y: cy, w }, slots: [], discard };
+    const w = Math.min((H_ * 0.72) / RATIO, W_ * 0.5);
+    return { stack: { x: cx - (view.discard() ? W_ * 0.04 : 0), y: cy, w }, slots: [], discard };
   }
   if (n === 1) {
     // The drawn card covers the deck, offset just enough that the deck still
     // reads as underneath it.
-    const w = Math.min((H_ * 0.78) / CARD_RATIO, W_ * 0.6);
+    const w = Math.min((H_ * 0.78) / RATIO, W_ * 0.6);
     return {
       stack: { x: cx - w * 0.16, y: cy - w * 0.12, w: w * 0.94 },
       slots: [{ x: cx + w * 0.09, y: cy + w * 0.07, w }],
@@ -2126,12 +2189,12 @@ function deckLayout(n) {
   }
   // The deck steps aside; the hand takes the table.
   const stackW = Math.max(48, Math.min(78, W_ * 0.15));
-  const stack = { x: b.right - stackW / 2 - 10, y: b.top + (stackW * CARD_RATIO) / 2 + 8, w: stackW };
+  const stack = { x: b.right - stackW / 2 - 10, y: b.top + (stackW * RATIO) / 2 + 8, w: stackW };
   const areaL = b.left + 8, areaR = b.right - 8, areaT = b.top + 8, areaB = b.floor - 10;
   let best = null;
   for (let cols = 1; cols <= n; cols++) {
     const rows = Math.ceil(n / cols);
-    const w = Math.min((areaR - areaL) / cols - 10, ((areaB - areaT) / rows - 12) / CARD_RATIO, 200);
+    const w = Math.min((areaR - areaL) / cols - 10, ((areaB - areaT) / rows - 12) / RATIO, 200);
     if (!best || w > best.w) best = { cols, rows, w };
   }
   const { cols, rows, w } = best;
@@ -2142,7 +2205,7 @@ function deckLayout(n) {
     const rowW = inRow * (w + 10) - 10;
     slots.push({
       x: areaL + (areaR - areaL) / 2 - rowW / 2 + c * (w + 10) + w / 2,
-      y: areaT + (areaB - areaT) / 2 + (r - (rows - 1) / 2) * (w * CARD_RATIO + 12),
+      y: areaT + (areaB - areaT) / 2 + (r - (rows - 1) / 2) * (w * RATIO + 12),
       w,
     });
   }
@@ -2259,7 +2322,7 @@ function dealFromNotation(notation) {
 const cardsPicker = $('cardsPicker');
 const deckCountVal = $('deckCount');
 const deckRemainVal = $('deckRemain');
-const deckFlagButtons = [...document.querySelectorAll('.deck-flag')];
+const deckFlagButtons = [...document.querySelectorAll('#cardsPicker .deck-flag')];
 
 function syncCardsUI({ writeField = true, restage = true } = {}) {
   deckCountVal.textContent = String(deckState.draw);
@@ -2334,6 +2397,299 @@ function syncCardsFromField() {
     deckState.draw = draw;
     persistDeck();
     syncCardsUI({ writeField: false, restage: false });
+  } catch { /* mid-type */ }
+}
+
+// ---- the tarot deck ----
+//
+// The cards engine at 78: same persisted draw-without-replacement order, same
+// stack/deal/riffle/discard sprites (via tarotView), plus reversals. Each
+// card's orientation is fixed at shuffle time — the deck carries its reversals
+// through the spread the way a physical deck does — and a reversed card lands
+// upside down on the tray. The art is its own lazy module (tarot-art.js).
+const TAROT_KEY = 'dicebox:tarot:v1';
+const tarotState = {
+  order: [], revs: [], pos: 0, reversals: true, replace: false, draw: 1,
+  discard: 0, discardTop: null, hand: [], handReplace: false,
+};
+{
+  try {
+    const saved = JSON.parse(store.get(TAROT_KEY) || 'null');
+    if (saved && Array.isArray(saved.order) && saved.order.every(x => typeof x === 'string')) {
+      Object.assign(tarotState, saved, { draw: Math.max(1, Math.min(10, saved.draw || 1)) });
+      if (!Array.isArray(tarotState.revs) || tarotState.revs.length !== tarotState.order.length) {
+        tarotState.revs = tarotState.order.map(() => false);
+      }
+      // A hand left on the table when the page closed folds into the discard,
+      // exactly as the cards deck does.
+      if (Array.isArray(tarotState.hand) && tarotState.hand.length && !tarotState.handReplace) {
+        tarotState.discard += tarotState.hand.length;
+        tarotState.discardTop = tarotState.hand[tarotState.hand.length - 1];
+      }
+      tarotState.hand = [];
+    }
+  } catch { /* fresh deck */ }
+}
+const persistTarot = () => store.set(TAROT_KEY, JSON.stringify(tarotState));
+
+// The 78 ids, generated locally so the deck can shuffle before the art module
+// arrives: 22 trumps then each suit's Ace-Ten and Page/Knight/Queen/King.
+function tarotDeckIds() {
+  const ids = [];
+  for (let i = 0; i < 22; i++) ids.push('T' + String(i).padStart(2, '0'));
+  for (const s of ['b', 'c', 's', 'd']) {
+    for (const r of ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', 'P', 'N', 'Q', 'K']) ids.push(s + r);
+  }
+  return ids;
+}
+const tarotTotal = () => 78;
+const tarotRemaining = () => (tarotState.replace ? 78 : Math.max(0, tarotState.order.length - tarotState.pos));
+
+let lastSweptReplaceTarot = false;
+
+function reshuffleTarot() {
+  tarotState.order = newDeckOrder(tarotDeckIds(), n => cryptoIndex(n) + 1);
+  tarotState.revs = tarotState.order.map(() => tarotState.reversals && cryptoIndex(2) === 1);
+  tarotState.pos = 0;
+  tarotState.discard = 0;
+  tarotState.discardTop = null;
+  tarotState.hand = [];
+  persistTarot();
+}
+
+function drawTarotCards(n) {
+  let picks;
+  if (tarotState.replace) {
+    const pool = tarotDeckIds();
+    picks = Array.from({ length: n }, () => ({
+      id: pool[cryptoIndex(pool.length)],
+      rev: tarotState.reversals && cryptoIndex(2) === 1,
+    }));
+  } else {
+    if (tarotState.order.length === 0) reshuffleTarot();
+    picks = [];
+    for (let i = tarotState.pos; i < Math.min(tarotState.pos + n, tarotState.order.length); i++) {
+      picks.push({ id: tarotState.order[i], rev: !!tarotState.revs[i] });
+    }
+    tarotState.pos += picks.length;
+    persistTarot();
+  }
+  lastSweptReplaceTarot = tarotState.handReplace;
+  if (tarotState.hand.length && !tarotState.handReplace) {
+    tarotState.discard += tarotState.hand.length;
+    tarotState.discardTop = tarotState.hand[tarotState.hand.length - 1];
+  }
+  tarotState.hand = picks.slice();
+  tarotState.handReplace = tarotState.replace;
+  persistTarot();
+  const drawn = picks.map(p => ({ id: p.id, label: tarotArt.tarotMeta(p.id).label, rev: p.rev }));
+  return {
+    schema: 2,
+    system: 'tarot',
+    notation: `tarot:${n}`,
+    groups: [{ kind: 'cards', count: drawn.length, cards: drawn }],
+    summary: summarizeTarot(drawn, tarotRemaining(), tarotTotal()),
+  };
+}
+
+let tarotArt = null;
+let tarotArtLoading = null;
+function ensureTarotArt() {
+  if (tarotArt) return Promise.resolve(tarotArt);
+  if (!tarotArtLoading) {
+    /* global __dicebox */
+    tarotArtLoading = (typeof __dicebox !== 'undefined' && __dicebox.tarotSVG)
+      ? Promise.resolve(__dicebox)
+      : import('./tarot-art.js');
+    tarotArtLoading = tarotArtLoading.then(m => (tarotArt = m));
+  }
+  return tarotArtLoading;
+}
+
+const tarotImgCache = new Map();
+function tarotImage(id) {
+  const key = `${id}|${isDark() ? 'd' : 'l'}`;
+  let entry = tarotImgCache.get(key);
+  if (entry) return entry;
+  const svg = tarotArt.tarotSVG(id, { dark: isDark() })
+    .replace('<svg ', '<svg width="750" height="1290" ');
+  const img = new Image();
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  entry = { img, ready: img.decode ? img.decode().catch(() => {}) : Promise.resolve() };
+  tarotImgCache.set(key, entry);
+  return entry;
+}
+
+// The idle tray in Tarot mode: the deck, waiting.
+function stageTarotIdle() {
+  if (!tarotArt) return;
+  if (tarotState.order.length === 0) reshuffleTarot();
+  const { stack, discard } = deckLayout(0, tarotView);
+  state.dice = [new DeckStackSprite(stack.x, stack.y, stack.w, tarotView)];
+  if (tarotState.discard > 0) state.dice.push(new DiscardPileSprite(discard.x, discard.y, discard.w, tarotView));
+  dropIdleCache();
+  $('total').dataset.idle = '1';
+  $('total').dataset.kind = 'number';
+  $('total').textContent = '—';
+  $('breakdown').textContent = systemHint('tarot').idle;
+  hideHint();
+}
+
+async function dealTarotFlow(result, { remote = false } = {}) {
+  await ensureTarotArt();
+  await tarotImage('back').ready;
+  await Promise.all(result.summary.drawn.map(c => tarotImage(c.id).ready));
+
+  const n = result.summary.drawn.length;
+  const { stack, slots, discard } = deckLayout(n, tarotView);
+  const prev = state.dice.find(d => d.isStack);
+  const stackSprite = new DeckStackSprite(prev ? prev.x : stack.x, prev ? prev.y : stack.y, prev ? prev.size : stack.w, tarotView);
+  if (prev && (prev.x !== stack.x || prev.size !== stack.w)) stackSprite.moveTo(stack.x, stack.y, stack.w);
+  else { stackSprite.x = stack.x; stackSprite.y = stack.y; stackSprite.size = stack.w; }
+  const dealFrom = { x: prev ? prev.x : stack.x, y: prev ? prev.y : stack.y };
+  const sprites = [stackSprite];
+
+  let delay0 = 0;
+  if (!remote) {
+    for (const d of state.dice) {
+      if (d.isCard && !d.isStack && !d.isDiscard && d.phase === 'idle' && !d.gone) {
+        const dest = lastSweptReplaceTarot
+          ? { to: { x: stack.x, y: stack.y, w: d.size }, mode: 'return' }
+          : { to: { x: discard.x, y: discard.y, w: discard.w }, mode: 'discard' };
+        sprites.push(new CardSprite(d.id, { x: d.x, y: d.y }, dest.to, { mode: dest.mode, view: tarotView, rev: d.rev }));
+        delay0 = 0.24;
+      }
+    }
+  }
+  if (!remote && tarotState.discard > 0) {
+    sprites.push(new DiscardPileSprite(discard.x, discard.y, discard.w, tarotView));
+  }
+  result.summary.drawn.forEach((c, i) => {
+    sprites.push(new CardSprite(c.id, dealFrom, slots[i], { delay: delay0 + i * 0.12, remote, view: tarotView, rev: !!c.rev }));
+  });
+
+  state.dice = sprites;
+  dropIdleCache();
+  $('total').dataset.rolling = '1';
+  const settleMs = (delay0 + n * 0.12 + DEAL_S + FLIP_S) * 1000 + 160;
+  setTimeout(() => finish(result), settleMs);
+  if (!remote && navigator.vibrate) navigator.vibrate([6, 30, 8]);
+  hideHint();
+  return result;
+}
+
+function dealTarotFlowRemote(result, claim) {
+  const preload = [tarotImage('back').ready, ...result.summary.drawn.map(c => tarotImage(c.id).ready)];
+  Promise.all(preload).then(() => {
+    if (state.remoteClaim !== claim) return;
+    const n = result.summary.drawn.length;
+    const { stack, slots } = deckLayout(n, tarotView);
+    const sprites = [new DeckStackSprite(stack.x, stack.y, stack.w, tarotView)];
+    result.summary.drawn.forEach((c, i) => {
+      sprites.push(new CardSprite(c.id, { x: stack.x, y: stack.y }, slots[i], { delay: i * 0.12, remote: true, view: tarotView, rev: !!c.rev }));
+    });
+    state.dice = sprites;
+    dropIdleCache();
+    $('total').dataset.rolling = '1';
+    setTimeout(() => {
+      if (state.remoteClaim !== claim) return;
+      delete $('total').dataset.rolling;
+      delete $('total').dataset.idle;
+      setTotal(tarotHeadline(result));
+      $('breakdown').textContent = describeTarot(result);
+    }, (n * 0.12 + DEAL_S + FLIP_S) * 1000 + 160);
+  });
+}
+
+function dealFromTarotNotation(notation) {
+  let draw;
+  try { draw = parseTarot(notation).draw; } catch (err) { showError(err.message); return; }
+  clearError();
+  state.remoteClaim = null;
+  ensureTarotArt()
+    .then(() => dealTarotFlow(drawTarotCards(draw)))
+    .then(res => {
+      state.last = res;
+      $('notation').value = res.notation;
+      syncTarotUI({ writeField: false, restage: false });
+    })
+    .catch(err => showError(String((err && err.message) || err)));
+}
+
+// ---- the tarot picker ----
+const tarotPicker = $('tarotPicker');
+const tarotCountVal = $('tarotCount');
+const tarotRemainVal = $('tarotRemain');
+const tarotFlagButtons = [...document.querySelectorAll('#tarotPicker .deck-flag')];
+
+function syncTarotUI({ writeField = true, restage = true } = {}) {
+  tarotCountVal.textContent = String(tarotState.draw);
+  tarotRemainVal.textContent = tarotState.replace ? '78∞' : `${tarotRemaining()}/${tarotTotal()}`;
+  for (const b of tarotFlagButtons) {
+    const on = b.dataset.flag === 'rev' ? tarotState.reversals : tarotState.replace;
+    b.setAttribute('aria-pressed', String(on));
+  }
+  if (writeField && uiSystem === 'tarot') $('notation').value = `tarot:${tarotState.draw}`;
+  if (restage && uiSystem === 'tarot' && !$('total').dataset.rolling) stageTarotIdle();
+}
+
+bindTapHold($('tarotCountChip'), dir => {
+  tarotState.draw = Math.max(1, Math.min(10, tarotState.draw + dir));
+  persistTarot();
+  syncTarotUI({ restage: false });
+});
+$('tarotShuffle').addEventListener('click', () => {
+  ensureTarotArt().then(() => {
+    const prevCards = state.dice.filter(d => d.isCard && !d.isStack && !d.isDiscard && !d.gone && d.phase === 'idle');
+    const hadDiscard = tarotState.discard > 0;
+    const discardTop = tarotState.discardTop;
+    const prevDiscardSprite = state.dice.find(d => d.isDiscard);
+    reshuffleTarot();
+    const { stack } = deckLayout(0, tarotView);
+    const stackSprite = new DeckStackSprite(stack.x, stack.y, stack.w, tarotView);
+    const sprites = [stackSprite];
+    for (const d of prevCards) {
+      sprites.push(new CardSprite(d.id, { x: d.x, y: d.y }, { x: stack.x, y: stack.y, w: d.size }, { mode: 'return', view: tarotView }));
+    }
+    if (hadDiscard && discardTop && prevDiscardSprite) {
+      for (let i = 0; i < 3; i++) {
+        sprites.push(new CardSprite(discardTop.id, { x: prevDiscardSprite.x, y: prevDiscardSprite.y },
+          { x: stack.x, y: stack.y, w: prevDiscardSprite.size }, { mode: 'return', delay: i * 0.07, view: tarotView }));
+      }
+    }
+    const sweeping = sprites.length > 1;
+    stackSprite.riffleAfter = sweeping ? 0.34 : 0.001;
+    state.dice = sprites;
+    dropIdleCache();
+    $('total').dataset.idle = '1';
+    $('total').dataset.kind = 'number';
+    $('total').textContent = '—';
+    $('breakdown').textContent = systemHint('tarot').idle;
+    if (navigator.vibrate) navigator.vibrate([6, 40, 6, 40, 6, 40, 10]);
+    syncTarotUI({ restage: false });
+  });
+});
+for (const b of tarotFlagButtons) {
+  b.addEventListener('click', () => {
+    if (b.dataset.flag === 'rev') {
+      // Orientations were fixed at shuffle time, so changing whether the deck
+      // holds reversals means a fresh shuffle — same rule as the jokers toggle.
+      tarotState.reversals = !tarotState.reversals;
+      reshuffleTarot();
+    } else {
+      tarotState.replace = !tarotState.replace;
+      persistTarot();
+    }
+    syncTarotUI();
+  });
+}
+
+function syncTarotFromField() {
+  try {
+    const { draw } = parseTarot($('notation').value);
+    tarotState.draw = draw;
+    persistTarot();
+    syncTarotUI({ writeField: false, restage: false });
   } catch { /* mid-type */ }
 }
 
@@ -2685,6 +3041,7 @@ function clearPool() {
       // The deck persists (it is the character's deck, like Stress); clearing
       // just returns the tray to the idle stack.
       case 'cards': ensureCardArt().then(() => { if (uiSystem === 'cards') syncCardsUI(); }); break;
+      case 'tarot': ensureTarotArt().then(() => { if (uiSystem === 'tarot') syncTarotUI(); }); break;
     }
     return;
   }
@@ -3559,6 +3916,7 @@ function emptyTrayRoll() {
   if (uiSystem === 'mist') return mistCtl.notation();
   if (uiSystem === 'mothership') return msNotation();
   if (uiSystem === 'cards') return `deck:${deckState.draw}`;
+  if (uiSystem === 'tarot') return `tarot:${tarotState.draw}`;
   const last = state.last;
   const lastNumeric = last && (last.system === 'numeric' || last.system === undefined);
   return (lastNumeric && last.notation) || `d${state.defaultSides}`;
@@ -3974,13 +4332,15 @@ function showRemoteRoll(roll) {
   // called by the dealer's own timer; addHistory ran above, and finish adds
   // again, so the dealer path for remote skips it via the claim below not
   // being ours... simpler: cards route renders and sets the readout directly.
-  if (result.system === 'cards') {
+  if (result.system === 'cards' || result.system === 'tarot') {
     if ($('total').dataset.rolling && !state.remoteClaim) return;
     const claim = {};
     state.remoteClaim = claim;
-    ensureCardArt().then(() => {
+    const ensure = result.system === 'tarot' ? ensureTarotArt : ensureCardArt;
+    const deal = result.system === 'tarot' ? dealTarotFlowRemote : dealCardsFlowRemote;
+    ensure().then(() => {
       if (state.remoteClaim !== claim) return;
-      dealCardsFlowRemote(result, claim);
+      deal(result, claim);
     });
     return;
   }
