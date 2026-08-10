@@ -17,3 +17,6 @@ owlbear/.test-build/
 !.env.example
 .dev.vars
 .wrangler/
+
+# LGPL fallback deck (Aguilar), kept locally, never shipped
+Vector-Cards-Version-3.2.zip
