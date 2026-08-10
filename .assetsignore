@@ -19,6 +19,10 @@ dist
 # Screenshots for the README; not part of the app.
 docs
 
+# The LGPL Aguilar deck, kept locally as a documented fallback but never
+# referenced or served — and a 20MB binary has no business on the CDN.
+Vector-Cards-Version-3.2.zip
+
 # The Owlbear Rodeo panel. A separate build for a separate origin, with headers
 # of its own — it permits being framed, which this origin must never do. Serving
 # it from here would put a framable copy of the app on the same host as the one
