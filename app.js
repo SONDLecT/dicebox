@@ -1829,8 +1829,10 @@ function cardImage(id) {
   const key = `${id}|${isDark() ? 'd' : 'l'}`;
   let entry = cardImgCache.get(key);
   if (entry) return entry;
+  // Rasterise generously: a single drawn card can fill most of the tray, and on
+  // a dpr-3 phone that is well past 500 device pixels wide.
   const svg = cardArt.cardSVG(id, { dark: isDark() })
-    .replace('<svg ', '<svg width="500" height="700" ');
+    .replace('<svg ', '<svg width="750" height="1050" ');
   const img = new Image();
   img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
   entry = { img, ready: img.decode ? img.decode().catch(() => {}) : Promise.resolve() };
@@ -3626,8 +3628,12 @@ function drawFrame(dt) {
     if (idleSince === null) idleSince = performance.now();
     if (performance.now() - idleSince >= REVEAL_MS && (!idleCanvas || !idleSize || idleSize[0] !== w || idleSize[1] !== h)) {
       if (!idleCanvas) idleCanvas = document.createElement('canvas');
-      idleCanvas.width = w; idleCanvas.height = h;
-      idleCanvas.getContext('2d').drawImage(canvas, 0, 0, w, h);
+      // Snapshot at the backing store's device resolution, not CSS pixels. A
+      // CSS-sized copy re-blits soft on any dpr > 1 screen — invisible on
+      // wireframe dice, but a settled card visibly dropped a resolution the
+      // moment the cache took over from the live render.
+      idleCanvas.width = canvas.width; idleCanvas.height = canvas.height;
+      idleCanvas.getContext('2d').drawImage(canvas, 0, 0);
       idleSize = [w, h];
     }
   } else {
