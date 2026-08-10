@@ -159,6 +159,8 @@ They are released as their own CC0 repositories, usable well outside Dicebox:
   of the tarot
 - **[woodcut-napoletane](https://github.com/SONDLecT/woodcut-napoletane)** —
   the 40 carte napoletane, keyline and colour
+- **[woodcut-utagaruta](https://github.com/SONDLecT/woodcut-utagaruta)** —
+  the 100 yomifuda of the Hyakunin Isshu, with the poems as data
 
 ## How the rolls work
 
