@@ -155,6 +155,11 @@
             <rect x="5.5" y="3" width="13" height="18" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.5"/>
             <path d="M12 8.2 C14.4 10.2 13.4 12.6 12.2 12.6 C13 13.6 13.4 14.2 13.6 14.8 L10.4 14.8 C10.6 14.2 11 13.6 11.8 12.6 C10.6 12.6 9.6 10.2 12 8.2 Z" fill="currentColor"/>
           </g>
+          <!-- Tarot: a taller card carrying an eight-point star, after the deck's back. -->
+          <g class="mode-ico" data-for="tarot">
+            <rect x="5.5" y="3" width="13" height="18" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M12 7.2 L13.2 10.8 L16.8 10.8 L13.9 13 L15 16.6 L12 14.4 L9 16.6 L10.1 13 L7.2 10.8 L10.8 10.8 Z" fill="currentColor"/>
+          </g>
           <!-- Mothership: a spacesuit helmet — dome and curved visor. -->
           <g class="mode-ico" data-for="mothership" fill="none" stroke="currentColor"
              stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">
@@ -601,6 +606,12 @@
         <span class="mode-row-name">Tarot</span>
         <span class="mode-row-sub">the Woodcut Tarot &middot; all 78</span>
       </button>
+    </div>
+
+    <!-- Opened by holding a drawn card: the card rises off the table for a
+         close look, covering everything below the top bar. A tap puts it back. -->
+    <div id="cardFocus" hidden role="dialog" aria-label="Card close-up">
+      <div class="card-focus-art" id="cardFocusArt"></div>
     </div>
 
     <!-- Opened by holding a die. Sits on the tray like the help panel, so the

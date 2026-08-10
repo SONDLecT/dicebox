@@ -2175,8 +2175,9 @@ export class Surface {
     for (const d of dice) {
       if (!d.settled) continue;
       // A dropped die loses its contact mark too, so the kept dice are the only
-      // ones that read as sitting on the table.
-      if (d.kept === false) continue;
+      // ones that read as sitting on the table. Cards lie flat and cast their
+      // own shadow — an ellipse peeking out from under a rectangle reads wrong.
+      if (d.kept === false || d.isCard) continue;
       ctx.beginPath();
       ctx.ellipse(d.x, d.y + d.size * 0.46, d.size * 0.34, d.size * 0.07, 0, 0, TAU);
       ctx.stroke();

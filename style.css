@@ -428,6 +428,7 @@ body {
 #modeToggle[data-system="numeric"] .mode-ico[data-for="numeric"] { display: block; }
 #modeToggle[data-system="v5"] .mode-ico[data-for="v5"] { display: block; }
 #modeToggle[data-system="fate"] .mode-ico[data-for="fate"] { display: block; }
+#modeToggle[data-system="tarot"] .mode-ico[data-for="tarot"] { display: block; }
 #modeToggle[data-system="genesys"] .mode-ico[data-for="genesys"] { display: block; }
 #modeToggle[data-system="daggerheart"] .mode-ico[data-for="daggerheart"] { display: block; }
 #modeToggle[data-system="cthulhutech"] .mode-ico[data-for="cthulhutech"] { display: block; }
@@ -1079,6 +1080,35 @@ body {
 }
 /* A single red card's label in the big readout keeps its suit's colour. */
 #total[data-variant="card-red"] { color: #C74B3F; }
+
+/* ---- card close-up ---- */
+/* Everything below the top bar frosts over and the held card rises into it.
+   The bar stays clear (and above, z-wise), so the corner menus keep working
+   while a card is up. */
+#cardFocus {
+  position: fixed;
+  z-index: 30;
+  left: 0; right: 0; bottom: 0;
+  /* top is set from the real bar height when it opens */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--paper) 82%, transparent);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  cursor: zoom-out;
+}
+.card-focus-art {
+  transition: transform 280ms cubic-bezier(0.2, 0.8, 0.25, 1), opacity 220ms ease;
+  will-change: transform;
+}
+.card-focus-art svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  box-shadow: 0 20px 52px rgba(0, 0, 0, 0.45);
+}
 /* A reversed tarot card reads in the mode's violet rather than an alarm red —
    reversal is a meaning, not a failure. */
 #total[data-variant="tarot-rev"] { color: var(--accent); }

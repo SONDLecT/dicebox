@@ -1001,6 +1001,8 @@ function setSystem(system, { roll = false, url = true } = {}) {
   if (!SYSTEMS[system]) system = 'numeric';
   const changed = system !== uiSystem;
   uiSystem = system;
+  // A card held up for a look belongs to the table it came from.
+  if (changed) closeCardFocus();
 
   // Reflect the mode into the address so the current view is shareable and the
   // browser's back button returns to the previous system. Guarded because some
@@ -1188,6 +1190,7 @@ window.addEventListener('resize', () => {
   if (!modeSheet.hidden) closeMode();
   if (!help.hidden) setHelp(false);
   if (!roomPanel.hidden) closeRoom();
+  closeCardFocus();
 });
 
 for (const row of modeRows) {
@@ -1937,6 +1940,7 @@ const DEAL_S = 0.34, FLIP_S = 0.26;
 const cardsView = {
   ratio: CARD_RATIO,
   image: id => cardImage(id),
+  svg: id => cardArt.cardSVG(id, { dark: isDark() }),
   remaining: () => deckRemaining(),
   total: () => deckTotal(),
   replace: () => deckState.replace,
@@ -1946,6 +1950,7 @@ const cardsView = {
 const tarotView = {
   ratio: 1.72,
   image: id => tarotImage(id),
+  svg: id => tarotArt.tarotSVG(id, { dark: isDark() }),
   remaining: () => tarotRemaining(),
   total: () => tarotTotal(),
   replace: () => tarotState.replace,
@@ -3900,11 +3905,110 @@ function attachModifierSheet(button, sides) {
 // ---- flick to throw ----
 
 let drag = null;
+// ---- card close-up ----
+//
+// Cards are the one thing on the tray you want to pick up and actually look
+// at. Holding a drawn card lifts it into a full close-up over everything but
+// the top bar; a tap sets it back down. The overlay carries the card's own
+// SVG rather than the tray raster, so the woodcut is pin-sharp at any size,
+// and a reversed tarot card stays upside down — that is what was dealt.
+const cardFocusEl = $('cardFocus');
+const cardFocusArt = $('cardFocusArt');
+let cardHoldTimer = null;
+let cardHoldFired = false;
+let cardFocusFrom = null; // the transform it rose from, for the way back down
+
+function drawnCardAt(clientX, clientY) {
+  const r = canvas.getBoundingClientRect();
+  const x = clientX - r.left, y = clientY - r.top;
+  let hit = null;
+  for (const d of state.dice) {
+    if (!d.isCard || d.isStack || d.isDiscard || d.gone || d.phase !== 'idle') continue;
+    const w = d.size, h = w * d.view.ratio;
+    // Later sprites draw on top, so the last hit wins, same as the eye.
+    if (Math.abs(x - d.x) <= w / 2 && Math.abs(y - d.y) <= h / 2) hit = d;
+  }
+  return hit;
+}
+
+function openCardFocus(d) {
+  const art = d.view === tarotView ? tarotArt : cardArt;
+  if (!art || !cardFocusEl.hidden) return;
+  const barBottom = Math.round(document.querySelector('header.bar').getBoundingClientRect().bottom);
+  cardFocusEl.style.top = `${barBottom}px`;
+
+  const areaW = window.innerWidth, areaH = window.innerHeight - barBottom;
+  const ratio = d.view.ratio;
+  const w = Math.min(areaW - 36, (areaH - 36) / ratio);
+  const h = w * ratio;
+  cardFocusArt.style.width = `${Math.round(w)}px`;
+  cardFocusArt.style.height = `${Math.round(h)}px`;
+  cardFocusArt.innerHTML = d.view.svg(d.id);
+
+  // Rise from where the card lies on the table: same FLIP move the eye makes.
+  const cr = canvas.getBoundingClientRect();
+  const dx = (cr.left + d.x) - areaW / 2;
+  const dy = (cr.top + d.y) - (barBottom + areaH / 2);
+  const rev = d.rev ? ' rotate(180deg)' : '';
+  cardFocusFrom = `translate(${Math.round(dx)}px, ${Math.round(dy)}px) scale(${(d.size / w).toFixed(3)})${rev}`;
+  cardFocusArt.style.transition = 'none';
+  cardFocusArt.style.transform = cardFocusFrom;
+  cardFocusEl.hidden = false;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    cardFocusArt.style.transition = '';
+    cardFocusArt.style.transform = rev.trim() || 'none';
+  }));
+}
+
+function closeCardFocus() {
+  if (cardFocusEl.hidden) return;
+  const from = cardFocusFrom;
+  cardFocusFrom = null;
+  cardFocusArt.style.transform = from || 'scale(0.2)';
+  cardFocusArt.style.opacity = '0';
+  setTimeout(() => {
+    cardFocusEl.hidden = true;
+    cardFocusArt.style.opacity = '';
+    cardFocusArt.innerHTML = '';
+  }, 240);
+}
+
+cardFocusEl.addEventListener('click', closeCardFocus);
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !cardFocusEl.hidden) closeCardFocus();
+});
+
 canvas.addEventListener('pointerdown', e => {
   drag = { x: e.clientX, y: e.clientY, t: performance.now() };
-  canvas.setPointerCapture(e.pointerId);
+  // A pointer can be gone by the time capture is asked for (and synthetic
+  // pointers never had one); losing capture is fine, losing the handler isn't.
+  try { canvas.setPointerCapture(e.pointerId); } catch { /* no capture */ }
+  // Holding a drawn card lifts it off the table for a close look; the timer
+  // dies on any real movement, so flicks and drags stay flicks and drags.
+  cardHoldFired = false;
+  const hit = drawnCardAt(e.clientX, e.clientY);
+  if (hit) {
+    cardHoldTimer = setTimeout(() => {
+      cardHoldTimer = null;
+      cardHoldFired = true;
+      openCardFocus(hit);
+      if (navigator.vibrate) navigator.vibrate(10);
+    }, 420);
+  }
+});
+canvas.addEventListener('pointermove', e => {
+  if (cardHoldTimer && drag && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 12) {
+    clearTimeout(cardHoldTimer);
+    cardHoldTimer = null;
+  }
+});
+canvas.addEventListener('pointercancel', () => {
+  if (cardHoldTimer) { clearTimeout(cardHoldTimer); cardHoldTimer = null; }
+  drag = null;
 });
 canvas.addEventListener('pointerup', e => {
+  if (cardHoldTimer) { clearTimeout(cardHoldTimer); cardHoldTimer = null; }
+  if (cardHoldFired) { cardHoldFired = false; drag = null; return; }
   if (!drag) return;
   const dt = Math.max(16, performance.now() - drag.t);
   const vx = ((e.clientX - drag.x) / dt) * 1000;
@@ -4086,7 +4190,9 @@ function drawFrame(dt) {
     const wasSettled = d.settled;
     d.step(dt, state.bounds);
     if (!wasSettled && d.settled) {
-      state.surface.impact(d.x, d.y, d.size);
+      // Dice thump; cards don't. A landing ripple under a flat card reads as
+      // a stray mark, so the impact stays a dice thing.
+      if (!d.isCard) state.surface.impact(d.x, d.y, d.size);
       // A rerolled die lands once, then throws itself again. Doing it here
       // rather than at roll time means the pause starts when the die actually
       // stops, however long its first tumble took.
