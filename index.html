@@ -404,8 +404,9 @@
       <p class="note">
         A standard 52-card deck (jokers optional), drawn <b>without
         replacement</b> — the deck remembers what's gone until you
-        <b>Shuffle</b>. Flip on <b>Replace</b> and every draw goes back,
-        making each one an independent 1-in-52. The cards are the
+        <b>Shuffle</b>. Flip on <b>Replace</b> and each draw goes back in,
+        an independent pick from whatever the deck still holds; the discard
+        stays out of play until you shuffle. The cards are the
         <a href="https://github.com/SONDLecT/woodcut-cards" target="_blank"
            rel="noopener noreferrer">Woodcut deck</a> — courts traced from
         public-domain decks of the 1650s–1860s.
@@ -1083,7 +1084,7 @@
       </svg>
       <span class="deck-shuffle-label">Shuffle</span>
     </button>
-    <button type="button" class="deck-flag" data-flag="rev" aria-pressed="true" aria-label="Allow reversed cards (reshuffles)">
+    <button type="button" class="deck-flag" data-flag="rev" aria-pressed="true" aria-label="Allow reversed cards">
       <svg class="deck-flag-ico" viewBox="0 0 30 30" aria-hidden="true">
         <rect class="crd" x="8" y="4" width="14" height="21" rx="2.4"/>
         <path class="mark" d="M15 20.5 L13.6 16.9 L10 16.8 L12.9 14.6 L11.9 11 L15 13.2 L18.1 11 L17.1 14.6 L20 16.8 L16.4 16.9 Z"/>

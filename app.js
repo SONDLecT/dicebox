@@ -1132,7 +1132,19 @@ const modeRows = [...modeSheet.querySelectorAll('.mode-row')];
 function anchorPop(pop, btn) {
   const r = btn.getBoundingClientRect();
   pop.style.top = `${Math.round(r.bottom + 8)}px`;
-  pop.style.right = `${Math.max(8, Math.round(window.innerWidth - r.right))}px`;
+  // Right-anchored to the button, but never past the left edge of the screen:
+  // a wide panel (help is 400px) under a mid-bar button on a narrow phone
+  // would otherwise render partly off-screen. Hidden elements have no box, so
+  // measure through a visibility flicker when needed.
+  const wasHidden = pop.hidden;
+  if (wasHidden) { pop.style.visibility = 'hidden'; pop.hidden = false; }
+  const w = pop.offsetWidth;
+  if (wasHidden) { pop.hidden = true; pop.style.visibility = ''; }
+  const right = Math.min(
+    Math.max(8, Math.round(window.innerWidth - r.right)),
+    Math.max(8, window.innerWidth - w - 8),
+  );
+  pop.style.right = `${right}px`;
 }
 
 function openMode() {
@@ -1805,7 +1817,10 @@ function deckIds() {
   return out;
 }
 const deckTotal = () => 52 + (deckState.jokers ? 2 : 0);
-const deckRemaining = () => (deckState.replace ? deckTotal() : Math.max(0, deckState.order.length - deckState.pos));
+// What is physically in the deck. Replace mode draws from (and returns to)
+// this same pool, so the count holds steady — but the discard stays out until
+// a shuffle folds it back in, exactly like a real table.
+const deckRemaining = () => Math.max(0, deckState.order.length - deckState.pos);
 
 // Whether the hand being swept off the table was drawn with replacement —
 // read by the dealer for the sweep animation after drawDeckCards has already
@@ -1836,11 +1851,13 @@ function reshuffleDeck() {
 // (for labels) — callers go through dealCardsFlow, which loads it.
 function drawDeckCards(n) {
   let ids;
+  if (deckState.order.length === 0) reshuffleDeck();
   if (deckState.replace) {
-    const pool = deckIds();
-    ids = Array.from({ length: n }, () => pool[cryptoIndex(pool.length)]);
+    // Independent picks from what is still in the deck — not the full 52.
+    // Cards sitting in the discard are out of play until a shuffle.
+    const pool = deckState.order.slice(deckState.pos);
+    ids = pool.length ? Array.from({ length: n }, () => pool[cryptoIndex(pool.length)]) : [];
   } else {
-    if (deckState.order.length === 0) reshuffleDeck();
     ids = deckState.order.slice(deckState.pos, deckState.pos + n);
     deckState.pos += ids.length;
     persistDeck();
@@ -2036,7 +2053,7 @@ class DeckStackSprite {
   draw(ctx) {
     const w = this.size, h = w * this.view.ratio;
     const img = this.view.image('back').img;
-    const empty = this.view.remaining() === 0 && !this.view.replace();
+    const empty = this.view.remaining() === 0;
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.shadowColor = 'rgba(0,0,0,0.35)';
@@ -2107,7 +2124,7 @@ class DeckStackSprite {
     ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--muted');
     ctx.font = `${Math.max(11, Math.round(w * 0.09))}px ui-monospace, monospace`;
     ctx.textAlign = 'center';
-    ctx.fillText(this.view.replace() ? `${this.view.total()} · replace` : `${this.view.remaining()} left`, this.x, this.y + h / 2 + Math.max(16, w * 0.13));
+    ctx.fillText(this.view.replace() ? `${this.view.remaining()} · replace` : `${this.view.remaining()} left`, this.x, this.y + h / 2 + Math.max(16, w * 0.13));
     ctx.restore();
   }
   throwWith() {}
@@ -2326,7 +2343,7 @@ const deckFlagButtons = [...document.querySelectorAll('#cardsPicker .deck-flag')
 
 function syncCardsUI({ writeField = true, restage = true } = {}) {
   deckCountVal.textContent = String(deckState.draw);
-  deckRemainVal.textContent = deckState.replace ? `${deckTotal()}∞` : `${deckRemaining()}/${deckTotal()}`;
+  deckRemainVal.textContent = deckState.replace ? `${deckRemaining()}∞` : `${deckRemaining()}/${deckTotal()}`;
   for (const b of deckFlagButtons) {
     const on = b.dataset.flag === 'jokers' ? deckState.jokers : deckState.replace;
     b.setAttribute('aria-pressed', String(on));
@@ -2443,13 +2460,16 @@ function tarotDeckIds() {
   return ids;
 }
 const tarotTotal = () => 78;
-const tarotRemaining = () => (tarotState.replace ? 78 : Math.max(0, tarotState.order.length - tarotState.pos));
+const tarotRemaining = () => Math.max(0, tarotState.order.length - tarotState.pos);
 
 let lastSweptReplaceTarot = false;
 
 function reshuffleTarot() {
   tarotState.order = newDeckOrder(tarotDeckIds(), n => cryptoIndex(n) + 1);
-  tarotState.revs = tarotState.order.map(() => tarotState.reversals && cryptoIndex(2) === 1);
+  // Every shuffle deals orientations, whatever the Reversals flag says; the
+  // flag only decides whether they apply at draw time. That makes the toggle
+  // non-destructive: flipping it never resets the deck.
+  tarotState.revs = tarotState.order.map(() => cryptoIndex(2) === 1);
   tarotState.pos = 0;
   tarotState.discard = 0;
   tarotState.discardTop = null;
@@ -2459,17 +2479,21 @@ function reshuffleTarot() {
 
 function drawTarotCards(n) {
   let picks;
+  if (tarotState.order.length === 0) reshuffleTarot();
   if (tarotState.replace) {
-    const pool = tarotDeckIds();
-    picks = Array.from({ length: n }, () => ({
-      id: pool[cryptoIndex(pool.length)],
-      rev: tarotState.reversals && cryptoIndex(2) === 1,
-    }));
+    // Independent picks from what is still in the deck; the discard stays out
+    // until a shuffle, and each pick keeps its shuffled orientation.
+    const span = tarotState.order.length - tarotState.pos;
+    picks = span > 0
+      ? Array.from({ length: n }, () => {
+        const i = tarotState.pos + cryptoIndex(span);
+        return { id: tarotState.order[i], rev: tarotState.reversals && !!tarotState.revs[i] };
+      })
+      : [];
   } else {
-    if (tarotState.order.length === 0) reshuffleTarot();
     picks = [];
     for (let i = tarotState.pos; i < Math.min(tarotState.pos + n, tarotState.order.length); i++) {
-      picks.push({ id: tarotState.order[i], rev: !!tarotState.revs[i] });
+      picks.push({ id: tarotState.order[i], rev: tarotState.reversals && !!tarotState.revs[i] });
     }
     tarotState.pos += picks.length;
     persistTarot();
@@ -2624,7 +2648,7 @@ const tarotFlagButtons = [...document.querySelectorAll('#tarotPicker .deck-flag'
 
 function syncTarotUI({ writeField = true, restage = true } = {}) {
   tarotCountVal.textContent = String(tarotState.draw);
-  tarotRemainVal.textContent = tarotState.replace ? '78∞' : `${tarotRemaining()}/${tarotTotal()}`;
+  tarotRemainVal.textContent = tarotState.replace ? `${tarotRemaining()}∞` : `${tarotRemaining()}/${tarotTotal()}`;
   for (const b of tarotFlagButtons) {
     const on = b.dataset.flag === 'rev' ? tarotState.reversals : tarotState.replace;
     b.setAttribute('aria-pressed', String(on));
@@ -2672,10 +2696,15 @@ $('tarotShuffle').addEventListener('click', () => {
 for (const b of tarotFlagButtons) {
   b.addEventListener('click', () => {
     if (b.dataset.flag === 'rev') {
-      // Orientations were fixed at shuffle time, so changing whether the deck
-      // holds reversals means a fresh shuffle — same rule as the jokers toggle.
+      // Orientations were dealt at shuffle time either way; the flag only
+      // gates whether they apply, so toggling never resets the deck. Decks
+      // shuffled before orientations were always dealt get theirs now, for
+      // the undrawn cards only.
       tarotState.reversals = !tarotState.reversals;
-      reshuffleTarot();
+      if (tarotState.reversals && !tarotState.revs.some(Boolean)) {
+        for (let i = tarotState.pos; i < tarotState.revs.length; i++) tarotState.revs[i] = cryptoIndex(2) === 1;
+      }
+      persistTarot();
     } else {
       tarotState.replace = !tarotState.replace;
       persistTarot();

@@ -1090,7 +1090,8 @@ body {
   position: fixed;
   z-index: 40;
   width: 252px;
-  max-height: min(72vh, 500px);
+  /* Tall enough for all thirteen rows on a phone; small screens still scroll. */
+  max-height: min(84vh, 640px);
   overflow-y: auto;
   background: var(--face);
   border: 1px solid var(--hair);
