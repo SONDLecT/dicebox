@@ -3972,6 +3972,64 @@ function syncUtaFromField() {
   } catch { /* mid-type */ }
 }
 
+// ---- clearing a deck table ----
+//
+// The X next to Draw sweeps the table clean without drawing: the hand goes to
+// the discard exactly as the next draw would have sent it — or home to the
+// deck in replace mode, where the cards never really left — and the tray
+// settles back to the idle stack.
+function deckBundle() {
+  switch (uiSystem) {
+    case 'cards': return { view: cardsView, st: deckState, persist: persistDeck, sync: syncCardsUI };
+    case 'tarot': return { view: tarotView, st: tarotState, persist: persistTarot, sync: syncTarotUI };
+    case 'napoletane': return { view: napView, st: napState, persist: persistNap, sync: syncNapUI };
+    case 'hanafuda': return { view: hanaView, st: hanaState, persist: persistHana, sync: syncHanaUI };
+    case 'utagaruta': return { view: utaView, st: utaState, persist: persistUta, sync: syncUtaUI };
+    default: return null;
+  }
+}
+
+function clearDeckTable() {
+  const d = deckBundle();
+  if (!d) return false;
+  if (!d.view.loaded() || $('total').dataset.rolling) return true;
+  const drawn = state.dice.filter(x => x.isCard && !x.isStack && !x.isDiscard && !x.gone && x.phase === 'idle');
+  const prevPile = { count: d.view.discard(), top: d.view.discardTop() };
+  const replace = !!d.st.handReplace;
+  if (replace) {
+    d.st.hand = [];
+    d.persist();
+  } else if (d.st.hand.length) {
+    d.st.pile.push(...d.st.hand);
+    d.st.hand = [];
+    d.persist();
+  }
+  const { stack, discard } = deckLayout(0, d.view);
+  const sprites = [new DeckStackSprite(stack.x, stack.y, stack.w, d.view)];
+  for (const c of drawn) {
+    const dest = replace
+      ? { to: { x: stack.x, y: stack.y, w: c.size }, mode: 'return' }
+      : { to: { x: discard.x, y: discard.y, w: discard.w }, mode: 'discard' };
+    sprites.push(new CardSprite(c.id, { x: c.x, y: c.y }, dest.to, { mode: dest.mode, view: d.view }));
+  }
+  if (d.view.discard() > 0) {
+    const hold = drawn.length
+      ? { count: prevPile.count, top: prevPile.top, for: DEAL_S + 0.08 }
+      : null;
+    sprites.push(new DiscardPileSprite(discard.x, discard.y, discard.w, d.view, hold));
+  }
+  state.dice = sprites;
+  dropIdleCache();
+  $('total').dataset.idle = '1';
+  $('total').dataset.kind = 'number';
+  $('total').textContent = '—';
+  $('breakdown').textContent = systemHint(uiSystem).idle;
+  d.sync({ restage: false });
+  if (navigator.vibrate) navigator.vibrate(8);
+  hideHint();
+  return true;
+}
+
 // ---- the pool ----
 //
 // Tapping dice builds a pool: tap d20 twice and d6 once and you have 2d20+1d6,
@@ -4338,6 +4396,10 @@ function clearPool() {
 }
 
 $('clear').addEventListener('click', () => {
+  // In a deck mode the X sweeps the table: drawn cards go to the discard
+  // (or home to the deck in replace mode) and the tray returns to idle. In
+  // the dice modes it clears the pool, as it always has.
+  if (clearDeckTable()) { $('notation').focus(); return; }
   clearPool();
   $('notation').focus();
 });
