@@ -1017,7 +1017,7 @@ const DEFAULT_HINT = { idle: 'Pick dice or type a roll', placeholder: 'Tap dice 
 const SYSTEM_HINTS = {
   pbta: { idle: 'Set a modifier, then roll 2d6', placeholder: 'Set a modifier, or type pbta:+2' },
   mist: { idle: 'Set your Power, then roll 2d6', placeholder: 'Set your Power, or type mist:+1' },
-  mothership: { idle: 'Set your target, then roll under it', placeholder: 'Set a target, or type ms:c@35' },
+  mothership: { idle: 'Roll d100 — set a target to resolve it, or let the table judge', placeholder: 'Roll, or type ms:c@35' },
   cards: { idle: 'Tap the deck to draw', placeholder: 'Tap the deck, or type deck:3' },
   tarot: { idle: 'Tap the deck to draw', placeholder: 'Tap the deck, or type tarot:3' },
   napoletane: { idle: 'Tocca il mazzo per pescare', placeholder: 'Tocca il mazzo, o scrivi nap:3' },
@@ -1749,7 +1749,9 @@ const mistCtl = { notation: () => twod6Notation('mist'), reset: resetTwod6, from
 // it persists across reloads and mode switches. Damage/wounds use the numeric
 // strip below (plain xd10 / 1d5 / 1d100).
 const MS_STRESS_KEY = 'dicebox:ms:stress';
-const ms = { mode: 'check', target: 30, skill: null, advantage: null, stress: 2 };
+// Target defaults to unset — the table sets the difficulty, as in the other
+// judge-it-at-the-table systems; a bare number rolls and the table reads it.
+const ms = { mode: 'check', target: null, skill: null, advantage: null, stress: 2 };
 {
   // Restore the tracked Stress; anything out of the 2-20 band falls back to 2.
   const saved = Number(store.get(MS_STRESS_KEY));
@@ -1772,7 +1774,7 @@ const msPanicRoll = $('msPanicRoll');
 function resetMothership() {
   // The roll config resets; Stress does not — it is the character's state.
   ms.mode = 'check';
-  ms.target = 30;
+  ms.target = null;
   ms.skill = null;
   ms.advantage = null;
   syncMs({ writeField: false });
