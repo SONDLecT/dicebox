@@ -1171,15 +1171,21 @@ body {
 }
 /* The two-faced close-up: decks with a reading side (uta-garuta) flip over.
    The front is the traced art, the back a typeset reading of the poem. */
-.card-focus-art { perspective: 1400px; }
+/* Perspective belongs ONLY on the flipping element, never the base close-up.
+   On the base class it wrapped every card — cards, tarot, napoletane — in a 3D
+   context, and Firefox rasterises a 3D-context layer at a size cap, so a card
+   filling the screen came out a blurry blow-up. Applying perspective() inside
+   the flip's own transform keeps the uta-garuta turn in 3D while leaving every
+   other close-up a plain, crisp vector. */
 .cf-flip {
   position: relative;
   width: 100%;
   height: 100%;
   transform-style: preserve-3d;
   transition: transform 460ms cubic-bezier(0.3, 0.7, 0.3, 1);
+  transform: perspective(1400px) rotateY(0deg);
 }
-.cf-flip.flipped { transform: rotateY(180deg); }
+.cf-flip.flipped { transform: perspective(1400px) rotateY(180deg); }
 .cf-face {
   position: absolute;
   inset: 0;

@@ -213,6 +213,9 @@ if (existing.find(d => d.hostname === DOMAIN && d.service === SCRIPT)) {
   console.log(`Custom domain already attached: ${DOMAIN}`);
 } else {
   console.log(`Attaching ${DOMAIN}...`);
+  const zoneName = DOMAIN.split('.').slice(-2).join('.');
+  const zones = await api(`/zones?name=${zoneName}`);
+  if (!zones.length) { console.error(`No zone found for ${zoneName}`); process.exit(1); }
   await api(`/accounts/${ACCOUNT}/workers/domains`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -220,7 +223,7 @@ if (existing.find(d => d.hostname === DOMAIN && d.service === SCRIPT)) {
       environment: 'production',
       hostname: DOMAIN,
       service: SCRIPT,
-      zone_id: env.CLOUDFLARE_ZONE_ID,
+      zone_id: zones[0].id,
     }),
   });
   console.log('Custom domain attached.');
