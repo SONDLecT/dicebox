@@ -1,5 +1,10 @@
-// Cache-first service worker. The whole app is a handful of static files, so we
-// precache all of them and never hit the network after install.
+// The app precaches all its files so it works fully offline. The code files
+// (the shell, app.js, style.css and the small modules) are served
+// NETWORK-FIRST when online, so a deploy lands on the next load instead of a
+// reload or two later — the cache is the offline fallback, not the primary.
+// The big deck-art modules and the icons stay cache-first: they are large and
+// change rarely, and the deploy's content-hashed cache name refreshes them on
+// the next service-worker update.
 
 // Replaced at deploy time with a hash of every asset shipped alongside it, so
 // this never has to be remembered — see swCacheName in tools/deploy.mjs. A
@@ -87,35 +92,47 @@ async function handle(request) {
     return fetch(request);
   }
 
-  // Every other navigation resolves to the app shell. The edge redirects
-  // /index.html to /, and an installed app launching at a redirecting URL fails
-  // to load — so navigations are answered from the shell rather than followed.
-
+  // Navigations: network-first. An updated shell then lands on the next load,
+  // not two loads later. Offline (or a failed fetch) falls back to the cached
+  // shell. The edge redirects /index.html to /, so a redirected response is not
+  // stored — replaying one re-triggers the redirect and browsers reject it.
   if (request.mode === 'navigate') {
-    const shell = await cache.match('./', { ignoreSearch: true });
-    if (shell) return shell;
     try {
       const res = await fetch(request);
-      if (res.ok && !res.redirected) await cache.put('./', res.clone());
+      if (res.ok && !res.redirected) cache.put('./', res.clone());
       return res;
     } catch {
-      return new Response('Dicebox is offline and has no cached copy yet.', {
+      const shell = await cache.match('./', { ignoreSearch: true });
+      return shell || new Response('Dicebox is offline and has no cached copy yet.', {
         status: 503,
         headers: { 'Content-Type': 'text/plain; charset=utf-8' },
       });
     }
   }
 
-  const hit = await cache.match(request, { ignoreSearch: true });
-  if (hit) return hit;
+  // The big deck-art modules and the icons stay cache-first — large, rarely
+  // changed, and refreshed by the content-hashed cache name on SW update.
+  const cacheFirst = /-art\.js$/.test(url.pathname) || url.pathname.includes('/icons/');
+  if (cacheFirst) {
+    const hit = await cache.match(request, { ignoreSearch: true });
+    if (hit) return hit;
+    try {
+      const res = await fetch(request);
+      if (res.ok && !res.redirected) cache.put(request, res.clone());
+      return res;
+    } catch {
+      return new Response('', { status: 504, statusText: 'Offline' });
+    }
+  }
 
+  // Everything else — app.js, style.css, the small modules: network-first with
+  // the cache as offline fallback, so an online reload always runs fresh code.
   try {
     const res = await fetch(request);
-    // Redirected responses are not stored: replaying one from cache re-triggers
-    // the redirect and browsers reject it for navigations.
     if (res.ok && !res.redirected) cache.put(request, res.clone());
     return res;
   } catch {
-    return new Response('', { status: 504, statusText: 'Offline' });
+    const hit = await cache.match(request, { ignoreSearch: true });
+    return hit || new Response('', { status: 504, statusText: 'Offline' });
   }
 }
