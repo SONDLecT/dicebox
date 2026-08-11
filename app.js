@@ -118,6 +118,11 @@ $('themeToggle').addEventListener('click', () => {
     if (utaState.pile.length) ids.push(utaState.pile[utaState.pile.length - 1]);
     Promise.all(ids.map(id => utaImage(id).ready)).then(dropIdleCache);
   }
+  if (uiSystem === 'hanafuda' && hanaArt) {
+    const ids = [...new Set(state.dice.filter(d => d.isCard).map(d => (d.isStack || d.isDiscard ? 'back' : d.id)))];
+    if (hanaState.pile.length) ids.push(hanaState.pile[hanaState.pile.length - 1]);
+    Promise.all(ids.map(id => hanaImage(id).ready)).then(dropIdleCache);
+  }
   // A card held up for a look, or a discard fanned open, retints too.
   retintCardOverlays();
   syncThemeLabel();
@@ -2117,7 +2122,7 @@ const hanaView = {
   // card. A data-URI <img> renders as its own SVG document, where the page's
   // CSP doesn't reach, and img-src data: is already allowed.
   svg: id => '<img alt="" draggable="false" src="data:image/svg+xml;charset=utf-8,'
-    + encodeURIComponent(hanaArt.hanaSVG(id)) + '">',
+    + encodeURIComponent(hanaArt.hanaSVG(id, { dark: isDark() })) + '">',
   loaded: () => !!hanaArt,
   remaining: () => hanaRemaining(),
   total: () => hanaTotal(),
@@ -3418,16 +3423,15 @@ function ensureHanaArt() {
   return hanaArtLoading;
 }
 
-// The Mantia set carries its own colour on both grounds, so the cache is not
-// keyed by theme the way the retinting woodcut decks are.
 const hanaImgCache = new Map();
 function hanaImage(id) {
-  let entry = hanaImgCache.get(id);
+  const key = `${id}|${isDark() ? 'd' : 'l'}`;
+  let entry = hanaImgCache.get(key);
   if (entry) return entry;
-  const svg = hanaArt.hanaSVG(id)
+  const svg = hanaArt.hanaSVG(id, { dark: isDark() })
     .replace('<svg ', '<svg width="732" height="1200" ');
   const img = new Image();
-  img.addEventListener('error', () => hanaImgCache.delete(id));
+  img.addEventListener('error', () => hanaImgCache.delete(key));
   img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
   entry = { img, ready: img.decode ? img.decode().catch(() => {}) : Promise.resolve() };
   if (typeof createImageBitmap === 'function') {
@@ -3436,7 +3440,7 @@ function hanaImage(id) {
       .then(bmp => { entry.img = bmp; })
       .catch(() => {});
   }
-  hanaImgCache.set(id, entry);
+  hanaImgCache.set(key, entry);
   return entry;
 }
 
