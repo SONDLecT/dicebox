@@ -44,7 +44,7 @@ const args = new Map(
     }));
 
 const relay = args.get('relay');
-const site = args.get('site') || 'https://dicebox.trollskull.cc';
+const site = args.get('site') || 'https://dicebox.cc';
 
 // The hostname the panel is served from. Written into the generated wrangler
 // config as a custom domain, and it must not be the app's own origin — the app

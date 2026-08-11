@@ -22,7 +22,11 @@
 // exception at all and stays local-only, which is the default anyway.
 const RELAY_ORIGINS = {
   'dev.dicebox.trollskull.cc': 'wss://dev.relay.dicebox.trollskull.cc',
-  'dicebox.trollskull.cc': 'wss://relay.dicebox.trollskull.cc',
+  // The canonical home and the old host both talk to the same relay, reachable
+  // under either name (same Worker, same Durable Objects), so a room id is the
+  // same table whichever front door a player came through.
+  'dicebox.cc': 'wss://relay.dicebox.cc',
+  'dicebox.trollskull.cc': 'wss://relay.dicebox.cc',
 };
 
 const securityHeaders = hostname => {

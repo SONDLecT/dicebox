@@ -5,6 +5,7 @@
   "compatibility_date": "2026-07-18",
 
   "routes": [
+    { "pattern": "relay.dicebox.cc", "custom_domain": true },
     { "pattern": "relay.dicebox.trollskull.cc", "custom_domain": true }
   ],
 
@@ -35,7 +36,7 @@
     // This is CSRF hygiene, not authentication. The passphrase decides
     // membership and the relay never sees it; the list only stops an unrelated
     // site pointing its users at someone else's broadcast channel.
-    "ALLOWED_ORIGINS": "https://dicebox.trollskull.cc,https://dev.dicebox.trollskull.cc,https://vtt.dicebox.trollskull.cc"
+    "ALLOWED_ORIGINS": "https://dicebox.cc,https://dicebox.trollskull.cc,https://dev.dicebox.trollskull.cc,https://vtt.dicebox.trollskull.cc"
   },
 
   "observability": {

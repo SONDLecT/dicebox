@@ -7,7 +7,7 @@
 An offline dice roller for tabletop RPGs. No build step, no dependencies, no
 network.
 
-Try it at **[dicebox.trollskull.cc](https://dicebox.trollskull.cc)** — that is a
+Try it at **[dicebox.cc](https://dicebox.cc)** — that is a
 demo instance, not a service. To keep a copy of your own, see
 [Getting it offline](#getting-it-offline): download it as a single file, install
 it from the browser, or host it yourself.
@@ -115,7 +115,7 @@ notation. Symbols are drawn the way the official dice show them, and the plain
 numbers they landed on are always in the line under the result. Ordinary dice
 still roll in any mode, so weapon damage or a stray d20 needs no mode change.
 
-Every mode has its own short URL — `dicebox.trollskull.cc/dh`,
+Every mode has its own short URL — `dicebox.cc/dh`,
 `/mosh1e`, `/vtmv5` and so on — which opens Dicebox straight into it.
 
 ## Card decks
@@ -351,7 +351,7 @@ totals are all inside it.
 rolls" guarantee.** You are running the code, and you can read it.
 
 **The hosted demo does not, and this is a genuine difference rather than a
-technicality.** [dicebox.trollskull.cc](https://dicebox.trollskull.cc) serves
+technicality.** [dicebox.cc](https://dicebox.cc) serves
 the JavaScript that does the encrypting. Encryption in the browser is only as
 trustworthy as the code the browser was handed, so using the demo means trusting
 me to keep serving honest code — not just today but on every load, since the app
@@ -398,7 +398,7 @@ Three ways, easiest first.
 
 ### Download one file
 
-Grab **[dicebox.html](https://dicebox.trollskull.cc/dicebox.html)** — or the copy
+Grab **[dicebox.html](https://dicebox.cc/dicebox.html)** — or the copy
 in [`dist/`](dist/dicebox.html) — and open it. That is the entire app in a single
 file: no server, no install, no network. Put it on a USB stick, email it to
 yourself, keep it in a folder with your character sheets. It works the same on a
@@ -408,7 +408,7 @@ The help panel inside the app links to it too.
 
 ### Install it from the web
 
-Open [the demo](https://dicebox.trollskull.cc) and install it. After the first
+Open [the demo](https://dicebox.cc) and install it. After the first
 load it runs offline, because a service worker keeps a local copy.
 
 | Browser | How |

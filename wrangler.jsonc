@@ -6,6 +6,7 @@
   // Serves the app at the custom domain. Cloudflare creates and manages the DNS
   // record for it, so nothing needs adding by hand.
   "routes": [
+    { "pattern": "dicebox.cc", "custom_domain": true },
     { "pattern": "dicebox.trollskull.cc", "custom_domain": true }
   ],
 

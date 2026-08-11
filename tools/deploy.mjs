@@ -48,9 +48,11 @@ const config = JSON.parse(
 const DEV = process.argv.includes('--dev');
 
 const SCRIPT = DEV ? `${config.name}-dev` : config.name;
-const DOMAIN = DEV
-  ? (env.DEV_HOSTNAME || `dev.${config.routes?.[0]?.pattern}`)
-  : config.routes?.[0]?.pattern;
+// Dev is a single sandbox host; prod attaches every custom domain the config
+// lists (the app now answers on both dicebox.cc and the old trollskull host).
+const DOMAINS = DEV
+  ? [env.DEV_HOSTNAME || `dev.${config.routes?.[0]?.pattern}`]
+  : (config.routes || []).filter(r => r.custom_domain).map(r => r.pattern);
 
 // --- collect the files that ship ---
 
@@ -309,15 +311,26 @@ await api(`/accounts/${ACCOUNT}/workers/scripts/${SCRIPT}?include_subdomain_avai
 });
 console.log('Worker published.');
 
-// --- 4. attach the custom domain ---
+// --- 4. attach the custom domains ---
+//
+// The zone is derived from each hostname rather than a single configured id, so
+// domains in different zones (dicebox.cc and the old trollskull host) both
+// attach from one deploy. Attaching is idempotent and never detaches, so the
+// old host keeps serving until it is removed by hand.
 
-if (DOMAIN) {
+for (const DOMAIN of DOMAINS) {
   const existing = await api(`/accounts/${ACCOUNT}/workers/domains?hostname=${DOMAIN}`);
   const attached = existing.find(d => d.hostname === DOMAIN && d.service === SCRIPT);
 
   if (attached) {
     console.log(`Custom domain already attached: ${DOMAIN}`);
   } else {
+    const zoneName = DOMAIN.split('.').slice(-2).join('.');
+    const zones = await api(`/zones?name=${zoneName}`);
+    if (!zones.length) {
+      console.error(`No zone found for ${zoneName} — skipping ${DOMAIN}`);
+      continue;
+    }
     console.log(`Attaching ${DOMAIN}...`);
     await api(`/accounts/${ACCOUNT}/workers/domains`, {
       method: 'PUT',
@@ -326,10 +339,10 @@ if (DOMAIN) {
         environment: 'production',
         hostname: DOMAIN,
         service: SCRIPT,
-        zone_id: env.CLOUDFLARE_ZONE_ID,
+        zone_id: zones[0].id,
       }),
     });
     console.log('Custom domain attached.');
   }
-  console.log(`\nLive at https://${DOMAIN}`);
 }
+console.log(`\nLive at https://${DOMAINS[0]}`);
