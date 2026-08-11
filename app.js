@@ -5288,9 +5288,21 @@ function focusCard(id, rev, view, from) {
   cardFocusArt.style.transform = cardFocusFrom;
   cardFocusShownAt = performance.now();
   cardFocusEl.hidden = false;
+  const restingTransform = revT.trim() || '';
   requestAnimationFrame(() => requestAnimationFrame(() => {
     cardFocusArt.style.transition = '';
-    cardFocusArt.style.transform = revT.trim() || 'none';
+    cardFocusArt.style.transform = restingTransform || 'none';
+    // When the rise finishes, drop the transform entirely (or leave only the
+    // reversed rotation). A card left on a transform-promoted compositor layer
+    // is rasterised once and cached — on a high-DPI phone that cache is a
+    // low-resolution blow-up, the blur the whole card wears until dismissed.
+    // Clearing the transform retires the layer so the vector re-renders sharp.
+    const settle = () => {
+      cardFocusArt.style.transform = restingTransform;
+      void cardFocusArt.offsetHeight; // force the re-raster at device resolution
+    };
+    cardFocusArt.addEventListener('transitionend', settle, { once: true });
+    setTimeout(settle, 340); // belt-and-suspenders if transitionend is missed
   }));
 }
 
