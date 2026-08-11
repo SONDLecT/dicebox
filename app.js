@@ -1820,7 +1820,9 @@ msTargetDial.addEventListener('click', () => {
   openNumberDial({
     title: 'Target', value: ms.target ?? 30, min: 1, max: 99,
     actionLabel: 'Set Target', inputLabel: 'Target number',
+    clearLabel: 'Table sets it',
     commit: value => { ms.target = value; syncMs(); },
+    onClear: () => { ms.target = null; syncMs(); },
   });
 });
 // Only four tiers, so Skill cycles: a tap advances (None → Trained → Expert →
@@ -4635,6 +4637,7 @@ const dialInput = $('dialInput');
 const dialTitle = $('dialTitle');
 const dialPrefix = $('dialPrefix');
 const dialAdd = $('dialAdd');
+const dialClear = $('dialClear');
 const dialClose = $('dialClose');
 let customSides = 20;
 let dialReturnFocus = null;
@@ -4726,6 +4729,10 @@ function openNumberDial(config) {
   dialInput.setAttribute('aria-label', dialConfig.inputLabel);
   wheel.setAttribute('aria-label', dialConfig.inputLabel);
   dialAdd.textContent = dialConfig.actionLabel;
+  // An optional release action: some values (the Mothership target) can be
+  // given back to the table rather than set to a number.
+  dialClear.hidden = !dialConfig.clearLabel;
+  if (dialConfig.clearLabel) dialClear.textContent = dialConfig.clearLabel;
   for (const item of wheel.children) {
     const value = Number(item.dataset.value);
     item.hidden = value < dialConfig.min || value > dialConfig.max;
@@ -4766,7 +4773,7 @@ function closeDial() {
 
 dial.addEventListener('keydown', e => {
   if (e.key !== 'Tab' || dial.hidden) return;
-  const focusable = [dialClose, wheel, dialInput, dialAdd].filter(el => !el.hidden && !el.disabled);
+  const focusable = [dialClose, wheel, dialInput, dialAdd, dialClear].filter(el => !el.hidden && !el.disabled);
   if (!focusable.length) return;
   const first = focusable[0];
   const last = focusable[focusable.length - 1];
@@ -4784,6 +4791,10 @@ dial.addEventListener('keydown', e => {
 
 $('customDie').addEventListener('click', openDial);
 dialClose.addEventListener('click', closeDial);
+dialClear.addEventListener('click', () => {
+  if (dialConfig && dialConfig.onClear) dialConfig.onClear();
+  closeDial();
+});
 dialAdd.addEventListener('click', () => {
   const value = dialValue();
   const commit = dialConfig.commit;

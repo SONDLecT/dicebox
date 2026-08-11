@@ -1286,6 +1286,23 @@ body {
    reversal is a meaning, not a failure. */
 #total[data-variant="tarot-rev"] { color: var(--accent); }
 
+/* The dial's optional second action: releases the value back to "unset"
+   (the Mothership target's table-sets-it state). A quiet ghost next to the
+   primary commit. */
+.dial-clear {
+  appearance: none;
+  border: 1px solid var(--hair);
+  background: none;
+  color: var(--muted);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.dial-clear:hover { color: var(--line); border-color: var(--muted); }
+
 /* ---- system picker popover ---- */
 /* A corner menu anchored under the header's mode button (openMode positions it
    from the button's rect). One-line rows: mark, shorthand, dice. */
