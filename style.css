@@ -1155,7 +1155,11 @@ body {
 }
 .card-focus-art {
   transition: transform 280ms cubic-bezier(0.2, 0.8, 0.25, 1), opacity 220ms ease;
-  will-change: transform;
+  /* No will-change: pinning this as a permanent GPU layer makes the browser
+     rasterise the vector card once at a low resolution and scale the texture,
+     which fills a high-DPI screen with a blurry blow-up. The transform
+     transition still composites on its own for the 280ms it runs; letting the
+     layer retire afterwards re-rasterises the SVG crisp at device resolution. */
 }
 .card-focus-art svg,
 .card-focus-art img {
