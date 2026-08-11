@@ -323,7 +323,20 @@ timeouts, origins — in full.
 
 There is an Owlbear Rodeo panel, which joins a room as an ordinary member —
 same passphrase, same rolls, no special status. It is the same app built for an
-iframe rather than a second implementation:
+iframe rather than a second implementation.
+
+**To add the hosted panel:** in Owlbear Rodeo open **Profile → Add Extension**
+and paste
+
+```
+https://vtt.dicebox.cc/manifest.json
+```
+
+The Dicebox panel then appears in the room's toolbar. Everyone who wants the
+shared log joins the same room with the same passphrase — in the panel, in a
+browser tab, or on a phone; they are all the same kind of participant.
+
+**To host your own panel** instead of using that one:
 
 ```sh
 npm run build:owlbear -- --relay=wss://relay.example.com/ws --host=vtt.example.com

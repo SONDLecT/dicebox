@@ -2378,3 +2378,6 @@ body {
 @media (prefers-reduced-motion: reduce) {
   * { transition-duration: 1ms !important; }
 }
+
+.room-owlbear{margin-top:12px;padding-top:12px;border-top:1px solid var(--hair);line-height:1.5}
+.room-owlbear code{font-family:ui-monospace,monospace;font-size:0.92em;background:color-mix(in srgb,var(--line) 8%,transparent);padding:1px 5px;border-radius:5px;word-break:break-all}

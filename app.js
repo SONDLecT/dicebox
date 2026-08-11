@@ -5897,6 +5897,10 @@ function suggestName() {
 }
 
 const roomPanel = $('roomPanel');
+// Don't tell the Owlbear panel how to add the Owlbear panel: hide that note
+// when Dicebox is already running framed. Comparing window refs is safe even
+// cross-origin; reading the parent's location would not be, so we never do.
+if (window.self !== window.top) { const _ow = $('roomOwlbear'); if (_ow) _ow.hidden = true; }
 const roomToggle = $('roomToggle');
 const roomFlag = $('shareFlag');
 const roomNameField = $('roomName');
