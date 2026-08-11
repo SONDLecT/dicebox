@@ -5654,8 +5654,11 @@ function trayIdle() {
 // drawing them wastes a frame on something nobody can see — and any translucency
 // in the panel would let them ghost through.
 function trayCovered() {
-  return !sheet.hidden || !dial.hidden || !historyPanel.hidden || !help.hidden
-      || !roomPanel.hidden;
+  // Only the full-viewport modals count — they use inset:0, so nothing behind
+  // them is visible and drawing the tray is wasted. The help and room panels
+  // (and the mode picker) are corner popovers: the table shows around them, so
+  // the tray must keep rendering or the visible part blanks out.
+  return !sheet.hidden || !dial.hidden || !historyPanel.hidden;
 }
 
 function drawFrame(dt) {
