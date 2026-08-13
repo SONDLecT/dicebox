@@ -1342,10 +1342,17 @@ function v5Step(kind, by) {
 // unset, which the reducer treats differently from a difficulty of 1.
 bindTapHold(v5NormalFace, dir => v5Step('normal', dir));
 bindTapHold(v5HungerFace, dir => v5Step('hunger', dir));
-bindTapHold(v5DiffChip, dir => {
-  if (dir > 0) v5.difficulty = v5.difficulty === null ? 1 : Math.min(10, v5.difficulty + 1);
-  else v5.difficulty = v5.difficulty === null || v5.difficulty <= 1 ? null : v5.difficulty - 1;
-  syncV5();
+// Difficulty opens the tactile roller, the one number-picker every system
+// shares, with a "Table sets it" release back to unset — the same control as
+// the Mothership target and the custom die.
+v5DiffChip.addEventListener('click', () => {
+  openNumberDial({
+    title: 'Difficulty', value: v5.difficulty ?? 4, min: 1, max: 10,
+    actionLabel: 'Set Difficulty', inputLabel: 'Difficulty',
+    clearLabel: 'Table sets it',
+    commit: value => { v5.difficulty = value; syncV5(); },
+    onClear: () => { v5.difficulty = null; syncV5(); },
+  });
 });
 
 // A `v5:` pool typed into the field drives the controls, so the two never
@@ -1533,10 +1540,14 @@ bindTapHold(dhAdvButtons.find(b => b.dataset.adv === 'dis'), dir => {
 $('dhRoll').addEventListener('click', () => doRoll(dhNotation()));
 
 bindTapHold(dhModChip, dir => { dhState.modifier = Math.max(-100, Math.min(100, dhState.modifier + dir)); syncDh(); });
-bindTapHold(dhDiffChip, dir => {
-  if (dir > 0) dhState.difficulty = dhState.difficulty === null ? 10 : Math.min(100, dhState.difficulty + 1);
-  else dhState.difficulty = dhState.difficulty === null || dhState.difficulty <= 1 ? null : dhState.difficulty - 1;
-  syncDh();
+dhDiffChip.addEventListener('click', () => {
+  openNumberDial({
+    title: 'Difficulty', value: dhState.difficulty ?? 12, min: 1, max: 100,
+    actionLabel: 'Set Difficulty', inputLabel: 'Difficulty',
+    clearLabel: 'Table sets it',
+    commit: value => { dhState.difficulty = value; syncDh(); },
+    onClear: () => { dhState.difficulty = null; syncDh(); },
+  });
 });
 
 function syncDhFromField() {
@@ -1583,7 +1594,7 @@ function bindTapHold(el, step) {
   });
 }
 
-const ct = { dice: 6, difficulty: 3 };
+const ct = { dice: 6, difficulty: null };
 const ctAddDie = $('ctAddDie');
 const ctDiffChip = $('ctDiffChip');
 const ctDiffVal = $('ctDifficulty');
@@ -1592,7 +1603,7 @@ function resetCthulhuTech() {
   // CthulhuTech builds a pool, so it opens empty like the numeric tray — tap the
   // d10 to add. Difficulty is a setting, not a die, so it keeps its default.
   ct.dice = 0;
-  ct.difficulty = 3;
+  ct.difficulty = null;
   syncCt({ writeField: false });
 }
 
@@ -1623,10 +1634,14 @@ function syncCt({ writeField = true } = {}) {
 // Tap the d10 to add to the pool, hold to remove one (down to empty).
 bindTapHold(ctAddDie, dir => { ct.dice = Math.max(0, Math.min(100, ct.dice + dir)); syncCt(); });
 // Difficulty cycles unset → 1 … 20; holding below 1 returns to unset (report hits).
-bindTapHold(ctDiffChip, dir => {
-  if (dir > 0) ct.difficulty = ct.difficulty === null ? 1 : Math.min(20, ct.difficulty + 1);
-  else ct.difficulty = ct.difficulty === null || ct.difficulty <= 1 ? null : ct.difficulty - 1;
-  syncCt();
+ctDiffChip.addEventListener('click', () => {
+  openNumberDial({
+    title: 'Difficulty', value: ct.difficulty ?? 3, min: 1, max: 20,
+    actionLabel: 'Set Difficulty', inputLabel: 'Difficulty',
+    clearLabel: 'Table sets it',
+    commit: value => { ct.difficulty = value; syncCt(); },
+    onClear: () => { ct.difficulty = null; syncCt(); },
+  });
 });
 
 function syncCtFromField() {
@@ -1646,7 +1661,7 @@ function syncCtFromField() {
 
 // Success starts empty — the Feat die always rolls and shows in the tray, and you
 // build the Success pool on top of it.
-const tor = { success: 0, favour: null, weary: false, tn: 14 };
+const tor = { success: 0, favour: null, weary: false, tn: null };
 const torAddSuccess = $('torAddSuccess');
 const torTnChip = $('torTnChip');
 const torTnVal = $('torTn');
@@ -1656,7 +1671,7 @@ function resetOneRing() {
   tor.success = 0;
   tor.favour = null;
   tor.weary = false;
-  tor.tn = 14;
+  tor.tn = null;
   syncTor({ writeField: false });
 }
 
@@ -1689,10 +1704,14 @@ for (const btn of torFlagButtons) {
 // Tap the d6 to add a Success die, hold to remove one.
 bindTapHold(torAddSuccess, dir => { tor.success = Math.max(0, Math.min(20, tor.success + dir)); syncTor(); });
 // Target cycles unset → 10 … 100; holding below 1 returns to unset.
-bindTapHold(torTnChip, dir => {
-  if (dir > 0) tor.tn = tor.tn === null ? 10 : Math.min(100, tor.tn + 1);
-  else tor.tn = tor.tn === null || tor.tn <= 1 ? null : tor.tn - 1;
-  syncTor();
+torTnChip.addEventListener('click', () => {
+  openNumberDial({
+    title: 'Target Number', value: tor.tn ?? 14, min: 1, max: 100,
+    actionLabel: 'Set Target', inputLabel: 'Target Number',
+    clearLabel: 'Table sets it',
+    commit: value => { tor.tn = value; syncTor(); },
+    onClear: () => { tor.tn = null; syncTor(); },
+  });
 });
 
 function syncTorFromField() {
