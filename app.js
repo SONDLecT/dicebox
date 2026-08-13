@@ -647,6 +647,7 @@ function flattenRollDice(result) {
 // colour so the renderer stays system-agnostic. `remote` marks a peer's dice so
 // haptics fire only on your own throws; they look identical either way.
 function buildTrayDice(flat, result, { remote = false } = {}) {
+  let crownedMarked = false;
   return flat.map(f => {
     const die = new Die(f.sides, f.value, 0, 0, 40);
     die.kept = f.kept;
@@ -726,8 +727,13 @@ function buildTrayDice(flat, result, { remote = false } = {}) {
     // An oracle draw is a single dN in the steel oracle colour — neutral, since a
     // table result is information, not a pass/fail.
     else if (result.system === 'oracle') die.genColor = IRON_COLORS.oracle;
-    // DCC (numeric rolls in the dice-chain mode): each die takes its chain colour.
-    if (uiSystem === 'dcc' && f.sides && DCC_COLORS[f.sides]) die.genColor = DCC_COLORS[f.sides];
+    // DCC (numeric rolls in the dice-chain mode): each die takes its chain colour,
+    // and the first die matching the crowned type wears a gold glow on the tray —
+    // the action die, unmistakable once it lands.
+    if (uiSystem === 'dcc' && f.sides && DCC_COLORS[f.sides]) {
+      die.genColor = DCC_COLORS[f.sides];
+      if (!crownedMarked && f.sides === dccCrown) { die.crowned = true; crownedMarked = true; }
+    }
     return die;
   });
 }
@@ -4791,11 +4797,16 @@ function stageFromPool({ writeField }) {
   clearError();
 
   const staged = [];
+  let stagedCrown = false;
   for (const [sides, entry] of pool) {
     for (let i = 0; i < entry.count; i++) {
       const d = new Die(sides, null, 0, 0, 40);
-      // In DCC the staged pool wears the chain colours too, not just after rolling.
-      if (uiSystem === 'dcc' && DCC_COLORS[sides]) d.genColor = DCC_COLORS[sides];
+      // In DCC the staged pool wears the chain colours too, not just after rolling,
+      // and the crowned type gets its gold aura here as well.
+      if (uiSystem === 'dcc' && DCC_COLORS[sides]) {
+        d.genColor = DCC_COLORS[sides];
+        if (!stagedCrown && sides === dccCrown) { d.crowned = true; stagedCrown = true; }
+      }
       staged.push(d);
     }
   }
@@ -5211,6 +5222,8 @@ const DCC_SHAPE = {
 };
 function dccShapePath(sides) {
   if (sides === 10) return 'M15 2.5 26 13 15 27.5 4 13Z';
+  // The d7 is the oddball — a rounded barrel/pentagonal prism, not a polygon.
+  if (sides === 7) return 'M9 5 Q3.5 15 9 25 Q15 27.2 21 25 Q26.5 15 21 5 Q15 2.8 9 5 Z';
   const [n, rot] = DCC_SHAPE[sides] || [8, -90];
   const r = 12.5, pts = [];
   for (let i = 0; i < n; i++) {
@@ -5232,8 +5245,12 @@ function dccStep(sides, dir) {
 }
 function setDccCrown(sides) {
   dccCrown = sides;
-  for (const wrap of dccChainEl.children) {
-    wrap.classList.toggle('is-action', DCC_STRIP[Number(wrap.dataset.i)] === dccCrown);
+  const idx = DCC_STRIP.indexOf(sides);
+  [...dccChainEl.children].forEach((wrap, i) => wrap.classList.toggle('is-action', i === idx));
+  const crowned = dccChainEl.children[idx];
+  if (crowned) {
+    crowned.querySelector('.dcc-arrow-l').disabled = idx === 0;
+    crowned.querySelector('.dcc-arrow-r').disabled = idx === DCC_STRIP.length - 1;
   }
 }
 
@@ -5246,12 +5263,34 @@ function buildDccChain() {
     wrap.style.setProperty('--dc', DCC_COLORS[sides]);
     if (sides === dccCrown) wrap.classList.add('is-action');
 
+    // The crown row: a left step-arrow, the crown itself, a right step-arrow.
+    // Only the crowned die shows any of it. The arrows shift the crown one step
+    // along the chain; tapping a die's crown directly jumps it there.
+    const crownRow = document.createElement('div');
+    crownRow.className = 'dcc-crown-row';
+
+    const arrowL = document.createElement('button');
+    arrowL.type = 'button';
+    arrowL.className = 'dcc-arrow dcc-arrow-l';
+    arrowL.setAttribute('aria-label', 'Step the crown one die down the chain');
+    arrowL.innerHTML = '<svg viewBox="0 0 12 16" aria-hidden="true"><path d="M9 2 3 8l6 6"/></svg>';
+    arrowL.addEventListener('click', e => { e.stopPropagation(); if (i > 0) setDccCrown(DCC_STRIP[i - 1]); });
+
     const crown = document.createElement('button');
     crown.type = 'button';
     crown.className = 'dcc-crown';
     crown.setAttribute('aria-label', `Make d${sides} your action die`);
     crown.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18 4.6 8 9 12.5 12 5 15 12.5 19.4 8 21 18Z"/></svg>';
     crown.addEventListener('click', () => setDccCrown(sides));
+
+    const arrowR = document.createElement('button');
+    arrowR.type = 'button';
+    arrowR.className = 'dcc-arrow dcc-arrow-r';
+    arrowR.setAttribute('aria-label', 'Step the crown one die up the chain');
+    arrowR.innerHTML = '<svg viewBox="0 0 12 16" aria-hidden="true"><path d="M3 2l6 6-6 6"/></svg>';
+    arrowR.addEventListener('click', e => { e.stopPropagation(); if (i < DCC_STRIP.length - 1) setDccCrown(DCC_STRIP[i + 1]); });
+
+    crownRow.append(arrowL, crown, arrowR);
 
     const die = document.createElement('button');
     die.type = 'button';
@@ -5260,7 +5299,7 @@ function buildDccChain() {
     die.innerHTML = `<svg class="dcc-token-shape" viewBox="0 0 30 30" aria-hidden="true"><path d="${dccShapePath(sides)}"/></svg><span class="dcc-token-label">d${sides}</span>`;
     bindTapHold(die, dir => dccStep(sides, dir));
 
-    wrap.append(crown, die);
+    wrap.append(crownRow, die);
     dccChainEl.append(wrap);
   });
   dccChainEl.dataset.built = '1';
@@ -5268,6 +5307,7 @@ function buildDccChain() {
 
 function enterDcc() {
   buildDccChain();
+  setDccCrown(dccCrown);
   markDccPool();
 }
 

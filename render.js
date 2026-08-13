@@ -1303,6 +1303,13 @@ export class Die {
     const micro = !this.solid.hideSmoothEdges && this.solid.faces.length > SPHERICAL_AT
       ? Math.min(0.55, Math.max(0.08, 0.55 * Math.sqrt(100 / this.solid.faces.length)))
       : null;
+    // The DCC action die wears its crown into the tray: a gold aura glows around
+    // the wireframe — on the staged shelf and once it lands — so the die you rolled
+    // as your action die is unmistakable among a fistful of others.
+    if (this.crowned) {
+      ctx.shadowColor = '#E6C63C';
+      ctx.shadowBlur = 13;
+    }
     const emit = (edges, alpha, width) => {
       ctx.beginPath();
       for (const edge of edges) {
@@ -1352,6 +1359,7 @@ export class Die {
       ctx.stroke();
     }
     }
+    ctx.shadowBlur = 0;
     ctx.globalAlpha = fade;
 
     this.drawValue(ctx, theme, s, pts, proj);

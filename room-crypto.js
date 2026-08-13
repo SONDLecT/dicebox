@@ -13,7 +13,7 @@
 // A hand-written list was tried first and carried 35 bits at five words, which
 // is not enough — the count of words in the list matters as much as the count
 // of words in the phrase, and it is easy to be badly wrong about by eye.
-const WORDS = [
+export const WORDS = [
   'acid', 'acorn', 'acre', 'acts', 'afar', 'affix', 'aged', 'agent', 'agile', 'aging',
   'agony', 'ahead', 'aide', 'aids', 'aim', 'ajar', 'alarm', 'alias', 'alibi', 'alien',
   'alike', 'alive', 'aloe', 'aloft', 'aloha', 'alone', 'amend', 'amino', 'ample', 'amuse',

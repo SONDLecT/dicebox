@@ -777,14 +777,29 @@ body {
   display: flex; flex-direction: column; align-items: center; width: 50px;
 }
 /* A crown above each die — dim and hollow until you crown that die; then it is
-   solid gold and the die below it glows as the action die (the king). */
-/* The space above every die is a tap target that crowns it, but only the crowned
-   die shows a crown — no ghost outlines cluttering the rest. Desktop gets a faint
-   hover hint so the affordance is discoverable. */
+   solid gold and the die below it glows as the action die (the king). The space
+   above every die is a tap target that crowns it, but only the crowned die shows
+   a crown — no ghost outlines cluttering the rest. Desktop gets a faint hover
+   hint so the affordance is discoverable. On the crowned die the crown is flanked
+   by ‹ › arrows that step it one die along the chain. */
+.dcc-crown-row { display: flex; align-items: center; justify-content: center; height: 16px; }
 .dcc-crown { appearance: none; border: 0; background: transparent; cursor: pointer; width: 30px; height: 16px; padding: 0; display: grid; place-items: center; }
 .dcc-crown svg { width: 20px; height: 13px; fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-linejoin: round; opacity: 0; transition: opacity .15s; }
 .dcc-crown:hover svg { opacity: 0.35; }
 .dcc-token.is-action .dcc-crown svg { fill: #E6C63C; stroke: #E6C63C; opacity: 1; }
+/* The step-arrows collapse to nothing on every die but the crowned one, so the
+   rest of the chain keeps its tight spacing. */
+.dcc-arrow {
+  appearance: none; border: 0; background: transparent; cursor: pointer;
+  width: 0; height: 16px; padding: 0; overflow: hidden; display: grid; place-items: center;
+  opacity: 0; pointer-events: none; transition: opacity .15s;
+}
+.dcc-arrow svg { width: 11px; height: 14px; fill: none; stroke: #E6C63C; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.dcc-arrow-l { padding-right: 1px; }
+.dcc-arrow-r { padding-left: 1px; }
+.dcc-token.is-action .dcc-arrow { width: 16px; opacity: 0.9; pointer-events: auto; }
+.dcc-token.is-action .dcc-arrow:hover { opacity: 1; }
+.dcc-token.is-action .dcc-arrow[disabled] { opacity: 0.2; cursor: default; }
 
 .dcc-die-btn {
   appearance: none; border: 0; background: transparent; cursor: pointer;
@@ -803,8 +818,10 @@ body {
   content: "×" attr(data-count); position: absolute; top: 12px; right: 2px;
   color: var(--dc); font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums;
 }
-/* The action die reads as the king — full colour and a gentle glow-pulse. */
-.dcc-token.is-action .dcc-die-btn { opacity: 1; }
+/* The action die reads as the king — grown ~40%, full colour, a gentle glow-pulse,
+   and lifted above its neighbours so the extra size never gets clipped. */
+.dcc-token.is-action { z-index: 2; }
+.dcc-token.is-action .dcc-die-btn { opacity: 1; transform: scale(1.4); transform-origin: center top; }
 .dcc-token.is-action .dcc-token-shape path { fill: color-mix(in srgb, var(--dc) 42%, transparent); }
 .dcc-token.is-action .dcc-token-label { color: var(--dc); }
 .dcc-token.is-action .dcc-token-shape { animation: dcc-crownglow 1.9s ease-in-out infinite; }

@@ -14,7 +14,22 @@ if (!globalThis.btoa) {
 import {
   generatePassphrase, normalizePassphrase, deriveRoom, newSender,
   encryptMessage, decryptMessage, PHRASE_BITS, PHRASE_WORDS, PROTOCOL_VERSION,
+  WORDS,
 } from '../room-crypto.js';
+
+// Passphrases join words with '-', but the EFF list itself contains a hyphenated
+// entry ("yo-yo"), so a naive split over-counts. Greedily re-merge any adjacent
+// pair that spells a real wordlist entry to recover the true word count.
+const WORD_SET = new Set(WORDS);
+function phraseWordCount(p) {
+  const seg = p.split('-');
+  let n = 0;
+  for (let i = 0; i < seg.length; ) {
+    if (i + 1 < seg.length && WORD_SET.has(`${seg[i]}-${seg[i + 1]}`)) { n++; i += 2; }
+    else { n++; i++; }
+  }
+  return n;
+}
 
 let pass = 0, fail = 0;
 const ok = (name, cond, extra = '') => {
@@ -30,7 +45,7 @@ const rejects = async (name, fn, extra = '') => {
 
 {
   const p = generatePassphrase();
-  ok('passphrase has the right number of words', p.split('-').length === PHRASE_WORDS, p);
+  ok('passphrase has the right number of words', phraseWordCount(p) === PHRASE_WORDS, p);
   ok('passphrase is lowercase and hyphenated', /^[a-z]+(-[a-z]+)+$/.test(p), p);
 
   // 51.7 bits from five EFF words. That is not enough on its own — it is the
