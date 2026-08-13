@@ -4865,7 +4865,9 @@ function markDccPool() {
   if (!dccChainEl) return;
   for (const t of dccChainEl.children) {
     const n = pool.get(DCC_STRIP[Number(t.dataset.i)])?.count || 0;
-    if (n > 1) t.dataset.count = String(n); else delete t.dataset.count;
+    // The count rides the chip itself so its ::after can read attr(data-count).
+    const chip = t.querySelector('.dcc-chip');
+    if (n > 1) chip.dataset.count = String(n); else delete chip.dataset.count;
     t.classList.toggle('in-pool', n > 0);
   }
 }
@@ -5252,6 +5254,11 @@ function setDccCrown(sides) {
     crowned.querySelector('.dcc-arrow-l').disabled = idx === 0;
     crowned.querySelector('.dcc-arrow-r').disabled = idx === DCC_STRIP.length - 1;
   }
+  // Recolour the staged tray live: colour marks the action die, so moving the
+  // crown while a pool is out on the shelf must move the coloured die in step.
+  if (uiSystem === 'dcc' && pool.size > 0 && $('total').dataset.idle === '1') {
+    stageFromPool({ writeField: false });
+  }
 }
 
 function buildDccChain() {
@@ -5260,6 +5267,7 @@ function buildDccChain() {
     const wrap = document.createElement('div');
     wrap.className = 'dcc-token';
     wrap.dataset.i = i;
+    wrap.dataset.sides = sides;
     // The chain hue rides on --chain; a die only spends it (as --dc) once crowned.
     wrap.style.setProperty('--chain', DCC_COLORS[sides]);
     if (sides === dccCrown) wrap.classList.add('is-action');
