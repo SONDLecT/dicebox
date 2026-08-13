@@ -2121,6 +2121,7 @@ function resetIron() { iron.modifier = 2; iron.progressScore = 1; ironActive = {
 
 function syncIron({ writeField = true } = {}) {
   ironDial.textContent = iron.modifier > 0 ? '+' + iron.modifier : String(iron.modifier);
+  $('ironProgressDial').textContent = iron.progressScore;
   for (const tile of $('ironShelf').querySelectorAll('.iron-tile')) {
     const active = ironActive.kind === 'oracle'
       ? (tile.dataset.id === ironActive.id)
@@ -2151,11 +2152,14 @@ ironDial.addEventListener('click', () => {
     commit: v => { iron.modifier = v; selectIronRoll({ kind: 'action' }, { roll: false }); },
   });
 });
-$('ironProgress').addEventListener('click', () => {
+// Mirrors the Action tile: the body rolls the progress roll at the current box
+// count; the value chip opens the dial to set the boxes (0-10) without rolling.
+$('ironProgressRoll').addEventListener('click', () => selectIronRoll({ kind: 'progress' }));
+$('ironProgressDial').addEventListener('click', () => {
   openNumberDial({
     title: 'Progress — filled boxes', value: iron.progressScore, min: 1, max: 10,
-    actionLabel: 'Roll progress', inputLabel: 'Filled boxes',
-    commit: v => { iron.progressScore = v; selectIronRoll({ kind: 'progress' }); },
+    actionLabel: 'Set boxes', inputLabel: 'Filled boxes',
+    commit: v => { iron.progressScore = v; selectIronRoll({ kind: 'progress' }, { roll: false }); },
   });
 });
 
@@ -2176,6 +2180,19 @@ function unpinOracle(id) {
   renderIronPins();
   if (ironActive.kind === 'oracle' && ironActive.id === id) selectIronRoll({ kind: 'action' }, { roll: false });
 }
+// The collection breadcrumb for a table id, cached per dataset — a pinned
+// "Feature" is meaningless without its "Planet › Inhabited World" context.
+function oraclePath(id) {
+  const ds = curOracles();
+  if (!ds) return '';
+  if (!ds.__paths) {
+    const map = Object.create(null);
+    for (const t of oracleTableList(ds)) map[t.id] = t.path.join(' › ');
+    Object.defineProperty(ds, '__paths', { value: map, enumerable: false });
+  }
+  return ds.__paths[id] || '';
+}
+
 function renderIronPins() {
   const shelf = $('ironShelf');
   if (!shelf) return;
@@ -2192,13 +2209,15 @@ function renderIronPins() {
     const main = document.createElement('button');
     main.type = 'button';
     main.className = 'iron-tile-main';
+    const path = oraclePath(id);
     const name = document.createElement('span');
     name.className = 'iron-tile-name';
     name.textContent = table.name;
     const sub = document.createElement('span');
     sub.className = 'iron-tile-sub';
-    sub.textContent = 'd' + table.sides;
+    sub.textContent = path || ('d' + table.sides);
     main.append(name, sub);
+    main.title = path ? `${path} › ${table.name}` : table.name;
     main.addEventListener('click', () => selectIronRoll({ kind: 'oracle', id }));
     const close = document.createElement('button');
     close.type = 'button';
