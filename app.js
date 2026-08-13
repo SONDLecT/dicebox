@@ -1259,10 +1259,9 @@ function setSystem(system, { roll = false, url = true } = {}) {
   // Daggerheart and Mothership keep the numeric strip too — their signature roll
   // is separate, but weapons/damage/wounds are ordinary dice. Mothership's owned
   // books use d5, d10, d20 and d100; d? remains available for table-specific dice.
-  numPicker.hidden = system !== 'numeric' && system !== 'daggerheart' && system !== 'mothership' && system !== 'dcc';
+  numPicker.hidden = system !== 'numeric' && system !== 'daggerheart' && system !== 'mothership';
   diceButtons.classList.toggle('standard-only', system === 'daggerheart');
   diceButtons.classList.toggle('mothership-only', system === 'mothership');
-  diceButtons.classList.toggle('dcc-only', system === 'dcc');
   if (system === 'dcc') enterDcc();
   numPicker.classList.toggle('mothership-rail', system === 'mothership');
   msFieldsRow.hidden = system !== 'mothership';
@@ -1279,7 +1278,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
   cocPicker.hidden = system !== 'callofcthulhu';
   dgPicker.hidden = system !== 'deltagreen';
   ironPicker.hidden = system !== 'ironsworn' && system !== 'starforged';
-  $('dccFieldsRow').hidden = system !== 'dcc';
+  $('dccPicker').hidden = system !== 'dcc';
   cardsPicker.hidden = system !== 'cards';
   tarotPicker.hidden = system !== 'tarot';
   napPicker.hidden = system !== 'napoletane';
@@ -4793,7 +4792,12 @@ function stageFromPool({ writeField }) {
 
   const staged = [];
   for (const [sides, entry] of pool) {
-    for (let i = 0; i < entry.count; i++) staged.push(new Die(sides, null, 0, 0, 40));
+    for (let i = 0; i < entry.count; i++) {
+      const d = new Die(sides, null, 0, 0, 40);
+      // In DCC the staged pool wears the chain colours too, not just after rolling.
+      if (uiSystem === 'dcc' && DCC_COLORS[sides]) d.genColor = DCC_COLORS[sides];
+      staged.push(d);
+    }
   }
   state.dice = staged.slice(0, ANIMATE_LIMIT);
   placeGrid(state.dice);
@@ -5178,49 +5182,80 @@ function ensureDieButton(sides) {
 
 // ---- Dungeon Crawl Classics: the dice chain ----
 //
-// The numeric roller trimmed to the chain (the dcc-only strip filter shows just
-// these dice), plus a tracker for your action die: shift it up or down the chain
-// and tap it to roll. The die strip below still builds ordinary pools (2d6+3
-// damage, a d16 spell), so nothing about numeric rolling is lost.
-const dcc = { pos: DCC_CHAIN.indexOf(20) };   // index into DCC_CHAIN; d20 to start
-function dccSides() { return DCC_CHAIN[dcc.pos]; }
+// A tactile die selector: the chain is a scroll-snapping row of die-shaped tokens
+// (each its own 2D shape and colour, like the Genesys dice), and the token in the
+// centre is your action die — enlarged, and what Roll throws. Scroll or tap to
+// move along the chain; there is no separate dialog. d100 rides the end for the
+// Judge's tables. Ordinary pools (2d6+3 damage) are still typeable in the field.
+const dcc = { pos: DCC_STRIP.indexOf(20) };   // index into DCC_STRIP
+function dccSides() { return DCC_STRIP[dcc.pos]; }
+const dccChainEl = $('dccChain');
+
+// A regular polygon per die, rotated so chain neighbours read differently even
+// when they share a vertex count; d10 is the classic kite, d100 a near-circle.
+const DCC_SHAPE = {
+  3: [3, -90], 4: [3, 90], 5: [5, -90], 6: [4, -45], 7: [7, -90], 8: [4, -90],
+  12: [5, 90], 14: [6, -90], 16: [8, -90], 20: [6, 0], 24: [8, 22.5], 30: [10, -90], 100: [24, -90],
+};
+function dccShapePath(sides) {
+  if (sides === 10) return 'M15 2.5 26 13 15 27.5 4 13Z';
+  const [n, rot] = DCC_SHAPE[sides] || [8, -90];
+  const r = 12.5, pts = [];
+  for (let i = 0; i < n; i++) {
+    const a = (rot + i * 360 / n) * Math.PI / 180;
+    pts.push(`${(15 + r * Math.cos(a)).toFixed(1)} ${(15 + r * Math.sin(a)).toFixed(1)}`);
+  }
+  return 'M' + pts.join(' ') + 'Z';
+}
+
+function buildDccChain() {
+  if (!dccChainEl || dccChainEl.dataset.built) return;
+  DCC_STRIP.forEach((sides, i) => {
+    const t = document.createElement('button');
+    t.type = 'button';
+    t.className = 'dcc-token';
+    t.dataset.i = i;
+    t.style.setProperty('--dc', DCC_COLORS[sides]);
+    t.setAttribute('aria-label', 'd' + sides);
+    t.innerHTML = `<svg class="dcc-token-shape" viewBox="0 0 30 30" aria-hidden="true"><path d="${dccShapePath(sides)}"/></svg><span class="dcc-token-label">d${sides}</span>`;
+    // Tapping the active (centred) die rolls it; tapping another selects it.
+    t.addEventListener('click', () => { if (i === dcc.pos) doRoll('d' + sides); else centerDccToken(i); });
+    dccChainEl.append(t);
+  });
+  dccChainEl.dataset.built = '1';
+}
 
 function enterDcc() {
-  // Every chain die earns a real button, tagged so the dcc-only filter shows just
-  // the chain (and hides the d? — the whole chain is present, so it is not needed).
-  // Each carries its chain colour as --dc for the button tint.
-  for (const s of DCC_STRIP) ensureDieButton(s);
-  for (const b of diceButtons.children) {
-    const sides = Number(b.dataset.sides);
-    const inStrip = DCC_SET.has(sides);
-    b.classList.toggle('dcc-chain', inStrip);
-    if (inStrip) b.style.setProperty('--dc', DCC_COLORS[sides]);
-  }
-  syncDccTrack();
+  buildDccChain();
+  requestAnimationFrame(() => centerDccToken(dcc.pos, { smooth: false }));
 }
 
-function syncDccTrack() {
-  const dccDie = $('dccDie');
-  dccDie.textContent = 'd' + dccSides();
-  dccDie.style.setProperty('--dc', DCC_COLORS[dccSides()]);
-  $('dccDown').disabled = dcc.pos === 0;
-  $('dccUp').disabled = dcc.pos === DCC_CHAIN.length - 1;
-  // Mark the action die on the strip so its place on the chain is visible.
-  for (const b of diceButtons.children) {
-    if (b.dataset.sides) b.classList.toggle('dcc-current', Number(b.dataset.sides) === dccSides());
-  }
+function centerDccToken(i, { smooth = true } = {}) {
+  dcc.pos = Math.max(0, Math.min(DCC_STRIP.length - 1, i));
+  markDccActive();
+  const t = dccChainEl.children[dcc.pos];
+  if (t) t.scrollIntoView({ inline: 'center', block: 'nearest', behavior: smooth ? 'smooth' : 'auto' });
 }
 
-function shiftDcc(by) {
-  dcc.pos = Math.max(0, Math.min(DCC_CHAIN.length - 1, dcc.pos + by));
-  syncDccTrack();
-  const cur = [...diceButtons.children].find(b => Number(b.dataset.sides) === dccSides());
-  cur?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+function markDccActive() {
+  [...dccChainEl.children].forEach((t, i) => t.classList.toggle('is-active', i === dcc.pos));
+  if (uiSystem === 'dcc') $('notation').value = 'd' + dccSides();
 }
 
-$('dccDown').addEventListener('click', () => shiftDcc(-1));
-$('dccUp').addEventListener('click', () => shiftDcc(1));
-$('dccDie').addEventListener('click', () => doRoll('d' + dccSides()));
+// On scroll, the token nearest the centre becomes the action die.
+let dccScrollTimer = null;
+dccChainEl?.addEventListener('scroll', () => {
+  clearTimeout(dccScrollTimer);
+  dccScrollTimer = setTimeout(() => {
+    const mid = dccChainEl.scrollLeft + dccChainEl.clientWidth / 2;
+    let best = dcc.pos, bestD = Infinity;
+    [...dccChainEl.children].forEach((t, i) => {
+      const d = Math.abs(t.offsetLeft + t.offsetWidth / 2 - mid);
+      if (d < bestD) { bestD = d; best = i; }
+    });
+    if (best !== dcc.pos) { dcc.pos = best; markDccActive(); }
+  }, 80);
+}, { passive: true });
 
 // ---- full history ----
 //

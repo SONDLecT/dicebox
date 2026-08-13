@@ -761,20 +761,31 @@ body {
 /* The owned PSG/WOM use only d5, d10, d20 and d100. Keep d? and a custom die
    created through it, but hide Dicebox's broader DCC/novelty catalog here. */
 .dice-buttons.mothership-only .dbtn:not(.custom):not([data-sides="5"]):not([data-sides="10"]):not([data-sides="20"]):not([data-sides="100"]):not([data-custom]) { display: none; }
-/* DCC: the strip is exactly the dice chain — every button tagged .dcc-chain on
-   entry — so the d? and any off-chain die drop away. */
-.dice-buttons.dcc-only .dbtn:not(.dcc-chain) { display: none; }
-.dice-buttons.dcc-only .dbtn.dcc-chain { border-color: var(--dc); color: var(--dc); }
-.dice-buttons.dcc-only .dbtn.dcc-current { box-shadow: 0 0 0 2px var(--dc); }
-/* DCC action-die tracker: a stepper showing where you sit on the chain. */
-.dcc-fields-row { display: flex; align-items: center; gap: 10px; padding-bottom: 8px; }
-.dcc-label { font-family: "Iosevka Etoile", ui-monospace, monospace; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
-.dcc-stepper { display: inline-flex; align-items: stretch; border: 1px solid var(--hair); border-radius: 12px; overflow: hidden; }
-.dcc-shift { appearance: none; border: 0; background: var(--face); color: var(--line); font-size: 14px; padding: 0 14px; cursor: pointer; }
-.dcc-shift:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 12%, transparent); }
-.dcc-shift:disabled { color: var(--muted); opacity: 0.45; cursor: default; }
-.dcc-die { appearance: none; border: 0; border-left: 1px solid var(--hair); border-right: 1px solid var(--hair); background: color-mix(in srgb, var(--dc, var(--accent)) 14%, transparent); color: var(--dc, var(--accent)); font: inherit; font-weight: 700; font-size: 16px; padding: 9px 16px; cursor: pointer; font-variant-numeric: tabular-nums; min-width: 62px; }
-.dcc-die:hover { background: color-mix(in srgb, var(--dc, var(--accent)) 24%, transparent); }
+/* DCC: the dice chain as a horizontal scroll-snap selector. Each die is its own
+   2D shape in its own colour; the token centred in the row is the action die —
+   enlarged and full colour — and what Roll throws. The side padding lets the
+   first and last die reach the centre. */
+.dcc-picker { display: block; padding: 0; }
+.dcc-chain {
+  display: flex; align-items: center; gap: 4px;
+  overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none;
+  padding: 6px calc(50% - 28px);
+  -webkit-overflow-scrolling: touch;
+}
+.dcc-chain::-webkit-scrollbar { display: none; }
+.dcc-token {
+  scroll-snap-align: center; flex: 0 0 auto;
+  appearance: none; border: 0; background: transparent; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  width: 56px; padding: 6px 0; opacity: 0.5; transition: opacity .15s, transform .15s;
+}
+.dcc-token-shape { width: 40px; height: 40px; }
+.dcc-token-shape path { fill: color-mix(in srgb, var(--dc) 22%, transparent); stroke: var(--dc); stroke-width: 1.6; stroke-linejoin: round; }
+.dcc-token-label { font-size: 11px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+.dcc-token.is-active { opacity: 1; transform: scale(1.3); }
+.dcc-token.is-active .dcc-token-shape path { fill: color-mix(in srgb, var(--dc) 52%, transparent); }
+.dcc-token.is-active .dcc-token-label { color: var(--dc); }
+@media (prefers-reduced-motion: reduce) { .dcc-token { transition: none; } }
 
 /* The total tinted by the duality tone. */
 .total[data-variant="hope"] { color: #C9A227; }

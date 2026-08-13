@@ -1140,16 +1140,6 @@
   </output>
 
   <section class="picker" id="numPicker" aria-label="Dice">
-    <!-- DCC: the action die on the dice chain. ◄/► shift it a step; tap the die
-         to roll it. The strip below is the chain, so any die is a tap away too. -->
-    <div class="dcc-fields-row" id="dccFieldsRow" hidden>
-      <span class="dcc-label">Action die</span>
-      <div class="dcc-stepper">
-        <button type="button" class="dcc-shift" id="dccDown" aria-label="Shift the action die down the chain">◄</button>
-        <button type="button" class="dcc-die" id="dccDie" aria-label="Roll the action die">d20</button>
-        <button type="button" class="dcc-shift" id="dccUp" aria-label="Shift the action die up the chain">►</button>
-      </div>
-    </div>
     <div class="ms-fields-row" id="msFieldsRow" hidden>
       <div class="ms-direct-field ms-dial-field">
         <span>Target</span>
@@ -1476,6 +1466,13 @@
       <button type="button" class="iron-odd" data-odds="unlikely">Unlikely</button>
       <button type="button" class="iron-odd" data-odds="small-chance">Small&nbsp;Chance</button>
     </div>
+  </section>
+
+  <!-- DCC: the dice chain as a scroll-snap selector. Each die is its own shape
+       and colour; the one centred is your action die — enlarged, and what Roll
+       throws. Scroll or tap to move along the chain. d100 rides the end. -->
+  <section class="picker dcc-picker" id="dccPicker" aria-label="DCC dice chain" hidden>
+    <div class="dcc-chain" id="dccChain"></div>
   </section>
 
   <!-- Cards: the Woodcut deck. The deck itself sits on the tray (tap it to
