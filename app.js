@@ -5206,7 +5206,7 @@ const dccChainEl = $('dccChain');
 // d100 a near-circle. The rest are regular polygons, rotated so chain neighbours
 // read differently even when they share a vertex count.
 const DCC_SHAPE = {
-  3: [4, -45], 4: [3, -90], 5: [5, -90], 6: [4, -45], 7: [7, -90], 8: [4, -90],
+  3: [4, -45], 4: [3, -90], 5: [5, -90], 6: [4, -45], 7: [6, 30], 8: [4, -90],
   12: [5, 90], 14: [6, -90], 16: [8, -90], 20: [6, 0], 24: [8, 22.5], 30: [10, -90], 100: [24, -90],
 };
 function dccShapePath(sides) {
@@ -5220,26 +5220,48 @@ function dccShapePath(sides) {
   return 'M' + pts.join(' ') + 'Z';
 }
 
-// The tokens are pool buttons like everywhere else in Dicebox: tap adds one of
-// that die, hold removes one, and Roll throws the whole pool — so a fistful of
-// d6 damage works, not just one die. Their shape and colour make the chain read.
+// Each die is a row-token: a crown above (tap to make it your action die) and
+// the die itself below, which is a pool button (tap adds one, hold removes one).
+// Roll throws the pool, so a fistful of d6 damage works. The crown is a pure
+// tracker — it says which die you are on the chain, glowing so it reads as the
+// king, and it shifts by crowning the die to its left or right.
+let dccCrown = 20;   // sides of the action die
 function dccStep(sides, dir) {
   const cur = pool.get(sides)?.count || 0;
   setDieCount(sides, cur + dir * perTap());
+}
+function setDccCrown(sides) {
+  dccCrown = sides;
+  for (const wrap of dccChainEl.children) {
+    wrap.classList.toggle('is-action', DCC_STRIP[Number(wrap.dataset.i)] === dccCrown);
+  }
 }
 
 function buildDccChain() {
   if (!dccChainEl || dccChainEl.dataset.built) return;
   DCC_STRIP.forEach((sides, i) => {
-    const t = document.createElement('button');
-    t.type = 'button';
-    t.className = 'dcc-token';
-    t.dataset.i = i;
-    t.style.setProperty('--dc', DCC_COLORS[sides]);
-    t.setAttribute('aria-label', `d${sides} — tap to add, hold to remove`);
-    t.innerHTML = `<svg class="dcc-token-shape" viewBox="0 0 30 30" aria-hidden="true"><path d="${dccShapePath(sides)}"/></svg><span class="dcc-token-label">d${sides}</span>`;
-    bindTapHold(t, dir => dccStep(sides, dir));
-    dccChainEl.append(t);
+    const wrap = document.createElement('div');
+    wrap.className = 'dcc-token';
+    wrap.dataset.i = i;
+    wrap.style.setProperty('--dc', DCC_COLORS[sides]);
+    if (sides === dccCrown) wrap.classList.add('is-action');
+
+    const crown = document.createElement('button');
+    crown.type = 'button';
+    crown.className = 'dcc-crown';
+    crown.setAttribute('aria-label', `Make d${sides} your action die`);
+    crown.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18 4.6 8 9 12.5 12 5 15 12.5 19.4 8 21 18Z"/></svg>';
+    crown.addEventListener('click', () => setDccCrown(sides));
+
+    const die = document.createElement('button');
+    die.type = 'button';
+    die.className = 'dcc-die-btn';
+    die.setAttribute('aria-label', `d${sides} — tap to add, hold to remove`);
+    die.innerHTML = `<svg class="dcc-token-shape" viewBox="0 0 30 30" aria-hidden="true"><path d="${dccShapePath(sides)}"/></svg><span class="dcc-token-label">d${sides}</span>`;
+    bindTapHold(die, dir => dccStep(sides, dir));
+
+    wrap.append(crown, die);
+    dccChainEl.append(wrap);
   });
   dccChainEl.dataset.built = '1';
 }
