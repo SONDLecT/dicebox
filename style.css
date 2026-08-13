@@ -1398,9 +1398,11 @@ body {
 .mode-genesys { --sys: #BFA766; }
 .mode-daggerheart { --sys: #C9A227; }
 .mode-cthulhutech { --sys: #57B591; }
-/* ---- Call of Cthulhu picker: skill dial over two d10-shaped modifier keys. */
-.coc-picker { flex-direction: column; align-items: center; gap: 10px; }
-.coc-picker .gen-chips { max-width: 236px; }
+/* ---- Call of Cthulhu picker: skill dial and the two d10-shaped modifier keys
+   all on one row — the keys are compact, so nothing needs its own line. */
+.coc-picker { flex-direction: row; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; }
+.coc-picker .gen-chips { width: auto; gap: 8px; }
+.coc-picker .gen-chip { flex: 0 0 auto; min-width: 58px; }
 .coc-bonus { --dc: #5DAE6A; }
 .coc-penalty { --dc: #C0453F; }
 .mode-callofcthulhu { --sys: #7FA05A; }
