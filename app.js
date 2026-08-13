@@ -8,6 +8,8 @@ import { rollGenesys, describeGenesys, genesysHeadline, parseGenesys } from './s
 import { rollDaggerheart, describeDaggerheart, daggerheartHeadline, parseDaggerheart } from './system-dice.js';
 import { rollCthulhuTech, describeCthulhuTech, cthulhutechHeadline, parseCthulhuTech } from './system-dice.js';
 import { rollMothership, describeMothership, mothershipHeadline, parseMothership, resolveMothershipStress } from './system-dice.js';
+import { rollCallOfCthulhu, describeCallOfCthulhu, callOfCthulhuHeadline, parseCallOfCthulhu } from './system-dice.js';
+import { rollDeltaGreen, describeDeltaGreen, deltaGreenHeadline, parseDeltaGreen } from './system-dice.js';
 import { parseCards, newDeckOrder, summarizeCards, cardsHeadline, describeCards, parseTarot, summarizeTarot, tarotHeadline, describeTarot, parseNapoletane, parseHanafuda, parseUtagaruta } from './system-dice.js';
 import { rollStarWars, describeStarWars, starWarsHeadline, parseStarWars } from './system-dice.js';
 import { rollOneRing, describeOneRing, oneRingHeadline, parseOneRing } from './system-dice.js';
@@ -344,6 +346,26 @@ const SYSTEM_THEMES = {
   // gunmetal steel, the industrial radiation-caution look that sets it apart from
   // the four gold systems. The acid green is the constant; only the steel
   // neutrals flip for light, where the accent deepens to hold WCAG AA contrast.
+  callofcthulhu: {
+    dark: {
+      '--paper': '#0C0F0B', '--face': '#151A12', '--line': '#DDE3D6', '--muted': '#818B77',
+      '--hair': '#232A1C', '--accent': '#7FA05A', '--danger': '#C0453F',
+    },
+    light: {
+      '--paper': '#E7EAE2', '--face': '#F4F6EF', '--line': '#1C2216', '--muted': '#5C6650',
+      '--hair': '#D3D8C7', '--accent': '#5E7C3D', '--danger': '#9E3529',
+    },
+  },
+  deltagreen: {
+    dark: {
+      '--paper': '#080D0A', '--face': '#101713', '--line': '#D6E0D9', '--muted': '#77887E',
+      '--hair': '#1A2620', '--accent': '#4E9068', '--danger': '#C0453F',
+    },
+    light: {
+      '--paper': '#E2E8E4', '--face': '#EFF4F0', '--line': '#132019', '--muted': '#516058',
+      '--hair': '#C8D3CB', '--accent': '#2F6B49', '--danger': '#9E3529',
+    },
+  },
   mothership: {
     dark: {
       '--paper': '#0C0E10', '--face': '#15181C', '--line': '#DCE2E6', '--muted': '#7D8991',
@@ -625,6 +647,19 @@ function buildTrayDice(flat, result, { remote = false } = {}) {
       else if (passed === false) die.genColor = MS_COLORS.fail;
       else die.genColor = f.role === 'tens' ? MS_COLORS.tens : f.role === 'panic' ? MS_COLORS.panic : MS_COLORS.ones;
     }
+    // Call of Cthulhu / Delta Green percentile pairs: the tens die is labelled
+    // 00-90, and the kept dice tint by the resolved outcome (crit/success green,
+    // fumble/failure red); a dropped bonus/penalty die fades via kept=false.
+    else if (result.system === 'coc' || result.system === 'deltagreen') {
+      const C = result.system === 'coc' ? COC_COLORS : DG_COLORS;
+      const o = result.summary.outcome;
+      if (f.role === 'tens') die.displayLabel = String(f.value).padStart(2, '0');
+      if (o === 'critical') die.genColor = C.crit;
+      else if (o === 'fumble') die.genColor = C.fumble;
+      else if (result.summary.success === true) die.genColor = C.success;
+      else if (result.summary.success === false) die.genColor = C.fail;
+      else die.genColor = f.role === 'tens' ? C.tens : C.ones;
+    }
     return die;
   });
 }
@@ -652,6 +687,8 @@ function doRoll(notation) {
       : sys === 'pbta' ? rollPbta(notation)
       : sys === 'mist' ? rollMist(notation)
       : sys === 'mothership' ? rollMothership(notation)
+      : sys === 'callofcthulhu' ? rollCallOfCthulhu(notation)
+      : sys === 'deltagreen' ? rollDeltaGreen(notation)
       : roll(notation);
   } catch (err) {
     showError(err.message);
@@ -745,6 +782,8 @@ function resultHeadline(result) {
   if (result.system === 'onering') return oneRingHeadline(result);
   if (result.system === 'pbta' || result.system === 'mist') return twod6Headline(result);
   if (result.system === 'mothership') return mothershipHeadline(result);
+  if (result.system === 'coc') return callOfCthulhuHeadline(result);
+  if (result.system === 'deltagreen') return deltaGreenHeadline(result);
   if (result.system === 'cards') return cardsHeadline(result);
   if (result.system === 'tarot') return tarotHeadline(result);
   if (result.system === 'napoletane') return cardsHeadline(result);
@@ -762,6 +801,8 @@ function resultDetail(result) {
   if (result.system === 'onering') return describeOneRing(result);
   if (result.system === 'pbta' || result.system === 'mist') return describe2d6(result);
   if (result.system === 'mothership') return describeMothership(result);
+  if (result.system === 'coc') return describeCallOfCthulhu(result);
+  if (result.system === 'deltagreen') return describeDeltaGreen(result);
   if (result.system === 'cards') return describeCards(result);
   if (result.system === 'tarot') return describeTarot(result);
   if (result.system === 'napoletane') return describeCards(result);
@@ -929,6 +970,8 @@ $('notation').addEventListener('input', () => {
   if (typedSystem === 'pbta') { pbtaCtl.fromField(); return; }
   if (typedSystem === 'mist') { mistCtl.fromField(); return; }
   if (typedSystem === 'mothership') { syncMsFromField(); return; }
+  if (typedSystem === 'callofcthulhu') { syncCocFromField(); return; }
+  if (typedSystem === 'deltagreen') { syncDgFromField(); return; }
   if (typedSystem === 'cards') { syncCardsFromField(); return; }
   if (typedSystem === 'tarot') { syncTarotFromField(); return; }
   if (typedSystem === 'napoletane') { syncNapFromField(); return; }
@@ -1007,6 +1050,8 @@ const SYSTEMS = {
   pbta: { badge: 'PbtA' },
   mist: { badge: 'Mist' },
   mothership: { badge: 'MoSh 1e' },
+  callofcthulhu: { badge: 'CoC 7e' },
+  deltagreen: { badge: 'Delta Green' },
 };
 
 // Empty-tray copy. Most modes build a pool by tapping dice, so the default
@@ -1018,6 +1063,8 @@ const SYSTEM_HINTS = {
   pbta: { idle: 'Set a modifier, then roll 2d6', placeholder: 'Set a modifier, or type pbta:+2' },
   mist: { idle: 'Set your Power, then roll 2d6', placeholder: 'Set your Power, or type mist:+1' },
   mothership: { idle: 'Roll d100 — set a target to resolve it, or let the table judge', placeholder: 'Roll, or type ms:c@35' },
+  callofcthulhu: { idle: 'Roll d100 under your skill — set the skill, or let the table judge', placeholder: 'Roll, or type coc:60' },
+  deltagreen: { idle: 'Roll d100 under your target — set it, or let the table judge', placeholder: 'Roll, or type dg:50' },
   cards: { idle: 'Tap the deck to draw', placeholder: 'Tap the deck, or type deck:3' },
   tarot: { idle: 'Tap the deck to draw', placeholder: 'Tap the deck, or type tarot:3' },
   napoletane: { idle: 'Tocca il mazzo per pescare', placeholder: 'Tocca il mazzo, o scrivi nap:3' },
@@ -1036,9 +1083,9 @@ const SLUG_TO_SYSTEM = {
   cards: 'cards', tarot: 'tarot', italiane: 'napoletane', napoletane: 'napoletane', scopa: 'napoletane', hanafuda: 'hanafuda', koikoi: 'hanafuda', hana: 'hanafuda', utagaruta: 'utagaruta', karuta: 'utagaruta', hyakunin: 'utagaruta', vtmv5: 'v5', fate: 'fate', genesys: 'genesys', dh: 'daggerheart', ctech2e: 'cthulhutech',
   swrpg: 'starwars', tor2e: 'onering', pbta: 'pbta', mist: 'mist', mosh1e: 'mothership',
   v5: 'v5', vtm: 'v5', daggerheart: 'daggerheart', cthulhutech: 'cthulhutech', ctech: 'cthulhutech',
-  force: 'starwars', feat: 'onering', tor: 'onering', mothership: 'mothership', mosh: 'mothership',
+  force: 'starwars', feat: 'onering', tor: 'onering', mothership: 'mothership', mosh: 'mothership', coc: 'callofcthulhu', callofcthulhu: 'callofcthulhu', cthulhu: 'callofcthulhu', dg: 'deltagreen', deltagreen: 'deltagreen',
 };
-const SYSTEM_TO_SLUG = { cards: 'cards', tarot: 'tarot', napoletane: 'napoletane', hanafuda: 'hanafuda', utagaruta: 'utagaruta', v5: 'vtmv5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', mothership: 'mosh1e' };
+const SYSTEM_TO_SLUG = { cards: 'cards', tarot: 'tarot', napoletane: 'napoletane', hanafuda: 'hanafuda', utagaruta: 'utagaruta', v5: 'vtmv5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', mothership: 'mosh1e', callofcthulhu: 'coc', deltagreen: 'dg' };
 
 function systemFromPath() {
   const seg = (location.pathname || '/').replace(/^\/+|\/+$/g, '').toLowerCase();
@@ -1062,6 +1109,8 @@ const torPicker = $('torPicker');
 // stepper, identical between the two modes.
 const twod6Picker = $('twod6Picker');
 const msPicker = $('msPicker');
+const cocPicker = $('cocPicker');
+const dgPicker = $('dgPicker');
 // Numeric's strip lives after the final signature picker in the DOM. Daggerheart
 // and Mothership both show their own controls above ordinary damage dice; hidden
 // intervening pickers do not affect layout in either mode.
@@ -1122,6 +1171,8 @@ function setSystem(system, { roll = false, url = true } = {}) {
   torPicker.hidden = system !== 'onering';
   twod6Picker.hidden = system !== 'pbta' && system !== 'mist';
   msPicker.hidden = system !== 'mothership';
+  cocPicker.hidden = system !== 'callofcthulhu';
+  dgPicker.hidden = system !== 'deltagreen';
   cardsPicker.hidden = system !== 'cards';
   tarotPicker.hidden = system !== 'tarot';
   napPicker.hidden = system !== 'napoletane';
@@ -1164,6 +1215,8 @@ function setSystem(system, { roll = false, url = true } = {}) {
   $('helpPbta').hidden = system !== 'pbta';
   $('helpMist').hidden = system !== 'mist';
   $('helpMothership').hidden = system !== 'mothership';
+  $('helpCallofcthulhu').hidden = system !== 'callofcthulhu';
+  $('helpDeltagreen').hidden = system !== 'deltagreen';
   $('helpCards').hidden = system !== 'cards';
   $('helpTarot').hidden = system !== 'tarot';
   $('helpNapoletane').hidden = system !== 'napoletane';
@@ -1196,6 +1249,8 @@ function setSystem(system, { roll = false, url = true } = {}) {
     // plain Roll or flick throws it; tapping numeric dice replaces it with a pool.
     if (system === 'daggerheart') $('notation').value = dhNotation();
     if (system === 'mothership') $('notation').value = msNotation();
+    if (system === 'callofcthulhu') $('notation').value = cocNotation();
+    if (system === 'deltagreen') $('notation').value = dgNotation();
     if (system === 'cards') $('notation').value = deckNotation();
     if (system === 'tarot') $('notation').value = tarotNotation();
     if (system === 'napoletane') $('notation').value = napNotation();
@@ -1866,6 +1921,103 @@ msStressDial.addEventListener('click', () => {
 // pool and every other system.
 msCheckRoll.addEventListener('click', () => { ms.mode = 'check'; syncMs(); });
 msPanicRoll.addEventListener('click', () => { ms.mode = 'panic'; syncMs(); });
+
+// ---- Call of Cthulhu 7e ----
+//
+// d100 under a skill, in tiers, with optional bonus/penalty dice. The skill is
+// the shared roller (table-set by default); bonus and penalty are one signed
+// count of extra tens dice that cancel each other.
+const COC_COLORS = { crit: '#8FC98A', success: '#5DAE6A', fail: '#C0453F', fumble: '#8E2F26', tens: '#7F9B57', ones: '#6A757C' };
+const coc = { target: null, modifier: 0 };
+const cocSkillDial = $('cocSkillDial');
+const cocBonusBtn = $('cocBonus');
+const cocPenaltyBtn = $('cocPenalty');
+
+function cocNotation() {
+  let s = 'coc:';
+  if (coc.target !== null) s += coc.target;
+  if (coc.modifier > 0) s += 'b' + (coc.modifier > 1 ? coc.modifier : '');
+  else if (coc.modifier < 0) s += 'p' + (-coc.modifier > 1 ? -coc.modifier : '');
+  return s;
+}
+function resetCoc() { coc.target = null; coc.modifier = 0; }
+
+function syncCoc({ writeField = true } = {}) {
+  cocSkillDial.textContent = coc.target === null ? '—' : String(coc.target);
+  if (coc.target === null) cocSkillDial.dataset.unset = '1'; else delete cocSkillDial.dataset.unset;
+  const bonus = Math.max(0, coc.modifier), penalty = Math.max(0, -coc.modifier);
+  $('cocBonusVal').textContent = String(bonus);
+  $('cocPenaltyVal').textContent = String(penalty);
+  cocBonusBtn.setAttribute('aria-pressed', String(bonus > 0));
+  cocPenaltyBtn.setAttribute('aria-pressed', String(penalty > 0));
+  if (writeField && uiSystem === 'callofcthulhu') $('notation').value = cocNotation();
+  if (uiSystem === 'callofcthulhu' && !$('total').dataset.rolling) stageSystemPool();
+}
+
+cocSkillDial.addEventListener('click', () => {
+  openNumberDial({
+    title: 'Skill', value: coc.target ?? 50, min: 1, max: 100,
+    actionLabel: 'Set Skill', inputLabel: 'Skill',
+    clearLabel: 'Table sets it',
+    commit: v => { coc.target = v; syncCoc(); },
+    onClear: () => { coc.target = null; syncCoc(); },
+  });
+});
+// Bonus and penalty are one signed axis that cancels, capped at 3 a side. Tap a
+// button to add its kind (switching sides if needed); hold to remove one.
+function setCocMod(n) { coc.modifier = Math.max(-3, Math.min(3, n)); syncCoc(); }
+bindTapHold(cocBonusBtn, dir => {
+  if (dir > 0) setCocMod(coc.modifier < 0 ? 1 : coc.modifier + 1);
+  else if (coc.modifier > 0) setCocMod(coc.modifier - 1);
+});
+bindTapHold(cocPenaltyBtn, dir => {
+  if (dir > 0) setCocMod(coc.modifier > 0 ? -1 : coc.modifier - 1);
+  else if (coc.modifier < 0) setCocMod(coc.modifier + 1);
+});
+
+function syncCocFromField() {
+  try {
+    const { target, modifier } = parseCallOfCthulhu($('notation').value);
+    coc.target = target; coc.modifier = modifier;
+    syncCoc({ writeField: false });
+  } catch { /* mid-type */ }
+}
+
+// ---- Delta Green ----
+//
+// d100 under a target (skill or stat x5). 01 always succeeds, 100 always fails,
+// and matching digits turn a success Critical or a failure a Fumble. One dial.
+const DG_COLORS = { crit: '#7FCF95', success: '#57A06A', fail: '#C0453F', fumble: '#8E2F26', tens: '#5E8A63', ones: '#6A757C' };
+const dg = { target: null };
+const dgTargetDial = $('dgTargetDial');
+
+function dgNotation() { return 'dg:' + (dg.target !== null ? dg.target : ''); }
+function resetDg() { dg.target = null; }
+
+function syncDg({ writeField = true } = {}) {
+  dgTargetDial.textContent = dg.target === null ? '—' : String(dg.target);
+  if (dg.target === null) dgTargetDial.dataset.unset = '1'; else delete dgTargetDial.dataset.unset;
+  if (writeField && uiSystem === 'deltagreen') $('notation').value = dgNotation();
+  if (uiSystem === 'deltagreen' && !$('total').dataset.rolling) stageSystemPool();
+}
+
+dgTargetDial.addEventListener('click', () => {
+  openNumberDial({
+    title: 'Target', value: dg.target ?? 50, min: 1, max: 99,
+    actionLabel: 'Set Target', inputLabel: 'Target',
+    clearLabel: 'Table sets it',
+    commit: v => { dg.target = v; syncDg(); },
+    onClear: () => { dg.target = null; syncDg(); },
+  });
+});
+
+function syncDgFromField() {
+  try {
+    const { target } = parseDeltaGreen($('notation').value);
+    dg.target = target;
+    syncDg({ writeField: false });
+  } catch { /* mid-type */ }
+}
 
 function syncMsFromField() {
   try {
@@ -4296,6 +4448,17 @@ function systemStageDescriptors() {
       }
       break;
     }
+    case 'callofcthulhu': {
+      const tens = 1 + Math.abs(coc.modifier);
+      add(tens, { sides: 10, genColor: COC_COLORS.tens, kind: 'coc-check' });
+      add(1, { sides: 10, genColor: COC_COLORS.ones, kind: 'coc-check' });
+      break;
+    }
+    case 'deltagreen': {
+      add(1, { sides: 10, genColor: DG_COLORS.tens, kind: 'dg-check' });
+      add(1, { sides: 10, genColor: DG_COLORS.ones, kind: 'dg-check' });
+      break;
+    }
   }
   return out;
 }
@@ -4394,6 +4557,8 @@ function clearPool() {
       case 'onering': resetOneRing(); syncTor(); break;
       case 'pbta': case 'mist': resetTwod6(); syncTwod6(); break;
       case 'mothership': resetMothership(); syncMs(); break;
+      case 'callofcthulhu': resetCoc(); syncCoc(); break;
+      case 'deltagreen': resetDg(); syncDg(); break;
       // The deck persists (it is the character's deck, like Stress); clearing
       // just returns the tray to the idle stack.
       case 'cards': ensureCardArt().then(() => { if (uiSystem === 'cards') syncCardsUI(); }); break;
@@ -5554,6 +5719,8 @@ function emptyTrayRoll() {
   if (uiSystem === 'pbta') return pbtaCtl.notation();
   if (uiSystem === 'mist') return mistCtl.notation();
   if (uiSystem === 'mothership') return msNotation();
+  if (uiSystem === 'callofcthulhu') return cocNotation();
+  if (uiSystem === 'deltagreen') return dgNotation();
   if (uiSystem === 'cards') return deckNotation();
   if (uiSystem === 'tarot') return tarotNotation();
   if (uiSystem === 'napoletane') return napNotation();
@@ -5576,6 +5743,8 @@ function restageActiveSystem() {
     case 'onering': syncTor(); break;
     case 'pbta': case 'mist': syncTwod6(); break;
     case 'mothership': syncMs(); break;
+    case 'callofcthulhu': syncCoc(); break;
+    case 'deltagreen': syncDg(); break;
   }
 }
 

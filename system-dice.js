@@ -40,6 +40,8 @@ export function detectSystem(src) {
   if (/^pbta:/.test(s)) return 'pbta';
   if (/^mist:/.test(s)) return 'mist';
   if (/^ms:/.test(s)) return 'mothership';
+  if (/^coc:/.test(s)) return 'callofcthulhu';
+  if (/^dg:/.test(s)) return 'deltagreen';
   if (/^deck:/.test(s)) return 'cards';
   if (/^tarot:/.test(s)) return 'tarot';
   if (/^(?:ita|nap):/.test(s)) return 'napoletane';
@@ -209,6 +211,8 @@ export function rollAny(src, uiSystem = 'numeric') {
   if (sys === 'pbta') return rollPbta(src);
   if (sys === 'mist') return rollMist(src);
   if (sys === 'mothership') return rollMothership(src);
+  if (sys === 'callofcthulhu') return rollCallOfCthulhu(src);
+  if (sys === 'deltagreen') return rollDeltaGreen(src);
   return { system: 'numeric', deferred: true, notation: String(src) };
 }
 
@@ -802,6 +806,192 @@ export function describeMothership(result) {
     parts.push(`Stress at 20 — reduce the relevant Stat or Save by ${amount}`);
   } else if (s.stressDelta) parts.push('+1 Stress');
   if (s.forcesPanic) parts.push('Panic Check');
+  return parts.join(' · ');
+}
+
+// ---- Call of Cthulhu 7e ----
+//
+// A d100 rolled UNDER a skill, in tiers: <= skill/5 Extreme, <= skill/2 Hard,
+// <= skill Regular, above it a Failure. 01 is always a Critical; 100 always
+// Fumbles, as does 96-100 when the skill is under 50. Bonus/penalty dice roll
+// extra tens dice and keep the best (lowest) or worst (highest), sharing the
+// one ones die. Notation: "coc:60", "coc:60b", "coc:60p2", or bare "coc:".
+const COC_REGEX = /^coc:(\d+)?(?:(b|p)(\d+)?)?$/;
+
+export function parseCallOfCthulhu(src) {
+  const m = COC_REGEX.exec(String(src || '').trim().toLowerCase());
+  if (!m) throw new Error('Expected a Call of Cthulhu roll like "coc:60", "coc:60b", or "coc:60p2"');
+  const target = m[1] === undefined ? null : Number(m[1]);
+  const kind = m[2] || null;                       // 'b' bonus | 'p' penalty
+  const extra = kind ? (m[3] ? Number(m[3]) : 1) : 0;
+  if (target !== null && (target < 1 || target > 100)) throw new Error('Skill must be 1-100');
+  if (extra > 3) throw new Error('Bonus/penalty dice must be 1-3');
+  return { target, modifier: kind === 'p' ? -extra : extra };  // + bonus, - penalty
+}
+
+// One ones die, plus |modifier| extra tens dice. Each tens die combines with the
+// shared ones die (00 tens + 0 ones is 100, never 0); a bonus keeps the lowest
+// combined result, a penalty the highest. A plain roll has a single tens die.
+function rollPercentile(modifier = 0) {
+  const ones = randInt(10) - 1;                          // 0-9
+  const tensCount = 1 + Math.abs(modifier);
+  const tens = Array.from({ length: tensCount }, () => (randInt(10) - 1) * 10); // 0,10,…,90
+  const combine = t => (t === 0 && ones === 0 ? 100 : t + ones);
+  let kept = tens[0];
+  for (const tv of tens) {
+    if (modifier > 0 ? combine(tv) < combine(kept) : combine(tv) > combine(kept)) kept = tv;
+  }
+  const value = combine(kept);
+  return { ones, tens, kept, value, double: kept / 10 === ones };
+}
+
+export function rollCallOfCthulhu(src) {
+  const { target, modifier } = parseCallOfCthulhu(src);
+  const r = rollPercentile(modifier);
+  // Every tens die is on the tray; the one that was kept is flagged, the rest
+  // fade like a dropped advantage die. The shared ones die is always kept.
+  const dice = [];
+  for (let i = 0; i < r.tens.length; i++) {
+    dice.push({ role: 'tens', value: r.tens[i], sides: 10, kept: r.tens[i] === r.kept && !dice.some(d => d.kept), rerolled: false, exploded: false });
+  }
+  dice.push({ role: 'ones', value: r.ones, sides: 10, kept: true, rerolled: false, exploded: false });
+  return {
+    schema: 2,
+    system: 'coc',
+    notation: String(src),
+    groups: [{ kind: 'dice', dieType: 'coc', count: dice.length, dice, subtotal: 0 }],
+    summary: summarizeCallOfCthulhu(r, target, modifier),
+  };
+}
+
+const COC_ORDER = { critical: 5, extreme: 4, hard: 3, regular: 2, failure: 1, fumble: 0 };
+
+export function summarizeCallOfCthulhu(roll, target, modifier = 0) {
+  const value = roll.value;
+  let outcome;
+  if (value === 1) outcome = 'critical';                 // 01 always a Critical
+  else if (value === 100) outcome = 'fumble';            // 100 always Fumbles
+  else if (target === null) outcome = 'unresolved';
+  else if (target < 50 && value >= 96) outcome = 'fumble';
+  else if (value <= Math.floor(target / 5)) outcome = 'extreme';
+  else if (value <= Math.floor(target / 2)) outcome = 'hard';
+  else if (value <= target) outcome = 'regular';
+  else outcome = 'failure';
+  const succeeded = outcome === 'critical' || outcome === 'extreme'
+    || outcome === 'hard' || outcome === 'regular';
+  return {
+    kind: 'coc',
+    tens: roll.kept, ones: roll.ones, value, target, modifier,
+    outcome,
+    success: outcome === 'unresolved' ? null : succeeded,
+  };
+}
+
+const COC_OUTCOME_LABEL = {
+  critical: 'Critical', extreme: 'Extreme Success', hard: 'Hard Success',
+  regular: 'Success', failure: 'Failure', fumble: 'Fumble',
+};
+
+export function callOfCthulhuHeadline(result) {
+  const s = result.summary;
+  if (s.outcome === 'unresolved') return { kind: 'number', text: String(s.value) };
+  const variant = (s.outcome === 'critical' || s.outcome === 'extreme') ? 'roll-crit-success'
+    : (s.outcome === 'hard' || s.outcome === 'regular') ? 'roll-success'
+    : s.outcome === 'fumble' ? 'roll-crit-failure'
+    : 'roll-failure';
+  return { kind: 'text', text: COC_OUTCOME_LABEL[s.outcome], variant };
+}
+
+export function describeCallOfCthulhu(result) {
+  const s = result.summary;
+  const parts = [];
+  if (s.outcome !== 'unresolved') parts.push(COC_OUTCOME_LABEL[s.outcome]);
+  const valueLabel = s.value === 100 ? '100' : String(s.value).padStart(2, '0');
+  const tensLabel = String(s.tens).padStart(2, '0');
+  parts.push(`rolled ${valueLabel} (${tensLabel} + ${s.ones})`);
+  if (s.target !== null) parts.push(`under ${s.target}`);
+  if (s.modifier > 0) parts.push(s.modifier === 1 ? 'bonus die' : `${s.modifier} bonus dice`);
+  else if (s.modifier < 0) parts.push(-s.modifier === 1 ? 'penalty die' : `${-s.modifier} penalty dice`);
+  return parts.join(' · ');
+}
+
+// ---- Delta Green ----
+//
+// A d100 rolled UNDER the target (skill, or a stat x5). 01 always succeeds and
+// is a Critical; 100 always fails and is a Fumble. Matching digits (doubles)
+// make any success a Critical and any failure a Fumble. Notation: "dg:60" or
+// bare "dg:".
+const DG_REGEX = /^dg:(\d+)?$/;
+
+export function parseDeltaGreen(src) {
+  const m = DG_REGEX.exec(String(src || '').trim().toLowerCase());
+  if (!m) throw new Error('Expected a Delta Green roll like "dg:60"');
+  const target = m[1] === undefined ? null : Number(m[1]);
+  if (target !== null && (target < 1 || target > 99)) throw new Error('Target must be 1-99');
+  return { target };
+}
+
+export function rollDeltaGreen(src) {
+  const { target } = parseDeltaGreen(src);
+  const r = rollPercentile(0);
+  const dice = [
+    { role: 'tens', value: r.kept, sides: 10, kept: true, rerolled: false, exploded: false },
+    { role: 'ones', value: r.ones, sides: 10, kept: true, rerolled: false, exploded: false },
+  ];
+  return {
+    schema: 2,
+    system: 'deltagreen',
+    notation: String(src),
+    groups: [{ kind: 'dice', dieType: 'deltagreen', count: dice.length, dice, subtotal: 0 }],
+    summary: summarizeDeltaGreen(r, target),
+  };
+}
+
+export function summarizeDeltaGreen(roll, target) {
+  const value = roll.value;
+  const double = roll.double;
+  let outcome;
+  if (target === null) outcome = 'unresolved';
+  else {
+    const alwaysFail = value === 100;
+    const success = value === 1 || (!alwaysFail && value <= target);
+    if (success) outcome = (value === 1 || double) ? 'critical' : 'success';
+    else outcome = (value === 100 || double) ? 'fumble' : 'failure';
+  }
+  const succeeded = outcome === 'critical' || outcome === 'success';
+  return {
+    kind: 'deltagreen',
+    tens: roll.kept, ones: roll.ones, value, double, target,
+    outcome,
+    success: outcome === 'unresolved' ? null : succeeded,
+  };
+}
+
+const DG_OUTCOME_LABEL = {
+  critical: 'Critical Success', success: 'Success',
+  failure: 'Failure', fumble: 'Fumble',
+};
+
+export function deltaGreenHeadline(result) {
+  const s = result.summary;
+  if (s.outcome === 'unresolved') return { kind: 'number', text: String(s.value) };
+  const variant = s.outcome === 'critical' ? 'roll-crit-success'
+    : s.outcome === 'success' ? 'roll-success'
+    : s.outcome === 'fumble' ? 'roll-crit-failure'
+    : 'roll-failure';
+  return { kind: 'text', text: DG_OUTCOME_LABEL[s.outcome], variant };
+}
+
+export function describeDeltaGreen(result) {
+  const s = result.summary;
+  const parts = [];
+  if (s.outcome !== 'unresolved') parts.push(DG_OUTCOME_LABEL[s.outcome]);
+  const valueLabel = s.value === 100 ? '100' : String(s.value).padStart(2, '0');
+  const tensLabel = String(s.tens).padStart(2, '0');
+  let read = `rolled ${valueLabel} (${tensLabel} + ${s.ones})`;
+  if (s.double) read += ', doubles';
+  parts.push(read);
+  if (s.target !== null) parts.push(`under ${s.target}`);
   return parts.join(' · ');
 }
 

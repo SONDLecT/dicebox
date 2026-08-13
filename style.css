@@ -435,6 +435,8 @@ body {
 #modeToggle[data-system="genesys"] .mode-ico[data-for="genesys"] { display: block; }
 #modeToggle[data-system="daggerheart"] .mode-ico[data-for="daggerheart"] { display: block; }
 #modeToggle[data-system="cthulhutech"] .mode-ico[data-for="cthulhutech"] { display: block; }
+#modeToggle[data-system="callofcthulhu"] .mode-ico[data-for="callofcthulhu"] { display: block; }
+#modeToggle[data-system="deltagreen"] .mode-ico[data-for="deltagreen"] { display: block; }
 #modeToggle[data-system="starwars"] .mode-ico[data-for="starwars"] { display: block; }
 #modeToggle[data-system="onering"] .mode-ico[data-for="onering"] { display: block; }
 #modeToggle[data-system="pbta"] .mode-ico[data-for="pbta"] { display: block; }
@@ -764,6 +766,12 @@ body {
 
 /* CthulhuTech: the hit count glows green when it meets the Difficulty, greys
    out when it falls short. */
+/* Roll-under systems (Call of Cthulhu, Delta Green): a crit reads gold, a
+   success green, a plain failure muted, a fumble red. */
+.total[data-variant="roll-crit-success"] { color: #E7C24C; }
+.total[data-variant="roll-success"] { color: #57B591; }
+.total[data-variant="roll-failure"] { color: var(--muted); }
+.total[data-variant="roll-crit-failure"] { color: #C0453F; }
 .total[data-variant="ct-success"] { color: #57B591; }
 .total[data-variant="ct-failure"] { color: var(--muted); }
 
@@ -1390,6 +1398,8 @@ body {
 .mode-genesys { --sys: #BFA766; }
 .mode-daggerheart { --sys: #C9A227; }
 .mode-cthulhutech { --sys: #57B591; }
+.mode-callofcthulhu { --sys: #7FA05A; }
+.mode-deltagreen { --sys: #4E9068; }
 .mode-starwars { --sys: #5B9BD5; }
 .mode-onering { --sys: #B5893C; }
 .mode-pbta { --sys: #D97A3C; }

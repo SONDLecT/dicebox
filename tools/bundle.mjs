@@ -52,6 +52,8 @@ const SYSTEM_EXPORTS = [
   'rollOneRing', 'describeOneRing', 'oneRingHeadline', 'parseOneRing',
   'rollPbta', 'rollMist', 'twod6Headline', 'describe2d6', 'parsePbta', 'parseMist',
   'rollMothership', 'describeMothership', 'mothershipHeadline', 'parseMothership', 'resolveMothershipStress',
+  'rollCallOfCthulhu', 'describeCallOfCthulhu', 'callOfCthulhuHeadline', 'parseCallOfCthulhu',
+  'rollDeltaGreen', 'describeDeltaGreen', 'deltaGreenHeadline', 'parseDeltaGreen',
   'parseCards', 'newDeckOrder', 'summarizeCards', 'cardsHeadline', 'describeCards',
   'parseTarot', 'summarizeTarot', 'tarotHeadline', 'describeTarot',
   'parseNapoletane', 'parseHanafuda', 'parseUtagaruta',

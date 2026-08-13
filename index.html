@@ -107,6 +107,13 @@
             <path d="M12 2.6v18.8"/>
           </g>
           <!-- CthulhuTech: an eldritch eye trailing tentacles. -->
+          <g class="mode-ico" data-for="callofcthulhu" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 12c3-5 15-5 18 0-3 5-15 5-18 0Z"/>
+            <circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/>
+          </g>
+          <g class="mode-ico" data-for="deltagreen" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">
+            <path d="M12 4 20 19 4 19Z"/>
+          </g>
           <g class="mode-ico" data-for="cthulhutech" fill="none" stroke="currentColor"
              stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
             <path d="M4 10 C8 5 16 5 20 10 C16 15 8 15 4 10 Z"/>
@@ -422,6 +429,38 @@
       </p>
       </div>
 
+      <div id="helpCallofcthulhu" hidden>
+      <dl class="syntax">
+        <dt>coc:60</dt>   <dd>d100 under a skill of 60</dd>
+        <dt>coc:60b</dt>  <dd>with a bonus die</dd>
+        <dt>coc:60p2</dt> <dd>with two penalty dice</dd>
+        <dt>coc:</dt>     <dd>no skill — the table judges</dd>
+      </dl>
+      <p class="note">
+        Roll d100 <b>under</b> your skill. At or under the skill is a
+        <b>Regular</b> success; under <b>half</b> a <b>Hard</b>; under a
+        <b>fifth</b> an <b>Extreme</b>. <b>01</b> is always a Critical; <b>100</b>
+        always a Fumble, as does <b>96–100</b> when the skill is below 50.
+        <b>Bonus</b> and <b>penalty</b> dice roll an extra tens die and keep the
+        best or worst; they cancel. Set the skill on the dial, or leave it unset
+        and the roll just reports the number.
+      </p>
+      </div>
+
+      <div id="helpDeltagreen" hidden>
+      <dl class="syntax">
+        <dt>dg:60</dt> <dd>d100 under a target of 60</dd>
+        <dt>dg:</dt>   <dd>no target — the table judges</dd>
+      </dl>
+      <p class="note">
+        Roll d100 <b>under</b> your target (a skill, or a stat &times;5).
+        <b>01</b> always succeeds and is a Critical; <b>100</b> always fails and
+        is a Fumble. <b>Matching digits</b> — 11, 22, 33 &hellip; — turn a
+        success into a <b>Critical</b> and a failure into a <b>Fumble</b>. Set
+        the target on the dial, or leave it unset to just read the number.
+      </p>
+      </div>
+
       <div id="helpCards" hidden>
       <dl class="syntax">
         <dt>deck:1</dt>         <dd>draw a card</dd>
@@ -612,6 +651,14 @@
         <span class="mode-row-name">Dicebox</span>
         <span class="mode-row-sub">any dice &middot; full notation</span>
       </button>
+            <button type="button" class="mode-row mode-callofcthulhu" data-system="callofcthulhu" aria-pressed="false">
+        <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 12c3-5 15-5 18 0-3 5-15 5-18 0Z"/>
+          <circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/>
+        </svg>
+        <span class="mode-row-name">CoC 7e</span>
+        <span class="mode-row-sub">d100 roll-under &middot; tiers</span>
+      </button>
             <button type="button" class="mode-row mode-cthulhutech" data-system="cthulhutech" aria-pressed="false">
         <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true">
           <g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
@@ -622,6 +669,13 @@
         </svg>
         <span class="mode-row-name">CTech 2e</span>
         <span class="mode-row-sub">d10 pool &middot; even = hit</span>
+      </button>
+      <button type="button" class="mode-row mode-deltagreen" data-system="deltagreen" aria-pressed="false">
+        <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">
+          <path d="M12 4 20 19 4 19Z"/>
+        </svg>
+        <span class="mode-row-name">Delta Green</span>
+        <span class="mode-row-sub">d100 &middot; doubles crit</span>
       </button>
       <button type="button" class="mode-row mode-daggerheart" data-system="daggerheart" aria-pressed="false">
         <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true">
@@ -1232,6 +1286,28 @@
         </svg>
         <span class="ms-adv-label">Disadvantage</span>
       </button>
+    </div>
+  </section>
+
+  <section class="picker ms-picker" id="cocPicker" aria-label="Call of Cthulhu roll" hidden>
+    <div class="ms-direct-field ms-dial-field">
+      <span>Skill</span>
+      <button type="button" class="ms-value-dial" id="cocSkillDial" data-unset="1" aria-haspopup="dialog" aria-controls="dial" aria-label="Set Skill">—</button>
+    </div>
+    <button type="button" class="spin-chip" id="cocBonus" aria-pressed="false" aria-label="Bonus die — tap to add, hold to remove">
+      <span class="spin-chip-label">Bonus</span>
+      <span class="spin-chip-val" id="cocBonusVal">0</span>
+    </button>
+    <button type="button" class="spin-chip" id="cocPenalty" aria-pressed="false" aria-label="Penalty die — tap to add, hold to remove">
+      <span class="spin-chip-label">Penalty</span>
+      <span class="spin-chip-val" id="cocPenaltyVal">0</span>
+    </button>
+  </section>
+
+  <section class="picker ms-picker" id="dgPicker" aria-label="Delta Green roll" hidden>
+    <div class="ms-direct-field ms-dial-field">
+      <span>Target</span>
+      <button type="button" class="ms-value-dial" id="dgTargetDial" data-unset="1" aria-haspopup="dialog" aria-controls="dial" aria-label="Set Target">—</button>
     </div>
   </section>
 

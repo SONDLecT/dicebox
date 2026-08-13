@@ -62,7 +62,7 @@ const ALWAYS_REVALIDATE = new Set(['/sw.js', '/', '/index.html', '/manifest.webm
 // all; the earlier forms stay as aliases so links shared before each rename
 // keep working.
 const SYSTEM_SLUGS = new Set([
-  '/cards', '/tarot', '/italiane', '/napoletane', '/scopa', '/hanafuda', '/koikoi', '/hana', '/utagaruta', '/karuta', '/hyakunin', '/vtmv5', '/fate', '/genesys', '/dh', '/ctech2e', '/swrpg', '/tor2e', '/pbta', '/mist', '/mosh1e',
+  '/cards', '/tarot', '/italiane', '/napoletane', '/scopa', '/hanafuda', '/koikoi', '/hana', '/utagaruta', '/karuta', '/hyakunin', '/vtmv5', '/fate', '/genesys', '/dh', '/ctech2e', '/swrpg', '/tor2e', '/pbta', '/mist', '/mosh1e', '/coc', '/callofcthulhu', '/cthulhu', '/dg', '/deltagreen',
   '/v5', '/vtm', '/daggerheart', '/cthulhutech', '/force', '/feat', '/mothership', '/ctech', '/tor', '/mosh',
 ]);
 
