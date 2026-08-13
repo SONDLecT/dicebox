@@ -4845,6 +4845,18 @@ function markPool() {
       b.removeAttribute('title');
     }
   }
+  markDccPool();
+}
+
+// The DCC chain tokens carry the same count badge as the numeric buttons, so the
+// shaped tokens read as pool buttons (tap adds, hold removes) — not single rolls.
+function markDccPool() {
+  if (!dccChainEl) return;
+  for (const t of dccChainEl.children) {
+    const n = pool.get(DCC_STRIP[Number(t.dataset.i)])?.count || 0;
+    if (n > 1) t.dataset.count = String(n); else delete t.dataset.count;
+    t.classList.toggle('in-pool', n > 0);
+  }
 }
 
 // ---- staging the system pools like the numeric one ----
@@ -5037,7 +5049,7 @@ function clearPool() {
   // is not a valid system pool. Its sync then restages the tray and rewrites the
   // field. Build-from-scratch systems (V5, Genesys) default to an empty pool, so
   // they clear to nothing just like numeric.
-  if (uiSystem !== 'numeric') {
+  if (uiSystem !== 'numeric' && uiSystem !== 'dcc') {
     switch (uiSystem) {
       case 'v5': resetV5(); syncV5(); break;
       case 'fate': resetFate(); syncFate(); break;
@@ -5187,14 +5199,14 @@ function ensureDieButton(sides) {
 // centre is your action die — enlarged, and what Roll throws. Scroll or tap to
 // move along the chain; there is no separate dialog. d100 rides the end for the
 // Judge's tables. Ordinary pools (2d6+3 damage) are still typeable in the field.
-const dcc = { pos: DCC_STRIP.indexOf(20) };   // index into DCC_STRIP
-function dccSides() { return DCC_STRIP[dcc.pos]; }
 const dccChainEl = $('dccChain');
 
-// A regular polygon per die, rotated so chain neighbours read differently even
-// when they share a vertex count; d10 is the classic kite, d100 a near-circle.
+// A 2D shape per die, after the physical set: d3 and d6 are cubes (squares),
+// d4 a tetrahedron (triangle), d8 an octahedron (diamond), d10 the classic kite,
+// d100 a near-circle. The rest are regular polygons, rotated so chain neighbours
+// read differently even when they share a vertex count.
 const DCC_SHAPE = {
-  3: [3, -90], 4: [3, 90], 5: [5, -90], 6: [4, -45], 7: [7, -90], 8: [4, -90],
+  3: [4, -45], 4: [3, -90], 5: [5, -90], 6: [4, -45], 7: [7, -90], 8: [4, -90],
   12: [5, 90], 14: [6, -90], 16: [8, -90], 20: [6, 0], 24: [8, 22.5], 30: [10, -90], 100: [24, -90],
 };
 function dccShapePath(sides) {
@@ -5208,6 +5220,14 @@ function dccShapePath(sides) {
   return 'M' + pts.join(' ') + 'Z';
 }
 
+// The tokens are pool buttons like everywhere else in Dicebox: tap adds one of
+// that die, hold removes one, and Roll throws the whole pool — so a fistful of
+// d6 damage works, not just one die. Their shape and colour make the chain read.
+function dccStep(sides, dir) {
+  const cur = pool.get(sides)?.count || 0;
+  setDieCount(sides, cur + dir * perTap());
+}
+
 function buildDccChain() {
   if (!dccChainEl || dccChainEl.dataset.built) return;
   DCC_STRIP.forEach((sides, i) => {
@@ -5216,10 +5236,9 @@ function buildDccChain() {
     t.className = 'dcc-token';
     t.dataset.i = i;
     t.style.setProperty('--dc', DCC_COLORS[sides]);
-    t.setAttribute('aria-label', 'd' + sides);
+    t.setAttribute('aria-label', `d${sides} — tap to add, hold to remove`);
     t.innerHTML = `<svg class="dcc-token-shape" viewBox="0 0 30 30" aria-hidden="true"><path d="${dccShapePath(sides)}"/></svg><span class="dcc-token-label">d${sides}</span>`;
-    // Tapping the active (centred) die rolls it; tapping another selects it.
-    t.addEventListener('click', () => { if (i === dcc.pos) doRoll('d' + sides); else centerDccToken(i); });
+    bindTapHold(t, dir => dccStep(sides, dir));
     dccChainEl.append(t);
   });
   dccChainEl.dataset.built = '1';
@@ -5227,35 +5246,8 @@ function buildDccChain() {
 
 function enterDcc() {
   buildDccChain();
-  requestAnimationFrame(() => centerDccToken(dcc.pos, { smooth: false }));
+  markDccPool();
 }
-
-function centerDccToken(i, { smooth = true } = {}) {
-  dcc.pos = Math.max(0, Math.min(DCC_STRIP.length - 1, i));
-  markDccActive();
-  const t = dccChainEl.children[dcc.pos];
-  if (t) t.scrollIntoView({ inline: 'center', block: 'nearest', behavior: smooth ? 'smooth' : 'auto' });
-}
-
-function markDccActive() {
-  [...dccChainEl.children].forEach((t, i) => t.classList.toggle('is-active', i === dcc.pos));
-  if (uiSystem === 'dcc') $('notation').value = 'd' + dccSides();
-}
-
-// On scroll, the token nearest the centre becomes the action die.
-let dccScrollTimer = null;
-dccChainEl?.addEventListener('scroll', () => {
-  clearTimeout(dccScrollTimer);
-  dccScrollTimer = setTimeout(() => {
-    const mid = dccChainEl.scrollLeft + dccChainEl.clientWidth / 2;
-    let best = dcc.pos, bestD = Infinity;
-    [...dccChainEl.children].forEach((t, i) => {
-      const d = Math.abs(t.offsetLeft + t.offsetWidth / 2 - mid);
-      if (d < bestD) { bestD = d; best = i; }
-    });
-    if (best !== dcc.pos) { dcc.pos = best; markDccActive(); }
-  }, 80);
-}, { passive: true });
 
 // ---- full history ----
 //
