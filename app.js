@@ -5260,7 +5260,8 @@ function buildDccChain() {
     const wrap = document.createElement('div');
     wrap.className = 'dcc-token';
     wrap.dataset.i = i;
-    wrap.style.setProperty('--dc', DCC_COLORS[sides]);
+    // The chain hue rides on --chain; a die only spends it (as --dc) once crowned.
+    wrap.style.setProperty('--chain', DCC_COLORS[sides]);
     if (sides === dccCrown) wrap.classList.add('is-action');
 
     // The crown row: a left step-arrow, the crown itself, a right step-arrow.
@@ -5294,9 +5295,9 @@ function buildDccChain() {
 
     const die = document.createElement('button');
     die.type = 'button';
-    die.className = 'dcc-die-btn';
+    die.className = 'dcc-chip';
     die.setAttribute('aria-label', `d${sides} — tap to add, hold to remove`);
-    die.innerHTML = `<svg class="dcc-token-shape" viewBox="0 0 30 30" aria-hidden="true"><path d="${dccShapePath(sides)}"/></svg><span class="dcc-token-label">d${sides}</span>`;
+    die.innerHTML = `<svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true"><path d="${dccShapePath(sides)}"/></svg><span class="dcc-chip-label">d${sides}</span>`;
     bindTapHold(die, dir => dccStep(sides, dir));
 
     wrap.append(crownRow, die);
