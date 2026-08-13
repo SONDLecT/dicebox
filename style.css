@@ -439,6 +439,7 @@ body {
 #modeToggle[data-system="deltagreen"] .mode-ico[data-for="deltagreen"] { display: block; }
 #modeToggle[data-system="ironsworn"] .mode-ico[data-for="ironsworn"] { display: block; }
 #modeToggle[data-system="starforged"] .mode-ico[data-for="starforged"] { display: block; }
+#modeToggle[data-system="dcc"] .mode-ico[data-for="dcc"] { display: block; }
 #modeToggle[data-system="starwars"] .mode-ico[data-for="starwars"] { display: block; }
 #modeToggle[data-system="onering"] .mode-ico[data-for="onering"] { display: block; }
 #modeToggle[data-system="pbta"] .mode-ico[data-for="pbta"] { display: block; }
@@ -760,6 +761,20 @@ body {
 /* The owned PSG/WOM use only d5, d10, d20 and d100. Keep d? and a custom die
    created through it, but hide Dicebox's broader DCC/novelty catalog here. */
 .dice-buttons.mothership-only .dbtn:not(.custom):not([data-sides="5"]):not([data-sides="10"]):not([data-sides="20"]):not([data-sides="100"]):not([data-custom]) { display: none; }
+/* DCC: the strip is exactly the dice chain — every button tagged .dcc-chain on
+   entry — so the d? and any off-chain die drop away. */
+.dice-buttons.dcc-only .dbtn:not(.dcc-chain) { display: none; }
+.dice-buttons.dcc-only .dbtn.dcc-chain { border-color: var(--dc); color: var(--dc); }
+.dice-buttons.dcc-only .dbtn.dcc-current { box-shadow: 0 0 0 2px var(--dc); }
+/* DCC action-die tracker: a stepper showing where you sit on the chain. */
+.dcc-fields-row { display: flex; align-items: center; gap: 10px; padding-bottom: 8px; }
+.dcc-label { font-family: "Iosevka Etoile", ui-monospace, monospace; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.dcc-stepper { display: inline-flex; align-items: stretch; border: 1px solid var(--hair); border-radius: 12px; overflow: hidden; }
+.dcc-shift { appearance: none; border: 0; background: var(--face); color: var(--line); font-size: 14px; padding: 0 14px; cursor: pointer; }
+.dcc-shift:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.dcc-shift:disabled { color: var(--muted); opacity: 0.45; cursor: default; }
+.dcc-die { appearance: none; border: 0; border-left: 1px solid var(--hair); border-right: 1px solid var(--hair); background: color-mix(in srgb, var(--dc, var(--accent)) 14%, transparent); color: var(--dc, var(--accent)); font: inherit; font-weight: 700; font-size: 16px; padding: 9px 16px; cursor: pointer; font-variant-numeric: tabular-nums; min-width: 62px; }
+.dcc-die:hover { background: color-mix(in srgb, var(--dc, var(--accent)) 24%, transparent); }
 
 /* The total tinted by the duality tone. */
 .total[data-variant="hope"] { color: #C9A227; }
@@ -1530,6 +1545,7 @@ body {
 .mode-deltagreen { --sys: #4E9068; }
 .mode-ironsworn { --sys: #6E8B9A; }
 .mode-starforged { --sys: #8E86C9; }
+.mode-dcc { --sys: #C36A3C; }
 .mode-starwars { --sys: #5B9BD5; }
 .mode-onering { --sys: #B5893C; }
 .mode-pbta { --sys: #D97A3C; }

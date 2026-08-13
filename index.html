@@ -128,6 +128,10 @@
           <g class="mode-ico" data-for="deltagreen" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">
             <path d="M12 4 20 19 4 19Z"/>
           </g>
+          <!-- DCC: a d7-ish many-sided die — the dice chain's oddball spirit. -->
+          <g class="mode-ico" data-for="dcc" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
+            <path d="M12 2.5 20 8v8l-8 5.5L4 16V8z"/><path d="M4 8 12 12l8-4M12 12v9.5"/>
+          </g>
           <!-- Ironsworn: an upright sword — an oath sworn on iron. -->
           <g class="mode-ico" data-for="ironsworn" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 2.5 V15"/><path d="M9 15 H15"/><path d="M12 15 V19"/>
@@ -383,6 +387,21 @@
         <b>Difficulty</b> — roughly 3 for a simple task up to 6 or 7 for the
         near-impossible. Leave the difficulty unset and it just reports the hits. <b>Tap</b> a
         die to add it, <b>hold</b> to remove.
+      </p>
+      </div>
+
+      <div id="helpDcc" hidden>
+      <dl class="syntax">
+        <dt>d20</dt>   <dd>tap the die, or type it</dd>
+        <dt>2d6+3</dt> <dd>ordinary pools still work</dd>
+      </dl>
+      <p class="note">
+        Dungeon Crawl Classics rolls the <b>dice chain</b>: d3, d4, d5, d6, d7, d8,
+        d10, d12, d14, d16, d20, d24, d30. Your <b>action die</b> sits somewhere on
+        it, and effects — a warrior's Mighty Deed, luck, spellburn — shift it a
+        step up or down. Use <b>◄ / ►</b> to move it and tap it to roll; the strip
+        below is the whole chain, so any die is a tap away. Every one renders in
+        its true shape — no <code>d?</code> needed.
       </p>
       </div>
 
@@ -723,6 +742,13 @@
         </svg>
         <span class="mode-row-name">CTech 2e</span>
         <span class="mode-row-sub">d10 pool &middot; even = hit</span>
+      </button>
+      <button type="button" class="mode-row mode-dcc" data-system="dcc" aria-pressed="false">
+        <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
+          <path d="M12 2.5 20 8v8l-8 5.5L4 16V8z"/><path d="M4 8 12 12l8-4M12 12v9.5"/>
+        </svg>
+        <span class="mode-row-name">DCC</span>
+        <span class="mode-row-sub">the dice chain</span>
       </button>
       <button type="button" class="mode-row mode-deltagreen" data-system="deltagreen" aria-pressed="false">
         <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">
@@ -1114,6 +1140,16 @@
   </output>
 
   <section class="picker" id="numPicker" aria-label="Dice">
+    <!-- DCC: the action die on the dice chain. ◄/► shift it a step; tap the die
+         to roll it. The strip below is the chain, so any die is a tap away too. -->
+    <div class="dcc-fields-row" id="dccFieldsRow" hidden>
+      <span class="dcc-label">Action die</span>
+      <div class="dcc-stepper">
+        <button type="button" class="dcc-shift" id="dccDown" aria-label="Shift the action die down the chain">◄</button>
+        <button type="button" class="dcc-die" id="dccDie" aria-label="Roll the action die">d20</button>
+        <button type="button" class="dcc-shift" id="dccUp" aria-label="Shift the action die up the chain">►</button>
+      </div>
+    </div>
     <div class="ms-fields-row" id="msFieldsRow" hidden>
       <div class="ms-direct-field ms-dial-field">
         <span>Target</span>

@@ -43,6 +43,25 @@ const QUICK = [1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 30, 100];
 // these, so its dice strip hides the rest of the DCC oddities.
 const STANDARD_DICE = new Set([4, 6, 8, 10, 12, 20]);
 
+// Dungeon Crawl Classics rolls the full "dice chain": your action die sits at a
+// position on it and effects (Mighty Deeds, luck, spellburn) shift it up or down
+// a step. Every die on it already renders — this is the numeric roller trimmed
+// to the chain, plus a tracker for where you are. No d? needed: it is all here.
+const DCC_CHAIN = [3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 30];
+// The strip also carries a d100: not on the chain (the ◄/► tracker), but the
+// Judge rolls it constantly for crit/fumble/corruption/mercurial-magic tables.
+const DCC_STRIP = [...DCC_CHAIN, 100];
+const DCC_SET = new Set(DCC_STRIP);
+// One colour per die, after a physical DCC set — the chain reads as a rainbow so
+// you can pick your die at a glance. Saturated enough to hold on both themes,
+// both on the chain buttons and on the rolled dice. d100 gets a quieter grey to
+// set it apart as the off-chain utility die.
+const DCC_COLORS = {
+  3: '#4E9E52', 4: '#70737C', 5: '#9463B0', 6: '#C2503F', 7: '#8FA6B4',
+  8: '#D6A93A', 10: '#DC8FB4', 12: '#3F86D6', 14: '#DB7430', 16: '#4059B5',
+  20: '#B9B3A2', 24: '#CE4C40', 30: '#E6C63C', 100: '#8A8594',
+};
+
 // Above this many dice, throwing them across the tray stops being legible and
 // the pairwise separation gets expensive. Larger rolls spin in place instead.
 const THROW_LIMIT = 24;
@@ -388,6 +407,16 @@ const SYSTEM_THEMES = {
       '--hair': '#CFCDDD', '--accent': '#5E56A0', '--danger': '#9E3529',
     },
   },
+  dcc: {
+    dark: {
+      '--paper': '#0E0A08', '--face': '#1A1310', '--line': '#E7DAD0', '--muted': '#948578',
+      '--hair': '#2A1E18', '--accent': '#C36A3C', '--danger': '#C0453F',
+    },
+    light: {
+      '--paper': '#EBE4DD', '--face': '#F5EFE8', '--line': '#241813', '--muted': '#6A5A4E',
+      '--hair': '#D8CCBF', '--accent': '#9A4E24', '--danger': '#9E3529',
+    },
+  },
   mothership: {
     dark: {
       '--paper': '#0C0E10', '--face': '#15181C', '--line': '#DCE2E6', '--muted': '#7D8991',
@@ -697,6 +726,8 @@ function buildTrayDice(flat, result, { remote = false } = {}) {
     // An oracle draw is a single dN in the steel oracle colour — neutral, since a
     // table result is information, not a pass/fail.
     else if (result.system === 'oracle') die.genColor = IRON_COLORS.oracle;
+    // DCC (numeric rolls in the dice-chain mode): each die takes its chain colour.
+    if (uiSystem === 'dcc' && f.sides && DCC_COLORS[f.sides]) die.genColor = DCC_COLORS[f.sides];
     return die;
   });
 }
@@ -1118,6 +1149,7 @@ const SYSTEMS = {
   deltagreen: { badge: 'Delta Green' },
   ironsworn: { badge: 'Ironsworn' },
   starforged: { badge: 'Starforged' },
+  dcc: { badge: 'DCC' },
 };
 
 // Empty-tray copy. Most modes build a pool by tapping dice, so the default
@@ -1133,6 +1165,7 @@ const SYSTEM_HINTS = {
   deltagreen: { idle: 'Roll d100 under your target — set it, or let the table judge', placeholder: 'Roll, or type dg:50' },
   ironsworn: { idle: 'Tap a roll — Action, Progress, or an oracle', placeholder: 'Roll, or type iron:+2' },
   starforged: { idle: 'Tap a roll — Action, Progress, or an oracle', placeholder: 'Roll, or type iron:+2' },
+  dcc: { idle: 'Roll along the dice chain — shift your action die and go', placeholder: 'Tap a die, or type d16' },
   cards: { idle: 'Tap the deck to draw', placeholder: 'Tap the deck, or type deck:3' },
   tarot: { idle: 'Tap the deck to draw', placeholder: 'Tap the deck, or type tarot:3' },
   napoletane: { idle: 'Tocca il mazzo per pescare', placeholder: 'Tocca il mazzo, o scrivi nap:3' },
@@ -1152,9 +1185,9 @@ const SLUG_TO_SYSTEM = {
   swrpg: 'starwars', tor2e: 'onering', pbta: 'pbta', mist: 'mist', mosh1e: 'mothership',
   v5: 'v5', vtm: 'v5', daggerheart: 'daggerheart', cthulhutech: 'cthulhutech', ctech: 'cthulhutech',
   force: 'starwars', feat: 'onering', tor: 'onering', mothership: 'mothership', mosh: 'mothership', coc: 'callofcthulhu', callofcthulhu: 'callofcthulhu', cthulhu: 'callofcthulhu', dg: 'deltagreen', deltagreen: 'deltagreen',
-  ironsworn: 'ironsworn', iron: 'ironsworn', starforged: 'starforged', sf: 'starforged',
+  ironsworn: 'ironsworn', iron: 'ironsworn', starforged: 'starforged', sf: 'starforged', dcc: 'dcc',
 };
-const SYSTEM_TO_SLUG = { cards: 'cards', tarot: 'tarot', napoletane: 'napoletane', hanafuda: 'hanafuda', utagaruta: 'utagaruta', v5: 'vtmv5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', mothership: 'mosh1e', callofcthulhu: 'coc', deltagreen: 'dg', ironsworn: 'ironsworn', starforged: 'starforged' };
+const SYSTEM_TO_SLUG = { cards: 'cards', tarot: 'tarot', napoletane: 'napoletane', hanafuda: 'hanafuda', utagaruta: 'utagaruta', v5: 'vtmv5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', mothership: 'mosh1e', callofcthulhu: 'coc', deltagreen: 'dg', ironsworn: 'ironsworn', starforged: 'starforged', dcc: 'dcc' };
 
 function systemFromPath() {
   const seg = (location.pathname || '/').replace(/^\/+|\/+$/g, '').toLowerCase();
@@ -1226,9 +1259,11 @@ function setSystem(system, { roll = false, url = true } = {}) {
   // Daggerheart and Mothership keep the numeric strip too — their signature roll
   // is separate, but weapons/damage/wounds are ordinary dice. Mothership's owned
   // books use d5, d10, d20 and d100; d? remains available for table-specific dice.
-  numPicker.hidden = system !== 'numeric' && system !== 'daggerheart' && system !== 'mothership';
+  numPicker.hidden = system !== 'numeric' && system !== 'daggerheart' && system !== 'mothership' && system !== 'dcc';
   diceButtons.classList.toggle('standard-only', system === 'daggerheart');
   diceButtons.classList.toggle('mothership-only', system === 'mothership');
+  diceButtons.classList.toggle('dcc-only', system === 'dcc');
+  if (system === 'dcc') enterDcc();
   numPicker.classList.toggle('mothership-rail', system === 'mothership');
   msFieldsRow.hidden = system !== 'mothership';
   v5Picker.hidden = system !== 'v5';
@@ -1244,6 +1279,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
   cocPicker.hidden = system !== 'callofcthulhu';
   dgPicker.hidden = system !== 'deltagreen';
   ironPicker.hidden = system !== 'ironsworn' && system !== 'starforged';
+  $('dccFieldsRow').hidden = system !== 'dcc';
   cardsPicker.hidden = system !== 'cards';
   tarotPicker.hidden = system !== 'tarot';
   napPicker.hidden = system !== 'napoletane';
@@ -1289,6 +1325,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
   $('helpCallofcthulhu').hidden = system !== 'callofcthulhu';
   $('helpDeltagreen').hidden = system !== 'deltagreen';
   $('helpIronsworn').hidden = system !== 'ironsworn' && system !== 'starforged';
+  $('helpDcc').hidden = system !== 'dcc';
   $('helpCards').hidden = system !== 'cards';
   $('helpTarot').hidden = system !== 'tarot';
   $('helpNapoletane').hidden = system !== 'napoletane';
@@ -5138,6 +5175,52 @@ function ensureDieButton(sides) {
   syncNudges();
   return button;
 }
+
+// ---- Dungeon Crawl Classics: the dice chain ----
+//
+// The numeric roller trimmed to the chain (the dcc-only strip filter shows just
+// these dice), plus a tracker for your action die: shift it up or down the chain
+// and tap it to roll. The die strip below still builds ordinary pools (2d6+3
+// damage, a d16 spell), so nothing about numeric rolling is lost.
+const dcc = { pos: DCC_CHAIN.indexOf(20) };   // index into DCC_CHAIN; d20 to start
+function dccSides() { return DCC_CHAIN[dcc.pos]; }
+
+function enterDcc() {
+  // Every chain die earns a real button, tagged so the dcc-only filter shows just
+  // the chain (and hides the d? — the whole chain is present, so it is not needed).
+  // Each carries its chain colour as --dc for the button tint.
+  for (const s of DCC_STRIP) ensureDieButton(s);
+  for (const b of diceButtons.children) {
+    const sides = Number(b.dataset.sides);
+    const inStrip = DCC_SET.has(sides);
+    b.classList.toggle('dcc-chain', inStrip);
+    if (inStrip) b.style.setProperty('--dc', DCC_COLORS[sides]);
+  }
+  syncDccTrack();
+}
+
+function syncDccTrack() {
+  const dccDie = $('dccDie');
+  dccDie.textContent = 'd' + dccSides();
+  dccDie.style.setProperty('--dc', DCC_COLORS[dccSides()]);
+  $('dccDown').disabled = dcc.pos === 0;
+  $('dccUp').disabled = dcc.pos === DCC_CHAIN.length - 1;
+  // Mark the action die on the strip so its place on the chain is visible.
+  for (const b of diceButtons.children) {
+    if (b.dataset.sides) b.classList.toggle('dcc-current', Number(b.dataset.sides) === dccSides());
+  }
+}
+
+function shiftDcc(by) {
+  dcc.pos = Math.max(0, Math.min(DCC_CHAIN.length - 1, dcc.pos + by));
+  syncDccTrack();
+  const cur = [...diceButtons.children].find(b => Number(b.dataset.sides) === dccSides());
+  cur?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+}
+
+$('dccDown').addEventListener('click', () => shiftDcc(-1));
+$('dccUp').addEventListener('click', () => shiftDcc(1));
+$('dccDie').addEventListener('click', () => doRoll('d' + dccSides()));
 
 // ---- full history ----
 //
