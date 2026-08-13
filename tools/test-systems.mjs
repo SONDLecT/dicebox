@@ -16,6 +16,7 @@ import { parseMothership, rollMothership, summarizeMothershipCheck, summarizeMot
 import { parseCards, newDeckOrder, summarizeCards, cardsHeadline, describeCards } from '../system-dice.js';
 import { parseTarot, summarizeTarot, tarotHeadline, describeTarot } from '../system-dice.js';
 import { parseNapoletane } from '../system-dice.js';
+import { parseIronsworn, rollIronsworn, summarizeIronsworn, describeIronsworn, ironswornHeadline } from '../system-dice.js';
 import * as systemModule from '../system-dice.js';
 
 let pass = 0, fail = 0;
@@ -791,6 +792,48 @@ ok('parse via alias', eq(parseNapoletane('nap:3'), { draw: 3, replace: false }))
 ok('parse ita:1 replace', eq(parseNapoletane('ita:1 replace'), { draw: 1, replace: true }));
 for (const bad of ['ita:', 'ita:0', 'ita:11', 'ita:1 jokers', 'deck:1']) {
   ok(`reject ita ${bad}`, (() => { try { parseNapoletane(bad); return false; } catch { return true; } })());
+}
+
+// ---- Ironsworn / Starforged ----
+ok('detect iron', detectSystem('iron:+2') === 'ironsworn');
+ok('parse iron: (no adds)', eq(parseIronsworn('iron:'), { progress: false, modifier: 0, progressScore: null }));
+ok('parse iron:+2', eq(parseIronsworn('iron:+2'), { progress: false, modifier: 2, progressScore: null }));
+ok('parse iron:2 (bare adds)', eq(parseIronsworn('iron:2'), { progress: false, modifier: 2, progressScore: null }));
+ok('parse iron:-1 (negative)', eq(parseIronsworn('iron:-1'), { progress: false, modifier: -1, progressScore: null }));
+ok('parse iron:p6 (progress)', eq(parseIronsworn('iron:p6'), { progress: true, modifier: null, progressScore: 6 }));
+for (const bad of ['iron:p11', 'iron:21', 'iron:-10', 'iron:xyz', 'ironx', 'dg:60']) {
+  ok(`reject iron ${bad}`, (() => { try { parseIronsworn(bad); return false; } catch { return true; } })());
+}
+{
+  const sum = (o) => summarizeIronsworn(o);
+  const base = { progress: false, actionDie: 4, modifier: 2 };
+  ok('strong hit beats both', sum({ ...base, score: 6, challenge: [3, 5], match: false }).outcome === 'strong');
+  ok('weak hit beats one', sum({ ...base, score: 6, challenge: [7, 5], match: false }).outcome === 'weak');
+  ok('miss beats neither', sum({ ...base, score: 4, challenge: [7, 9], match: false }).outcome === 'miss');
+  ok('a tie is not a beat', sum({ ...base, score: 6, challenge: [6, 2], match: false }).outcome === 'weak');
+  ok('strong is a success', sum({ ...base, score: 6, challenge: [3, 5], match: false }).success === true);
+  ok('miss is not a success', sum({ ...base, score: 4, challenge: [7, 9], match: false }).success === false);
+  const matchStrong = { summary: sum({ ...base, score: 6, challenge: [2, 2], match: true }) };
+  ok('match strong headline + variant', eq(ironswornHeadline(matchStrong), { kind: 'text', text: 'Strong Hit — Match', variant: 'band-hit' }));
+  ok('weak headline variant is amber', ironswornHeadline({ summary: sum({ ...base, score: 6, challenge: [7, 5], match: false }) }).variant === 'band-partial');
+  ok('miss headline variant is muted', ironswornHeadline({ summary: sum({ ...base, score: 4, challenge: [7, 9], match: false }) }).variant === 'band-miss');
+  const prog = { summary: sum({ progress: true, actionDie: null, modifier: null, score: 8, challenge: [3, 5], match: false }) };
+  ok('progress roll resolves without an action die', prog.summary.outcome === 'strong' && prog.summary.actionDie === null);
+  ok('progress describe reads progress N', /progress 8 vs 3, 5/.test(describeIronsworn(prog)));
+  ok('action describe shows the math', /action 4 \+ 2 = 6 vs 3, 5/.test(describeIronsworn({ summary: sum({ ...base, score: 6, challenge: [3, 5], match: false }) })));
+}
+{
+  // live rng: score is always capped at 10 and every roll resolves
+  for (let i = 0; i < 200; i++) {
+    const r = rollIronsworn('iron:20');
+    ok('score capped at 10', r.summary.score <= 10, `score=${r.summary.score}`);
+    ok('outcome always resolves', ['strong', 'weak', 'miss'].includes(r.summary.outcome));
+    const chall = r.groups[0].dice.filter(d => d.role === 'challenge');
+    ok('two challenge dice on the tray', chall.length === 2);
+    ok('action die present on action roll', r.groups[0].dice.some(d => d.role === 'action'));
+  }
+  const p = rollIronsworn('iron:p0');
+  ok('progress roll has no action die', !p.groups[0].dice.some(d => d.role === 'action'));
 }
 
 console.log(`\nsystem-dice: ${pass} passed, ${fail} failed`);

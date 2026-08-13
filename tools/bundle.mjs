@@ -63,6 +63,8 @@ const TAROT_ART_EXPORTS = ['tarotSVG', 'TAROT_IDS', 'tarotMeta', 'TAROT_SUITS'];
 const NAP_ART_EXPORTS = ['napSVG', 'NAP_IDS', 'napMeta'];
 const HANA_ART_EXPORTS = ['hanaSVG', 'HANA_IDS', 'hanaMeta'];
 const UTA_ART_EXPORTS = ['utaSVG', 'UTA_IDS', 'utaMeta'];
+const ORACLE_EXPORTS = ['rollOracle', 'oracleReading', 'oracleText', 'oracleTableList'];
+const IRON_ORACLE_EXPORTS = ['IRONSWORN_ORACLES'];
 const RENDER_EXPORTS = ['Die', 'Surface', 'separate', 'beginFrame', 'solidFor', 'UNDER_30_GAP'];
 const ROOM_CRYPTO_EXPORTS = [
   'deriveRoom', 'newSender', 'encryptMessage', 'decryptMessage',
@@ -79,6 +81,8 @@ const script = [
   moduleScope('dice.js'),
   moduleScope('under30-gap.js'),
   moduleScope('system-dice.js'),
+  moduleScope('oracle-dice.js', ['randInt']),
+  moduleScope('ironsworn-oracles.js'),
   moduleScope('cards-art.js'),
   moduleScope('tarot-art.js'),
   moduleScope('nap-art.js'),
@@ -88,7 +92,7 @@ const script = [
   moduleScope('room-crypto.js'),
   moduleScope('room.js', ROOM_CRYPTO_EXPORTS),
   moduleScope('app.js', [
-    ...DICE_EXPORTS, ...SYSTEM_EXPORTS, ...CARDS_ART_EXPORTS, ...TAROT_ART_EXPORTS, ...NAP_ART_EXPORTS, ...HANA_ART_EXPORTS, ...UTA_ART_EXPORTS, ...RENDER_EXPORTS, ...ROOM_CRYPTO_EXPORTS, ...ROOM_EXPORTS,
+    ...DICE_EXPORTS, ...SYSTEM_EXPORTS, ...ORACLE_EXPORTS, ...IRON_ORACLE_EXPORTS, ...CARDS_ART_EXPORTS, ...TAROT_ART_EXPORTS, ...NAP_ART_EXPORTS, ...HANA_ART_EXPORTS, ...UTA_ART_EXPORTS, ...RENDER_EXPORTS, ...ROOM_CRYPTO_EXPORTS, ...ROOM_EXPORTS,
   ]),
 ].join('\n\n');
 

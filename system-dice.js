@@ -19,8 +19,9 @@
 const V5_REGEX = /^v5:(\d+)(?:h(\d+))?(?:@(\d+))?$/;
 
 // A strong uniform integer in [1, sides]. Mirrors dice.js randInt (rejection
-// sampling avoids the modulo bias of a naive `% sides`).
-function randInt(sides) {
+// sampling avoids the modulo bias of a naive `% sides`). Exported so the oracle
+// engine draws from the same crypto source as the dice.
+export function randInt(sides) {
   if (sides <= 1) return 1;
   const limit = Math.floor(0x100000000 / sides) * sides;
   const buf = new Uint32Array(1);
@@ -42,6 +43,10 @@ export function detectSystem(src) {
   if (/^ms:/.test(s)) return 'mothership';
   if (/^coc:/.test(s)) return 'callofcthulhu';
   if (/^dg:/.test(s)) return 'deltagreen';
+  if (/^iron:/.test(s)) return 'ironsworn';
+  // Oracle table draws (Ironsworn/Starforged) are rolled app-side against the
+  // lazy-loaded dataset, so this only tags the notation; rollAny does not roll it.
+  if (/^oracle:/.test(s)) return 'oracle';
   if (/^deck:/.test(s)) return 'cards';
   if (/^tarot:/.test(s)) return 'tarot';
   if (/^(?:ita|nap):/.test(s)) return 'napoletane';
@@ -213,6 +218,7 @@ export function rollAny(src, uiSystem = 'numeric') {
   if (sys === 'mothership') return rollMothership(src);
   if (sys === 'callofcthulhu') return rollCallOfCthulhu(src);
   if (sys === 'deltagreen') return rollDeltaGreen(src);
+  if (sys === 'ironsworn') return rollIronsworn(src);
   return { system: 'numeric', deferred: true, notation: String(src) };
 }
 
@@ -992,6 +998,102 @@ export function describeDeltaGreen(result) {
   if (s.double) read += ', doubles';
   parts.push(read);
   if (s.target !== null) parts.push(`under ${s.target}`);
+  return parts.join(' · ');
+}
+
+// ---- Ironsworn / Starforged (the Ironsworn family, Shawn Tomkin, CC BY 4.0) ----
+//
+// One action roll underlies both games. Roll a d6 action die, add your stat and
+// any adds, cap the score at 10, and set it against two d10 challenge dice. Beat
+// BOTH → Strong Hit; beat ONE → Weak Hit; beat NEITHER → Miss. When the two
+// challenge dice show the same number that is a Match — a twist whose meaning
+// follows the outcome (a bonus on a hit, a worse turn on a miss). A progress
+// roll drops the action die and sets a progress-track value (0-10) against the
+// same two challenge dice. No target is needed: the challenge dice are the
+// opposition, so every roll resolves on its own.
+//
+//   iron:        an action roll with no adds
+//   iron:+2      an action roll, +2 to the action die
+//   iron:-1      a negative modifier is legal
+//   iron:p6      a progress roll with a track value of 6
+const IRON_REGEX = /^iron:(p)?([+-]?\d+)?$/;
+
+export function parseIronsworn(src) {
+  const m = IRON_REGEX.exec(String(src || '').trim().toLowerCase());
+  if (!m) throw new Error('Expected an Ironsworn roll like "iron:+2" or a progress roll "iron:p6"');
+  const progress = Boolean(m[1]);
+  const raw = m[2] === undefined ? 0 : Number(m[2]);
+  if (progress) {
+    if (raw < 0 || raw > 10) throw new Error('Progress must be 0-10');
+    return { progress: true, modifier: null, progressScore: raw };
+  }
+  if (raw < -9 || raw > 20) throw new Error('Modifier must be -9 to 20');
+  return { progress: false, modifier: raw, progressScore: null };
+}
+
+export function rollIronsworn(src) {
+  const { progress, modifier, progressScore } = parseIronsworn(src);
+  const challenge = [randInt(10), randInt(10)];          // 1-10 each
+  const match = challenge[0] === challenge[1];
+  let actionDie = null, score;
+  if (progress) {
+    score = progressScore;
+  } else {
+    actionDie = randInt(6);                              // 1-6
+    score = Math.max(0, Math.min(actionDie + modifier, 10)); // score is capped at 10
+  }
+  const dice = [];
+  if (!progress) dice.push({ role: 'action', value: actionDie, sides: 6, kept: true, rerolled: false, exploded: false });
+  for (const c of challenge) {
+    dice.push({ role: 'challenge', value: c, sides: 10, beaten: score > c, matched: match, kept: true, rerolled: false, exploded: false });
+  }
+  return {
+    schema: 2,
+    system: 'ironsworn',
+    notation: String(src),
+    groups: [{ kind: 'dice', dieType: 'ironsworn', count: dice.length, dice, subtotal: 0 }],
+    summary: summarizeIronsworn({ progress, actionDie, modifier, score, challenge, match }),
+  };
+}
+
+export function summarizeIronsworn(r) {
+  const beats = r.challenge.filter(c => r.score > c).length;
+  const outcome = beats === 2 ? 'strong' : beats === 1 ? 'weak' : 'miss';
+  return {
+    kind: 'ironsworn',
+    progress: r.progress,
+    actionDie: r.actionDie,
+    modifier: r.progress ? null : r.modifier,
+    score: r.score,
+    challenge: r.challenge,
+    match: r.match,
+    beats,
+    outcome,
+    success: outcome !== 'miss',
+  };
+}
+
+const IRON_OUTCOME_LABEL = { strong: 'Strong Hit', weak: 'Weak Hit', miss: 'Miss' };
+
+export function ironswornHeadline(result) {
+  const s = result.summary;
+  const variant = s.outcome === 'strong' ? 'band-hit'
+    : s.outcome === 'weak' ? 'band-partial'
+    : 'band-miss';
+  const text = s.match ? `${IRON_OUTCOME_LABEL[s.outcome]} — Match` : IRON_OUTCOME_LABEL[s.outcome];
+  return { kind: 'text', text, variant };
+}
+
+export function describeIronsworn(result) {
+  const s = result.summary;
+  const parts = [IRON_OUTCOME_LABEL[s.outcome]];
+  if (s.progress) {
+    parts.push(`progress ${s.score} vs ${s.challenge.join(', ')}`);
+  } else {
+    const mod = s.modifier ? (s.modifier > 0 ? ` + ${s.modifier}` : ` − ${-s.modifier}`) : '';
+    parts.push(`action ${s.actionDie}${mod} = ${s.score} vs ${s.challenge.join(', ')}`);
+  }
+  if (s.match) parts.push('match');
   return parts.join(' · ');
 }
 

@@ -10,6 +10,8 @@ import { rollCthulhuTech, describeCthulhuTech, cthulhutechHeadline, parseCthulhu
 import { rollMothership, describeMothership, mothershipHeadline, parseMothership, resolveMothershipStress } from './system-dice.js';
 import { rollCallOfCthulhu, describeCallOfCthulhu, callOfCthulhuHeadline, parseCallOfCthulhu } from './system-dice.js';
 import { rollDeltaGreen, describeDeltaGreen, deltaGreenHeadline, parseDeltaGreen } from './system-dice.js';
+import { rollIronsworn, describeIronsworn, ironswornHeadline, parseIronsworn } from './system-dice.js';
+import { rollOracle, oracleReading, oracleSlug, findOracleBySlug, oracleTableList } from './oracle-dice.js';
 import { parseCards, newDeckOrder, summarizeCards, cardsHeadline, describeCards, parseTarot, summarizeTarot, tarotHeadline, describeTarot, parseNapoletane, parseHanafuda, parseUtagaruta } from './system-dice.js';
 import { rollStarWars, describeStarWars, starWarsHeadline, parseStarWars } from './system-dice.js';
 import { rollOneRing, describeOneRing, oneRingHeadline, parseOneRing } from './system-dice.js';
@@ -366,6 +368,16 @@ const SYSTEM_THEMES = {
       '--hair': '#C8D3CB', '--accent': '#2F6B49', '--danger': '#9E3529',
     },
   },
+  ironsworn: {
+    dark: {
+      '--paper': '#090C0F', '--face': '#121820', '--line': '#D7DEE4', '--muted': '#79838C',
+      '--hair': '#1B232B', '--accent': '#6E8B9A', '--danger': '#C0453F',
+    },
+    light: {
+      '--paper': '#E3E7EB', '--face': '#EFF3F6', '--line': '#141C24', '--muted': '#545E66',
+      '--hair': '#C9D1D8', '--accent': '#4A6B7C', '--danger': '#9E3529',
+    },
+  },
   mothership: {
     dark: {
       '--paper': '#0C0E10', '--face': '#15181C', '--line': '#DCE2E6', '--muted': '#7D8991',
@@ -665,6 +677,16 @@ function buildTrayDice(flat, result, { remote = false } = {}) {
       else if (result.summary.success === false) die.genColor = C.fail;
       else die.genColor = f.role === 'tens' ? C.tens : C.ones;
     }
+    // Ironsworn / Starforged: the action die is gold; each challenge die shows
+    // green if the score beat it and red if not, so the tray reads the outcome
+    // at a glance (both green = Strong, one = Weak, none = Miss).
+    else if (result.system === 'ironsworn') {
+      if (f.role === 'action') die.genColor = IRON_COLORS.action;
+      else die.genColor = f.beaten ? IRON_COLORS.beaten : IRON_COLORS.miss;
+    }
+    // An oracle draw is a single dN in the steel oracle colour — neutral, since a
+    // table result is information, not a pass/fail.
+    else if (result.system === 'oracle') die.genColor = IRON_COLORS.oracle;
     return die;
   });
 }
@@ -682,6 +704,7 @@ function doRoll(notation) {
     if (sys === 'napoletane') { dealFromNapNotation(notation); return; }
     if (sys === 'hanafuda') { dealFromHanaNotation(notation); return; }
     if (sys === 'utagaruta') { dealFromUtaNotation(notation); return; }
+    if (sys === 'oracle') { rollOracleFromNotation(notation); return; }
     result = sys === 'v5' ? rollV5(notation)
       : sys === 'fate' ? rollFate(notation)
       : sys === 'genesys' ? rollGenesys(notation)
@@ -694,6 +717,7 @@ function doRoll(notation) {
       : sys === 'mothership' ? rollMothership(notation)
       : sys === 'callofcthulhu' ? rollCallOfCthulhu(notation)
       : sys === 'deltagreen' ? rollDeltaGreen(notation)
+      : sys === 'ironsworn' ? rollIronsworn(notation)
       : roll(notation);
   } catch (err) {
     showError(err.message);
@@ -714,8 +738,20 @@ function doRoll(notation) {
   // roll typed in V5 mode stays V5-coloured. applySystemTheme runs at mode
   // selection, so nothing to do here.
 
+  throwResult(result);
+}
+
+// Present a computed result on the tray: claim it, build and place the dice, and
+// throw or spin them (or settle instantly for an empty/huge pool), finishing into
+// the readout and log when they land. Shared by the dice engines and the oracle
+// roller, so an oracle draw tumbles its d100 exactly like any other roll instead
+// of silently swapping text.
+function throwResult(result, { writeField = true } = {}) {
   state.last = result;
-  $('notation').value = result.notation;
+  // Quick one-off rolls (an oracle draw, a progress roll) leave the field on the
+  // mode's primary expression so the Roll button keeps doing the action roll;
+  // typed and dice-engine rolls write themselves in as the current expression.
+  if (writeField) $('notation').value = result.notation;
 
   const flat = flattenRollDice(result);
 
@@ -789,6 +825,8 @@ function resultHeadline(result) {
   if (result.system === 'mothership') return mothershipHeadline(result);
   if (result.system === 'coc') return callOfCthulhuHeadline(result);
   if (result.system === 'deltagreen') return deltaGreenHeadline(result);
+  if (result.system === 'ironsworn') return ironswornHeadline(result);
+  if (result.system === 'oracle') return { kind: 'text', text: oracleReading(result.summary), variant: 'oracle' };
   if (result.system === 'cards') return cardsHeadline(result);
   if (result.system === 'tarot') return tarotHeadline(result);
   if (result.system === 'napoletane') return cardsHeadline(result);
@@ -808,6 +846,13 @@ function resultDetail(result) {
   if (result.system === 'mothership') return describeMothership(result);
   if (result.system === 'coc') return describeCallOfCthulhu(result);
   if (result.system === 'deltagreen') return describeDeltaGreen(result);
+  if (result.system === 'ironsworn') return describeIronsworn(result);
+  if (result.system === 'oracle') {
+    const o = result.summary;
+    let s = `${o.name} · d${o.sides} = ${o.roll}`;
+    if (o.suggested && o.suggested.length) s += ' · may also roll ' + o.suggested.map(x => x.name + (x.n > 1 ? ` ×${x.n}` : '')).join(', ');
+    return s;
+  }
   if (result.system === 'cards') return describeCards(result);
   if (result.system === 'tarot') return describeTarot(result);
   if (result.system === 'napoletane') return describeCards(result);
@@ -977,6 +1022,10 @@ $('notation').addEventListener('input', () => {
   if (typedSystem === 'mothership') { syncMsFromField(); return; }
   if (typedSystem === 'callofcthulhu') { syncCocFromField(); return; }
   if (typedSystem === 'deltagreen') { syncDgFromField(); return; }
+  if (typedSystem === 'ironsworn') { syncIronFromField(); return; }
+  // An oracle slug is field-only (no picker to keep in step); leave it be so the
+  // active mode's controls are not torn down by the numeric parser.
+  if (typedSystem === 'oracle') return;
   if (typedSystem === 'cards') { syncCardsFromField(); return; }
   if (typedSystem === 'tarot') { syncTarotFromField(); return; }
   if (typedSystem === 'napoletane') { syncNapFromField(); return; }
@@ -1057,6 +1106,7 @@ const SYSTEMS = {
   mothership: { badge: 'MoSh 1e' },
   callofcthulhu: { badge: 'CoC 7e' },
   deltagreen: { badge: 'Delta Green' },
+  ironsworn: { badge: 'Ironsworn' },
 };
 
 // Empty-tray copy. Most modes build a pool by tapping dice, so the default
@@ -1070,6 +1120,7 @@ const SYSTEM_HINTS = {
   mothership: { idle: 'Roll d100 — set a target to resolve it, or let the table judge', placeholder: 'Roll, or type ms:c@35' },
   callofcthulhu: { idle: 'Roll d100 under your skill — set the skill, or let the table judge', placeholder: 'Roll, or type coc:60' },
   deltagreen: { idle: 'Roll d100 under your target — set it, or let the table judge', placeholder: 'Roll, or type dg:50' },
+  ironsworn: { idle: 'Set your modifier, then roll the action die against the challenge', placeholder: 'Roll, or type iron:+2' },
   cards: { idle: 'Tap the deck to draw', placeholder: 'Tap the deck, or type deck:3' },
   tarot: { idle: 'Tap the deck to draw', placeholder: 'Tap the deck, or type tarot:3' },
   napoletane: { idle: 'Tocca il mazzo per pescare', placeholder: 'Tocca il mazzo, o scrivi nap:3' },
@@ -1089,8 +1140,9 @@ const SLUG_TO_SYSTEM = {
   swrpg: 'starwars', tor2e: 'onering', pbta: 'pbta', mist: 'mist', mosh1e: 'mothership',
   v5: 'v5', vtm: 'v5', daggerheart: 'daggerheart', cthulhutech: 'cthulhutech', ctech: 'cthulhutech',
   force: 'starwars', feat: 'onering', tor: 'onering', mothership: 'mothership', mosh: 'mothership', coc: 'callofcthulhu', callofcthulhu: 'callofcthulhu', cthulhu: 'callofcthulhu', dg: 'deltagreen', deltagreen: 'deltagreen',
+  ironsworn: 'ironsworn', starforged: 'ironsworn', iron: 'ironsworn',
 };
-const SYSTEM_TO_SLUG = { cards: 'cards', tarot: 'tarot', napoletane: 'napoletane', hanafuda: 'hanafuda', utagaruta: 'utagaruta', v5: 'vtmv5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', mothership: 'mosh1e', callofcthulhu: 'coc', deltagreen: 'dg' };
+const SYSTEM_TO_SLUG = { cards: 'cards', tarot: 'tarot', napoletane: 'napoletane', hanafuda: 'hanafuda', utagaruta: 'utagaruta', v5: 'vtmv5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', mothership: 'mosh1e', callofcthulhu: 'coc', deltagreen: 'dg', ironsworn: 'ironsworn' };
 
 function systemFromPath() {
   const seg = (location.pathname || '/').replace(/^\/+|\/+$/g, '').toLowerCase();
@@ -1116,6 +1168,7 @@ const twod6Picker = $('twod6Picker');
 const msPicker = $('msPicker');
 const cocPicker = $('cocPicker');
 const dgPicker = $('dgPicker');
+const ironPicker = $('ironPicker');
 // Numeric's strip lives after the final signature picker in the DOM. Daggerheart
 // and Mothership both show their own controls above ordinary damage dice; hidden
 // intervening pickers do not affect layout in either mode.
@@ -1178,6 +1231,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
   msPicker.hidden = system !== 'mothership';
   cocPicker.hidden = system !== 'callofcthulhu';
   dgPicker.hidden = system !== 'deltagreen';
+  ironPicker.hidden = system !== 'ironsworn';
   cardsPicker.hidden = system !== 'cards';
   tarotPicker.hidden = system !== 'tarot';
   napPicker.hidden = system !== 'napoletane';
@@ -1222,6 +1276,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
   $('helpMothership').hidden = system !== 'mothership';
   $('helpCallofcthulhu').hidden = system !== 'callofcthulhu';
   $('helpDeltagreen').hidden = system !== 'deltagreen';
+  $('helpIronsworn').hidden = system !== 'ironsworn';
   $('helpCards').hidden = system !== 'cards';
   $('helpTarot').hidden = system !== 'tarot';
   $('helpNapoletane').hidden = system !== 'napoletane';
@@ -1256,6 +1311,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
     if (system === 'mothership') $('notation').value = msNotation();
     if (system === 'callofcthulhu') $('notation').value = cocNotation();
     if (system === 'deltagreen') $('notation').value = dgNotation();
+    if (system === 'ironsworn') $('notation').value = ironNotation();
     if (system === 'cards') $('notation').value = deckNotation();
     if (system === 'tarot') $('notation').value = tarotNotation();
     if (system === 'napoletane') $('notation').value = napNotation();
@@ -2023,6 +2079,303 @@ function syncDgFromField() {
     syncDg({ writeField: false });
   } catch { /* mid-type */ }
 }
+
+// ---- Ironsworn / Starforged ----
+//
+// One action roll for both games: a d6 action die + your modifier (stat + adds,
+// score capped at 10) against two d10 challenge dice. Beat both for a Strong
+// Hit, one for a Weak Hit, neither for a Miss; matching challenge dice are a
+// twist. A progress roll swaps the action die for a track value (1-10). The
+// picker is one dial whose meaning flips with the Progress toggle.
+const IRON_COLORS = { action: '#C9A227', beaten: '#57A06A', miss: '#C0453F', challenge: '#6E7F8C', oracle: '#8AA1AE' };
+// One model for the whole mode: everything you can roll is a TILE in the "Your
+// rolls" shelf — Action, Progress, and each pinned oracle. Tapping a tile loads
+// it as the active roll (its dice stage on the tray) and rolls it; the notation
+// field carries the active roll, so Roll and a tray tap re-roll whatever is
+// loaded. This is the same "what's on the tray is what you roll" contract as the
+// rest of Dicebox — no separate oracle card, no ambiguity about what Roll does.
+const iron = { modifier: 2, progressScore: 1 };
+let ironActive = { kind: 'action' };   // { kind:'action'|'progress' } | { kind:'oracle', id }
+const ironPins = [];                    // pinned oracle table ids, in pin order
+const ironDial = $('ironDial');
+
+function ironNotation() {
+  if (ironActive.kind === 'progress') return 'iron:p' + iron.progressScore;
+  if (ironActive.kind === 'oracle') return 'oracle:' + oracleSlug(ironOracles, ironActive.id);
+  const m = iron.modifier;
+  return 'iron:' + (m > 0 ? '+' + m : m < 0 ? String(m) : '');
+}
+function resetIron() { iron.modifier = 2; iron.progressScore = 1; ironActive = { kind: 'action' }; ironPins.length = 0; renderIronPins(); }
+
+function syncIron({ writeField = true } = {}) {
+  ironDial.textContent = iron.modifier > 0 ? '+' + iron.modifier : String(iron.modifier);
+  for (const tile of $('ironShelf').querySelectorAll('.iron-tile')) {
+    const active = ironActive.kind === 'oracle'
+      ? (tile.dataset.id === ironActive.id)
+      : (tile.dataset.roll === ironActive.kind);
+    tile.classList.toggle('is-active', active);
+  }
+  if (writeField && uiSystem === 'ironsworn') $('notation').value = ironNotation();
+  if (uiSystem === 'ironsworn' && !$('total').dataset.rolling) stageSystemPool();
+}
+
+// Load a roll as active and (by default) throw it. doRoll routes iron:/oracle:
+// notation to the right engine, so this is the single path for every tile.
+function selectIronRoll(active, { roll = true } = {}) {
+  ironActive = active;
+  syncIron();
+  const activeTile = $('ironShelf').querySelector('.iron-tile.is-active');
+  if (activeTile) activeTile.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: 'smooth' });
+  if (roll) doRoll(ironNotation());
+}
+
+// The Action tile: its body rolls the action roll; the +N chip opens the dial to
+// set the stat/adds (which just re-arms it — you tap Action, or Roll, to throw).
+$('ironActionRoll').addEventListener('click', () => selectIronRoll({ kind: 'action' }));
+ironDial.addEventListener('click', () => {
+  openNumberDial({
+    title: 'Modifier', value: Math.max(1, iron.modifier), min: 1, max: 9, prefix: '+',
+    actionLabel: 'Set Modifier', inputLabel: 'Modifier',
+    commit: v => { iron.modifier = v; selectIronRoll({ kind: 'action' }, { roll: false }); },
+  });
+});
+$('ironProgress').addEventListener('click', () => {
+  openNumberDial({
+    title: 'Progress — filled boxes', value: iron.progressScore, min: 1, max: 10,
+    actionLabel: 'Roll progress', inputLabel: 'Filled boxes',
+    commit: v => { iron.progressScore = v; selectIronRoll({ kind: 'progress' }); },
+  });
+});
+
+function syncIronFromField() {
+  try {
+    const p = parseIronsworn($('notation').value);
+    if (p.progress) { iron.progressScore = p.progressScore; ironActive = { kind: 'progress' }; }
+    else { iron.modifier = p.modifier; ironActive = { kind: 'action' }; }
+    syncIron({ writeField: false });
+  } catch { /* mid-type */ }
+}
+
+// Pinned oracle tiles: added from the browser, re-rollable in one tap, ✕ to drop.
+function pinOracle(id) { if (!ironPins.includes(id)) { ironPins.push(id); renderIronPins(); } }
+function unpinOracle(id) {
+  const i = ironPins.indexOf(id);
+  if (i >= 0) ironPins.splice(i, 1);
+  renderIronPins();
+  if (ironActive.kind === 'oracle' && ironActive.id === id) selectIronRoll({ kind: 'action' }, { roll: false });
+}
+function renderIronPins() {
+  const shelf = $('ironShelf');
+  if (!shelf) return;
+  for (const t of shelf.querySelectorAll('.iron-tile-oracle')) t.remove();
+  if (!ironOracles) return;
+  const addTile = $('ironOracles');   // pins sit before the +Oracles tile
+  for (const id of ironPins) {
+    const table = ironOracles.tables[id];
+    if (!table) continue;
+    const tile = document.createElement('div');
+    tile.className = 'iron-tile iron-tile-oracle';
+    tile.dataset.roll = 'oracle';
+    tile.dataset.id = id;
+    const main = document.createElement('button');
+    main.type = 'button';
+    main.className = 'iron-tile-main';
+    const name = document.createElement('span');
+    name.className = 'iron-tile-name';
+    name.textContent = table.name;
+    const sub = document.createElement('span');
+    sub.className = 'iron-tile-sub';
+    sub.textContent = 'd' + table.sides;
+    main.append(name, sub);
+    main.addEventListener('click', () => selectIronRoll({ kind: 'oracle', id }));
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'iron-tile-close';
+    close.setAttribute('aria-label', 'Unpin ' + table.name);
+    close.textContent = '✕';
+    close.addEventListener('click', e => { e.stopPropagation(); unpinOracle(id); });
+    tile.append(main, close);
+    shelf.insertBefore(tile, addTile);
+  }
+  syncIron({ writeField: false });
+}
+
+// ---- Ironsworn oracles ----
+//
+// The oracle set (Datasworn, CC BY 4.0) is ~40 tables of d100 lookups plus a
+// handful that roll on each other. The data module is lazy-loaded on first open
+// like the deck art; the engine (oracle-dice.js) rolls a table and resolves the
+// "roll twice"/linked rolls. A rolled table lands in the readout and history the
+// way a die roll does, so consulting an oracle still feels like a Dicebox roll.
+let ironOracles = null, ironOraclesLoading = null;
+function ensureIronOracles() {
+  if (ironOracles) return Promise.resolve(ironOracles);
+  if (!ironOraclesLoading) {
+    /* global __dicebox */
+    ironOraclesLoading = (typeof __dicebox !== 'undefined' && __dicebox.IRONSWORN_ORACLES)
+      ? Promise.resolve({ IRONSWORN_ORACLES: __dicebox.IRONSWORN_ORACLES })
+      : import('./ironsworn-oracles.js');
+    ironOraclesLoading = ironOraclesLoading.then(m => (ironOracles = m.IRONSWORN_ORACLES));
+  }
+  return ironOraclesLoading;
+}
+
+const oracleSheet = $('oracleSheet');
+const oracleTree = $('oracleTree');
+const oracleSearch = $('oracleSearch');
+
+function oracleTableCount(node) {
+  let n = (node.tables || []).length;
+  for (const g of node.groups || []) n += oracleTableCount(g);
+  return n;
+}
+
+function buildOracleTree() {
+  if (!ironOracles || oracleTree.dataset.built) return;
+  const make = node => {
+    const coll = document.createElement('div');
+    coll.className = 'oracle-coll';
+    const head = document.createElement('button');
+    head.type = 'button';
+    head.className = 'oracle-coll-head';
+    head.innerHTML = '<svg class="oracle-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>';
+    const nm = document.createElement('span');
+    nm.className = 'oracle-coll-name';
+    nm.textContent = node.name;
+    const cnt = document.createElement('span');
+    cnt.className = 'oracle-coll-count';
+    cnt.textContent = oracleTableCount(node);
+    head.append(nm, cnt);
+    head.addEventListener('click', () => coll.classList.toggle('open'));
+    coll.append(head);
+    const kids = document.createElement('div');
+    kids.className = 'oracle-kids';
+    for (const id of node.tables || []) {
+      const t = ironOracles.tables[id];
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'oracle-table';
+      b.dataset.search = t.name.toLowerCase();
+      const label = document.createElement('span');
+      label.className = 'oracle-table-name';
+      label.textContent = t.name;
+      const path = document.createElement('span');
+      path.className = 'oracle-table-path';
+      path.textContent = node.name;
+      const dtag = document.createElement('span');
+      dtag.className = 'oracle-dtag';
+      dtag.textContent = 'd' + t.sides;
+      b.append(label, path, dtag);
+      b.addEventListener('click', () => rollOracleFromBrowser(id));
+      kids.append(b);
+    }
+    for (const g of node.groups || []) kids.append(make(g));
+    coll.append(kids);
+    return coll;
+  };
+  oracleTree.textContent = '';
+  for (const c of ironOracles.tree) oracleTree.append(make(c));
+  // Open Ask the Oracle by default — the odds tables are the most-reached.
+  for (const coll of oracleTree.querySelectorAll('.oracle-coll')) {
+    const name = coll.querySelector('.oracle-coll-name');
+    if (name && (name.textContent === 'Moves' || name.textContent === 'Ask the Oracle')) coll.classList.add('open');
+  }
+  oracleTree.dataset.built = '1';
+}
+
+// The five Ask the Oracle likelihoods live in the picker as one-tap buttons.
+// Each asks a yes/no at that chance: load the data if needed, roll the matching
+// odds table, and throw its d100 like any roll.
+for (const btn of document.querySelectorAll('.iron-odd')) {
+  btn.addEventListener('click', () => {
+    ensureIronOracles().then(ds => {
+      const id = findOracleBySlug(ds, btn.dataset.odds);
+      if (id) selectIronRoll({ kind: 'oracle', id });
+    });
+  });
+}
+
+oracleSearch.addEventListener('input', () => {
+  const q = oracleSearch.value.trim().toLowerCase();
+  oracleTree.classList.toggle('searching', !!q);
+  let any = false;
+  for (const b of oracleTree.querySelectorAll('.oracle-table')) {
+    const match = !q || b.dataset.search.includes(q);
+    b.hidden = !match;
+    if (match) any = true;
+  }
+  let empty = oracleTree.querySelector('.oracle-empty');
+  if (!any) {
+    if (!empty) {
+      empty = document.createElement('p');
+      empty.className = 'oracle-empty';
+      empty.textContent = 'No tables match.';
+      oracleTree.append(empty);
+    }
+  } else if (empty) empty.remove();
+});
+
+function openOracles() {
+  ensureIronOracles().then(() => {
+    if (uiSystem !== 'ironsworn') return;
+    buildOracleTree();
+    setHelp(false);
+    closeSheet();
+    closeDial();
+    closeHistory();
+    closeMode();
+    closeRoom();
+    oracleSheet.hidden = false;
+    oracleSearch.focus();
+  });
+}
+function closeOracles() { oracleSheet.hidden = true; }
+
+// Build a result for an oracle draw: a single dN die showing the rolled number,
+// so it throws on the tray like any other roll instead of silently swapping text.
+// The node (answer + any linked/suggested rolls) rides along as the summary —
+// the headline and detail read from it, and it is what a shared table receives.
+function makeOracleResult(node) {
+  return {
+    system: 'oracle',
+    notation: 'oracle:' + oracleSlug(ironOracles, node.id),
+    groups: [{
+      kind: 'dice', dieType: 'oracle', sides: node.sides, count: 1,
+      dice: [{ value: node.roll, sides: node.sides, kept: true, rerolled: false, exploded: false }],
+    }],
+    summary: node,
+  };
+}
+
+// A table picked in the browser pins to the shelf and becomes the active roll —
+// its die loads on the tray and throws, and the tile stays so you can re-roll it
+// or jump back to it later.
+function rollOracleFromBrowser(id) {
+  pinOracle(id);
+  closeOracles();
+  selectIronRoll({ kind: 'oracle', id });
+}
+
+// The typed path: "oracle:pay-the-price", "oracle:likely". The dataset loads on
+// demand (the notation can be typed before the browser is ever opened), then the
+// slug resolves to a table. An unknown slug is a clear error, not a silent numeric
+// fall-through.
+function rollOracleFromNotation(notation) {
+  const query = String(notation).slice(String(notation).indexOf(':') + 1).trim();
+  ensureIronOracles().then(ds => {
+    const id = findOracleBySlug(ds, query);
+    if (!id) { showError(`No oracle table matches "${query}"`); return; }
+    clearError();
+    throwResult(makeOracleResult(rollOracle(ds, id)));
+  });
+}
+
+$('ironOracles').addEventListener('click', openOracles);
+$('oracleClose').addEventListener('click', closeOracles);
+oracleSheet.addEventListener('click', e => { if (e.target === oracleSheet) closeOracles(); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !oracleSheet.hidden) { closeOracles(); $('ironOracles').focus(); }
+});
 
 function syncMsFromField() {
   try {
@@ -4465,6 +4818,21 @@ function systemStageDescriptors() {
       add(1, { sides: 10, genColor: DG_COLORS.ones, kind: 'dg-check' });
       break;
     }
+    case 'ironsworn': {
+      // Stage the dice of whatever roll is loaded, so the tray always shows what
+      // Roll will throw: an oracle's single dN, a progress roll's two challenge
+      // dice, or the action roll's d6 + two challenge dice.
+      if (ironActive.kind === 'oracle') {
+        const sides = ironOracles && ironOracles.tables[ironActive.id] ? ironOracles.tables[ironActive.id].sides : 100;
+        add(1, { sides, genColor: IRON_COLORS.oracle, kind: 'iron-oracle' });
+      } else if (ironActive.kind === 'progress') {
+        add(2, { sides: 10, genColor: IRON_COLORS.challenge, kind: 'iron-challenge' });
+      } else {
+        add(1, { sides: 6, genColor: IRON_COLORS.action, kind: 'iron-action' });
+        add(2, { sides: 10, genColor: IRON_COLORS.challenge, kind: 'iron-challenge' });
+      }
+      break;
+    }
   }
   return out;
 }
@@ -4565,6 +4933,7 @@ function clearPool() {
       case 'mothership': resetMothership(); syncMs(); break;
       case 'callofcthulhu': resetCoc(); syncCoc(); break;
       case 'deltagreen': resetDg(); syncDg(); break;
+      case 'ironsworn': resetIron(); syncIron(); break;
       // The deck persists (it is the character's deck, like Stress); clearing
       // just returns the tray to the idle stack.
       case 'cards': ensureCardArt().then(() => { if (uiSystem === 'cards') syncCardsUI(); }); break;
@@ -5727,6 +6096,7 @@ function emptyTrayRoll() {
   if (uiSystem === 'mothership') return msNotation();
   if (uiSystem === 'callofcthulhu') return cocNotation();
   if (uiSystem === 'deltagreen') return dgNotation();
+  if (uiSystem === 'ironsworn') return ironNotation();
   if (uiSystem === 'cards') return deckNotation();
   if (uiSystem === 'tarot') return tarotNotation();
   if (uiSystem === 'napoletane') return napNotation();
@@ -5751,6 +6121,7 @@ function restageActiveSystem() {
     case 'mothership': syncMs(); break;
     case 'callofcthulhu': syncCoc(); break;
     case 'deltagreen': syncDg(); break;
+    case 'ironsworn': syncIron(); break;
   }
 }
 

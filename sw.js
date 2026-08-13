@@ -26,14 +26,17 @@ const ASSETS = [
   './render.js',
   './under30-gap.js',
   './system-dice.js',
+  './oracle-dice.js',
   // The deck art modules — big (cards ~1.1MB, tarot ~4.5MB), so the app pulls
   // each with a dynamic import only when its mode is opened; precaching them
-  // here is what keeps that first open working offline.
+  // here is what keeps that first open working offline. The Ironsworn oracle
+  // data loads the same way, on first entry to the mode.
   './cards-art.js',
   './tarot-art.js',
   './nap-art.js',
   './hana-art.js',
   './uta-art.js',
+  './ironsworn-oracles.js',
   './room.js',
   './room-crypto.js',
   './manifest.webmanifest',
