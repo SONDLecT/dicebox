@@ -2270,7 +2270,8 @@ function oracleTableCount(node) {
 
 function buildOracleTree() {
   if (!curOracles() || oracleTree.dataset.builtFor === activeGame()) return;
-  const make = node => {
+  const make = (node, ancestors = []) => {
+    const here = [...ancestors, node.name];   // full collection path to this node
     const coll = document.createElement('div');
     coll.className = 'oracle-coll';
     const head = document.createElement('button');
@@ -2293,13 +2294,15 @@ function buildOracleTree() {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'oracle-table';
-      b.dataset.search = t.name.toLowerCase();
+      // Search matches the whole path + name, so a category ("monstrosity")
+      // surfaces its tables (Size, Abilities…) even though none is named that.
+      b.dataset.search = [...here, t.name].join(' ').toLowerCase();
       const label = document.createElement('span');
       label.className = 'oracle-table-name';
       label.textContent = t.name;
       const path = document.createElement('span');
       path.className = 'oracle-table-path';
-      path.textContent = node.name;
+      path.textContent = here.join(' › ');
       const dtag = document.createElement('span');
       dtag.className = 'oracle-dtag';
       dtag.textContent = 'd' + t.sides;
@@ -2307,7 +2310,7 @@ function buildOracleTree() {
       b.addEventListener('click', () => rollOracleFromBrowser(id));
       kids.append(b);
     }
-    for (const g of node.groups || []) kids.append(make(g));
+    for (const g of node.groups || []) kids.append(make(g, here));
     coll.append(kids);
     return coll;
   };
@@ -2335,10 +2338,13 @@ for (const btn of document.querySelectorAll('.iron-odd')) {
 
 oracleSearch.addEventListener('input', () => {
   const q = oracleSearch.value.trim().toLowerCase();
+  // Every whitespace-separated word must appear somewhere in the path + name, so
+  // "monstrosity size" and "size monstrosity" both find the table.
+  const terms = q.split(/\s+/).filter(Boolean);
   oracleTree.classList.toggle('searching', !!q);
   let any = false;
   for (const b of oracleTree.querySelectorAll('.oracle-table')) {
-    const match = !q || b.dataset.search.includes(q);
+    const match = !terms.length || terms.every(t => b.dataset.search.includes(t));
     b.hidden = !match;
     if (match) any = true;
   }
