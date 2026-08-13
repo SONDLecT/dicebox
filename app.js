@@ -1946,8 +1946,8 @@ function syncCoc({ writeField = true } = {}) {
   cocSkillDial.textContent = coc.target === null ? '—' : String(coc.target);
   if (coc.target === null) cocSkillDial.dataset.unset = '1'; else delete cocSkillDial.dataset.unset;
   const bonus = Math.max(0, coc.modifier), penalty = Math.max(0, -coc.modifier);
-  $('cocBonusVal').textContent = String(bonus);
-  $('cocPenaltyVal').textContent = String(penalty);
+  if (bonus) cocBonusBtn.dataset.count = String(bonus); else delete cocBonusBtn.dataset.count;
+  if (penalty) cocPenaltyBtn.dataset.count = String(penalty); else delete cocPenaltyBtn.dataset.count;
   cocBonusBtn.setAttribute('aria-pressed', String(bonus > 0));
   cocPenaltyBtn.setAttribute('aria-pressed', String(penalty > 0));
   if (writeField && uiSystem === 'callofcthulhu') $('notation').value = cocNotation();
@@ -1963,16 +1963,16 @@ cocSkillDial.addEventListener('click', () => {
     onClear: () => { coc.target = null; syncCoc(); },
   });
 });
-// Bonus and penalty are one signed axis that cancels, capped at 3 a side. Tap a
-// button to add its kind (switching sides if needed); hold to remove one.
-function setCocMod(n) { coc.modifier = Math.max(-3, Math.min(3, n)); syncCoc(); }
-bindTapHold(cocBonusBtn, dir => {
-  if (dir > 0) setCocMod(coc.modifier < 0 ? 1 : coc.modifier + 1);
-  else if (coc.modifier > 0) setCocMod(coc.modifier - 1);
+// Bonus and penalty are one signed axis, capped at 3 a side. A tap cycles that
+// side up and wraps back through zero (0 → 1 → 2 → 3 → 0); tapping the other
+// side switches to it. No hold — a tap alone reaches every value.
+cocBonusBtn.addEventListener('click', () => {
+  coc.modifier = coc.modifier < 0 ? 1 : (coc.modifier + 1) % 4;
+  syncCoc();
 });
-bindTapHold(cocPenaltyBtn, dir => {
-  if (dir > 0) setCocMod(coc.modifier > 0 ? -1 : coc.modifier - 1);
-  else if (coc.modifier < 0) setCocMod(coc.modifier + 1);
+cocPenaltyBtn.addEventListener('click', () => {
+  coc.modifier = coc.modifier > 0 ? -1 : -(((-coc.modifier) + 1) % 4);
+  syncCoc();
 });
 
 function syncCocFromField() {

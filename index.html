@@ -1289,19 +1289,24 @@
     </div>
   </section>
 
-  <section class="picker ms-picker" id="cocPicker" aria-label="Call of Cthulhu roll" hidden>
+  <section class="picker coc-picker" id="cocPicker" aria-label="Call of Cthulhu roll" hidden>
     <div class="ms-direct-field ms-dial-field">
       <span>Skill</span>
       <button type="button" class="ms-value-dial" id="cocSkillDial" data-unset="1" aria-haspopup="dialog" aria-controls="dial" aria-label="Set Skill">—</button>
     </div>
-    <button type="button" class="spin-chip" id="cocBonus" aria-pressed="false" aria-label="Bonus die — tap to add, hold to remove">
-      <span class="spin-chip-label">Bonus</span>
-      <span class="spin-chip-val" id="cocBonusVal">0</span>
-    </button>
-    <button type="button" class="spin-chip" id="cocPenalty" aria-pressed="false" aria-label="Penalty die — tap to add, hold to remove">
-      <span class="spin-chip-label">Penalty</span>
-      <span class="spin-chip-val" id="cocPenaltyVal">0</span>
-    </button>
+    <!-- Bonus and penalty each ADD a percentile tens die, so they are shaped
+         like one — a d10 silhouette that fills and badges its count. A tap
+         cycles that side and wraps back through zero. -->
+    <div class="gen-chips">
+      <button type="button" class="gen-chip coc-bonus" id="cocBonus" aria-pressed="false" aria-label="Bonus dice — tap to cycle none to three">
+        <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true"><path d="M15 3 25 12.5 15 27 5 12.5Z"/></svg>
+        <span class="gen-chip-label">Bonus</span>
+      </button>
+      <button type="button" class="gen-chip coc-penalty" id="cocPenalty" aria-pressed="false" aria-label="Penalty dice — tap to cycle none to three">
+        <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true"><path d="M15 3 25 12.5 15 27 5 12.5Z"/></svg>
+        <span class="gen-chip-label">Penalty</span>
+      </button>
+    </div>
   </section>
 
   <section class="picker ms-picker" id="dgPicker" aria-label="Delta Green roll" hidden>
