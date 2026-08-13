@@ -654,7 +654,12 @@ function buildTrayDice(flat, result, { remote = false } = {}) {
       const C = result.system === 'coc' ? COC_COLORS : DG_COLORS;
       const o = result.summary.outcome;
       if (f.role === 'tens') die.displayLabel = String(f.value).padStart(2, '0');
-      if (o === 'critical') die.genColor = C.crit;
+      // A dropped bonus/penalty tens die keeps its green/red tint (faded by
+      // kept=false), so the modifier stays visible next to the kept result.
+      if (result.system === 'coc' && f.role === 'tens' && !f.kept) {
+        die.genColor = result.summary.modifier > 0 ? C.bonus : C.penalty;
+      }
+      else if (o === 'critical') die.genColor = C.crit;
       else if (o === 'fumble') die.genColor = C.fumble;
       else if (result.summary.success === true) die.genColor = C.success;
       else if (result.summary.success === false) die.genColor = C.fail;
@@ -1927,7 +1932,7 @@ msPanicRoll.addEventListener('click', () => { ms.mode = 'panic'; syncMs(); });
 // d100 under a skill, in tiers, with optional bonus/penalty dice. The skill is
 // the shared roller (table-set by default); bonus and penalty are one signed
 // count of extra tens dice that cancel each other.
-const COC_COLORS = { crit: '#8FC98A', success: '#5DAE6A', fail: '#C0453F', fumble: '#8E2F26', tens: '#7F9B57', ones: '#6A757C' };
+const COC_COLORS = { crit: '#8FC98A', success: '#5DAE6A', fail: '#C0453F', fumble: '#8E2F26', tens: '#7F9B57', ones: '#6A757C', bonus: '#5DAE6A', penalty: '#C0453F' };
 const coc = { target: null, modifier: 0 };
 const cocSkillDial = $('cocSkillDial');
 const cocBonusBtn = $('cocBonus');
@@ -4449,8 +4454,9 @@ function systemStageDescriptors() {
       break;
     }
     case 'callofcthulhu': {
-      const tens = 1 + Math.abs(coc.modifier);
-      add(tens, { sides: 10, genColor: COC_COLORS.tens, kind: 'coc-check' });
+      const extra = Math.abs(coc.modifier);
+      add(1, { sides: 10, genColor: COC_COLORS.tens, kind: 'coc-check' });
+      if (extra) add(extra, { sides: 10, genColor: coc.modifier > 0 ? COC_COLORS.bonus : COC_COLORS.penalty, kind: 'coc-check' });
       add(1, { sides: 10, genColor: COC_COLORS.ones, kind: 'coc-check' });
       break;
     }
