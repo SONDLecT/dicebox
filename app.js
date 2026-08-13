@@ -2336,6 +2336,26 @@ for (const btn of document.querySelectorAll('.iron-odd')) {
   });
 }
 
+// Keyboard-driven results, autocomplete-style: as you type, the top match is
+// highlighted; ↑/↓ move it and Enter rolls it, focus staying in the box.
+let oracleHi = -1;
+function oracleVisible() {
+  return [...oracleTree.querySelectorAll('.oracle-table')].filter(b => b.offsetParent !== null);
+}
+function setOracleHighlight(i) {
+  for (const b of oracleTree.querySelectorAll('.oracle-table.is-highlighted')) b.classList.remove('is-highlighted');
+  const vis = oracleVisible();
+  if (!vis.length) { oracleHi = -1; return; }
+  oracleHi = Math.max(0, Math.min(i, vis.length - 1));
+  const el = vis[oracleHi];
+  el.classList.add('is-highlighted');
+  el.scrollIntoView({ block: 'nearest' });
+}
+function clearOracleHighlight() {
+  for (const b of oracleTree.querySelectorAll('.oracle-table.is-highlighted')) b.classList.remove('is-highlighted');
+  oracleHi = -1;
+}
+
 oracleSearch.addEventListener('input', () => {
   const q = oracleSearch.value.trim().toLowerCase();
   // Every whitespace-separated word must appear somewhere in the path + name, so
@@ -2357,6 +2377,17 @@ oracleSearch.addEventListener('input', () => {
       oracleTree.append(empty);
     }
   } else if (empty) empty.remove();
+  if (terms.length) setOracleHighlight(0); else clearOracleHighlight();
+});
+
+oracleSearch.addEventListener('keydown', e => {
+  if (e.key === 'ArrowDown') { e.preventDefault(); setOracleHighlight(oracleHi + 1); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); setOracleHighlight(oracleHi - 1); }
+  else if (e.key === 'Enter') {
+    e.preventDefault();
+    const vis = oracleVisible();
+    (vis[oracleHi] || vis[0])?.click();
+  }
 });
 
 function openOracles() {

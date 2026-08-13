@@ -1511,6 +1511,8 @@ body {
   padding: 9px 8px 9px 22px; cursor: pointer; border-radius: 8px;
 }
 .oracle-table:hover { background: var(--face); }
+/* The keyboard-highlighted result (↑/↓ in the search box; Enter rolls it). */
+.oracle-table.is-highlighted { background: color-mix(in srgb, var(--accent) 16%, transparent); box-shadow: inset 2px 0 0 var(--accent); }
 .oracle-table-name { flex: 1; }
 .oracle-table-path { display: none; color: var(--muted); font-size: 11px; }
 .oracle-dtag { color: var(--muted); font-size: 10px; border: 1px solid var(--hair); border-radius: 5px; padding: 1px 5px; font-variant-numeric: tabular-nums; }
