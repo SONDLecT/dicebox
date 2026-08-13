@@ -1,12 +1,11 @@
 # Dicebox
 
 <p align="center">
-  <img src="og.png" alt="Dicebox — a self-hostable, open-source dice roller and card drawer that respects your privacy" width="720">
+  <img src="og.png" alt="Dicebox — a cross-platform, self-hosted open-source dice roller and card drawer that respects your privacy" width="720">
 </p>
 
-A self-hostable, open-source dice roller and card drawer that respects your
-privacy. It runs in any browser, on phone or desktop — no build step, no
-dependencies, no network.
+A cross-platform, self-hosted open-source dice roller and card drawer that
+respects your privacy.
 
 Try it at **[dicebox.cc](https://dicebox.cc)** — that is a
 demo instance, not a service. To keep a copy of your own, see
