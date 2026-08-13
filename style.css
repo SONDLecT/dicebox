@@ -807,31 +807,29 @@ body {
   opacity: 0.6; transition: opacity .15s, transform .1s;
 }
 .dcc-token-shape { width: 38px; height: 38px; }
-.dcc-token-shape path { fill: color-mix(in srgb, var(--dc) 20%, transparent); stroke: var(--dc); stroke-width: 1.6; stroke-linejoin: round; }
+/* Every die is the plain theme wireframe — hollow at rest, filled once in the
+   pool — so colour is reserved to mean one thing. */
+.dcc-token-shape path { fill: none; stroke: var(--muted); stroke-width: 1.6; stroke-linejoin: round; }
 .dcc-token-label { font-size: 11px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
 .dcc-die-btn:active { transform: scale(0.92); }
-/* In the pool: full colour, like a pressed numeric button, with a count badge. */
+/* In the pool: filled and full-strength like a pressed button, with a count
+   badge — still in the neutral theme colour, not the chain hue. */
 .dcc-token.in-pool .dcc-die-btn { opacity: 1; }
-.dcc-token.in-pool .dcc-token-shape path { fill: color-mix(in srgb, var(--dc) 50%, transparent); }
-.dcc-token.in-pool .dcc-token-label { color: var(--dc); }
+.dcc-token.in-pool .dcc-token-shape path { fill: color-mix(in srgb, var(--fg) 16%, transparent); stroke: var(--fg); }
+.dcc-token.in-pool .dcc-token-label { color: var(--fg); }
 .dcc-token[data-count]::after {
   content: "×" attr(data-count); position: absolute; top: 12px; right: 2px;
-  color: var(--dc); font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums;
+  color: var(--fg); font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums;
 }
-/* The action die reads as the king — grown ~40%, full colour, a gentle glow-pulse,
-   and lifted above its neighbours so the extra size never gets clipped. */
+/* The action die is the only coloured die on the chain — its chain hue, grown
+   ~40%, and lifted above its neighbours so the size never gets clipped. Colour
+   alone says "this is your action die". */
 .dcc-token.is-action { z-index: 2; }
 .dcc-token.is-action .dcc-die-btn { opacity: 1; transform: scale(1.4); transform-origin: center top; }
-.dcc-token.is-action .dcc-token-shape path { fill: color-mix(in srgb, var(--dc) 42%, transparent); }
+.dcc-token.is-action .dcc-token-shape path { fill: color-mix(in srgb, var(--dc) 32%, transparent); stroke: var(--dc); }
 .dcc-token.is-action .dcc-token-label { color: var(--dc); }
-.dcc-token.is-action .dcc-token-shape { animation: dcc-crownglow 1.9s ease-in-out infinite; }
-@keyframes dcc-crownglow {
-  0%, 100% { filter: drop-shadow(0 0 1px color-mix(in srgb, var(--dc) 55%, transparent)); }
-  50% { filter: drop-shadow(0 0 6px var(--dc)); }
-}
 @media (prefers-reduced-motion: reduce) {
   .dcc-die-btn { transition: none; }
-  .dcc-token.is-action .dcc-token-shape { animation: none; }
 }
 
 /* The total tinted by the duality tone. */

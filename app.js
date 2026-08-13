@@ -727,12 +727,12 @@ function buildTrayDice(flat, result, { remote = false } = {}) {
     // An oracle draw is a single dN in the steel oracle colour — neutral, since a
     // table result is information, not a pass/fail.
     else if (result.system === 'oracle') die.genColor = IRON_COLORS.oracle;
-    // DCC (numeric rolls in the dice-chain mode): each die takes its chain colour,
-    // and the first die matching the crowned type wears a gold glow on the tray —
-    // the action die, unmistakable once it lands.
-    if (uiSystem === 'dcc' && f.sides && DCC_COLORS[f.sides]) {
+    // DCC (numeric rolls in the dice-chain mode): only the action die is coloured
+    // — its chain colour marks it out — while every other die stays the plain
+    // theme wireframe, keeping the tray quiet and in-theme.
+    if (uiSystem === 'dcc' && !crownedMarked && f.sides === dccCrown && DCC_COLORS[f.sides]) {
       die.genColor = DCC_COLORS[f.sides];
-      if (!crownedMarked && f.sides === dccCrown) { die.crowned = true; crownedMarked = true; }
+      crownedMarked = true;
     }
     return die;
   });
@@ -1171,7 +1171,7 @@ const SYSTEM_HINTS = {
   deltagreen: { idle: 'Roll d100 under your target — set it, or let the table judge', placeholder: 'Roll, or type dg:50' },
   ironsworn: { idle: 'Tap a roll — Action, Progress, or an oracle', placeholder: 'Roll, or type iron:+2' },
   starforged: { idle: 'Tap a roll — Action, Progress, or an oracle', placeholder: 'Roll, or type iron:+2' },
-  dcc: { idle: 'Roll along the dice chain — shift your action die and go', placeholder: 'Tap a die, or type d16' },
+  dcc: { idle: '', placeholder: 'Tap a die, or type d16' },
   cards: { idle: 'Tap the deck to draw', placeholder: 'Tap the deck, or type deck:3' },
   tarot: { idle: 'Tap the deck to draw', placeholder: 'Tap the deck, or type tarot:3' },
   napoletane: { idle: 'Tocca il mazzo per pescare', placeholder: 'Tocca il mazzo, o scrivi nap:3' },
@@ -4801,11 +4801,11 @@ function stageFromPool({ writeField }) {
   for (const [sides, entry] of pool) {
     for (let i = 0; i < entry.count; i++) {
       const d = new Die(sides, null, 0, 0, 40);
-      // In DCC the staged pool wears the chain colours too, not just after rolling,
-      // and the crowned type gets its gold aura here as well.
-      if (uiSystem === 'dcc' && DCC_COLORS[sides]) {
+      // Only the action die carries its chain colour onto the staged shelf; the
+      // rest stay the plain theme wireframe.
+      if (uiSystem === 'dcc' && !stagedCrown && sides === dccCrown && DCC_COLORS[sides]) {
         d.genColor = DCC_COLORS[sides];
-        if (!stagedCrown && sides === dccCrown) { d.crowned = true; stagedCrown = true; }
+        stagedCrown = true;
       }
       staged.push(d);
     }
