@@ -1,19 +1,20 @@
 # Dicebox
 
 <p align="center">
-  <img src="brand/d20.svg" alt="Dicebox deconstructed d20 mark" width="112">
+  <img src="og.png" alt="Dicebox — a self-hostable, open-source dice roller and card drawer that respects your privacy" width="720">
 </p>
 
-An offline dice roller for tabletop RPGs. No build step, no dependencies, no
-network.
+A self-hostable, open-source dice roller and card drawer that respects your
+privacy. It runs in any browser, on phone or desktop — no build step, no
+dependencies, no network.
 
 Try it at **[dicebox.cc](https://dicebox.cc)** — that is a
 demo instance, not a service. To keep a copy of your own, see
 [Getting it offline](#getting-it-offline): download it as a single file, install
 it from the browser, or host it yourself.
 
-Out of the box it does more than plain dice: ten [game-system modes](#game-systems)
-— Vampire, Daggerheart, Mothership and the rest — and two hand-traced
+Out of the box it does more than plain dice: a dozen [game-system modes](#game-systems)
+— Vampire, Daggerheart, Mothership and the rest — and five
 [card decks](#card-decks), all of it local and offline.
 
 It stays a local dice roller unless you ask for more. Optionally it will also
@@ -108,6 +109,8 @@ picker and the notation all change to match.
 | **The One Ring 2e** | `tor:3@14` | the Feat die and a pool of Success dice |
 | **CthulhuTech 2e** | `ct:8@4` | a d10 pool counting even-face hits |
 | **Mothership 1e** | `ms:c@35` | d100 roll-under, Panic, and tracked Stress |
+| **Call of Cthulhu 7e** | `coc:65b` | d100 roll-under with bonus and penalty dice |
+| **Delta Green** | `dg:50` | d100 roll-under, criticals on matching digits |
 
 Each mode has a picker built for its own dice — tap to build the pool, hold to
 adjust — and a help panel (the **?** in the top bar) with its full rules and
