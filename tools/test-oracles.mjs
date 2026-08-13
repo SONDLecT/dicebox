@@ -24,8 +24,9 @@ ok('empty is safe', oracleText(null) === '' && oracleText(undefined) === '');
 ok('title present', IRON.title.includes('Ironsworn'));
 ok('author is Tomkin', IRON.authors.includes('Shawn Tomkin'));
 ok('license is CC BY 4.0', /creativecommons\.org\/licenses\/by\/4\.0/.test(IRON.license));
-ok('38 tables', Object.keys(IRON.tables).length === 38);
-ok('browse list covers all tables', oracleTableList(IRON).length === 38);
+// Ironsworn folds in its Delve expansion (classic 38 + delve 48).
+ok('86 tables (Ironsworn + Delve)', Object.keys(IRON.tables).length === 86);
+ok('browse list covers all tables', oracleTableList(IRON).length === 86);
 ok('table list carries a path', oracleTableList(IRON).every(t => Array.isArray(t.path) && t.path.length >= 1));
 
 // ---- data integrity: every table's rows tile 1..sides with no gaps/overlaps ----

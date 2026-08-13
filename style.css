@@ -438,6 +438,7 @@ body {
 #modeToggle[data-system="callofcthulhu"] .mode-ico[data-for="callofcthulhu"] { display: block; }
 #modeToggle[data-system="deltagreen"] .mode-ico[data-for="deltagreen"] { display: block; }
 #modeToggle[data-system="ironsworn"] .mode-ico[data-for="ironsworn"] { display: block; }
+#modeToggle[data-system="starforged"] .mode-ico[data-for="starforged"] { display: block; }
 #modeToggle[data-system="starwars"] .mode-ico[data-for="starwars"] { display: block; }
 #modeToggle[data-system="onering"] .mode-ico[data-for="onering"] { display: block; }
 #modeToggle[data-system="pbta"] .mode-ico[data-for="pbta"] { display: block; }
@@ -1523,6 +1524,7 @@ body {
 .mode-callofcthulhu { --sys: #7FA05A; }
 .mode-deltagreen { --sys: #4E9068; }
 .mode-ironsworn { --sys: #6E8B9A; }
+.mode-starforged { --sys: #8E86C9; }
 .mode-starwars { --sys: #5B9BD5; }
 .mode-onering { --sys: #B5893C; }
 .mode-pbta { --sys: #D97A3C; }

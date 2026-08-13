@@ -37,6 +37,7 @@ const ASSETS = [
   './hana-art.js',
   './uta-art.js',
   './ironsworn-oracles.js',
+  './starforged-oracles.js',
   './room.js',
   './room-crypto.js',
   './manifest.webmanifest',

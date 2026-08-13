@@ -173,7 +173,7 @@ ok('Mothership numeric rail is limited to rules dice plus d-question',
   const order = [...pop.matchAll(/data-system="([a-z0-9]+)"/g)].map(m => m[1]);
   ok('picker is a popover: Dicebox pinned first, then systems alphabetical by label',
      /class="mode-pop"/.test(pop) &&
-     order.join(',') === 'numeric,callofcthulhu,cthulhutech,deltagreen,daggerheart,fate,genesys,ironsworn,mist,mothership,pbta,starwars,onering,v5,cards,tarot,napoletane,hanafuda,utagaruta' &&
+     order.join(',') === 'numeric,callofcthulhu,cthulhutech,deltagreen,daggerheart,fate,genesys,ironsworn,mist,mothership,pbta,starforged,starwars,onering,v5,cards,tarot,napoletane,hanafuda,utagaruta' &&
      /class="mode-row mode-row-pinned" data-system="numeric"[^]*?>Dicebox</.test(pop));
   ok('picker rows carry the community shorthand',
      ['CTech 2e', 'DH', 'Fate', 'Genesys', 'Mist', 'MoSh 1e', 'PbtA', 'SWRPG', 'TOR 2e', 'VtM V5']

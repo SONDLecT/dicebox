@@ -128,10 +128,14 @@
           <g class="mode-ico" data-for="deltagreen" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">
             <path d="M12 4 20 19 4 19Z"/>
           </g>
-          <!-- Ironsworn / Starforged: an upright sword — an oath sworn on iron. -->
+          <!-- Ironsworn: an upright sword — an oath sworn on iron. -->
           <g class="mode-ico" data-for="ironsworn" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 2.5 V15"/><path d="M9 15 H15"/><path d="M12 15 V19"/>
             <circle cx="12" cy="20.4" r="1.2" fill="currentColor" stroke="none"/>
+          </g>
+          <!-- Starforged: a four-point star — the same oaths, out among the stars. -->
+          <g class="mode-ico" data-for="starforged" fill="currentColor" stroke="none">
+            <path d="M12 2 L13.4 10.6 L22 12 L13.4 13.4 L12 22 L10.6 13.4 L2 12 L10.6 10.6 Z"/>
           </g>
           <g class="mode-ico" data-for="cthulhutech" fill="none" stroke="currentColor"
              stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
@@ -793,6 +797,13 @@
         </svg>
         <span class="mode-row-name">PbtA</span>
         <span class="mode-row-sub">2d6 &middot; hit / partial / miss</span>
+      </button>
+      <button type="button" class="mode-row mode-starforged" data-system="starforged" aria-pressed="false">
+        <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+          <path d="M12 2 L13.4 10.6 L22 12 L13.4 13.4 L12 22 L10.6 13.4 L2 12 L10.6 10.6 Z"/>
+        </svg>
+        <span class="mode-row-name">Starforged</span>
+        <span class="mode-row-sub">d6 + stat vs two d10</span>
       </button>
       <button type="button" class="mode-row mode-starwars" data-system="starwars" aria-pressed="false">
         <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true">

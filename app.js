@@ -378,6 +378,16 @@ const SYSTEM_THEMES = {
       '--hair': '#C9D1D8', '--accent': '#4A6B7C', '--danger': '#9E3529',
     },
   },
+  starforged: {
+    dark: {
+      '--paper': '#0A0C12', '--face': '#141826', '--line': '#DAD8E8', '--muted': '#807E96',
+      '--hair': '#20233A', '--accent': '#8E86C9', '--danger': '#C0453F',
+    },
+    light: {
+      '--paper': '#E7E6EE', '--face': '#F1F0F7', '--line': '#181628', '--muted': '#56546A',
+      '--hair': '#CFCDDD', '--accent': '#5E56A0', '--danger': '#9E3529',
+    },
+  },
   mothership: {
     dark: {
       '--paper': '#0C0E10', '--face': '#15181C', '--line': '#DCE2E6', '--muted': '#7D8991',
@@ -1107,6 +1117,7 @@ const SYSTEMS = {
   callofcthulhu: { badge: 'CoC 7e' },
   deltagreen: { badge: 'Delta Green' },
   ironsworn: { badge: 'Ironsworn' },
+  starforged: { badge: 'Starforged' },
 };
 
 // Empty-tray copy. Most modes build a pool by tapping dice, so the default
@@ -1120,7 +1131,8 @@ const SYSTEM_HINTS = {
   mothership: { idle: 'Roll d100 — set a target to resolve it, or let the table judge', placeholder: 'Roll, or type ms:c@35' },
   callofcthulhu: { idle: 'Roll d100 under your skill — set the skill, or let the table judge', placeholder: 'Roll, or type coc:60' },
   deltagreen: { idle: 'Roll d100 under your target — set it, or let the table judge', placeholder: 'Roll, or type dg:50' },
-  ironsworn: { idle: 'Set your modifier, then roll the action die against the challenge', placeholder: 'Roll, or type iron:+2' },
+  ironsworn: { idle: 'Tap a roll — Action, Progress, or an oracle', placeholder: 'Roll, or type iron:+2' },
+  starforged: { idle: 'Tap a roll — Action, Progress, or an oracle', placeholder: 'Roll, or type iron:+2' },
   cards: { idle: 'Tap the deck to draw', placeholder: 'Tap the deck, or type deck:3' },
   tarot: { idle: 'Tap the deck to draw', placeholder: 'Tap the deck, or type tarot:3' },
   napoletane: { idle: 'Tocca il mazzo per pescare', placeholder: 'Tocca il mazzo, o scrivi nap:3' },
@@ -1140,9 +1152,9 @@ const SLUG_TO_SYSTEM = {
   swrpg: 'starwars', tor2e: 'onering', pbta: 'pbta', mist: 'mist', mosh1e: 'mothership',
   v5: 'v5', vtm: 'v5', daggerheart: 'daggerheart', cthulhutech: 'cthulhutech', ctech: 'cthulhutech',
   force: 'starwars', feat: 'onering', tor: 'onering', mothership: 'mothership', mosh: 'mothership', coc: 'callofcthulhu', callofcthulhu: 'callofcthulhu', cthulhu: 'callofcthulhu', dg: 'deltagreen', deltagreen: 'deltagreen',
-  ironsworn: 'ironsworn', starforged: 'ironsworn', iron: 'ironsworn',
+  ironsworn: 'ironsworn', iron: 'ironsworn', starforged: 'starforged', sf: 'starforged',
 };
-const SYSTEM_TO_SLUG = { cards: 'cards', tarot: 'tarot', napoletane: 'napoletane', hanafuda: 'hanafuda', utagaruta: 'utagaruta', v5: 'vtmv5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', mothership: 'mosh1e', callofcthulhu: 'coc', deltagreen: 'dg', ironsworn: 'ironsworn' };
+const SYSTEM_TO_SLUG = { cards: 'cards', tarot: 'tarot', napoletane: 'napoletane', hanafuda: 'hanafuda', utagaruta: 'utagaruta', v5: 'vtmv5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', mothership: 'mosh1e', callofcthulhu: 'coc', deltagreen: 'dg', ironsworn: 'ironsworn', starforged: 'starforged' };
 
 function systemFromPath() {
   const seg = (location.pathname || '/').replace(/^\/+|\/+$/g, '').toLowerCase();
@@ -1231,7 +1243,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
   msPicker.hidden = system !== 'mothership';
   cocPicker.hidden = system !== 'callofcthulhu';
   dgPicker.hidden = system !== 'deltagreen';
-  ironPicker.hidden = system !== 'ironsworn';
+  ironPicker.hidden = system !== 'ironsworn' && system !== 'starforged';
   cardsPicker.hidden = system !== 'cards';
   tarotPicker.hidden = system !== 'tarot';
   napPicker.hidden = system !== 'napoletane';
@@ -1276,7 +1288,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
   $('helpMothership').hidden = system !== 'mothership';
   $('helpCallofcthulhu').hidden = system !== 'callofcthulhu';
   $('helpDeltagreen').hidden = system !== 'deltagreen';
-  $('helpIronsworn').hidden = system !== 'ironsworn';
+  $('helpIronsworn').hidden = system !== 'ironsworn' && system !== 'starforged';
   $('helpCards').hidden = system !== 'cards';
   $('helpTarot').hidden = system !== 'tarot';
   $('helpNapoletane').hidden = system !== 'napoletane';
@@ -1311,7 +1323,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
     if (system === 'mothership') $('notation').value = msNotation();
     if (system === 'callofcthulhu') $('notation').value = cocNotation();
     if (system === 'deltagreen') $('notation').value = dgNotation();
-    if (system === 'ironsworn') $('notation').value = ironNotation();
+    if (system === 'ironsworn' || system === 'starforged') $('notation').value = ironNotation();
     if (system === 'cards') $('notation').value = deckNotation();
     if (system === 'tarot') $('notation').value = tarotNotation();
     if (system === 'napoletane') $('notation').value = napNotation();
@@ -2101,7 +2113,7 @@ const ironDial = $('ironDial');
 
 function ironNotation() {
   if (ironActive.kind === 'progress') return 'iron:p' + iron.progressScore;
-  if (ironActive.kind === 'oracle') return 'oracle:' + oracleSlug(ironOracles, ironActive.id);
+  if (ironActive.kind === 'oracle') return 'oracle:' + oracleSlug(curOracles(), ironActive.id);
   const m = iron.modifier;
   return 'iron:' + (m > 0 ? '+' + m : m < 0 ? String(m) : '');
 }
@@ -2115,8 +2127,8 @@ function syncIron({ writeField = true } = {}) {
       : (tile.dataset.roll === ironActive.kind);
     tile.classList.toggle('is-active', active);
   }
-  if (writeField && uiSystem === 'ironsworn') $('notation').value = ironNotation();
-  if (uiSystem === 'ironsworn' && !$('total').dataset.rolling) stageSystemPool();
+  if (writeField && (uiSystem === 'ironsworn' || uiSystem === 'starforged')) $('notation').value = ironNotation();
+  if ((uiSystem === 'ironsworn' || uiSystem === 'starforged') && !$('total').dataset.rolling) stageSystemPool();
 }
 
 // Load a roll as active and (by default) throw it. doRoll routes iron:/oracle:
@@ -2168,10 +2180,10 @@ function renderIronPins() {
   const shelf = $('ironShelf');
   if (!shelf) return;
   for (const t of shelf.querySelectorAll('.iron-tile-oracle')) t.remove();
-  if (!ironOracles) return;
+  if (!curOracles()) return;
   const addTile = $('ironOracles');   // pins sit before the +Oracles tile
   for (const id of ironPins) {
-    const table = ironOracles.tables[id];
+    const table = curOracles().tables[id];
     if (!table) continue;
     const tile = document.createElement('div');
     tile.className = 'iron-tile iron-tile-oracle';
@@ -2202,22 +2214,29 @@ function renderIronPins() {
 
 // ---- Ironsworn oracles ----
 //
-// The oracle set (Datasworn, CC BY 4.0) is ~40 tables of d100 lookups plus a
-// handful that roll on each other. The data module is lazy-loaded on first open
-// like the deck art; the engine (oracle-dice.js) rolls a table and resolves the
-// "roll twice"/linked rolls. A rolled table lands in the readout and history the
-// way a die roll does, so consulting an oracle still feels like a Dicebox roll.
-let ironOracles = null, ironOraclesLoading = null;
-function ensureIronOracles() {
-  if (ironOracles) return Promise.resolve(ironOracles);
-  if (!ironOraclesLoading) {
+// The oracle sets (Datasworn, CC BY 4.0) — Ironsworn (with its Delve expansion
+// folded in) and Starforged, one per mode. Each data module is lazy-loaded on
+// first open like the deck art; the engine (oracle-dice.js) rolls a table and
+// resolves the "roll twice"/linked rolls. The two games share this whole machine
+// — only the loaded dataset differs, which is why Starforged is the same mode
+// engine as Ironsworn with a different oracle set.
+const ORACLE_EXPORT = { ironsworn: 'IRONSWORN_ORACLES', starforged: 'STARFORGED_ORACLES' };
+const ORACLE_MODULE = { ironsworn: './ironsworn-oracles.js', starforged: './starforged-oracles.js' };
+const oracleCache = {};
+const oracleLoading = {};
+function activeGame() { return uiSystem === 'starforged' ? 'starforged' : 'ironsworn'; }
+function curOracles() { return oracleCache[activeGame()] || null; }
+function ensureOracles(game = activeGame()) {
+  if (oracleCache[game]) return Promise.resolve(oracleCache[game]);
+  if (!oracleLoading[game]) {
     /* global __dicebox */
-    ironOraclesLoading = (typeof __dicebox !== 'undefined' && __dicebox.IRONSWORN_ORACLES)
-      ? Promise.resolve({ IRONSWORN_ORACLES: __dicebox.IRONSWORN_ORACLES })
-      : import('./ironsworn-oracles.js');
-    ironOraclesLoading = ironOraclesLoading.then(m => (ironOracles = m.IRONSWORN_ORACLES));
+    const exp = ORACLE_EXPORT[game];
+    oracleLoading[game] = (typeof __dicebox !== 'undefined' && __dicebox[exp])
+      ? Promise.resolve({ [exp]: __dicebox[exp] })
+      : import(ORACLE_MODULE[game]);
+    oracleLoading[game] = oracleLoading[game].then(m => (oracleCache[game] = m[exp]));
   }
-  return ironOraclesLoading;
+  return oracleLoading[game];
 }
 
 const oracleSheet = $('oracleSheet');
@@ -2231,7 +2250,7 @@ function oracleTableCount(node) {
 }
 
 function buildOracleTree() {
-  if (!ironOracles || oracleTree.dataset.built) return;
+  if (!curOracles() || oracleTree.dataset.builtFor === activeGame()) return;
   const make = node => {
     const coll = document.createElement('div');
     coll.className = 'oracle-coll';
@@ -2251,7 +2270,7 @@ function buildOracleTree() {
     const kids = document.createElement('div');
     kids.className = 'oracle-kids';
     for (const id of node.tables || []) {
-      const t = ironOracles.tables[id];
+      const t = curOracles().tables[id];
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'oracle-table';
@@ -2274,13 +2293,13 @@ function buildOracleTree() {
     return coll;
   };
   oracleTree.textContent = '';
-  for (const c of ironOracles.tree) oracleTree.append(make(c));
+  for (const c of curOracles().tree) oracleTree.append(make(c));
   // Open Ask the Oracle by default — the odds tables are the most-reached.
   for (const coll of oracleTree.querySelectorAll('.oracle-coll')) {
     const name = coll.querySelector('.oracle-coll-name');
     if (name && (name.textContent === 'Moves' || name.textContent === 'Ask the Oracle')) coll.classList.add('open');
   }
-  oracleTree.dataset.built = '1';
+  oracleTree.dataset.builtFor = activeGame();
 }
 
 // The five Ask the Oracle likelihoods live in the picker as one-tap buttons.
@@ -2288,7 +2307,7 @@ function buildOracleTree() {
 // odds table, and throw its d100 like any roll.
 for (const btn of document.querySelectorAll('.iron-odd')) {
   btn.addEventListener('click', () => {
-    ensureIronOracles().then(ds => {
+    ensureOracles().then(ds => {
       const id = findOracleBySlug(ds, btn.dataset.odds);
       if (id) selectIronRoll({ kind: 'oracle', id });
     });
@@ -2316,8 +2335,8 @@ oracleSearch.addEventListener('input', () => {
 });
 
 function openOracles() {
-  ensureIronOracles().then(() => {
-    if (uiSystem !== 'ironsworn') return;
+  ensureOracles().then(() => {
+    if (uiSystem !== 'ironsworn' && uiSystem !== 'starforged') return;
     buildOracleTree();
     setHelp(false);
     closeSheet();
@@ -2338,7 +2357,7 @@ function closeOracles() { oracleSheet.hidden = true; }
 function makeOracleResult(node) {
   return {
     system: 'oracle',
-    notation: 'oracle:' + oracleSlug(ironOracles, node.id),
+    notation: 'oracle:' + oracleSlug(curOracles(), node.id),
     groups: [{
       kind: 'dice', dieType: 'oracle', sides: node.sides, count: 1,
       dice: [{ value: node.roll, sides: node.sides, kept: true, rerolled: false, exploded: false }],
@@ -2362,7 +2381,7 @@ function rollOracleFromBrowser(id) {
 // fall-through.
 function rollOracleFromNotation(notation) {
   const query = String(notation).slice(String(notation).indexOf(':') + 1).trim();
-  ensureIronOracles().then(ds => {
+  ensureOracles().then(ds => {
     const id = findOracleBySlug(ds, query);
     if (!id) { showError(`No oracle table matches "${query}"`); return; }
     clearError();
@@ -4818,12 +4837,12 @@ function systemStageDescriptors() {
       add(1, { sides: 10, genColor: DG_COLORS.ones, kind: 'dg-check' });
       break;
     }
-    case 'ironsworn': {
+    case 'ironsworn': case 'starforged': {
       // Stage the dice of whatever roll is loaded, so the tray always shows what
       // Roll will throw: an oracle's single dN, a progress roll's two challenge
       // dice, or the action roll's d6 + two challenge dice.
       if (ironActive.kind === 'oracle') {
-        const sides = ironOracles && ironOracles.tables[ironActive.id] ? ironOracles.tables[ironActive.id].sides : 100;
+        const sides = curOracles() && curOracles().tables[ironActive.id] ? curOracles().tables[ironActive.id].sides : 100;
         add(1, { sides, genColor: IRON_COLORS.oracle, kind: 'iron-oracle' });
       } else if (ironActive.kind === 'progress') {
         add(2, { sides: 10, genColor: IRON_COLORS.challenge, kind: 'iron-challenge' });
@@ -4933,7 +4952,7 @@ function clearPool() {
       case 'mothership': resetMothership(); syncMs(); break;
       case 'callofcthulhu': resetCoc(); syncCoc(); break;
       case 'deltagreen': resetDg(); syncDg(); break;
-      case 'ironsworn': resetIron(); syncIron(); break;
+      case 'ironsworn': case 'starforged': resetIron(); syncIron(); break;
       // The deck persists (it is the character's deck, like Stress); clearing
       // just returns the tray to the idle stack.
       case 'cards': ensureCardArt().then(() => { if (uiSystem === 'cards') syncCardsUI(); }); break;
@@ -6096,7 +6115,7 @@ function emptyTrayRoll() {
   if (uiSystem === 'mothership') return msNotation();
   if (uiSystem === 'callofcthulhu') return cocNotation();
   if (uiSystem === 'deltagreen') return dgNotation();
-  if (uiSystem === 'ironsworn') return ironNotation();
+  if (uiSystem === 'ironsworn' || uiSystem === 'starforged') return ironNotation();
   if (uiSystem === 'cards') return deckNotation();
   if (uiSystem === 'tarot') return tarotNotation();
   if (uiSystem === 'napoletane') return napNotation();
@@ -6121,7 +6140,7 @@ function restageActiveSystem() {
     case 'mothership': syncMs(); break;
     case 'callofcthulhu': syncCoc(); break;
     case 'deltagreen': syncDg(); break;
-    case 'ironsworn': syncIron(); break;
+    case 'ironsworn': case 'starforged': syncIron(); break;
   }
 }
 
