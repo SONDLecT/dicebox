@@ -1347,7 +1347,7 @@ bindTapHold(v5HungerFace, dir => v5Step('hunger', dir));
 // the Mothership target and the custom die.
 v5DiffChip.addEventListener('click', () => {
   openNumberDial({
-    title: 'Difficulty', value: v5.difficulty ?? 4, min: 1, max: 10,
+    title: 'Difficulty', value: v5.difficulty ?? 3, min: 1, max: 10,
     actionLabel: 'Set Difficulty', inputLabel: 'Difficulty',
     clearLabel: 'Table sets it',
     commit: value => { v5.difficulty = value; syncV5(); },
@@ -1542,7 +1542,7 @@ $('dhRoll').addEventListener('click', () => doRoll(dhNotation()));
 bindTapHold(dhModChip, dir => { dhState.modifier = Math.max(-100, Math.min(100, dhState.modifier + dir)); syncDh(); });
 dhDiffChip.addEventListener('click', () => {
   openNumberDial({
-    title: 'Difficulty', value: dhState.difficulty ?? 12, min: 1, max: 100,
+    title: 'Difficulty', value: dhState.difficulty ?? 15, min: 1, max: 40,
     actionLabel: 'Set Difficulty', inputLabel: 'Difficulty',
     clearLabel: 'Table sets it',
     commit: value => { dhState.difficulty = value; syncDh(); },
@@ -1706,7 +1706,7 @@ bindTapHold(torAddSuccess, dir => { tor.success = Math.max(0, Math.min(20, tor.s
 // Target cycles unset → 10 … 100; holding below 1 returns to unset.
 torTnChip.addEventListener('click', () => {
   openNumberDial({
-    title: 'Target Number', value: tor.tn ?? 14, min: 1, max: 100,
+    title: 'Target Number', value: tor.tn ?? 14, min: 1, max: 30,
     actionLabel: 'Set Target', inputLabel: 'Target Number',
     clearLabel: 'Table sets it',
     commit: value => { tor.tn = value; syncTor(); },
