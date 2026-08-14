@@ -1070,6 +1070,13 @@ export class Die {
       // The point of a reroll is watching the first number go away, so the
       // numeral has to leave with the hop rather than ride it up.
       this.numeralIn = 0;
+      // A push holds the old value on the face through the pause and hands over
+      // the new one here, as the old numeral clears — so the new number is never
+      // shown before the die actually rerolls.
+      if (this.rerollValue !== undefined && this.rerollValue !== null) {
+        this.value = this.rerollValue;
+        this.rerollValue = null;
+      }
       this.vx = (Math.random() - 0.5) * 90;
       this.vy = -210;
       this.spin = [

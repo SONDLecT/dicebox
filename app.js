@@ -1763,7 +1763,10 @@ function pushThrow(pushed) {
   const dice = prev.map((d, i) => {
     const f = newFlat[i];
     if (f && f.rerolled) {
-      d.value = f.value;
+      // Keep the OLD value on the face through the reroll pause; the die swaps to
+      // its new value the instant it hops (when the numeral clears), so you watch
+      // the bad number leave rather than see the new one flash in first.
+      d.rerollValue = f.value;
       d.rerolled = true;
       d.rerollShown = true;   // fired here, so the landing hook does not re-fire
       // A settled, valued tray is cached and its physics is not stepped, so the
