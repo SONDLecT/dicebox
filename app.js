@@ -85,6 +85,9 @@ const state = {
   surface: new Surface(),
   bounds: { left: 0, right: 0, top: 0, floor: 0 },
   last: null,
+  // A push held between its two beats: the rerollable dice are picked up on the
+  // tray, and the next tap throws them to this pre-decided result.
+  pendingPush: null,
 };
 
 // ---- theme ----
@@ -266,10 +269,23 @@ const SYSTEM_THEMES = {
       '--hair': '#D0DAD3', '--accent': '#2E7358', '--danger': '#8C3A2E',
     },
   },
-  // Year Zero Engine — industrial amber on gunmetal, the warning-light glow of
-  // Alien's Mother. The dice carry their Base/Skill/Gear/Stress colours (below);
-  // the chrome stays neutral with an amber readout.
+  // Year Zero Engine — a muted survival olive on gunmetal, broad enough for the
+  // family (Mutant, Forbidden Lands, Vaesen, Coriolis). The dice carry their
+  // Base/Skill/Gear colours (below); the chrome stays neutral with an olive readout.
   yearzero: {
+    dark: {
+      '--paper': '#0E0F0C', '--face': '#181A14', '--line': '#DEE0D6', '--muted': '#6E7062',
+      '--hair': '#262820', '--accent': '#8FA05C', '--danger': '#D8685F',
+    },
+    light: {
+      '--paper': '#ECEDE6', '--face': '#F7F8F3', '--line': '#1A1C15', '--muted': '#71736A',
+      '--hair': '#D6D8CE', '--accent': '#5E6E32', '--danger': '#8C3A2E',
+    },
+  },
+  // Alien — industrial amber on gunmetal, the warning-light glow of Mother. The
+  // dice carry their Base/Skill/Stress colours (below); the chrome stays neutral
+  // with an amber readout.
+  alien: {
     dark: {
       '--paper': '#0D0F10', '--face': '#171A1C', '--line': '#DDE0E2', '--muted': '#6B7075',
       '--hair': '#252A2D', '--accent': '#D9922E', '--danger': '#D8685F',
@@ -836,6 +852,7 @@ function doRoll(notation) {
 // of silently swapping text.
 function throwResult(result, { writeField = true } = {}) {
   state.last = result;
+  state.pendingPush = null;   // a fresh throw cancels any half-done push
   // Quick one-off rolls (an oracle draw, a progress roll) leave the field on the
   // mode's primary expression so the Roll button keeps doing the action roll;
   // typed and dice-engine rolls write themselves in as the current expression.
@@ -1107,7 +1124,7 @@ $('notation').addEventListener('input', () => {
   if (typedSystem === 'genesys' || typedSystem === 'starwars') { syncGenFromField(); return; }
   if (typedSystem === 'daggerheart') { syncDhFromField(); return; }
   if (typedSystem === 'cthulhutech') { syncCtFromField(); return; }
-  if (typedSystem === 'yearzero') { syncYzFromField(); return; }
+  if (yzFamily(typedSystem)) { syncYzFromField(); return; }
   if (typedSystem === 'onering') { syncTorFromField(); return; }
   if (typedSystem === 'pbta') { pbtaCtl.fromField(); return; }
   if (typedSystem === 'mist') { mistCtl.fromField(); return; }
@@ -1192,6 +1209,7 @@ const SYSTEMS = {
   daggerheart: { badge: 'DH' },
   cthulhutech: { badge: 'CTech 2e' },
   yearzero: { badge: 'Year Zero' },
+  alien: { badge: 'Alien' },
   starwars: { badge: 'SWRPG' },
   onering: { badge: 'TOR 2e' },
   pbta: { badge: 'PbtA' },
@@ -1219,6 +1237,7 @@ const SYSTEM_HINTS = {
   starforged: { idle: 'Tap a roll — Action, Progress, or an oracle', placeholder: 'Roll, or type iron:+2' },
   dcc: { idle: '', placeholder: 'Tap a die, or type d16' },
   yearzero: { idle: 'Build a d6 pool — every 6 is a success', placeholder: 'Tap the dice, or type yz:5b3s2g' },
+  alien: { idle: 'Build a d6 pool — every 6 is a success', placeholder: 'Tap the dice, or type yz:5b1x' },
   cards: { idle: 'Tap the deck to draw', placeholder: 'Tap the deck, or type deck:3' },
   tarot: { idle: 'Tap the deck to draw', placeholder: 'Tap the deck, or type tarot:3' },
   napoletane: { idle: 'Tocca il mazzo per pescare', placeholder: 'Tocca il mazzo, o scrivi nap:3' },
@@ -1237,11 +1256,12 @@ const SLUG_TO_SYSTEM = {
   cards: 'cards', tarot: 'tarot', italiane: 'napoletane', napoletane: 'napoletane', scopa: 'napoletane', hanafuda: 'hanafuda', koikoi: 'hanafuda', hana: 'hanafuda', utagaruta: 'utagaruta', karuta: 'utagaruta', hyakunin: 'utagaruta', vtmv5: 'v5', fate: 'fate', genesys: 'genesys', dh: 'daggerheart', ctech2e: 'cthulhutech',
   swrpg: 'starwars', tor2e: 'onering', pbta: 'pbta', mist: 'mist', mosh1e: 'mothership',
   v5: 'v5', vtm: 'v5', daggerheart: 'daggerheart', cthulhutech: 'cthulhutech', ctech: 'cthulhutech',
-  yz: 'yearzero', yearzero: 'yearzero', alien: 'yearzero', forbiddenlands: 'yearzero', vaesen: 'yearzero', coriolis: 'yearzero', mutant: 'yearzero',
+  yz: 'yearzero', yearzero: 'yearzero', forbiddenlands: 'yearzero', vaesen: 'yearzero', coriolis: 'yearzero', mutant: 'yearzero', tales: 'yearzero',
+  alien: 'alien',
   force: 'starwars', feat: 'onering', tor: 'onering', mothership: 'mothership', mosh: 'mothership', coc: 'callofcthulhu', callofcthulhu: 'callofcthulhu', cthulhu: 'callofcthulhu', dg: 'deltagreen', deltagreen: 'deltagreen',
   ironsworn: 'ironsworn', iron: 'ironsworn', starforged: 'starforged', sf: 'starforged', dcc: 'dcc',
 };
-const SYSTEM_TO_SLUG = { cards: 'cards', tarot: 'tarot', napoletane: 'napoletane', hanafuda: 'hanafuda', utagaruta: 'utagaruta', v5: 'vtmv5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', yearzero: 'yz', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', mothership: 'mosh1e', callofcthulhu: 'coc', deltagreen: 'dg', ironsworn: 'ironsworn', starforged: 'starforged', dcc: 'dcc' };
+const SYSTEM_TO_SLUG = { cards: 'cards', tarot: 'tarot', napoletane: 'napoletane', hanafuda: 'hanafuda', utagaruta: 'utagaruta', v5: 'vtmv5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', yearzero: 'yz', alien: 'alien', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', mothership: 'mosh1e', callofcthulhu: 'coc', deltagreen: 'dg', ironsworn: 'ironsworn', starforged: 'starforged', dcc: 'dcc' };
 
 function systemFromPath() {
   const seg = (location.pathname || '/').replace(/^\/+|\/+$/g, '').toLowerCase();
@@ -1326,7 +1346,10 @@ function setSystem(system, { roll = false, url = true } = {}) {
   genesysPicker.classList.toggle('with-force', system === 'starwars');
   dhPicker.hidden = system !== 'daggerheart';
   ctPicker.hidden = system !== 'cthulhutech';
-  $('yzPicker').hidden = system !== 'yearzero';
+  // Alien reuses the Year Zero chip picker; the .alien class swaps the Gear chip
+  // out for the Stress chip.
+  $('yzPicker').hidden = system !== 'yearzero' && system !== 'alien';
+  $('yzPicker').classList.toggle('alien', system === 'alien');
   torPicker.hidden = system !== 'onering';
   twod6Picker.hidden = system !== 'pbta' && system !== 'mist';
   msPicker.hidden = system !== 'mothership';
@@ -1373,6 +1396,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
   $('helpDaggerheart').hidden = system !== 'daggerheart';
   $('helpCthulhutech').hidden = system !== 'cthulhutech';
   $('helpYearzero').hidden = system !== 'yearzero';
+  $('helpAlien').hidden = system !== 'alien';
   $('helpOnering').hidden = system !== 'onering';
   $('helpPbta').hidden = system !== 'pbta';
   $('helpMist').hidden = system !== 'mist';
@@ -1694,6 +1718,9 @@ for (const t of GEN_TYPES) {
 //
 // Four die types — Base, Skill, Gear, Stress — built by tapping chips, exactly
 // like Genesys. Each keeps a count; the notation is written from them.
+// Year Zero and Alien share one engine, pool state, and picker; the mode only
+// changes which chips show and whether a push raises Stress.
+const yzFamily = s => s === 'yearzero' || s === 'alien';
 const YZ_TYPES = [
   { type: 'base', letter: 'b', label: 'Base' },
   { type: 'skill', letter: 's', label: 'Skill' },
@@ -1720,7 +1747,7 @@ function syncYz({ writeField = true } = {}) {
     else { delete chip.dataset.count; chip.setAttribute('aria-pressed', 'false'); }
   }
   if (writeField) $('notation').value = yzNotation();
-  if (uiSystem === 'yearzero') stageSystemPool();
+  if (yzFamily(uiSystem)) stageSystemPool();
 }
 
 function yzStep(type, by) {
@@ -1741,66 +1768,71 @@ for (const t of YZ_TYPES) {
   bindTapHold($(`yz-${t.type}`), dir => yzStep(t.type, dir));
 }
 
-// Push rerolls everything that is not a 6 or a 1 and replays the throw, so the
-// rerolled dice hop and tumble again. A roll may be pushed once; the button
-// shows on a pushable Year Zero result and hides while a pool is staged.
-$('yzPush').addEventListener('click', () => {
-  const last = state.last;
-  if (!last || last.system !== 'yearzero' || !last.summary.canPush) return;
-  pushThrow(pushYearZero(last));
-});
+// A push is two beats, the way it feels at the table: pressing Push leaves your
+// 6s and 1s on the felt and picks the rest up into your hand (blank, waiting) —
+// and in Alien, a fresh Stress die joins them — then a tap on the tray throws
+// just that handful. The final result is decided up front; the tap only reveals
+// it. A roll may be pushed once.
+$('yzPush').addEventListener('click', preparePush);
 
-// A push replays only the dice that actually rerolled — the kept 6s and 1s stay
-// exactly where they landed, and keep no reroll mark — while an Alien push slides
-// its extra Stress die in among them. This is deliberately not throwResult, which
-// re-throws the whole tray and made every die tumble on a push.
-function pushThrow(pushed) {
-  state.last = pushed;
-  const newFlat = flattenRollDice(pushed);
+function preparePush() {
+  const last = state.last;
+  if (!last || last.system !== 'yearzero' || !last.summary.canPush || state.pendingPush) return;
+  const pushed = pushYearZero(last);
+  const pushedFlat = flattenRollDice(pushed);
   const prev = state.dice;
   const size = prev.length ? prev[0].size : 40;
 
+  // Kept 6s and 1s stay settled and numbered; the rerollable dice are picked up —
+  // blanked and marked — so they read as unrolled dice in your hand.
   const dice = prev.map((d, i) => {
-    const f = newFlat[i];
-    if (f && f.rerolled) {
-      // Keep the OLD value on the face through the reroll pause; the die swaps to
-      // its new value the instant it hops (when the numeral clears), so you watch
-      // the bad number leave rather than see the new one flash in first.
-      d.rerollValue = f.value;
-      d.rerolled = true;
-      d.rerollShown = true;   // fired here, so the landing hook does not re-fire
-      // A settled, valued tray is cached and its physics is not stepped, so the
-      // hop would never play on a push made after the dice came to rest. Marking
-      // the rerolled die unsettled wakes the loop; it holds still through the
-      // reroll pause anyway, then hops.
-      d.settled = false;
-      d.beginReroll();
-    }
+    const f = pushedFlat[i];
+    if (f && f.rerolled) { d.value = null; d.rerolled = false; d.picked = true; }
     return d;
   });
-
-  // The Alien push adds one Stress die. Start it off the bottom-right so it sorts
-  // last in the grid, then spin it into that slot.
+  // Alien: the extra Stress die joins the handful, blank until you throw it.
   const added = [];
-  for (let i = prev.length; i < newFlat.length; i++) {
-    const f = newFlat[i];
-    const die = new Die(f.sides, f.value, state.bounds.right, state.bounds.floor, size);
-    die.rerolled = true;
-    die.rerollShown = true;
+  for (let i = prev.length; i < pushedFlat.length; i++) {
+    const f = pushedFlat[i];
+    const die = new Die(f.sides, null, state.bounds.right, state.bounds.floor, size);
     die.genColor = YZ_COLORS[f.yzType] || YZ_COLORS.base;
+    die.settled = true; die.settling = true; die.settleT = 1;
+    die.rot = [0.5, 0.6, 0.1];
+    die.picked = true;
     dice.push(die);
     added.push(die);
   }
   state.dice = dice;
+  if (added.length) { rehomeGrid(dice); for (const die of added) { die.x = die.homeX; die.y = die.homeY; } }
 
-  // Only re-home when a die was added; the settled-die easing in step() slides
-  // everyone gently into the new grid instead of snapping.
-  if (added.length) rehomeGrid(dice);
-  for (const die of added) { die.x = die.homeX; die.y = die.homeY; die.spinInPlace(0); }
-
+  state.pendingPush = pushed;
+  $('total').dataset.idle = '1';
+  $('total').textContent = '—';
+  $('breakdown').textContent = 'Tap the tray to throw the pushed dice';
+  updateYzPush();
   dropIdleCache();
+  if (navigator.vibrate) navigator.vibrate(10);
+}
+
+// The second beat: throw the picked-up dice to the values the push already
+// decided, leaving the kept dice where they sit.
+function rollPendingPush(vx = 0, vy = 0, speed = 0) {
+  const pushed = state.pendingPush;
+  state.pendingPush = null;
+  state.last = pushed;   // the pushed roll is now the current one (canPush false)
+  const pushedFlat = flattenRollDice(pushed);
+  state.dice.forEach((d, i) => {
+    if (!d.picked) return;
+    d.picked = false;
+    d.value = pushedFlat[i].value;
+    d.rerolled = true;            // carries the ↻ reroll mark once it lands
+    d.homeX = d.x; d.homeY = d.y; // it lands back in its own slot
+    if (speed > 120) d.throwWith(vx * 0.5, Math.abs(vy) * 0.5 + 200);
+    else d.spinInPlace(Math.random() * 0.4);
+  });
   $('total').dataset.rolling = '1';
-  setTimeout(() => finish(pushed), 900);
+  dropIdleCache();
+  setTimeout(() => finish(pushed), 720);
   if (navigator.vibrate) navigator.vibrate([8, 40, 12]);
 }
 
@@ -1823,8 +1855,9 @@ function rehomeGrid(dice) {
 
 function updateYzPush() {
   const last = state.last;
-  $('yzPush').hidden = !(uiSystem === 'yearzero' && last && last.system === 'yearzero'
-    && last.summary && last.summary.canPush && $('total').dataset.idle !== '1');
+  $('yzPush').hidden = !(yzFamily(uiSystem) && last && last.system === 'yearzero'
+    && last.summary && last.summary.canPush && $('total').dataset.idle !== '1'
+    && !state.pendingPush);
 }
 
 // ---- Daggerheart pool ----
@@ -5120,6 +5153,7 @@ function systemStageDescriptors() {
       add(ct.dice, { sides: 10, genColor: CT_COLORS.miss, kind: 'ct' });
       break;
     case 'yearzero':
+    case 'alien':
       for (const t of YZ_TYPES) add(yz[t.type], { sides: 6, genColor: YZ_COLORS[t.type], kind: `yz-${t.type}` });
       break;
     case 'onering':
@@ -5180,6 +5214,7 @@ function systemStageDescriptors() {
 // tray for the active one. Notation is owned by the caller's sync* (this never
 // writes it).
 function stageSystemPool() {
+  state.pendingPush = null;   // building/restaging a pool abandons a pending push
   const staged = systemStageDescriptors().slice(0, ANIMATE_LIMIT).map(d => {
     const die = new Die(d.sides, null, 0, 0, 40);
     if (d.hunger) die.hunger = true;
@@ -5270,7 +5305,7 @@ function clearPool() {
       case 'genesys': case 'starwars': resetGenesys(); syncGen(); break;
       case 'daggerheart': resetDaggerheart(); syncDh(); break;
       case 'cthulhutech': resetCthulhuTech(); syncCt(); break;
-      case 'yearzero': resetYearZero(); syncYz(); break;
+      case 'yearzero': case 'alien': resetYearZero(); syncYz(); break;
       case 'onering': resetOneRing(); syncTor(); break;
       case 'pbta': case 'mist': resetTwod6(); syncTwod6(); break;
       case 'mothership': resetMothership(); syncMs(); break;
@@ -6542,6 +6577,10 @@ canvas.addEventListener('pointerup', e => {
     if (speed > 260) { discardCardSprite(hitCard); return; }
   }
 
+  // A pending push has the rerollable dice sitting picked-up on the tray; any tap
+  // or flick throws just that handful, leaving the kept 6s and 1s in place.
+  if (state.pendingPush) { rollPendingPush(vx, vy, speed); return; }
+
   // Tapping the discard pile fans it open instead of drawing. Hit-tested where
   // the finger LANDED (the aim point), not where it lifted, with a little pad.
   if (isTap) {
@@ -6581,7 +6620,7 @@ function emptyTrayRoll() {
   if (uiSystem === 'onering') return torNotation();
   if (uiSystem === 'daggerheart') return dhNotation();
   if (uiSystem === 'cthulhutech') return ctNotation() || ctExample();
-  if (uiSystem === 'yearzero') return yzNotation() || 'yz:5';
+  if (yzFamily(uiSystem)) return yzNotation() || 'yz:5';
   if (uiSystem === 'pbta') return pbtaCtl.notation();
   if (uiSystem === 'mist') return mistCtl.notation();
   if (uiSystem === 'mothership') return msNotation();
@@ -6607,7 +6646,7 @@ function restageActiveSystem() {
     case 'genesys': case 'starwars': syncGen(); break;
     case 'daggerheart': syncDh(); break;
     case 'cthulhutech': syncCt(); break;
-    case 'yearzero': syncYz(); break;
+    case 'yearzero': case 'alien': syncYz(); break;
     case 'onering': syncTor(); break;
     case 'pbta': case 'mist': syncTwod6(); break;
     case 'mothership': syncMs(); break;

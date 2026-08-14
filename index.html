@@ -155,6 +155,14 @@
             <rect x="3.5" y="8.5" width="12" height="12" rx="2.2"/>
             <rect x="8.5" y="3.5" width="12" height="12" rx="2.2"/>
           </g>
+          <!-- Alien: the same d6 pool, with a Stress die marked among it. -->
+          <g class="mode-ico" data-for="alien">
+            <g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">
+              <rect x="3.5" y="8.5" width="12" height="12" rx="2.2"/>
+              <rect x="8.5" y="3.5" width="12" height="12" rx="2.2"/>
+            </g>
+            <circle cx="9.5" cy="14.5" r="1.7" fill="currentColor" stroke="none"/>
+          </g>
           <!-- Star Wars: a TIE fighter — cockpit between two hexagonal panels. -->
           <g class="mode-ico" data-for="starwars">
             <g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
@@ -398,20 +406,37 @@
 
       <div id="helpYearzero" hidden>
       <dl class="syntax">
-        <dt>yz:5</dt>        <dd>five Base dice</dd>
-        <dt>yz:5b3s2g</dt>   <dd>Base 5, Skill 3, Gear 2</dd>
-        <dt>yz:5b3s2g1x</dt> <dd>the same, plus a Stress die</dd>
+        <dt>yz:5</dt>      <dd>five Base dice</dd>
+        <dt>yz:5b3s2g</dt> <dd>Base 5, Skill 3, Gear 2</dd>
       </dl>
       <p class="note">
-        Roll a pool of d6 and count every <b>6</b> as a success. One success carries
-        the roll, more is better. Tap the coloured chips to build the pool (Base,
-        Skill, Gear), or type the notation.
+        The engine behind Mutant, Forbidden Lands, Vaesen, and Coriolis. Roll a pool
+        of d6 and count every <b>6</b> as a success. One success carries the roll,
+        more is better. Tap the coloured chips to build the pool (Base, Skill, Gear),
+        or type the notation.
       </p>
       <p class="note">
-        Miss, and you can <b>Push</b>: reroll everything that is not a 6 or a 1. The
+        Miss, and you can <b>Push</b>: keep the 6s and 1s and reroll the rest. The
         <b>1s</b> left showing are banes. A Base 1 costs an attribute, a Gear 1
-        damages your gear. Alien folds in <b>Stress</b> dice: they roll for successes
-        too, but a 1 on one is a <b>Panic</b>, and each Push adds another.
+        damages your gear. Each roll can be pushed once.
+      </p>
+      </div>
+
+      <div id="helpAlien" hidden>
+      <dl class="syntax">
+        <dt>yz:5</dt>     <dd>five Base dice</dd>
+        <dt>yz:5b1x</dt>  <dd>five Base, one Stress</dd>
+        <dt>yz:4b2s3x</dt> <dd>Base 4, Skill 2, Stress 3</dd>
+      </dl>
+      <p class="note">
+        The Alien pool: Base and Skill dice, plus <b>Stress</b> dice equal to your
+        Stress level. Count every <b>6</b> as a success, one carries the roll. Tap
+        the chips to build the pool, or type the notation.
+      </p>
+      <p class="note">
+        Miss, and you can <b>Push</b>: keep the 6s and 1s and reroll the rest. A push
+        raises your Stress, so it <b>adds a Stress die</b> to the throw. A <b>1</b> on
+        any Stress die is a <b>Panic</b> — look it up on the Panic table.
       </p>
       </div>
 
@@ -751,6 +776,17 @@
         </svg>
         <span class="mode-row-name">Dicebox</span>
         <span class="mode-row-sub">any dice &middot; full notation</span>
+      </button>
+      <button type="button" class="mode-row mode-alien" data-system="alien" aria-pressed="false">
+        <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true">
+          <g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">
+            <rect x="3" y="9" width="11" height="11" rx="2"/>
+            <rect x="9" y="4" width="11" height="11" rx="2"/>
+          </g>
+          <circle cx="8.5" cy="14.5" r="1.5" fill="currentColor" stroke="none"/>
+        </svg>
+        <span class="mode-row-name">Alien</span>
+        <span class="mode-row-sub">d6 pool &middot; Stress &amp; Panic</span>
       </button>
             <button type="button" class="mode-row mode-callofcthulhu" data-system="callofcthulhu" aria-pressed="false">
         <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">

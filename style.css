@@ -436,6 +436,7 @@ body {
 #modeToggle[data-system="daggerheart"] .mode-ico[data-for="daggerheart"] { display: block; }
 #modeToggle[data-system="cthulhutech"] .mode-ico[data-for="cthulhutech"] { display: block; }
 #modeToggle[data-system="yearzero"] .mode-ico[data-for="yearzero"] { display: block; }
+#modeToggle[data-system="alien"] .mode-ico[data-for="alien"] { display: block; }
 #modeToggle[data-system="callofcthulhu"] .mode-ico[data-for="callofcthulhu"] { display: block; }
 #modeToggle[data-system="deltagreen"] .mode-ico[data-for="deltagreen"] { display: block; }
 #modeToggle[data-system="ironsworn"] .mode-ico[data-for="ironsworn"] { display: block; }
@@ -620,6 +621,9 @@ body {
 .yz-chip[data-type="skill"]  { --dc: #5BA860; }
 .yz-chip[data-type="gear"]   { --dc: #8C919A; }
 .yz-chip[data-type="stress"] { --dc: #D86A3A; }
+/* Year Zero rolls Base/Skill/Gear; Alien swaps Gear out for the Stress die. */
+.yz-picker:not(.alien) .yz-chip[data-type="stress"] { display: none; }
+.yz-picker.alien .yz-chip[data-type="gear"] { display: none; }
 /* A resting chip carries a faint wash of its die colour so the four read apart. */
 .yz-chip .die-ico path { fill-opacity: 0.24; }
 /* Push appears on the result and rerolls everything that is not a 6 or a 1. */
@@ -1527,7 +1531,8 @@ body {
 .mode-genesys { --sys: #BFA766; }
 .mode-daggerheart { --sys: #C9A227; }
 .mode-cthulhutech { --sys: #57B591; }
-.mode-yearzero { --sys: #D9922E; }
+.mode-yearzero { --sys: #8FA05C; }
+.mode-alien { --sys: #D9922E; }
 /* ---- Call of Cthulhu picker: skill dial and the two d10-shaped modifier keys
    all on one row — the keys are compact, so nothing needs its own line. */
 .coc-picker { flex-direction: row; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; }
