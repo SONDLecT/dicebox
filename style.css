@@ -768,7 +768,9 @@ body {
 .dcc-picker { display: block; padding: 0; }
 .dcc-chain {
   display: flex; align-items: flex-start; gap: 5px;
-  overflow-x: auto; scrollbar-width: none; padding: 4px 8px 6px;
+  /* Extra bottom room so the enlarged action chip (which grows downward) stays
+     inside the box — no vertical scrollbar, and clear of the notation field. */
+  overflow-x: auto; scrollbar-width: none; padding: 6px 8px 18px;
   -webkit-overflow-scrolling: touch;
 }
 .dcc-chain::-webkit-scrollbar { display: none; }

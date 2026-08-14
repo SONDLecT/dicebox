@@ -61,6 +61,10 @@ const DCC_COLORS = {
   8: '#D6A93A', 10: '#DC8FB4', 12: '#3F86D6', 14: '#DB7430', 16: '#4059B5',
   20: '#B9B3A2', 24: '#CE4C40', 30: '#E6C63C', 100: '#8A8594',
 };
+// The grey dice — d4, d20, d100 — have no hue to spend as the action die, so
+// they take the theme ink instead (bright white in dark, bold black in light).
+// Kept in sync with the matching [data-sides] rule in style.css.
+const DCC_INK_DICE = new Set([4, 20, 100]);
 
 // Above this many dice, throwing them across the tray stops being legible and
 // the pairwise separation gets expensive. Larger rolls spin in place instead.
@@ -153,6 +157,7 @@ $('themeToggle').addEventListener('click', () => {
   // Re-apply the active system's palette so its dark/light pair follows the
   // toggle instead of being frozen at whichever mode was active on roll.
   applySystemTheme(uiSystem);
+  recolorDccTray();
 });
 
 systemDark.addEventListener('change', () => {
@@ -162,6 +167,7 @@ systemDark.addEventListener('change', () => {
   // A system palette is written as inline custom properties, so it overrides the
   // stylesheet's own dark rules and cannot follow the OS on its own.
   applySystemTheme(uiSystem);
+  recolorDccTray();
 });
 
 // The button shows the theme you are in and switches to the other one, so the
@@ -648,6 +654,7 @@ function flattenRollDice(result) {
 // haptics fire only on your own throws; they look identical either way.
 function buildTrayDice(flat, result, { remote = false } = {}) {
   let crownedMarked = false;
+  const dccT = uiSystem === 'dcc' ? theme() : null;
   return flat.map(f => {
     const die = new Die(f.sides, f.value, 0, 0, 40);
     die.kept = f.kept;
@@ -727,12 +734,17 @@ function buildTrayDice(flat, result, { remote = false } = {}) {
     // An oracle draw is a single dN in the steel oracle colour — neutral, since a
     // table result is information, not a pass/fail.
     else if (result.system === 'oracle') die.genColor = IRON_COLORS.oracle;
-    // DCC (numeric rolls in the dice-chain mode): only the action die is coloured
-    // — its chain colour marks it out — while every other die stays the plain
-    // theme wireframe, keeping the tray quiet and in-theme.
-    if (uiSystem === 'dcc' && !crownedMarked && f.sides === dccCrown && DCC_COLORS[f.sides]) {
-      die.genColor = DCC_COLORS[f.sides];
-      crownedMarked = true;
+    // DCC (numeric rolls in the dice-chain mode): the action die carries the
+    // emphasis — its chain hue, or the theme ink for the grey dice — while every
+    // other die dims to the muted tone, so the action die is unmistakable whatever
+    // its colour, on both themes.
+    if (dccT && DCC_COLORS[f.sides]) {
+      if (!crownedMarked && f.sides === dccCrown) {
+        die.genColor = DCC_INK_DICE.has(f.sides) ? dccT.line : DCC_COLORS[f.sides];
+        crownedMarked = true;
+      } else {
+        die.genColor = dccT.muted;
+      }
     }
     return die;
   });
@@ -4798,14 +4810,19 @@ function stageFromPool({ writeField }) {
 
   const staged = [];
   let stagedCrown = false;
+  const dccT = uiSystem === 'dcc' ? theme() : null;
   for (const [sides, entry] of pool) {
     for (let i = 0; i < entry.count; i++) {
       const d = new Die(sides, null, 0, 0, 40);
-      // Only the action die carries its chain colour onto the staged shelf; the
-      // rest stay the plain theme wireframe.
-      if (uiSystem === 'dcc' && !stagedCrown && sides === dccCrown && DCC_COLORS[sides]) {
-        d.genColor = DCC_COLORS[sides];
-        stagedCrown = true;
+      // The action die takes the emphasis (chain hue, or theme ink for the greys)
+      // on the staged shelf; every other die dims to the muted tone.
+      if (dccT && DCC_COLORS[sides]) {
+        if (!stagedCrown && sides === dccCrown) {
+          d.genColor = DCC_INK_DICE.has(sides) ? dccT.line : DCC_COLORS[sides];
+          stagedCrown = true;
+        } else {
+          d.genColor = dccT.muted;
+        }
       }
       staged.push(d);
     }
@@ -5318,6 +5335,38 @@ function enterDcc() {
   buildDccChain();
   setDccCrown(dccCrown);
   markDccPool();
+  centerCrownedDie();
+}
+
+// The default action die (d20) sits two-thirds along the chain, off the right
+// edge on load. Centre it in the viewport on entry so it reads as the starting
+// point, not something hidden. Deferred a frame so the picker has laid out.
+function centerCrownedDie() {
+  requestAnimationFrame(() => {
+    if (!dccChainEl || !dccChainEl.clientWidth) return;
+    const el = dccChainEl.children[DCC_STRIP.indexOf(dccCrown)];
+    if (!el) return;
+    dccChainEl.scrollLeft = el.offsetLeft - (dccChainEl.clientWidth - el.offsetWidth) / 2;
+  });
+}
+
+// The tray colours are theme-aware (muted neutrals, ink for the grey action
+// dice), so a theme toggle while dice are already on the tray must repaint them
+// or a white action die would strand on a light ground.
+function recolorDccTray() {
+  if (uiSystem !== 'dcc') return;
+  const t = theme();
+  let crowned = false;
+  for (const d of state.dice) {
+    if (!DCC_COLORS[d.sides]) continue;
+    if (!crowned && d.sides === dccCrown) {
+      d.genColor = DCC_INK_DICE.has(d.sides) ? t.line : DCC_COLORS[d.sides];
+      crowned = true;
+    } else {
+      d.genColor = t.muted;
+    }
+  }
+  dropIdleCache();
 }
 
 // ---- full history ----
