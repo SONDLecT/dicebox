@@ -1376,6 +1376,29 @@ export class Die {
     ctx.globalAlpha = fade;
 
     this.drawValue(ctx, theme, s, pts, proj);
+    // A kept die — a pushed 6 or 1 held back from the reroll — wears a faint
+    // padlock over its face so the lock reads at a glance.
+    if (this.locked) {
+      const w = this.size * 0.30, h = this.size * 0.24, r = w * 0.22, cy = this.size * 0.05;
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.lineWidth = Math.max(1.2, this.size * 0.026);
+      ctx.strokeStyle = theme.line; ctx.fillStyle = theme.line;
+      ctx.globalAlpha = fade * 0.42;
+      ctx.beginPath();
+      ctx.arc(0, cy - h * 0.5, w * 0.30, Math.PI, 0);   // shackle
+      ctx.stroke();
+      const x0 = -w / 2, y0 = cy - h * 0.16;
+      ctx.beginPath();                                   // body
+      ctx.moveTo(x0 + r, y0);
+      ctx.arcTo(x0 + w, y0, x0 + w, y0 + h, r);
+      ctx.arcTo(x0 + w, y0 + h, x0, y0 + h, r);
+      ctx.arcTo(x0, y0 + h, x0, y0, r);
+      ctx.arcTo(x0, y0, x0 + w, y0, r);
+      ctx.closePath();
+      ctx.globalAlpha = fade * 0.26; ctx.fill();
+      ctx.globalAlpha = fade * 0.5; ctx.stroke();
+      ctx.globalAlpha = fade;
+    }
     ctx.restore();
   }
 

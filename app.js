@@ -86,8 +86,10 @@ const state = {
   bounds: { left: 0, right: 0, top: 0, floor: 0 },
   last: null,
   // A push held between its two beats: the rerollable dice are picked up on the
-  // tray, and the next tap throws them to this pre-decided result.
+  // tray, and the next tap throws them to this pre-decided result. pushKept holds
+  // the locked 6s/1s so they can be unlocked when the throw lands.
   pendingPush: null,
+  pushKept: null,
 };
 
 // ---- theme ----
@@ -852,7 +854,7 @@ function doRoll(notation) {
 // of silently swapping text.
 function throwResult(result, { writeField = true } = {}) {
   state.last = result;
-  state.pendingPush = null;   // a fresh throw cancels any half-done push
+  state.pendingPush = null; state.pushKept = null;   // a fresh throw cancels any half-done push
   // Quick one-off rolls (an oracle draw, a progress roll) leave the field on the
   // mode's primary expression so the Roll button keeps doing the action roll;
   // typed and dice-engine rolls write themselves in as the current expression.
@@ -1783,29 +1785,36 @@ function preparePush() {
   const prev = state.dice;
   const size = prev.length ? prev[0].size : 40;
 
-  // Kept 6s and 1s stay settled and numbered; the rerollable dice are picked up —
-  // blanked and marked — so they read as unrolled dice in your hand.
+  // Split the tray: the kept 6s and 1s are locked and slide to the left, while the
+  // rerollable dice are blanked ("picked up") and gather on the right.
+  const kept = [], picked = [];
   const dice = prev.map((d, i) => {
     const f = pushedFlat[i];
-    if (f && f.rerolled) { d.value = null; d.rerolled = false; d.picked = true; }
+    if (f && f.rerolled) { d.value = null; d.rerolled = false; d.picked = true; d.locked = false; picked.push(d); }
+    else { d.locked = true; d.picked = false; kept.push(d); }
     return d;
   });
-  // Alien: the extra Stress die joins the handful, blank until you throw it.
-  const added = [];
+  // Alien: the extra Stress die joins the picked handful, blank until thrown.
   for (let i = prev.length; i < pushedFlat.length; i++) {
     const f = pushedFlat[i];
-    const die = new Die(f.sides, null, state.bounds.right, state.bounds.floor, size);
+    const die = new Die(f.sides, null, 0, 0, size);
     die.genColor = YZ_COLORS[f.yzType] || YZ_COLORS.base;
     die.settled = true; die.settling = true; die.settleT = 1;
     die.rot = [0.5, 0.6, 0.1];
     die.picked = true;
-    dice.push(die);
-    added.push(die);
+    dice.push(die); picked.push(die);
+    die.freshPick = true;   // snapped into the cluster rather than eased
   }
   state.dice = dice;
-  if (added.length) { rehomeGrid(dice); for (const die of added) { die.x = die.homeX; die.y = die.homeY; } }
+
+  const { left, right, top, floor } = state.bounds;
+  const span = right - left, gap = span * 0.05;
+  packInto(kept,   left + gap, left + span * 0.44, top + gap, floor - gap);
+  packInto(picked, left + span * 0.56, right - gap, top + gap, floor - gap);
+  for (const d of picked) if (d.freshPick) { d.x = d.homeX; d.y = d.homeY; delete d.freshPick; }
 
   state.pendingPush = pushed;
+  state.pushKept = kept;
   $('total').dataset.idle = '1';
   $('total').textContent = '—';
   $('breakdown').textContent = 'Tap the tray to throw the pushed dice';
@@ -1814,26 +1823,45 @@ function preparePush() {
   if (navigator.vibrate) navigator.vibrate(10);
 }
 
-// The second beat: throw the picked-up dice to the values the push already
-// decided, leaving the kept dice where they sit.
-function rollPendingPush(vx = 0, vy = 0, speed = 0) {
+// The second beat: unlock the kept dice, re-home everyone to the final grid, and
+// throw the picked-up handful across the felt to the values the push decided.
+function rollPendingPush() {
   const pushed = state.pendingPush;
   state.pendingPush = null;
-  state.last = pushed;   // the pushed roll is now the current one (canPush false)
+  state.last = pushed;
   const pushedFlat = flattenRollDice(pushed);
+  for (const d of (state.pushKept || [])) d.locked = false;
+  state.pushKept = null;
+
+  rehomeGrid(state.dice);
   state.dice.forEach((d, i) => {
     if (!d.picked) return;
     d.picked = false;
     d.value = pushedFlat[i].value;
-    d.rerolled = true;            // carries the ↻ reroll mark once it lands
-    d.homeX = d.x; d.homeY = d.y; // it lands back in its own slot
-    if (speed > 120) d.throwWith(vx * 0.5, Math.abs(vy) * 0.5 + 200);
-    else d.spinInPlace(Math.random() * 0.4);
+    d.rerolled = true;
+    d.rerollShown = true;   // the roll IS the animation; no second reroll hop
+    // A real throw toward its grid slot — a handful cast across the table.
+    d.throwWith((d.homeX - d.x) * 2.4, (d.homeY - d.y) * 2.4);
   });
   $('total').dataset.rolling = '1';
   dropIdleCache();
-  setTimeout(() => finish(pushed), 720);
+  setTimeout(() => finish(pushed), 760);
   if (navigator.vibrate) navigator.vibrate([8, 40, 12]);
+}
+
+// Lay a subset of dice out in a tidy grid inside a box, as ease targets.
+function packInto(dice, x0, x1, y0, y1) {
+  const n = dice.length;
+  if (!n) return;
+  const w = Math.max(1, x1 - x0), h = Math.max(1, y1 - y0);
+  const cols = Math.max(1, Math.round(Math.sqrt(n * w / h)));
+  const rows = Math.ceil(n / cols);
+  const cw = w / cols, ch = h / rows;
+  dice.forEach((d, i) => {
+    const c = i % cols, r = Math.floor(i / cols);
+    d.homeX = x0 + cw * (c + 0.5);
+    d.homeY = y0 + ch * (r + 0.5);
+  });
 }
 
 // Ease targets for the current tray, ordered by where the dice already sit so
@@ -5214,7 +5242,7 @@ function systemStageDescriptors() {
 // tray for the active one. Notation is owned by the caller's sync* (this never
 // writes it).
 function stageSystemPool() {
-  state.pendingPush = null;   // building/restaging a pool abandons a pending push
+  state.pendingPush = null; state.pushKept = null;   // building/restaging a pool abandons a pending push
   const staged = systemStageDescriptors().slice(0, ANIMATE_LIMIT).map(d => {
     const die = new Die(d.sides, null, 0, 0, 40);
     if (d.hunger) die.hunger = true;
@@ -6579,7 +6607,7 @@ canvas.addEventListener('pointerup', e => {
 
   // A pending push has the rerollable dice sitting picked-up on the tray; any tap
   // or flick throws just that handful, leaving the kept 6s and 1s in place.
-  if (state.pendingPush) { rollPendingPush(vx, vy, speed); return; }
+  if (state.pendingPush) { rollPendingPush(); return; }
 
   // Tapping the discard pile fans it open instead of drawing. Hit-tested where
   // the finger LANDED (the aim point), not where it lifted, with a little pad.
