@@ -435,6 +435,7 @@ body {
 #modeToggle[data-system="genesys"] .mode-ico[data-for="genesys"] { display: block; }
 #modeToggle[data-system="daggerheart"] .mode-ico[data-for="daggerheart"] { display: block; }
 #modeToggle[data-system="cthulhutech"] .mode-ico[data-for="cthulhutech"] { display: block; }
+#modeToggle[data-system="yearzero"] .mode-ico[data-for="yearzero"] { display: block; }
 #modeToggle[data-system="callofcthulhu"] .mode-ico[data-for="callofcthulhu"] { display: block; }
 #modeToggle[data-system="deltagreen"] .mode-ico[data-for="deltagreen"] { display: block; }
 #modeToggle[data-system="ironsworn"] .mode-ico[data-for="ironsworn"] { display: block; }

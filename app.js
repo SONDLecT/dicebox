@@ -6581,6 +6581,7 @@ function emptyTrayRoll() {
   if (uiSystem === 'onering') return torNotation();
   if (uiSystem === 'daggerheart') return dhNotation();
   if (uiSystem === 'cthulhutech') return ctNotation() || ctExample();
+  if (uiSystem === 'yearzero') return yzNotation() || 'yz:5';
   if (uiSystem === 'pbta') return pbtaCtl.notation();
   if (uiSystem === 'mist') return mistCtl.notation();
   if (uiSystem === 'mothership') return msNotation();
