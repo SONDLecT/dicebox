@@ -749,7 +749,10 @@ export function summarizeBladeRunner(dice, pushed = false) {
     ones,
     outcome: successes >= 2 ? 'critical' : successes >= 1 ? 'success' : 'failure',
     pushed,
-    canPush: !pushed,
+    // You push a MISS, not a roll you already passed. On a miss every die is 1-5,
+    // so nothing but a 1 is ever "locked" — which is what the 6+ rule quietly
+    // means here.
+    canPush: !pushed && successes === 0,
   };
 }
 
