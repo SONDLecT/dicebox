@@ -38,6 +38,7 @@ export function detectSystem(src) {
   if (/^ct:/.test(s)) return 'cthulhutech';
   if (/^yz:/.test(s)) return 'yearzero';
   if (/^br:/.test(s)) return 'bladerunner';
+  if (/^t2k:/.test(s)) return 'twilight';
   if (/^sw:/.test(s)) return 'starwars';
   if (/^tor:/.test(s)) return 'onering';
   if (/^pbta:/.test(s)) return 'pbta';
@@ -215,6 +216,7 @@ export function rollAny(src, uiSystem = 'numeric') {
   if (sys === 'cthulhutech') return rollCthulhuTech(src);
   if (sys === 'yearzero') return rollYearZero(src);
   if (sys === 'bladerunner') return rollBladeRunner(src);
+  if (sys === 'twilight') return rollTwilight(src);
   if (sys === 'starwars') return rollStarWars(src);
   if (sys === 'onering') return rollOneRing(src);
   if (sys === 'pbta') return rollPbta(src);
@@ -772,6 +774,78 @@ export function describeBladeRunner(result) {
   const dice = result.groups[0].dice.map(d => `d${d.sides}[${d.value}]`).join(' + ');
   parts.push(dice);
   if (s.pushed && s.ones) parts.push(`${s.ones} damage`);
+  return parts.join(' · ');
+}
+
+// ---- Twilight: 2000 (T2K 4e) — Blade Runner's step-die sibling ----
+//
+// The same core as Blade Runner: an Attribute die + a Skill die, each d6-d12,
+// counting 6-9 as one success and 10+ as two, with the same push (reroll the
+// dice that are not a 6+, 1s lock). What's new is a pool of d6 Ammunition dice
+// rolled alongside for automatic fire: each 6 is an extra hit, and every 1 left
+// after a push knocks the weapon's Reliability down a step.
+//
+//   t2k:12,8      Attribute d12 + Skill d8
+//   t2k:12,8,3    the same, with three Ammo dice
+const T2K_REGEX = /^t2k:(6|8|10|12),(6|8|10|12)(?:,(\d+))?$/;
+
+export function parseTwilight(src) {
+  const m = T2K_REGEX.exec(String(src || '').trim().toLowerCase());
+  if (!m) throw new Error('Expected a Twilight: 2000 roll like "t2k:12,8" or "t2k:12,8,3"');
+  const ammo = m[3] === undefined ? 0 : Number(m[3]);
+  if (ammo > 20) throw new Error('Ammo dice must be 0-20');
+  return { attr: Number(m[1]), skill: Number(m[2]), ammo };
+}
+
+function twilightResult(notation, dice, pushed) {
+  return {
+    schema: 2,
+    system: 'twilight',
+    notation: String(notation),
+    groups: [{ kind: 'dice', dieType: 'twilight', sides: dice[0]?.sides ?? 6, count: dice.length, dice, subtotal: 0 }],
+    summary: summarizeTwilight(dice, pushed),
+  };
+}
+
+export function rollTwilight(src) {
+  const { attr, skill, ammo } = parseTwilight(src);
+  const dice = [makeBrDie(attr, 'attribute'), makeBrDie(skill, 'skill')];
+  for (let i = 0; i < ammo; i++) dice.push(makeBrDie(6, 'ammo'));
+  return twilightResult(src, dice, false);
+}
+
+// Push rerolls every die that is not already a 6+ and not locked on a 1 — base
+// dice and Ammo dice alike.
+export function pushTwilight(result) {
+  const dice = result.groups[0].dice.map(d =>
+    (d.value >= 6 || d.value === 1) ? d : { ...d, value: randInt(d.sides), rerolled: true });
+  return twilightResult(result.notation, dice, true);
+}
+
+export function summarizeTwilight(dice, pushed = false) {
+  let successes = 0, ones = 0;
+  for (const d of dice) { successes += brSuccesses(d.value); if (d.value === 1) ones++; }
+  return {
+    kind: 'twilight',
+    successes,
+    ones,
+    outcome: successes >= 1 ? 'success' : 'failure',
+    pushed,
+    canPush: !pushed && successes === 0,
+  };
+}
+
+export function twilightHeadline(result) {
+  const s = result.summary;
+  return { kind: 'number', text: String(s.successes), variant: s.outcome === 'success' ? 't2k-success' : 't2k-fail' };
+}
+
+export function describeTwilight(result) {
+  const s = result.summary;
+  const parts = [`${s.successes} success${s.successes === 1 ? '' : 'es'}`, s.outcome === 'success' ? 'Success' : 'Failure'];
+  if (s.pushed) parts.splice(1, 0, 'pushed');
+  parts.push(result.groups[0].dice.map(d => `d${d.sides}[${d.value}]`).join(' + '));
+  if (s.pushed && s.ones) parts.push(`Reliability −${s.ones}`);
   return parts.join(' · ');
 }
 

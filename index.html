@@ -168,6 +168,12 @@
             <path d="M4.5 20 9 4.5 15 4.5 19.5 20Z"/>
             <path d="M7 11.5H17M5.7 15.8H18.3"/>
           </g>
+          <!-- Twilight: 2000: a rifle cartridge — the ammo dice made flesh. -->
+          <g class="mode-ico" data-for="twilight" fill="none" stroke="currentColor"
+             stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">
+            <path d="M12 3C14.5 4.5 15 7 15 9L15 20 9 20 9 9C9 7 9.5 4.5 12 3Z"/>
+            <path d="M9 13H15"/>
+          </g>
           <!-- Star Wars: a TIE fighter — cockpit between two hexagonal panels. -->
           <g class="mode-ico" data-for="starwars">
             <g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
@@ -462,6 +468,24 @@
         Miss, and you can <b>Push</b>: reroll every die that is not already a 6 or
         higher. Any <b>1</b> locks and stays, and each 1 left showing costs a point of
         <b>Health</b> on a physical roll or <b>Resolve</b> on a mental one.
+      </p>
+      </div>
+
+      <div id="helpTwilight" hidden>
+      <dl class="syntax">
+        <dt>t2k:12,8</dt>   <dd>Attribute d12 + Skill d8</dd>
+        <dt>t2k:12,8,3</dt> <dd>the same, plus 3 Ammo dice</dd>
+      </dl>
+      <p class="note">
+        Twilight: 2000 rolls two step dice — an <b>Attribute</b> die and a <b>Skill</b>
+        die, each d6 to d12 — and counts successes: a <b>6-9</b> is one, a <b>10+</b>
+        is two. One success passes. Tap a die to step it up, hold to step down.
+      </p>
+      <p class="note">
+        Automatic fire adds <b>Ammo</b> dice, a pool of d6 (tap Ammo to add one). Each
+        <b>6</b> is an extra hit. Miss, and you can <b>Push</b>: reroll every die that
+        is not a 6 or higher. Any <b>1</b> locks, and each 1 left after a push drops
+        your weapon's <b>Reliability</b>.
       </p>
       </div>
 
@@ -947,6 +971,15 @@
         </svg>
         <span class="mode-row-name">SWRPG</span>
         <span class="mode-row-sub">narrative + Force</span>
+      </button>
+      <button type="button" class="mode-row mode-twilight" data-system="twilight" aria-pressed="false">
+        <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true"
+             fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round">
+          <path d="M12 3C14.5 4.5 15 7 15 9L15 20 9 20 9 9C9 7 9.5 4.5 12 3Z"/>
+          <path d="M9 13H15"/>
+        </svg>
+        <span class="mode-row-name">T2K 4e</span>
+        <span class="mode-row-sub">step dice &middot; ammo dice</span>
       </button>
       <button type="button" class="mode-row mode-onering" data-system="onering" aria-pressed="false">
         <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true">
@@ -1460,6 +1493,26 @@
       </button>
     </div>
     <button type="button" class="yz-push" id="brPush" hidden>Push</button>
+  </section>
+
+  <!-- Twilight: 2000: Attribute + Skill step dice, plus a pool of d6 Ammo dice.
+       Tap a die to step up, hold to step down; tap Ammo to add one, hold to drop. -->
+  <section class="picker br-picker" id="t2kPicker" aria-label="Twilight: 2000 roll" hidden>
+    <div class="br-dice">
+      <button type="button" class="br-die" id="t2k-attr" aria-label="Attribute die — tap to step up, hold to step down">
+        <span class="br-die-label">Attribute</span>
+        <span class="br-die-val" id="t2k-attr-val">d8</span>
+      </button>
+      <button type="button" class="br-die" id="t2k-skill" aria-label="Skill die — tap to step up, hold to step down">
+        <span class="br-die-label">Skill</span>
+        <span class="br-die-val" id="t2k-skill-val">d6</span>
+      </button>
+      <button type="button" class="br-die" id="t2k-ammo" aria-label="Ammo dice — tap to add, hold to remove">
+        <span class="br-die-label">Ammo</span>
+        <span class="br-die-val" id="t2k-ammo-val">0</span>
+      </button>
+    </div>
+    <button type="button" class="yz-push" id="t2kPush" hidden>Push</button>
   </section>
 
   <!-- The One Ring: a Feat die is always rolled. The controls are the Success

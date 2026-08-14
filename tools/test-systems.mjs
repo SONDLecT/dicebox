@@ -11,6 +11,7 @@ import { parseDaggerheart, rollDaggerheart, summarizeDaggerheart, describeDagger
 import { parseCthulhuTech, rollCthulhuTech, summarizeCthulhuTech, describeCthulhuTech, cthulhutechHeadline } from '../system-dice.js';
 import { parseYearZero, rollYearZero, pushYearZero, summarizeYearZero, describeYearZero, yearzeroHeadline } from '../system-dice.js';
 import { parseBladeRunner, rollBladeRunner, pushBladeRunner, summarizeBladeRunner, describeBladeRunner, bladeRunnerHeadline } from '../system-dice.js';
+import { parseTwilight, rollTwilight, pushTwilight, summarizeTwilight, describeTwilight, twilightHeadline } from '../system-dice.js';
 import { parseStarWars, rollStarWars, summarizeStarWars, describeStarWars, starWarsHeadline } from '../system-dice.js';
 import { parseOneRing, rollOneRing, summarizeOneRing, describeOneRing, oneRingHeadline } from '../system-dice.js';
 import { parsePbta, parseMist, rollPbta, rollMist, summarize2d6, describe2d6, twod6Headline } from '../system-dice.js';
@@ -556,6 +557,55 @@ for (const bad of ['ct:', 'ct:0', 'ct:101', 'ct:8@0', 'dh:', '4dF']) {
     ok('br fail variant', bladeRunnerHeadline({ summary: summarizeBladeRunner([{ sides: 6, value: 2 }]) }).variant === 'br-fail');
     const txt = describeBladeRunner({ summary: summarizeBladeRunner([{ sides: 12, value: 10 }, { sides: 8, value: 3 }], true), groups: [{ dice: [{ sides: 12, value: 10 }, { sides: 8, value: 3 }] }] });
     ok('br describe reads successes, push, outcome, dice', /2 successes · pushed · Critical · d12\[10\] \+ d8\[3\]/.test(txt));
+  }
+}
+
+// ---- Twilight 2000 (T2K 4e step-die + ammo) ----
+{
+  ok('detect t2k', detectSystem('t2k:12,8') === 'twilight');
+  ok('detect t2k with ammo', detectSystem('t2k:12,8,3') === 'twilight');
+  ok('t2k not br', detectSystem('br:12,8') === 'bladerunner');
+  ok('parse t2k:12,8', eq(parseTwilight('t2k:12,8'), { attr: 12, skill: 8, ammo: 0 }));
+  ok('parse t2k with ammo', eq(parseTwilight('t2k:10,6,4'), { attr: 10, skill: 6, ammo: 4 }));
+  for (const bad of ['t2k:', 't2k:12', 't2k:7,8', 't2k:12,8,99', 'br:12,8']) {
+    ok(`reject t2k ${bad}`, (() => { try { parseTwilight(bad); return false; } catch { return true; } })());
+  }
+
+  // 6-9 = one success, 10+ = two (shared with BR)
+  const s = summarizeTwilight([{ sides: 12, value: 11 }, { sides: 8, value: 7 }, { sides: 6, value: 3 }]);
+  ok('t2k counts 6-9 as one, 10+ as two', s.successes === 3);
+  ok('t2k one success passes', summarizeTwilight([{ sides: 8, value: 6 }, { sides: 6, value: 2 }]).outcome === 'success');
+  ok('t2k zero successes fails', summarizeTwilight([{ sides: 8, value: 5 }, { sides: 6, value: 2 }]).outcome === 'failure');
+  ok('t2k tallies ones for reliability', summarizeTwilight([{ sides: 6, value: 1 }, { sides: 6, value: 1 }]).ones === 2);
+  ok('t2k push blocked on success', summarizeTwilight([{ sides: 8, value: 6 }]).canPush === false);
+  ok('t2k push offered on failure', summarizeTwilight([{ sides: 8, value: 4 }]).canPush === true);
+
+  // roll shape: attribute + skill + ammo pool
+  {
+    const r = rollTwilight('t2k:12,8,3');
+    ok('t2k system tag', r.system === 'twilight');
+    ok('t2k rolls attr + skill + ammo dice', r.groups[0].dice.length === 5
+      && r.groups[0].dice[0].sides === 12 && r.groups[0].dice[1].sides === 8
+      && r.groups[0].dice.slice(2).every(d => d.sides === 6));
+    ok('rollAny routes t2k', rollAny('t2k:8,8').system === 'twilight');
+  }
+
+  // push: rerolls dice below 6 that aren't 1s; 6+ and 1s lock
+  {
+    const r = rollTwilight('t2k:12,12,4');
+    const p = pushTwilight(r);
+    ok('t2k push locks 6+ and 1s, rerolls the rest', r.groups[0].dice.every((d, i) =>
+      (d.value >= 6 || d.value === 1) ? p.groups[0].dice[i].value === d.value : true));
+    ok('t2k push marks pushed, blocks a second push', p.summary.pushed === true && p.summary.canPush === false);
+  }
+
+  // headline + describe
+  {
+    ok('t2k headline is the success count', twilightHeadline({ summary: s }).text === '3');
+    ok('t2k success variant', twilightHeadline({ summary: s }).variant === 't2k-success');
+    ok('t2k fail variant', twilightHeadline({ summary: summarizeTwilight([{ sides: 6, value: 2 }]) }).variant === 't2k-fail');
+    const txt = describeTwilight({ summary: summarizeTwilight([{ sides: 12, value: 10 }, { sides: 6, value: 1 }], true), groups: [{ dice: [{ sides: 12, value: 10 }, { sides: 6, value: 1 }] }] });
+    ok('t2k describe reads successes, push, reliability', /pushed/.test(txt) && /Reliability −1/.test(txt));
   }
 }
 

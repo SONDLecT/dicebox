@@ -9,6 +9,7 @@ import { rollDaggerheart, describeDaggerheart, daggerheartHeadline, parseDaggerh
 import { rollCthulhuTech, describeCthulhuTech, cthulhutechHeadline, parseCthulhuTech } from './system-dice.js';
 import { rollYearZero, describeYearZero, yearzeroHeadline, parseYearZero, pushYearZero } from './system-dice.js';
 import { rollBladeRunner, describeBladeRunner, bladeRunnerHeadline, parseBladeRunner, pushBladeRunner } from './system-dice.js';
+import { rollTwilight, describeTwilight, twilightHeadline, parseTwilight, pushTwilight } from './system-dice.js';
 import { rollMothership, describeMothership, mothershipHeadline, parseMothership, resolveMothershipStress } from './system-dice.js';
 import { rollCallOfCthulhu, describeCallOfCthulhu, callOfCthulhuHeadline, parseCallOfCthulhu } from './system-dice.js';
 import { rollDeltaGreen, describeDeltaGreen, deltaGreenHeadline, parseDeltaGreen } from './system-dice.js';
@@ -310,6 +311,18 @@ const SYSTEM_THEMES = {
       '--hair': '#D2DADE', '--accent': '#1B8C93', '--danger': '#8C3A2E',
     },
   },
+  // Twilight: 2000 — worn military olive-drab and rust, the fallout-lit gloom of
+  // a war that never ended. The step dice and tan ammo dice carry their colours.
+  twilight: {
+    dark: {
+      '--paper': '#0E0F0B', '--face': '#1A1C14', '--line': '#DEDFD2', '--muted': '#6C6E5E',
+      '--hair': '#262820', '--accent': '#B08A3E', '--danger': '#D8685F',
+    },
+    light: {
+      '--paper': '#ECECE3', '--face': '#F7F7F1', '--line': '#191A12', '--muted': '#70715F',
+      '--hair': '#D6D6C8', '--accent': '#7A5E22', '--danger': '#8C3A2E',
+    },
+  },
   // Star Wars — like Genesys, the dice carry the colour; the chrome is a calm
   // starfield blue.
   starwars: {
@@ -547,6 +560,14 @@ const BR_COLORS = {
   advantage: '#5BA860',
 };
 
+// Twilight: 2000 — olive Attribute, amber Skill, and the tan of the physical
+// ammo dice.
+const T2K_COLORS = {
+  attribute: '#9AA36A',
+  skill: '#D9A441',
+  ammo: '#C8B48A',
+};
+
 function applySystemTheme(system) {
   const root = document.documentElement;
   const scheme = SYSTEM_THEMES[system];
@@ -748,6 +769,8 @@ function buildTrayDice(flat, result, { remote = false } = {}) {
     else if (result.system === 'yearzero') die.genColor = YZ_COLORS[f.yzType] || YZ_COLORS.base;
     // Blade Runner: the Attribute die is teal, the Skill die amber, advantage green.
     else if (result.system === 'bladerunner') die.genColor = BR_COLORS[f.role] || BR_COLORS.attribute;
+    // Twilight: 2000 — olive Attribute, amber Skill, tan Ammo dice.
+    else if (result.system === 'twilight') die.genColor = T2K_COLORS[f.role] || T2K_COLORS.attribute;
     // One Ring: the Feat die shows a numeral, the Eye, or the Gandalf rune;
     // Success dice show their value, tinted (Tengwar 6 gold, Weary 1-3 faded).
     else if (result.system === 'onering') {
@@ -840,6 +863,7 @@ function doRoll(notation) {
       : sys === 'cthulhutech' ? rollCthulhuTech(notation)
       : sys === 'yearzero' ? rollYearZero(notation)
       : sys === 'bladerunner' ? rollBladeRunner(notation)
+      : sys === 'twilight' ? rollTwilight(notation)
       : sys === 'starwars' ? rollStarWars(notation)
       : sys === 'onering' ? rollOneRing(notation)
       : sys === 'pbta' ? rollPbta(notation)
@@ -952,6 +976,7 @@ function resultHeadline(result) {
   if (result.system === 'cthulhutech') return cthulhutechHeadline(result);
   if (result.system === 'yearzero') return yearzeroHeadline(result);
   if (result.system === 'bladerunner') return bladeRunnerHeadline(result);
+  if (result.system === 'twilight') return twilightHeadline(result);
   if (result.system === 'starwars') return starWarsHeadline(result);
   if (result.system === 'onering') return oneRingHeadline(result);
   if (result.system === 'pbta' || result.system === 'mist') return twod6Headline(result);
@@ -975,6 +1000,7 @@ function resultDetail(result) {
   if (result.system === 'cthulhutech') return describeCthulhuTech(result);
   if (result.system === 'yearzero') return describeYearZero(result);
   if (result.system === 'bladerunner') return describeBladeRunner(result);
+  if (result.system === 'twilight') return describeTwilight(result);
   if (result.system === 'starwars') return describeStarWars(result);
   if (result.system === 'onering') return describeOneRing(result);
   if (result.system === 'pbta' || result.system === 'mist') return describe2d6(result);
@@ -1022,6 +1048,7 @@ function finish(result) {
   $('wordmark').dataset.faded = '1';
   updateYzPush();
   updateBrPush();
+  updateT2kPush();
 }
 
 // The visible log stays short, but the record does not: a session's worth of
@@ -1155,6 +1182,7 @@ $('notation').addEventListener('input', () => {
   if (typedSystem === 'cthulhutech') { syncCtFromField(); return; }
   if (yzFamily(typedSystem)) { syncYzFromField(); return; }
   if (typedSystem === 'bladerunner') { syncBrFromField(); return; }
+  if (typedSystem === 'twilight') { syncT2kFromField(); return; }
   if (typedSystem === 'onering') { syncTorFromField(); return; }
   if (typedSystem === 'pbta') { pbtaCtl.fromField(); return; }
   if (typedSystem === 'mist') { mistCtl.fromField(); return; }
@@ -1241,6 +1269,7 @@ const SYSTEMS = {
   yearzero: { badge: 'Year Zero' },
   alien: { badge: 'Alien' },
   bladerunner: { badge: 'BRRPG' },
+  twilight: { badge: 'T2K 4e' },
   starwars: { badge: 'SWRPG' },
   onering: { badge: 'TOR 2e' },
   pbta: { badge: 'PbtA' },
@@ -1270,6 +1299,7 @@ const SYSTEM_HINTS = {
   yearzero: { idle: 'Build a d6 pool — every 6 is a success', placeholder: 'Tap the dice, or type yz:5b3s2g' },
   alien: { idle: 'Build a d6 pool — every 6 is a success', placeholder: 'Tap the dice, or type yz:5b1x' },
   bladerunner: { idle: 'Set your Attribute and Skill dice, then roll', placeholder: 'Set the dice, or type br:12,8' },
+  twilight: { idle: 'Set your dice and ammo, then roll', placeholder: 'Set the dice, or type t2k:12,8,3' },
   cards: { idle: 'Tap the deck to draw', placeholder: 'Tap the deck, or type deck:3' },
   tarot: { idle: 'Tap the deck to draw', placeholder: 'Tap the deck, or type tarot:3' },
   napoletane: { idle: 'Tocca il mazzo per pescare', placeholder: 'Tocca il mazzo, o scrivi nap:3' },
@@ -1291,10 +1321,11 @@ const SLUG_TO_SYSTEM = {
   yz: 'yearzero', yearzero: 'yearzero', forbiddenlands: 'yearzero', vaesen: 'yearzero', coriolis: 'yearzero', mutant: 'yearzero', tales: 'yearzero',
   alien: 'alien',
   brrpg: 'bladerunner', bladerunner: 'bladerunner',
+  t2k: 'twilight', twilight: 'twilight', twilight2000: 'twilight',
   force: 'starwars', feat: 'onering', tor: 'onering', mothership: 'mothership', mosh: 'mothership', coc: 'callofcthulhu', callofcthulhu: 'callofcthulhu', cthulhu: 'callofcthulhu', dg: 'deltagreen', deltagreen: 'deltagreen',
   ironsworn: 'ironsworn', iron: 'ironsworn', starforged: 'starforged', sf: 'starforged', dcc: 'dcc',
 };
-const SYSTEM_TO_SLUG = { cards: 'cards', tarot: 'tarot', napoletane: 'napoletane', hanafuda: 'hanafuda', utagaruta: 'utagaruta', v5: 'vtmv5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', yearzero: 'yz', alien: 'alien', bladerunner: 'brrpg', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', mothership: 'mosh1e', callofcthulhu: 'coc', deltagreen: 'dg', ironsworn: 'ironsworn', starforged: 'starforged', dcc: 'dcc' };
+const SYSTEM_TO_SLUG = { cards: 'cards', tarot: 'tarot', napoletane: 'napoletane', hanafuda: 'hanafuda', utagaruta: 'utagaruta', v5: 'vtmv5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', yearzero: 'yz', alien: 'alien', bladerunner: 'brrpg', twilight: 't2k', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', mothership: 'mosh1e', callofcthulhu: 'coc', deltagreen: 'dg', ironsworn: 'ironsworn', starforged: 'starforged', dcc: 'dcc' };
 
 function systemFromPath() {
   const seg = (location.pathname || '/').replace(/^\/+|\/+$/g, '').toLowerCase();
@@ -1384,6 +1415,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
   $('yzPicker').hidden = system !== 'yearzero' && system !== 'alien';
   $('yzPicker').classList.toggle('alien', system === 'alien');
   $('brPicker').hidden = system !== 'bladerunner';
+  $('t2kPicker').hidden = system !== 'twilight';
   torPicker.hidden = system !== 'onering';
   twod6Picker.hidden = system !== 'pbta' && system !== 'mist';
   msPicker.hidden = system !== 'mothership';
@@ -1432,6 +1464,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
   $('helpYearzero').hidden = system !== 'yearzero';
   $('helpAlien').hidden = system !== 'alien';
   $('helpBladerunner').hidden = system !== 'bladerunner';
+  $('helpTwilight').hidden = system !== 'twilight';
   $('helpOnering').hidden = system !== 'onering';
   $('helpPbta').hidden = system !== 'pbta';
   $('helpMist').hidden = system !== 'mist';
@@ -1462,6 +1495,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
     resetCthulhuTech();
     resetYearZero();
     resetBladeRunner();
+    resetTwilight();
     resetOneRing();
     pbtaCtl.reset();
     mistCtl.reset();
@@ -1814,11 +1848,13 @@ $('yzPush').addEventListener('click', preparePush);
 function preparePush() {
   const last = state.last;
   if (!last || !last.summary || !last.summary.canPush || state.pendingPush) return;
-  if (last.system !== 'yearzero' && last.system !== 'bladerunner') return;
-  // Each engine keeps its own dice: Year Zero holds 6s and 1s, Blade Runner holds
-  // any 6+ and 1s. The reducer flags which dice actually rerolled, so the split
-  // below is the same for both.
-  const pushed = last.system === 'bladerunner' ? pushBladeRunner(last) : pushYearZero(last);
+  if (!['yearzero', 'bladerunner', 'twilight'].includes(last.system)) return;
+  // Each engine keeps its own dice: Year Zero holds 6s and 1s, Blade Runner and
+  // Twilight hold any 6+ and 1s. The reducer flags which dice actually rerolled,
+  // so the split below is the same for all of them.
+  const pushed = last.system === 'bladerunner' ? pushBladeRunner(last)
+    : last.system === 'twilight' ? pushTwilight(last)
+    : pushYearZero(last);
   const pushedFlat = flattenRollDice(pushed);
   const prev = state.dice;
   const size = prev.length ? prev[0].size : 40;
@@ -1858,6 +1894,7 @@ function preparePush() {
   $('breakdown').textContent = 'Tap the tray to throw the pushed dice';
   updateYzPush();
   updateBrPush();
+  updateT2kPush();
   dropIdleCache();
   if (navigator.vibrate) navigator.vibrate(10);
 }
@@ -1982,6 +2019,54 @@ $('brPush').addEventListener('click', preparePush);
 function updateBrPush() {
   const last = state.last;
   $('brPush').hidden = !(uiSystem === 'bladerunner' && last && last.system === 'bladerunner'
+    && last.summary && last.summary.canPush && $('total').dataset.idle !== '1'
+    && !state.pendingPush);
+}
+
+// ---- Twilight: 2000 step dice ----
+//
+// Blade Runner's Attribute + Skill selectors, plus a pool of d6 Ammo dice. No
+// advantage/disadvantage control — Twilight steps the die sizes themselves, which
+// you set here directly.
+const t2k = { attr: 8, skill: 6, ammo: 0 };
+
+function resetTwilight() { t2k.attr = 8; t2k.skill = 6; t2k.ammo = 0; syncT2k({ writeField: false }); }
+
+function t2kNotation() { return `t2k:${t2k.attr},${t2k.skill}${t2k.ammo > 0 ? ',' + t2k.ammo : ''}`; }
+
+function syncT2k({ writeField = true } = {}) {
+  $('t2k-attr-val').textContent = `d${t2k.attr}`;
+  $('t2k-skill-val').textContent = `d${t2k.skill}`;
+  $('t2k-ammo-val').textContent = String(t2k.ammo);
+  if (writeField) $('notation').value = t2kNotation();
+  if (uiSystem === 'twilight') stageSystemPool();
+}
+
+function stepT2kDie(which, dir) {
+  const i = BR_SIZES.indexOf(t2k[which]);
+  t2k[which] = BR_SIZES[(i + (dir > 0 ? 1 : BR_SIZES.length - 1)) % BR_SIZES.length];
+  syncT2k();
+}
+
+function stepT2kAmmo(dir) { t2k.ammo = Math.max(0, Math.min(20, t2k.ammo + dir)); syncT2k(); }
+
+function syncT2kFromField() {
+  try {
+    const p = parseTwilight($('notation').value);
+    t2k.attr = p.attr; t2k.skill = p.skill; t2k.ammo = p.ammo;
+    syncT2k({ writeField: false });
+  } catch { /* mid-type */ }
+}
+
+bindTapHold($('t2k-attr'), dir => stepT2kDie('attr', dir));
+bindTapHold($('t2k-skill'), dir => stepT2kDie('skill', dir));
+bindTapHold($('t2k-ammo'), dir => stepT2kAmmo(dir));
+
+$('t2kPush').addEventListener('click', preparePush);
+
+function updateT2kPush() {
+  const last = state.last;
+  $('t2kPush').hidden = !(uiSystem === 'twilight' && last && last.system === 'twilight'
     && last.summary && last.summary.canPush && $('total').dataset.idle !== '1'
     && !state.pendingPush);
 }
@@ -5291,6 +5376,11 @@ function systemStageDescriptors() {
         if (br.mod === 'adv') add(1, { sides: Math.min(br.attr, br.skill), genColor: BR_COLORS.advantage, kind: 'br' });
       }
       break;
+    case 'twilight':
+      add(1, { sides: t2k.attr, genColor: T2K_COLORS.attribute, kind: 't2k' });
+      add(1, { sides: t2k.skill, genColor: T2K_COLORS.skill, kind: 't2k' });
+      add(t2k.ammo, { sides: 6, genColor: T2K_COLORS.ammo, kind: 't2k' });
+      break;
     case 'onering':
       add(tor.favour ? 2 : 1, { sides: 12, genColor: TOR_COLORS.feat, kind: 'tor-feat' });
       add(tor.success, { sides: 6, genColor: TOR_COLORS.success, kind: 'tor-success' });
@@ -5377,6 +5467,7 @@ function stageSystemPool() {
   hideHint();
   updateYzPush();
   updateBrPush();
+  updateT2kPush();
 }
 
 // Take one staged die of `kind` back off the pool by stepping the owning
@@ -5443,6 +5534,7 @@ function clearPool() {
       case 'cthulhutech': resetCthulhuTech(); syncCt(); break;
       case 'yearzero': case 'alien': resetYearZero(); syncYz(); break;
       case 'bladerunner': resetBladeRunner(); syncBr(); break;
+      case 'twilight': resetTwilight(); syncT2k(); break;
       case 'onering': resetOneRing(); syncTor(); break;
       case 'pbta': case 'mist': resetTwod6(); syncTwod6(); break;
       case 'mothership': resetMothership(); syncMs(); break;
@@ -6759,6 +6851,7 @@ function emptyTrayRoll() {
   if (uiSystem === 'cthulhutech') return ctNotation() || ctExample();
   if (yzFamily(uiSystem)) return yzNotation() || 'yz:5';
   if (uiSystem === 'bladerunner') return brNotation();
+  if (uiSystem === 'twilight') return t2kNotation();
   if (uiSystem === 'pbta') return pbtaCtl.notation();
   if (uiSystem === 'mist') return mistCtl.notation();
   if (uiSystem === 'mothership') return msNotation();
@@ -6786,6 +6879,7 @@ function restageActiveSystem() {
     case 'cthulhutech': syncCt(); break;
     case 'yearzero': case 'alien': syncYz(); break;
     case 'bladerunner': syncBr(); break;
+    case 'twilight': syncT2k(); break;
     case 'onering': syncTor(); break;
     case 'pbta': case 'mist': syncTwod6(); break;
     case 'mothership': syncMs(); break;

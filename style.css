@@ -438,6 +438,7 @@ body {
 #modeToggle[data-system="yearzero"] .mode-ico[data-for="yearzero"] { display: block; }
 #modeToggle[data-system="alien"] .mode-ico[data-for="alien"] { display: block; }
 #modeToggle[data-system="bladerunner"] .mode-ico[data-for="bladerunner"] { display: block; }
+#modeToggle[data-system="twilight"] .mode-ico[data-for="twilight"] { display: block; }
 #modeToggle[data-system="callofcthulhu"] .mode-ico[data-for="callofcthulhu"] { display: block; }
 #modeToggle[data-system="deltagreen"] .mode-ico[data-for="deltagreen"] { display: block; }
 #modeToggle[data-system="ironsworn"] .mode-ico[data-for="ironsworn"] { display: block; }
@@ -661,6 +662,13 @@ body {
 .br-mod[data-state="adv"] .br-die-val { color: #5BA860; }
 .br-mod[data-state="dis"] { border-color: var(--danger); }
 .br-mod[data-state="dis"] .br-die-val { color: var(--danger); }
+/* Twilight: 2000 reuses the selectors — olive Attribute, amber Skill, tan Ammo. */
+#t2k-attr { border-color: color-mix(in srgb, #9AA36A 45%, var(--hair)); }
+#t2k-attr .br-die-val { color: #9AA36A; }
+#t2k-skill { border-color: color-mix(in srgb, #D9A441 45%, var(--hair)); }
+#t2k-skill .br-die-val { color: #D9A441; }
+#t2k-ammo { border-color: color-mix(in srgb, #C8B48A 45%, var(--hair)); }
+#t2k-ammo .br-die-val { color: #C8B48A; }
 
 /* A standalone die-add button — the Genesys rack's look, sized to sit inline
    rather than fill a row. Used where a pool is one die type (CthulhuTech d10,
@@ -926,6 +934,8 @@ body {
 .total[data-variant="br-crit"] { color: #D9A441; }
 .total[data-variant="br-success"] { color: #5BA860; }
 .total[data-variant="br-fail"] { color: var(--muted); }
+.total[data-variant="t2k-success"] { color: #9AA36A; }
+.total[data-variant="t2k-fail"] { color: var(--muted); }
 
 /* CthulhuTech's difficulty can be unset — just count the hits. */
 .ct-picker .count[data-unset="1"] { color: var(--muted); }
@@ -1562,6 +1572,7 @@ body {
 .mode-yearzero { --sys: #8FA05C; }
 .mode-alien { --sys: #D9922E; }
 .mode-bladerunner { --sys: #38C6C6; }
+.mode-twilight { --sys: #B08A3E; }
 /* ---- Call of Cthulhu picker: skill dial and the two d10-shaped modifier keys
    all on one row — the keys are compact, so nothing needs its own line. */
 .coc-picker { flex-direction: row; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; }
