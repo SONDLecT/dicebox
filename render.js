@@ -991,12 +991,16 @@ export class Die {
     this.settled = false;
     this.settleT = 0;
     this.restRot = null;
+    // Seconds this die has been in the air on the current throw; drives the
+    // settle backstop so a jostling die always comes to rest.
+    this.airTime = 0;
     // How much of the numeral is showing, 0 to 1. See stepNumeral.
     this.numeralIn = 0;
   }
 
   throwWith(vx, vy) {
     this.vx = vx; this.vy = vy;
+    this.airTime = 0;
     this.spin = [
       (Math.random()-0.5) * TUMBLE + 0.15,
       (Math.random()-0.5) * TUMBLE + 0.15,
@@ -1132,6 +1136,7 @@ export class Die {
     }
 
     if (!this.settling) {
+      this.airTime += dt;
       this.x += this.vx * dt;
       this.y += this.vy * dt;
 
@@ -1161,7 +1166,16 @@ export class Die {
         this.vy += (this.homeY - this.y) * 3.2 * dt;
       }
 
-      if (Math.hypot(this.vx, this.vy) < SETTLE_SPEED && Math.abs(this.spin[0]) < 0.02) {
+      // Settle when nearly at rest — or, past a grace period, at a bar that rises
+      // the longer a die has been in the air, so one wedged between its neighbours
+      // and the home-slot spring cannot orbit the two forever. A crowded d6 tray
+      // was the case that sometimes never came to rest; the hard cap guarantees it
+      // always does. The same face-up search runs on entry, so a forced settle
+      // lands square-on rather than cocked.
+      const over = Math.max(0, this.airTime - 1.4);
+      const restless = Math.hypot(this.vx, this.vy) >= SETTLE_SPEED + over * 260
+                    || Math.abs(this.spin[0]) >= 0.02 + over * 0.06;
+      if (!restless || this.airTime > 3.2) {
         this.settling = true;
         this.settleT = 0;
         this.restRot = this.rot.slice();
