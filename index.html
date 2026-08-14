@@ -1353,6 +1353,7 @@
        Stress dice; the chips are coloured because the dice all share a shape.
        After a roll, Push rerolls everything that is not a 6 or a 1. -->
   <section class="picker yz-picker" id="yzPicker" aria-label="Year Zero dice" hidden>
+    <button type="button" class="yz-push" id="yzPush" hidden>Push</button>
     <div class="gen-chips">
       <button type="button" class="gen-chip yz-chip" id="yz-base" data-type="base" aria-pressed="false" aria-label="Add a Base die">
         <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true"><rect x="5" y="5" width="20" height="20" rx="4.5"/></svg>
@@ -1371,7 +1372,6 @@
         <span class="gen-chip-label">Stress</span>
       </button>
     </div>
-    <button type="button" class="yz-push" id="yzPush" hidden>Push</button>
   </section>
 
   <!-- The One Ring: a Feat die is always rolled. The controls are the Success

@@ -1747,8 +1747,71 @@ for (const t of YZ_TYPES) {
 $('yzPush').addEventListener('click', () => {
   const last = state.last;
   if (!last || last.system !== 'yearzero' || !last.summary.canPush) return;
-  throwResult(pushYearZero(last));
+  pushThrow(pushYearZero(last));
 });
+
+// A push replays only the dice that actually rerolled — the kept 6s and 1s stay
+// exactly where they landed, and keep no reroll mark — while an Alien push slides
+// its extra Stress die in among them. This is deliberately not throwResult, which
+// re-throws the whole tray and made every die tumble on a push.
+function pushThrow(pushed) {
+  state.last = pushed;
+  const newFlat = flattenRollDice(pushed);
+  const prev = state.dice;
+  const size = prev.length ? prev[0].size : 40;
+
+  const dice = prev.map((d, i) => {
+    const f = newFlat[i];
+    if (f && f.rerolled) {
+      d.value = f.value;
+      d.rerolled = true;
+      d.rerollShown = true;   // fired here, so the landing hook does not re-fire
+      d.beginReroll();
+    }
+    return d;
+  });
+
+  // The Alien push adds one Stress die; start it below the tray so it eases up
+  // into the last grid slot rather than shoving the others aside.
+  for (let i = prev.length; i < newFlat.length; i++) {
+    const f = newFlat[i];
+    const die = new Die(f.sides, f.value, 0, 0, size);
+    die.rerolled = true;
+    die.rerollShown = true;
+    die.genColor = YZ_COLORS[f.yzType] || YZ_COLORS.base;
+    die.settled = true; die.settling = true; die.settleT = 1;
+    die.rot = [0.5, 0.6, 0.1];
+    die.x = (state.bounds.left + state.bounds.right) / 2;
+    die.y = state.bounds.floor + size;
+    dice.push(die);
+  }
+  state.dice = dice;
+
+  // Only re-home when a die was added; the settled-die easing in step() slides
+  // everyone gently into the new grid instead of snapping.
+  if (dice.length !== prev.length) rehomeGrid(dice);
+
+  $('total').dataset.rolling = '1';
+  setTimeout(() => finish(pushed), 760);
+  if (navigator.vibrate) navigator.vibrate([8, 40, 12]);
+}
+
+// Ease targets for the current tray, ordered by where the dice already sit so
+// nothing jumps across it — a lighter cousin of placeGrid, which snaps.
+function rehomeGrid(dice) {
+  const { left, right, top, floor } = state.bounds;
+  const w = right - left, h = floor - top;
+  const cols = Math.ceil(Math.sqrt(dice.length * (w / Math.max(h, 1))));
+  const rows = Math.ceil(dice.length / cols);
+  const cw = w / cols, ch = h / rows;
+  const size = Math.max(26, Math.min(96, Math.min(cw, ch) * 0.78));
+  [...dice].sort((a, b) => (a.y - b.y) || (a.x - b.x)).forEach((d, i) => {
+    const c = i % cols, r = Math.floor(i / cols);
+    d.homeX = left + cw * (c + 0.5);
+    d.homeY = top + ch * (r + 0.5);
+    d.size = size;
+  });
+}
 
 function updateYzPush() {
   const last = state.last;
