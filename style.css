@@ -645,18 +645,19 @@ body {
 .br-dice { display: flex; gap: 8px; }
 .br-die {
   flex: 1 1 0; min-width: 0; position: relative;
-  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
   padding: 9px 6px; border: 1px solid var(--hair); border-radius: 12px;
   background: none; color: var(--line); font: inherit; cursor: pointer;
   transition: border-color 140ms ease, background 140ms ease, transform 120ms ease;
 }
 .br-die:active { transform: scale(0.95); }
+.br-die .die-ico { width: 24px; height: 24px; }
 .br-die-label { font-size: 9.5px; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
-.br-die-val { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.br-die-val { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
 #br-attr { border-color: color-mix(in srgb, #38C6C6 45%, var(--hair)); }
-#br-attr .br-die-val { color: #38C6C6; }
+#br-attr .br-die-val, #br-attr .die-ico { color: #38C6C6; }
 #br-skill { border-color: color-mix(in srgb, #D9A441 45%, var(--hair)); }
-#br-skill .br-die-val { color: #D9A441; }
+#br-skill .br-die-val, #br-skill .die-ico { color: #D9A441; }
 .br-mod .br-die-val { font-size: 12.5px; }
 .br-mod[data-state="adv"] { border-color: #5BA860; }
 .br-mod[data-state="adv"] .br-die-val { color: #5BA860; }
@@ -664,11 +665,11 @@ body {
 .br-mod[data-state="dis"] .br-die-val { color: var(--danger); }
 /* Twilight: 2000 reuses the selectors — olive Attribute, amber Skill, tan Ammo. */
 #t2k-attr { border-color: color-mix(in srgb, #9AA36A 45%, var(--hair)); }
-#t2k-attr .br-die-val { color: #9AA36A; }
+#t2k-attr .br-die-val, #t2k-attr .die-ico { color: #9AA36A; }
 #t2k-skill { border-color: color-mix(in srgb, #D9A441 45%, var(--hair)); }
-#t2k-skill .br-die-val { color: #D9A441; }
+#t2k-skill .br-die-val, #t2k-skill .die-ico { color: #D9A441; }
 #t2k-ammo { border-color: color-mix(in srgb, #C8B48A 45%, var(--hair)); }
-#t2k-ammo .br-die-val { color: #C8B48A; }
+#t2k-ammo .br-die-val, #t2k-ammo .die-ico { color: #C8B48A; }
 
 /* A standalone die-add button — the Genesys rack's look, sized to sit inline
    rather than fill a row. Used where a pool is one die type (CthulhuTech d10,

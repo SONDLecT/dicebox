@@ -1970,6 +1970,20 @@ function updateYzPush() {
 // d6/d8/d10/d12 — plus an advantage/disadvantage stepper. Advantage rolls a
 // third die, disadvantage rolls only the larger of the two.
 const BR_SIZES = [6, 8, 10, 12];
+
+// The step-die buttons wear the silhouette of the die they currently hold, the
+// same die-shape language the other pickers use: rounded square (d6), diamond
+// (d8), hexagon (d10), pentagon (d12). Stepping the die swaps the outline.
+const BR_DIE_SHAPES = {
+  6: 'M10 5H20A5 5 0 0 1 25 10V20A5 5 0 0 1 20 25H10A5 5 0 0 1 5 20V10A5 5 0 0 1 10 5Z',
+  8: 'M15 3 27 15 15 27 3 15Z',
+  10: 'M15 3 24 10 24 19 15 27 6 19 6 10Z',
+  12: 'M15 2.6 27.3 11.5 22.6 26 7.4 26 2.7 11.5Z',
+};
+function setDieShape(btnId, sides) {
+  const path = document.querySelector(`#${btnId} .die-ico path`);
+  if (path) path.setAttribute('d', BR_DIE_SHAPES[sides]);
+}
 const br = { attr: 8, skill: 6, mod: null };  // mod: null | 'adv' | 'dis'
 
 function resetBladeRunner() { br.attr = 8; br.skill = 6; br.mod = null; syncBr({ writeField: false }); }
@@ -1979,6 +1993,8 @@ function brNotation() { return `br:${br.attr},${br.skill}${br.mod || ''}`; }
 function syncBr({ writeField = true } = {}) {
   $('br-attr-val').textContent = `d${br.attr}`;
   $('br-skill-val').textContent = `d${br.skill}`;
+  setDieShape('br-attr', br.attr);
+  setDieShape('br-skill', br.skill);
   $('br-mod-val').textContent = br.mod === 'adv' ? 'Advantage' : br.mod === 'dis' ? 'Disadvantage' : 'Even odds';
   $('brMod').dataset.state = br.mod || 'even';
   if (writeField) $('notation').value = brNotation();
@@ -2038,6 +2054,8 @@ function syncT2k({ writeField = true } = {}) {
   $('t2k-attr-val').textContent = `d${t2k.attr}`;
   $('t2k-skill-val').textContent = `d${t2k.skill}`;
   $('t2k-ammo-val').textContent = String(t2k.ammo);
+  setDieShape('t2k-attr', t2k.attr);
+  setDieShape('t2k-skill', t2k.skill);
   if (writeField) $('notation').value = t2kNotation();
   if (uiSystem === 'twilight') stageSystemPool();
 }
