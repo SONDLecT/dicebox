@@ -1813,8 +1813,12 @@ $('yzPush').addEventListener('click', preparePush);
 
 function preparePush() {
   const last = state.last;
-  if (!last || last.system !== 'yearzero' || !last.summary.canPush || state.pendingPush) return;
-  const pushed = pushYearZero(last);
+  if (!last || !last.summary || !last.summary.canPush || state.pendingPush) return;
+  if (last.system !== 'yearzero' && last.system !== 'bladerunner') return;
+  // Each engine keeps its own dice: Year Zero holds 6s and 1s, Blade Runner holds
+  // any 6+ and 1s. The reducer flags which dice actually rerolled, so the split
+  // below is the same for both.
+  const pushed = last.system === 'bladerunner' ? pushBladeRunner(last) : pushYearZero(last);
   const pushedFlat = flattenRollDice(pushed);
   const prev = state.dice;
   const size = prev.length ? prev[0].size : 40;
@@ -1853,6 +1857,7 @@ function preparePush() {
   $('total').textContent = '—';
   $('breakdown').textContent = 'Tap the tray to throw the pushed dice';
   updateYzPush();
+  updateBrPush();
   dropIdleCache();
   if (navigator.vibrate) navigator.vibrate(10);
 }
@@ -1949,11 +1954,12 @@ function stepBrDie(which, dir) {
   syncBr();
 }
 
-// The advantage stepper walks disadvantage → even → advantage and stops at the ends.
+// The odds stepper cycles even → advantage → disadvantage → even, so a tap always
+// reaches every state (including back to even); hold walks it the other way.
 function stepBrMod(dir) {
-  const order = ['dis', null, 'adv'];
+  const order = [null, 'adv', 'dis'];
   const i = order.indexOf(br.mod);
-  br.mod = order[Math.max(0, Math.min(order.length - 1, i + dir))];
+  br.mod = order[(i + (dir > 0 ? 1 : order.length - 1)) % order.length];
   syncBr();
 }
 
@@ -1969,17 +1975,15 @@ bindTapHold($('br-attr'), dir => stepBrDie('attr', dir));
 bindTapHold($('br-skill'), dir => stepBrDie('skill', dir));
 bindTapHold($('brMod'), dir => stepBrMod(dir));
 
-// Push rerolls the dice that are not already a 6+ (1s lock), replayed as a throw.
-$('brPush').addEventListener('click', () => {
-  const last = state.last;
-  if (!last || last.system !== 'bladerunner' || !last.summary.canPush) return;
-  throwResult(pushBladeRunner(last));
-});
+// Push uses the same pick-up-and-throw gesture as Year Zero (preparePush), which
+// locks the successes and 1s and lifts only the rerollable dice.
+$('brPush').addEventListener('click', preparePush);
 
 function updateBrPush() {
   const last = state.last;
   $('brPush').hidden = !(uiSystem === 'bladerunner' && last && last.system === 'bladerunner'
-    && last.summary && last.summary.canPush && $('total').dataset.idle !== '1');
+    && last.summary && last.summary.canPush && $('total').dataset.idle !== '1'
+    && !state.pendingPush);
 }
 
 // ---- Daggerheart pool ----
