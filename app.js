@@ -1766,33 +1766,38 @@ function pushThrow(pushed) {
       d.value = f.value;
       d.rerolled = true;
       d.rerollShown = true;   // fired here, so the landing hook does not re-fire
+      // A settled, valued tray is cached and its physics is not stepped, so the
+      // hop would never play on a push made after the dice came to rest. Marking
+      // the rerolled die unsettled wakes the loop; it holds still through the
+      // reroll pause anyway, then hops.
+      d.settled = false;
       d.beginReroll();
     }
     return d;
   });
 
-  // The Alien push adds one Stress die; start it below the tray so it eases up
-  // into the last grid slot rather than shoving the others aside.
+  // The Alien push adds one Stress die. Start it off the bottom-right so it sorts
+  // last in the grid, then spin it into that slot.
+  const added = [];
   for (let i = prev.length; i < newFlat.length; i++) {
     const f = newFlat[i];
-    const die = new Die(f.sides, f.value, 0, 0, size);
+    const die = new Die(f.sides, f.value, state.bounds.right, state.bounds.floor, size);
     die.rerolled = true;
     die.rerollShown = true;
     die.genColor = YZ_COLORS[f.yzType] || YZ_COLORS.base;
-    die.settled = true; die.settling = true; die.settleT = 1;
-    die.rot = [0.5, 0.6, 0.1];
-    die.x = (state.bounds.left + state.bounds.right) / 2;
-    die.y = state.bounds.floor + size;
     dice.push(die);
+    added.push(die);
   }
   state.dice = dice;
 
   // Only re-home when a die was added; the settled-die easing in step() slides
   // everyone gently into the new grid instead of snapping.
-  if (dice.length !== prev.length) rehomeGrid(dice);
+  if (added.length) rehomeGrid(dice);
+  for (const die of added) { die.x = die.homeX; die.y = die.homeY; die.spinInPlace(0); }
 
+  dropIdleCache();
   $('total').dataset.rolling = '1';
-  setTimeout(() => finish(pushed), 760);
+  setTimeout(() => finish(pushed), 900);
   if (navigator.vibrate) navigator.vibrate([8, 40, 12]);
 }
 
