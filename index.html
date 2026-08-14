@@ -316,7 +316,14 @@
         <b>Critical</b>, or a <b>Messy Critical</b> when one of those 10s is on a
         Hunger die. A loss with a Hunger 1 is a <b>Bestial Failure</b>. Leave the
         difficulty unset and the roll reports its successes for the table to
-        call. <b>Tap</b> to add dice, <b>hold</b> to remove.
+        call. Tap <b>Pool</b> to add a die and <b>Hunger</b> to raise it, hold
+        either to lower.
+      </p>
+      <p class="note">
+        Hunger is your own state, so it sticks between rolls and through a
+        reload. A <b>Rouse check</b> spends one die on its own to power a
+        Discipline or wake for the night. It holds on a 6 or more and raises
+        your Hunger on a 1 to 5.
       </p>
       <p class="note">
         Each die wears a mark instead of a number. A success from 6 to 9 shows a
@@ -1344,10 +1351,13 @@
         <span class="v5-die-name">Hunger</span>
       </button>
     </div>
-    <button type="button" class="spin-chip" id="v5DiffChip" aria-haspopup="dialog" aria-controls="dial" aria-label="Set Difficulty">
-      <span class="spin-chip-label">Difficulty</span>
-      <span class="spin-chip-val" id="v5Difficulty" data-unset="1">—</span>
-    </button>
+    <div class="v5-lower">
+      <button type="button" class="spin-chip" id="v5DiffChip" aria-haspopup="dialog" aria-controls="dial" aria-label="Set Difficulty">
+        <span class="spin-chip-label">Difficulty</span>
+        <span class="spin-chip-val" id="v5Difficulty" data-unset="1">—</span>
+      </button>
+      <button type="button" class="v5-rouse" id="v5Rouse" aria-label="Rouse check, spend a Hunger die">Rouse check</button>
+    </div>
   </section>
 
   <!-- Fate: how many Fudge dice, and a skill modifier. Standard is 4dF. -->

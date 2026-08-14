@@ -4,7 +4,7 @@
 import { webcrypto } from 'node:crypto';
 if (!globalThis.crypto) globalThis.crypto = webcrypto;
 
-import { parseV5, rollV5, summarizeV5, detectSystem, describeV5, rollAny, v5Face, v5Headline } from '../system-dice.js';
+import { parseV5, rollV5, rollRouse, summarizeV5, detectSystem, describeV5, rollAny, v5Face, v5Headline } from '../system-dice.js';
 import { parseFate, rollFate, summarizeFate, describeFate, fateHeadline, fateFace, fateLadder } from '../system-dice.js';
 import { parseGenesys, rollGenesys, summarizeGenesys, describeGenesys, genesysHeadline, genesysFace, GENESYS_DICE } from '../system-dice.js';
 import { parseDaggerheart, rollDaggerheart, summarizeDaggerheart, describeDaggerheart, daggerheartHeadline } from '../system-dice.js';
@@ -180,6 +180,29 @@ ok('rollAny defers numeric', rollAny('4d6').deferred === true && rollAny('4d6').
   const s3 = { summary: summarizeV5([d(8, false), d(6, false)], null, 2, 0) };
   const h3 = v5Headline(s3);
   ok('headline unresolved is a number', h3.text === '2' && h3.kind === 'number');
+}
+
+// ---- Rouse check: one Hunger die, holds on 6+, raises Hunger on 1-5 ----
+{
+  // Every possible value resolves the right way, and the die is always a single
+  // Hunger d10 the tray can render.
+  for (let trial = 0; trial < 60; trial++) {
+    const r = rollRouse();
+    ok('rouse is a v5 roll', r.system === 'v5');
+    ok('rouse throws one Hunger die', r.groups[0].dice.length === 1 && r.groups[0].dice[0].hunger === true);
+    const { value, success, hungerGain } = r.summary;
+    ok('rouse value is a d10', value >= 1 && value <= 10);
+    ok('rouse holds iff 6+', success === (value >= 6));
+    ok('rouse raises Hunger only on a failure', hungerGain === (value >= 6 ? 0 : 1));
+  }
+  // Headline and detail read the rouse summary on their own, with hungerAfter
+  // supplied by the caller.
+  const hold = v5Headline({ summary: { kind: 'rouse', value: 8, success: true, hungerGain: 0, hungerAfter: 2 } });
+  ok('rouse hold headline', hold.text === 'Blood holds');
+  const rise = v5Headline({ summary: { kind: 'rouse', value: 3, success: false, hungerGain: 1, hungerAfter: 3 } });
+  ok('rouse rise headline names the new Hunger', rise.text === 'Hunger 3' && rise.variant === 'v5-hunger');
+  const riseTxt = describeV5({ summary: { kind: 'rouse', value: 3, success: false, hungerGain: 1, hungerAfter: 3 } });
+  ok('rouse detail names the new Hunger', /Hunger rises to 3/.test(riseTxt));
 }
 
 // ---- Fate / Fudge ----

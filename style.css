@@ -529,6 +529,21 @@ body {
 }
 .v5-die-btn:active { transform: scale(0.95); }
 
+/* Difficulty and the Rouse check share the row below the pool: the chip stretches,
+   the Rouse button sits at its side in the blood accent, since it spends Hunger. */
+.v5-lower { display: flex; gap: 10px; width: 100%; align-items: stretch; }
+.v5-lower .spin-chip { flex: 1 1 0; }
+.v5-rouse {
+  appearance: none; cursor: pointer; flex: 0 0 auto;
+  padding: 0 18px; border: 1px solid var(--accent); border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--line);
+  font: 600 13px/1 inherit; letter-spacing: 0.02em;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  transition: background 140ms ease, transform 120ms ease;
+}
+.v5-rouse:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+.v5-rouse:active { transform: scale(0.96); }
+
 /* ---- Fate dice ---- */
 
 /* Fate is fixed at 4dF, so the picker is just the modifier chip, centred. */
@@ -937,6 +952,7 @@ body {
 .total[data-variant="br-fail"] { color: var(--muted); }
 .total[data-variant="t2k-success"] { color: #9AA36A; }
 .total[data-variant="t2k-fail"] { color: var(--muted); }
+.total[data-variant="v5-hunger"] { color: var(--accent); }
 
 /* CthulhuTech's difficulty can be unset — just count the hits. */
 .ct-picker .count[data-unset="1"] { color: var(--muted); }

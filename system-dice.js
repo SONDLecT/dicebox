@@ -94,6 +94,24 @@ export function rollV5(src) {
   };
 }
 
+// A Rouse check: one Hunger die, spent to power a Discipline or wake for the
+// night. It holds on 6+ and raises Hunger by one on 1-5. No pool, no difficulty,
+// so it carries a 'rouse' summary the headline and detail read on their own.
+// `hungerAfter` is filled in by the caller once it has moved the tracked Hunger,
+// since the die alone does not know the new total.
+export function rollRouse() {
+  const value = randInt(10);
+  const success = value >= 6;
+  return {
+    schema: 2,
+    system: 'v5',
+    notation: 'v5:rouse',
+    groups: [{ kind: 'dice', dieType: 'v5', count: 1,
+      dice: [{ value, hunger: true, kept: true, rerolled: false, exploded: false, crit: null }], subtotal: 0 }],
+    summary: { kind: 'rouse', value, success, hungerGain: success ? 0 : 1, hungerAfter: null },
+  };
+}
+
 // V5 outcome rules
 //   * every die showing 6+ is one success — a 10 is NOT worth two on its own
 //   * each PAIR of 10s is a critical: the pair adds two further successes, so
@@ -171,6 +189,13 @@ export function v5Dice(result) {
 // not explain, then the dice themselves.
 export function describeV5(result) {
   const s = result.summary;
+  if (s.kind === 'rouse') {
+    if (s.success) return `Rouse check · the Blood holds · rolled ${s.value}`;
+    const climb = s.hungerRose === false
+      ? `Hunger stays at ${s.hungerAfter}, the Beast stirs`
+      : `Hunger rises to ${s.hungerAfter}`;
+    return `Rouse check · ${climb} · rolled ${s.value}`;
+  }
   const parts = [];
   if (s.outcome && OUTCOME_LABEL[s.outcome]) parts.push(OUTCOME_LABEL[s.outcome]);
   parts.push(`${s.successes} success${s.successes === 1 ? '' : 'es'}`
@@ -196,6 +221,11 @@ export function describeV5(result) {
 //     successes came up — a number, which keeps the roller looking like itself.
 export function v5Headline(result) {
   const s = result.summary;
+  if (s.kind === 'rouse') {
+    return s.success
+      ? { kind: 'text', text: 'Blood holds' }
+      : { kind: 'text', text: `Hunger ${s.hungerAfter}`, variant: 'v5-hunger' };
+  }
   if (s.outcome) {
     const text = s.outcome === 'success' && s.margin !== null
       ? `Success +${s.margin}`
