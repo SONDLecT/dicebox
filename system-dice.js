@@ -36,6 +36,7 @@ export function detectSystem(src) {
   if (/^gen:/.test(s)) return 'genesys';
   if (/^dh:/.test(s)) return 'daggerheart';
   if (/^ct:/.test(s)) return 'cthulhutech';
+  if (/^yz:/.test(s)) return 'yearzero';
   if (/^sw:/.test(s)) return 'starwars';
   if (/^tor:/.test(s)) return 'onering';
   if (/^pbta:/.test(s)) return 'pbta';
@@ -211,6 +212,7 @@ export function rollAny(src, uiSystem = 'numeric') {
   if (sys === 'genesys') return rollGenesys(src);
   if (sys === 'daggerheart') return rollDaggerheart(src);
   if (sys === 'cthulhutech') return rollCthulhuTech(src);
+  if (sys === 'yearzero') return rollYearZero(src);
   if (sys === 'starwars') return rollStarWars(src);
   if (sys === 'onering') return rollOneRing(src);
   if (sys === 'pbta') return rollPbta(src);
@@ -575,6 +577,112 @@ export function describeCthulhuTech(result) {
   const missVals = dice.filter(d => d.value % 2 !== 0).map(d => d.value);
   parts.push(`hits ${hitVals.length ? hitVals.join(', ') : 'none'}`);
   if (missVals.length) parts.push(`missed ${missVals.join(', ')}`);
+  return parts.join(' · ');
+}
+
+// ---- Year Zero Engine (the d6 success pool) ----
+//
+// Roll a pool of d6 and count every 6 as a Success; one success carries the roll,
+// more is better. The dice come in colours — Base (attribute), Skill, and Gear —
+// which matter on a Push: reroll everything that is not a 6 or a 1, and each 1
+// left showing is a bane. A Base 1 costs an attribute, a Gear 1 damages the gear.
+// Alien folds Stress dice into the pool: they roll for successes too, but a 1 on
+// one is a Panic, and each push adds another Stress die.
+//
+//   yz:5           five Base dice
+//   yz:5b3s2g      Base 5, Skill 3, Gear 2
+//   yz:5b3s2g1x    the same, plus a Stress die (Alien)
+const YZ_LETTER = { b: 'base', s: 'skill', g: 'gear', x: 'stress' };
+const YZ_TYPES = ['base', 'skill', 'gear', 'stress'];
+const YZ_TERM = /(\d+)([bsgx])/g;
+
+export function parseYearZero(src) {
+  const raw = String(src || '').trim().toLowerCase().replace(/^yz:/, '');
+  const pool = { base: 0, skill: 0, gear: 0, stress: 0 };
+  if (/^\d+$/.test(raw)) {
+    pool.base = Number(raw);
+  } else if (/^(?:\d+[bsgx])+$/.test(raw)) {
+    let m;
+    YZ_TERM.lastIndex = 0;
+    while ((m = YZ_TERM.exec(raw))) pool[YZ_LETTER[m[2]]] += Number(m[1]);
+  } else {
+    throw new Error('Expected a Year Zero pool like "yz:5" or "yz:5b3s2g"');
+  }
+  const total = pool.base + pool.skill + pool.gear + pool.stress;
+  if (total < 1 || total > 100) throw new Error('Pool must be 1-100 dice');
+  return pool;
+}
+
+function makeYzDie(type) {
+  return { value: randInt(6), type, kept: true, rerolled: false, exploded: false };
+}
+
+function yearzeroResult(notation, dice, pushed) {
+  return {
+    schema: 2,
+    system: 'yearzero',
+    notation: String(notation),
+    groups: [{ kind: 'dice', dieType: 'yearzero', sides: 6, count: dice.length, dice, subtotal: 0 }],
+    summary: summarizeYearZero(dice, pushed),
+  };
+}
+
+export function rollYearZero(src) {
+  const pool = parseYearZero(src);
+  const dice = [];
+  for (const type of YZ_TYPES) {
+    for (let i = 0; i < pool[type]; i++) dice.push(makeYzDie(type));
+  }
+  return yearzeroResult(src, dice, false);
+}
+
+// A push rerolls every die that is not already a 6 (a kept success) or a 1 (a
+// kept bane). An Alien push costs a Stress die, so one is added whenever the pool
+// already holds Stress.
+export function pushYearZero(result) {
+  const dice = result.groups[0].dice.map(d =>
+    d.value === 6 || d.value === 1 ? d : { ...d, value: randInt(6), rerolled: true });
+  if (dice.some(d => d.type === 'stress')) dice.push({ ...makeYzDie('stress'), rerolled: true });
+  return yearzeroResult(result.notation, dice, true);
+}
+
+export function summarizeYearZero(dice, pushed = false) {
+  let successes = 0;
+  const banes = { base: 0, skill: 0, gear: 0, stress: 0 };
+  for (const d of dice) {
+    if (d.value === 6) successes++;
+    else if (d.value === 1) banes[d.type]++;
+  }
+  return {
+    kind: 'yearzero',
+    count: dice.length,
+    successes,
+    ones: banes.base + banes.skill + banes.gear + banes.stress,
+    banes,
+    pushed,
+    panic: banes.stress > 0,   // Alien: any Stress 1 is a Panic
+    canPush: !pushed,          // a roll may be pushed once
+  };
+}
+
+// The readout is the success count: green once anything succeeds, red on a clean
+// miss, flagged when a Stress die panics.
+export function yearzeroHeadline(result) {
+  const s = result.summary;
+  const variant = s.panic ? 'yz-panic' : s.successes > 0 ? 'yz-success' : 'yz-fail';
+  return { kind: 'number', text: String(s.successes), variant };
+}
+
+export function describeYearZero(result) {
+  const s = result.summary;
+  const parts = [`${s.successes} success${s.successes === 1 ? '' : 'es'}`];
+  if (s.pushed) parts.push('pushed');
+  if (s.panic) parts.push('Panic!');
+  const banes = [];
+  if (s.banes.base) banes.push(`${s.banes.base} attribute`);
+  if (s.banes.gear) banes.push(`${s.banes.gear} gear`);
+  if (s.banes.stress) banes.push(`${s.banes.stress} stress`);
+  if (banes.length) parts.push(`banes: ${banes.join(', ')}`);
   return parts.join(' · ');
 }
 

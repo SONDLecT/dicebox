@@ -149,6 +149,12 @@
             <path d="M16 14 q1 3 0 6"/>
             <circle cx="12" cy="10" r="1.9" fill="currentColor" stroke="none"/>
           </g>
+          <!-- Year Zero: two stacked d6, the pool you count sixes from. -->
+          <g class="mode-ico" data-for="yearzero" fill="none" stroke="currentColor"
+             stroke-width="1.6" stroke-linejoin="round">
+            <rect x="3.5" y="8.5" width="12" height="12" rx="2.2"/>
+            <rect x="8.5" y="3.5" width="12" height="12" rx="2.2"/>
+          </g>
           <!-- Star Wars: a TIE fighter — cockpit between two hexagonal panels. -->
           <g class="mode-ico" data-for="starwars">
             <g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
@@ -387,6 +393,25 @@
         <b>Difficulty</b> — roughly 3 for a simple task up to 6 or 7 for the
         near-impossible. Leave the difficulty unset and it just reports the hits. <b>Tap</b> a
         die to add it, <b>hold</b> to remove.
+      </p>
+      </div>
+
+      <div id="helpYearzero" hidden>
+      <dl class="syntax">
+        <dt>yz:5</dt>        <dd>five Base dice</dd>
+        <dt>yz:5b3s2g</dt>   <dd>Base 5, Skill 3, Gear 2</dd>
+        <dt>yz:5b3s2g1x</dt> <dd>the same, plus a Stress die</dd>
+      </dl>
+      <p class="note">
+        Roll a pool of d6 and count every <b>6</b> as a success. One success carries
+        the roll, more is better. Tap the coloured chips to build the pool (Base,
+        Skill, Gear), or type the notation.
+      </p>
+      <p class="note">
+        Miss, and you can <b>Push</b>: reroll everything that is not a 6 or a 1. The
+        <b>1s</b> left showing are banes. A Base 1 costs an attribute, a Gear 1
+        damages your gear. Alien folds in <b>Stress</b> dice: they roll for successes
+        too, but a 1 on one is a <b>Panic</b>, and each Push adds another.
       </p>
       </div>
 
@@ -875,6 +900,16 @@
         <span class="mode-row-name">VtM V5</span>
         <span class="mode-row-sub">d10 pool + Hunger</span>
       </button>
+      <button type="button" class="mode-row mode-yearzero" data-system="yearzero" aria-pressed="false">
+        <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true">
+          <g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">
+            <rect x="3.5" y="8.5" width="12" height="12" rx="2.2"/>
+            <rect x="8.5" y="3.5" width="12" height="12" rx="2.2"/>
+          </g>
+        </svg>
+        <span class="mode-row-name">Year Zero</span>
+        <span class="mode-row-sub">d6 pool &middot; count the sixes</span>
+      </button>
       <button type="button" class="mode-row mode-row-break mode-cards" data-system="cards" aria-pressed="false">
         <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true">
           <rect x="5.5" y="3" width="13" height="18" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.5"/>
@@ -1312,6 +1347,31 @@
       <span class="spin-chip-label">Difficulty</span>
       <span class="spin-chip-val" id="ctDifficulty">3</span>
     </button>
+  </section>
+
+  <!-- Year Zero Engine: build a d6 pool from Base, Skill, Gear, and (Alien)
+       Stress dice; the chips are coloured because the dice all share a shape.
+       After a roll, Push rerolls everything that is not a 6 or a 1. -->
+  <section class="picker yz-picker" id="yzPicker" aria-label="Year Zero dice" hidden>
+    <div class="gen-chips">
+      <button type="button" class="gen-chip yz-chip" id="yz-base" data-type="base" aria-pressed="false" aria-label="Add a Base die">
+        <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true"><rect x="5" y="5" width="20" height="20" rx="4.5"/></svg>
+        <span class="gen-chip-label">Base</span>
+      </button>
+      <button type="button" class="gen-chip yz-chip" id="yz-skill" data-type="skill" aria-pressed="false" aria-label="Add a Skill die">
+        <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true"><rect x="5" y="5" width="20" height="20" rx="4.5"/></svg>
+        <span class="gen-chip-label">Skill</span>
+      </button>
+      <button type="button" class="gen-chip yz-chip" id="yz-gear" data-type="gear" aria-pressed="false" aria-label="Add a Gear die">
+        <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true"><rect x="5" y="5" width="20" height="20" rx="4.5"/></svg>
+        <span class="gen-chip-label">Gear</span>
+      </button>
+      <button type="button" class="gen-chip yz-chip" id="yz-stress" data-type="stress" aria-pressed="false" aria-label="Add a Stress die">
+        <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true"><rect x="5" y="5" width="20" height="20" rx="4.5"/></svg>
+        <span class="gen-chip-label">Stress</span>
+      </button>
+    </div>
+    <button type="button" class="yz-push" id="yzPush" hidden>Push</button>
   </section>
 
   <!-- The One Ring: a Feat die is always rolled. The controls are the Success

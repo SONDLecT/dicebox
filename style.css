@@ -612,6 +612,26 @@ body {
 /* The Force chip belongs to Star Wars only — hidden until that mode adds it. */
 .genesys-picker:not(.with-force) .gen-chip-force { display: none; }
 
+/* Year Zero — the Genesys chip rack, coloured per type (the dice all share a
+   d6 shape, so colour is what tells Base from Stress). Matched to YZ_COLORS. */
+.yz-picker { padding: 0; display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
+.yz-chip[data-type="base"]   { --dc: #D9A441; }
+.yz-chip[data-type="skill"]  { --dc: #5BA860; }
+.yz-chip[data-type="gear"]   { --dc: #8C919A; }
+.yz-chip[data-type="stress"] { --dc: #D86A3A; }
+/* A resting chip carries a faint wash of its die colour so the four read apart. */
+.yz-chip .die-ico path { fill-opacity: 0.24; }
+/* Push appears on the result and rerolls everything that is not a 6 or a 1. */
+.yz-push {
+  appearance: none; align-self: center; cursor: pointer;
+  padding: 6px 22px; border: 1px solid var(--accent); border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--line);
+  font: 600 13px/1 inherit; letter-spacing: 0.02em;
+  transition: background 140ms ease, transform 120ms ease;
+}
+.yz-push:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+.yz-push:active { transform: scale(0.96); }
+
 /* A standalone die-add button — the Genesys rack's look, sized to sit inline
    rather than fill a row. Used where a pool is one die type (CthulhuTech d10,
    Fate dF, the Vampire pair, a One Ring Success die). */
@@ -870,6 +890,9 @@ body {
 .total[data-variant="roll-crit-failure"] { color: #C0453F; }
 .total[data-variant="ct-success"] { color: #57B591; }
 .total[data-variant="ct-failure"] { color: var(--muted); }
+.total[data-variant="yz-success"] { color: #5BA860; }
+.total[data-variant="yz-fail"] { color: var(--muted); }
+.total[data-variant="yz-panic"] { color: var(--accent); }
 
 /* CthulhuTech's difficulty can be unset — just count the hits. */
 .ct-picker .count[data-unset="1"] { color: var(--muted); }
@@ -1503,6 +1526,7 @@ body {
 .mode-genesys { --sys: #BFA766; }
 .mode-daggerheart { --sys: #C9A227; }
 .mode-cthulhutech { --sys: #57B591; }
+.mode-yearzero { --sys: #D9922E; }
 /* ---- Call of Cthulhu picker: skill dial and the two d10-shaped modifier keys
    all on one row — the keys are compact, so nothing needs its own line. */
 .coc-picker { flex-direction: row; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; }

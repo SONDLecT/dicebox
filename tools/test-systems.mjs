@@ -9,6 +9,7 @@ import { parseFate, rollFate, summarizeFate, describeFate, fateHeadline, fateFac
 import { parseGenesys, rollGenesys, summarizeGenesys, describeGenesys, genesysHeadline, genesysFace, GENESYS_DICE } from '../system-dice.js';
 import { parseDaggerheart, rollDaggerheart, summarizeDaggerheart, describeDaggerheart, daggerheartHeadline } from '../system-dice.js';
 import { parseCthulhuTech, rollCthulhuTech, summarizeCthulhuTech, describeCthulhuTech, cthulhutechHeadline } from '../system-dice.js';
+import { parseYearZero, rollYearZero, pushYearZero, summarizeYearZero, describeYearZero, yearzeroHeadline } from '../system-dice.js';
 import { parseStarWars, rollStarWars, summarizeStarWars, describeStarWars, starWarsHeadline } from '../system-dice.js';
 import { parseOneRing, rollOneRing, summarizeOneRing, describeOneRing, oneRingHeadline } from '../system-dice.js';
 import { parsePbta, parseMist, rollPbta, rollMist, summarize2d6, describe2d6, twod6Headline } from '../system-dice.js';
@@ -444,6 +445,66 @@ for (const bad of ['ct:', 'ct:0', 'ct:101', 'ct:8@0', 'dh:', '4dF']) {
   ok('ct describe shows hits vs difficulty', /4 hits vs difficulty 3/.test(txt));
   ok('ct describe lists the hit dice', /hits 2, 4, 6, 8/.test(txt));
   ok('ct describe lists the misses', /missed 1/.test(txt));
+}
+
+// ---- Year Zero Engine ----
+{
+  // detection / parsing
+  ok('detect yz', detectSystem('yz:5') === 'yearzero');
+  ok('detect yz typed pool', detectSystem('yz:5b3s2g1x') === 'yearzero');
+  ok('yz not numeric', detectSystem('5d6') === 'numeric');
+  ok('parse yz:5 is base', eq(parseYearZero('yz:5'), { base: 5, skill: 0, gear: 0, stress: 0 }));
+  ok('parse yz typed', eq(parseYearZero('yz:5b3s2g1x'), { base: 5, skill: 3, gear: 2, stress: 1 }));
+  ok('parse yz sums repeats', eq(parseYearZero('yz:2b3b'), { base: 5, skill: 0, gear: 0, stress: 0 }));
+  for (const bad of ['yz:', 'yz:0', 'yz:5q', 'yz:101', 'ct:8', '4dF']) {
+    ok(`reject yz ${bad}`, (() => { try { parseYearZero(bad); return false; } catch { return true; } })());
+  }
+
+  // summary: 6s are successes, 1s are banes by type, a Stress 1 panics
+  const dice = (...specs) => specs.map(([value, type]) => ({ value, type }));
+  const s = summarizeYearZero(dice([6, 'base'], [6, 'skill'], [1, 'base'], [1, 'gear'], [1, 'stress'], [3, 'skill']));
+  ok('yz counts sixes as successes', s.successes === 2);
+  ok('yz tallies banes by type', s.banes.base === 1 && s.banes.gear === 1 && s.banes.stress === 1);
+  ok('yz stress 1 panics', s.panic === true);
+  ok('yz no stress 1 → no panic', summarizeYearZero(dice([6, 'base'], [1, 'base'])).panic === false);
+  ok('yz fresh roll can push', s.canPush === true);
+
+  // roll shape
+  {
+    const r = rollYearZero('yz:4b2s1g1x');
+    ok('yz system tag', r.system === 'yearzero');
+    ok('yz rolls the pool', r.groups[0].dice.length === 8 && r.groups[0].sides === 6);
+    ok('yz dice carry type', r.groups[0].dice.filter(d => d.type === 'base').length === 4);
+    ok('yz values 1..6', r.groups[0].dice.every(d => d.value >= 1 && d.value <= 6));
+    ok('rollAny routes yz', rollAny('yz:5').system === 'yearzero');
+  }
+
+  // push: keeps 6s and 1s, rerolls the rest, adds a Stress die, one push only
+  {
+    const r = rollYearZero('yz:6b1x');
+    const kept = r.groups[0].dice.map(d => (d.value === 6 || d.value === 1 ? d.value : null));
+    const p = pushYearZero(r);
+    ok('push adds a stress die (Alien)', p.groups[0].dice.length === r.groups[0].dice.length + 1);
+    ok('push keeps sixes and ones', r.groups[0].dice.every((d, i) =>
+      (d.value === 6 || d.value === 1) ? p.groups[0].dice[i].value === d.value : true) && kept.length === r.groups[0].dice.length);
+    ok('push marks pushed, blocks a second push', p.summary.pushed === true && p.summary.canPush === false);
+    const noStress = pushYearZero(rollYearZero('yz:5'));
+    ok('classic push adds no dice', noStress.groups[0].dice.length === 5);
+  }
+
+  // headline + describe
+  {
+    const win = { summary: summarizeYearZero(dice([6, 'base'], [6, 'skill'])) };
+    ok('yz headline is the success count', yearzeroHeadline(win).text === '2');
+    ok('yz headline success variant', yearzeroHeadline(win).variant === 'yz-success');
+    const miss = { summary: summarizeYearZero(dice([3, 'base'], [4, 'skill'])) };
+    ok('yz headline miss variant', yearzeroHeadline(miss).variant === 'yz-fail');
+    const panic = { summary: summarizeYearZero(dice([6, 'base'], [1, 'stress'])) };
+    ok('yz headline panic variant', yearzeroHeadline(panic).variant === 'yz-panic');
+    const txt = describeYearZero({ summary: summarizeYearZero(dice([6, 'base'], [1, 'base'], [1, 'stress']), true) });
+    ok('yz describe reads successes, push, panic, banes',
+      /1 success · pushed · Panic! · banes: 1 attribute, 1 stress/.test(txt));
+  }
 }
 
 // ---- Star Wars (Genesys + Force die) ----

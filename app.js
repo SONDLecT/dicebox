@@ -7,6 +7,7 @@ import { rollFate, describeFate, fateHeadline, fateFace, parseFate } from './sys
 import { rollGenesys, describeGenesys, genesysHeadline, parseGenesys } from './system-dice.js';
 import { rollDaggerheart, describeDaggerheart, daggerheartHeadline, parseDaggerheart } from './system-dice.js';
 import { rollCthulhuTech, describeCthulhuTech, cthulhutechHeadline, parseCthulhuTech } from './system-dice.js';
+import { rollYearZero, describeYearZero, yearzeroHeadline, parseYearZero, pushYearZero } from './system-dice.js';
 import { rollMothership, describeMothership, mothershipHeadline, parseMothership, resolveMothershipStress } from './system-dice.js';
 import { rollCallOfCthulhu, describeCallOfCthulhu, callOfCthulhuHeadline, parseCallOfCthulhu } from './system-dice.js';
 import { rollDeltaGreen, describeDeltaGreen, deltaGreenHeadline, parseDeltaGreen } from './system-dice.js';
@@ -265,6 +266,19 @@ const SYSTEM_THEMES = {
       '--hair': '#D0DAD3', '--accent': '#2E7358', '--danger': '#8C3A2E',
     },
   },
+  // Year Zero Engine — industrial amber on gunmetal, the warning-light glow of
+  // Alien's Mother. The dice carry their Base/Skill/Gear/Stress colours (below);
+  // the chrome stays neutral with an amber readout.
+  yearzero: {
+    dark: {
+      '--paper': '#0D0F10', '--face': '#171A1C', '--line': '#DDE0E2', '--muted': '#6B7075',
+      '--hair': '#252A2D', '--accent': '#D9922E', '--danger': '#D8685F',
+    },
+    light: {
+      '--paper': '#ECEEEF', '--face': '#F7F8F9', '--line': '#1A1D1F', '--muted': '#727679',
+      '--hair': '#D5D8DA', '--accent': '#9A5E14', '--danger': '#8C3A2E',
+    },
+  },
   // Star Wars — like Genesys, the dice carry the colour; the chrome is a calm
   // starfield blue.
   starwars: {
@@ -485,6 +499,15 @@ const GEN_COLORS = {
   setback: '#7C828A',      // black die → a legible smoke grey
 };
 
+// Year Zero dice, after the physical pool: yellow Base, green Skill, black Gear,
+// and the Alien Stress die in a warning orange to read as the panic risk it is.
+const YZ_COLORS = {
+  base: '#D9A441',
+  skill: '#5BA860',
+  gear: '#8C919A',
+  stress: '#D86A3A',
+};
+
 function applySystemTheme(system) {
   const root = document.documentElement;
   const scheme = SYSTEM_THEMES[system];
@@ -643,6 +666,8 @@ function flattenRollDice(result) {
         // Daggerheart/One Ring: the die's role, and (One Ring) its Feat face.
         role: d.role,
         torFaceKind: d.face,
+        // Year Zero: which colour of die (base/skill/gear/stress).
+        yzType: d.type,
       });
     }
   }
@@ -679,6 +704,9 @@ function buildTrayDice(flat, result, { remote = false } = {}) {
     else if (result.system === 'daggerheart') die.genColor = DH_COLORS[f.role];
     // CthulhuTech d10s glow green when even (a Hit), grey when odd (a miss).
     else if (result.system === 'cthulhutech') die.genColor = f.value % 2 === 0 ? CT_COLORS.hit : CT_COLORS.miss;
+    // Year Zero d6s are coloured by die type — Base/Skill/Gear/Stress — so a 1 on
+    // a Base or Gear die (a bane) and a 1 on a Stress die (a Panic) read by colour.
+    else if (result.system === 'yearzero') die.genColor = YZ_COLORS[f.yzType] || YZ_COLORS.base;
     // One Ring: the Feat die shows a numeral, the Eye, or the Gandalf rune;
     // Success dice show their value, tinted (Tengwar 6 gold, Weary 1-3 faded).
     else if (result.system === 'onering') {
@@ -769,6 +797,7 @@ function doRoll(notation) {
       : sys === 'genesys' ? rollGenesys(notation)
       : sys === 'daggerheart' ? rollDaggerheart(notation)
       : sys === 'cthulhutech' ? rollCthulhuTech(notation)
+      : sys === 'yearzero' ? rollYearZero(notation)
       : sys === 'starwars' ? rollStarWars(notation)
       : sys === 'onering' ? rollOneRing(notation)
       : sys === 'pbta' ? rollPbta(notation)
@@ -878,6 +907,7 @@ function resultHeadline(result) {
   if (result.system === 'genesys') return genesysHeadline(result);
   if (result.system === 'daggerheart') return daggerheartHeadline(result);
   if (result.system === 'cthulhutech') return cthulhutechHeadline(result);
+  if (result.system === 'yearzero') return yearzeroHeadline(result);
   if (result.system === 'starwars') return starWarsHeadline(result);
   if (result.system === 'onering') return oneRingHeadline(result);
   if (result.system === 'pbta' || result.system === 'mist') return twod6Headline(result);
@@ -899,6 +929,7 @@ function resultDetail(result) {
   if (result.system === 'genesys') return describeGenesys(result);
   if (result.system === 'daggerheart') return describeDaggerheart(result);
   if (result.system === 'cthulhutech') return describeCthulhuTech(result);
+  if (result.system === 'yearzero') return describeYearZero(result);
   if (result.system === 'starwars') return describeStarWars(result);
   if (result.system === 'onering') return describeOneRing(result);
   if (result.system === 'pbta' || result.system === 'mist') return describe2d6(result);
@@ -944,6 +975,7 @@ function finish(result) {
   roomLink.share(result);
   // The name has done its job by the first roll; let the tray have the page.
   $('wordmark').dataset.faded = '1';
+  updateYzPush();
 }
 
 // The visible log stays short, but the record does not: a session's worth of
@@ -1075,6 +1107,7 @@ $('notation').addEventListener('input', () => {
   if (typedSystem === 'genesys' || typedSystem === 'starwars') { syncGenFromField(); return; }
   if (typedSystem === 'daggerheart') { syncDhFromField(); return; }
   if (typedSystem === 'cthulhutech') { syncCtFromField(); return; }
+  if (typedSystem === 'yearzero') { syncYzFromField(); return; }
   if (typedSystem === 'onering') { syncTorFromField(); return; }
   if (typedSystem === 'pbta') { pbtaCtl.fromField(); return; }
   if (typedSystem === 'mist') { mistCtl.fromField(); return; }
@@ -1158,6 +1191,7 @@ const SYSTEMS = {
   genesys: { badge: 'Genesys' },
   daggerheart: { badge: 'DH' },
   cthulhutech: { badge: 'CTech 2e' },
+  yearzero: { badge: 'Year Zero' },
   starwars: { badge: 'SWRPG' },
   onering: { badge: 'TOR 2e' },
   pbta: { badge: 'PbtA' },
@@ -1184,6 +1218,7 @@ const SYSTEM_HINTS = {
   ironsworn: { idle: 'Tap a roll — Action, Progress, or an oracle', placeholder: 'Roll, or type iron:+2' },
   starforged: { idle: 'Tap a roll — Action, Progress, or an oracle', placeholder: 'Roll, or type iron:+2' },
   dcc: { idle: '', placeholder: 'Tap a die, or type d16' },
+  yearzero: { idle: 'Build a d6 pool — every 6 is a success', placeholder: 'Tap the dice, or type yz:5b3s2g' },
   cards: { idle: 'Tap the deck to draw', placeholder: 'Tap the deck, or type deck:3' },
   tarot: { idle: 'Tap the deck to draw', placeholder: 'Tap the deck, or type tarot:3' },
   napoletane: { idle: 'Tocca il mazzo per pescare', placeholder: 'Tocca il mazzo, o scrivi nap:3' },
@@ -1202,10 +1237,11 @@ const SLUG_TO_SYSTEM = {
   cards: 'cards', tarot: 'tarot', italiane: 'napoletane', napoletane: 'napoletane', scopa: 'napoletane', hanafuda: 'hanafuda', koikoi: 'hanafuda', hana: 'hanafuda', utagaruta: 'utagaruta', karuta: 'utagaruta', hyakunin: 'utagaruta', vtmv5: 'v5', fate: 'fate', genesys: 'genesys', dh: 'daggerheart', ctech2e: 'cthulhutech',
   swrpg: 'starwars', tor2e: 'onering', pbta: 'pbta', mist: 'mist', mosh1e: 'mothership',
   v5: 'v5', vtm: 'v5', daggerheart: 'daggerheart', cthulhutech: 'cthulhutech', ctech: 'cthulhutech',
+  yz: 'yearzero', yearzero: 'yearzero', alien: 'yearzero', forbiddenlands: 'yearzero', vaesen: 'yearzero', coriolis: 'yearzero', mutant: 'yearzero',
   force: 'starwars', feat: 'onering', tor: 'onering', mothership: 'mothership', mosh: 'mothership', coc: 'callofcthulhu', callofcthulhu: 'callofcthulhu', cthulhu: 'callofcthulhu', dg: 'deltagreen', deltagreen: 'deltagreen',
   ironsworn: 'ironsworn', iron: 'ironsworn', starforged: 'starforged', sf: 'starforged', dcc: 'dcc',
 };
-const SYSTEM_TO_SLUG = { cards: 'cards', tarot: 'tarot', napoletane: 'napoletane', hanafuda: 'hanafuda', utagaruta: 'utagaruta', v5: 'vtmv5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', mothership: 'mosh1e', callofcthulhu: 'coc', deltagreen: 'dg', ironsworn: 'ironsworn', starforged: 'starforged', dcc: 'dcc' };
+const SYSTEM_TO_SLUG = { cards: 'cards', tarot: 'tarot', napoletane: 'napoletane', hanafuda: 'hanafuda', utagaruta: 'utagaruta', v5: 'vtmv5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', yearzero: 'yz', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', mothership: 'mosh1e', callofcthulhu: 'coc', deltagreen: 'dg', ironsworn: 'ironsworn', starforged: 'starforged', dcc: 'dcc' };
 
 function systemFromPath() {
   const seg = (location.pathname || '/').replace(/^\/+|\/+$/g, '').toLowerCase();
@@ -1290,6 +1326,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
   genesysPicker.classList.toggle('with-force', system === 'starwars');
   dhPicker.hidden = system !== 'daggerheart';
   ctPicker.hidden = system !== 'cthulhutech';
+  $('yzPicker').hidden = system !== 'yearzero';
   torPicker.hidden = system !== 'onering';
   twod6Picker.hidden = system !== 'pbta' && system !== 'mist';
   msPicker.hidden = system !== 'mothership';
@@ -1335,6 +1372,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
   $('helpStarwars').hidden = system !== 'starwars';
   $('helpDaggerheart').hidden = system !== 'daggerheart';
   $('helpCthulhutech').hidden = system !== 'cthulhutech';
+  $('helpYearzero').hidden = system !== 'yearzero';
   $('helpOnering').hidden = system !== 'onering';
   $('helpPbta').hidden = system !== 'pbta';
   $('helpMist').hidden = system !== 'mist';
@@ -1363,6 +1401,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
     resetGenesys();
     resetDaggerheart();
     resetCthulhuTech();
+    resetYearZero();
     resetOneRing();
     pbtaCtl.reset();
     mistCtl.reset();
@@ -1649,6 +1688,72 @@ function syncGenFromField() {
 // tap/long-press language the numeric row uses for its modifiers.
 for (const t of GEN_TYPES) {
   bindTapHold($(`gen-${t.type}`), dir => genStep(t.type, dir));
+}
+
+// ---- Year Zero pool ----
+//
+// Four die types — Base, Skill, Gear, Stress — built by tapping chips, exactly
+// like Genesys. Each keeps a count; the notation is written from them.
+const YZ_TYPES = [
+  { type: 'base', letter: 'b', label: 'Base' },
+  { type: 'skill', letter: 's', label: 'Skill' },
+  { type: 'gear', letter: 'g', label: 'Gear' },
+  { type: 'stress', letter: 'x', label: 'Stress' },
+];
+const yz = Object.fromEntries(YZ_TYPES.map(t => [t.type, 0]));
+
+function resetYearZero() {
+  for (const t of YZ_TYPES) yz[t.type] = 0;
+  syncYz({ writeField: false });
+}
+
+function yzNotation() {
+  const terms = YZ_TYPES.filter(t => yz[t.type] > 0).map(t => `${yz[t.type]}${t.letter}`);
+  return terms.length ? `yz:${terms.join('')}` : '';
+}
+
+function syncYz({ writeField = true } = {}) {
+  for (const t of YZ_TYPES) {
+    const chip = $(`yz-${t.type}`);
+    const n = yz[t.type];
+    if (n > 0) { chip.dataset.count = String(n); chip.setAttribute('aria-pressed', 'true'); }
+    else { delete chip.dataset.count; chip.setAttribute('aria-pressed', 'false'); }
+  }
+  if (writeField) $('notation').value = yzNotation();
+  if (uiSystem === 'yearzero') stageSystemPool();
+}
+
+function yzStep(type, by) {
+  const total = YZ_TYPES.reduce((s, t) => s + yz[t.type], 0);
+  yz[type] = Math.max(0, Math.min(yz[type] + by, yz[type] + (100 - total)));
+  syncYz();
+}
+
+function syncYzFromField() {
+  try {
+    const pool = parseYearZero($('notation').value);
+    for (const t of YZ_TYPES) yz[t.type] = pool[t.type];
+    syncYz({ writeField: false });
+  } catch { /* mid-type, not yet valid */ }
+}
+
+for (const t of YZ_TYPES) {
+  bindTapHold($(`yz-${t.type}`), dir => yzStep(t.type, dir));
+}
+
+// Push rerolls everything that is not a 6 or a 1 and replays the throw, so the
+// rerolled dice hop and tumble again. A roll may be pushed once; the button
+// shows on a pushable Year Zero result and hides while a pool is staged.
+$('yzPush').addEventListener('click', () => {
+  const last = state.last;
+  if (!last || last.system !== 'yearzero' || !last.summary.canPush) return;
+  throwResult(pushYearZero(last));
+});
+
+function updateYzPush() {
+  const last = state.last;
+  $('yzPush').hidden = !(uiSystem === 'yearzero' && last && last.system === 'yearzero'
+    && last.summary && last.summary.canPush && $('total').dataset.idle !== '1');
 }
 
 // ---- Daggerheart pool ----
@@ -4943,6 +5048,9 @@ function systemStageDescriptors() {
     case 'cthulhutech':
       add(ct.dice, { sides: 10, genColor: CT_COLORS.miss, kind: 'ct' });
       break;
+    case 'yearzero':
+      for (const t of YZ_TYPES) add(yz[t.type], { sides: 6, genColor: YZ_COLORS[t.type], kind: `yz-${t.type}` });
+      break;
     case 'onering':
       add(tor.favour ? 2 : 1, { sides: 12, genColor: TOR_COLORS.feat, kind: 'tor-feat' });
       add(tor.success, { sides: 6, genColor: TOR_COLORS.success, kind: 'tor-success' });
@@ -5026,6 +5134,7 @@ function stageSystemPool() {
     ? `${staged.length} ${staged.length === 1 ? 'die' : 'dice'} ready`
     : systemHint(uiSystem).idle;
   hideHint();
+  updateYzPush();
 }
 
 // Take one staged die of `kind` back off the pool by stepping the owning
@@ -5046,6 +5155,10 @@ function removeSystemStageKind(kind) {
       if (kind && kind.startsWith('gen-')) {
         const type = kind.slice(4);
         if (gen[type] > 0) { gen[type] -= 1; syncGen(); return true; }
+      }
+      if (kind && kind.startsWith('yz-')) {
+        const type = kind.slice(3);
+        if (yz[type] > 0) { yz[type] -= 1; syncYz(); return true; }
       }
       return false; // Hope/Fear, the Feat die, the fixed 2d6 — not removable.
   }
@@ -5086,6 +5199,7 @@ function clearPool() {
       case 'genesys': case 'starwars': resetGenesys(); syncGen(); break;
       case 'daggerheart': resetDaggerheart(); syncDh(); break;
       case 'cthulhutech': resetCthulhuTech(); syncCt(); break;
+      case 'yearzero': resetYearZero(); syncYz(); break;
       case 'onering': resetOneRing(); syncTor(); break;
       case 'pbta': case 'mist': resetTwod6(); syncTwod6(); break;
       case 'mothership': resetMothership(); syncMs(); break;
@@ -6421,6 +6535,7 @@ function restageActiveSystem() {
     case 'genesys': case 'starwars': syncGen(); break;
     case 'daggerheart': syncDh(); break;
     case 'cthulhutech': syncCt(); break;
+    case 'yearzero': syncYz(); break;
     case 'onering': syncTor(); break;
     case 'pbta': case 'mist': syncTwod6(); break;
     case 'mothership': syncMs(); break;
