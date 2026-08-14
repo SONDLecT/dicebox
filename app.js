@@ -1603,14 +1603,18 @@ for (const row of modeRows) {
 // source the notation field is written from; typing a `v5:` pool by hand feeds
 // back into it through syncV5FromField.
 
-const v5 = { normal: 0, hunger: 0, difficulty: null };
-const v5NormalFace = $('v5NormalFace');
+// The pool is a total with a Hunger subset, exactly as V5 rolls it: `pool` dice,
+// `hunger` of them red, Hunger never adding to the total. `pool - hunger` is how
+// many stay white. Hunger caps at 5 (the game's ceiling) and can never exceed
+// the pool.
+const v5 = { pool: 0, hunger: 0, difficulty: null };
+const v5PoolFace = $('v5NormalFace');
 const v5HungerFace = $('v5HungerFace');
 const v5DiffChip = $('v5DiffChip');
 const v5DiffVal = $('v5Difficulty');
 
 function resetV5() {
-  v5.normal = 0;
+  v5.pool = 0;
   v5.hunger = 0;
   v5.difficulty = null;
   syncV5({ writeField: false });
@@ -1619,17 +1623,17 @@ function resetV5() {
 // Build the notation the pool represents. An empty pool writes nothing, so the
 // readout stays idle rather than showing a "v5:0".
 function v5Notation() {
-  const total = v5.normal + v5.hunger;
-  if (total < 1) return '';
-  let s = `v5:${total}`;
+  if (v5.pool < 1) return '';
+  let s = `v5:${v5.pool}`;
   if (v5.hunger > 0) s += `h${v5.hunger}`;
   if (v5.difficulty !== null) s += `@${v5.difficulty}`;
   return s;
 }
 
-// Reflect the state onto the controls, and (by default) into the field.
+// Reflect the state onto the controls, and (by default) into the field. The Pool
+// button carries the total; the Hunger button carries how many of those are red.
 function syncV5({ writeField = true } = {}) {
-  if (v5.normal > 0) v5NormalFace.dataset.count = String(v5.normal); else delete v5NormalFace.dataset.count;
+  if (v5.pool > 0) v5PoolFace.dataset.count = String(v5.pool); else delete v5PoolFace.dataset.count;
   if (v5.hunger > 0) v5HungerFace.dataset.count = String(v5.hunger); else delete v5HungerFace.dataset.count;
 
   if (v5.difficulty === null) {
@@ -1642,20 +1646,24 @@ function syncV5({ writeField = true } = {}) {
   if (uiSystem === 'v5') stageSystemPool();
 }
 
-// Step a die count, keeping the pool inside the parser's limits: 0–100 dice
-// total, and no more Hunger than there are dice.
+// The Pool button changes the total. Growing it adds white dice; shrinking it
+// drags Hunger down only once there are no white dice left to lose. The Hunger
+// button recolours dice already in the pool, so it never changes the total and
+// stops at 5 or at the pool size, whichever is smaller.
 function v5Step(kind, by) {
-  const other = kind === 'hunger' ? v5.normal : v5.hunger;
-  const current = kind === 'hunger' ? v5.hunger : v5.normal;
-  const next = Math.max(0, Math.min(current + by, 100 - other));
-  if (kind === 'hunger') v5.hunger = next; else v5.normal = next;
+  if (kind === 'pool') {
+    v5.pool = Math.max(0, Math.min(v5.pool + by, 100));
+    if (v5.hunger > v5.pool) v5.hunger = v5.pool;
+  } else {
+    v5.hunger = Math.max(0, Math.min(v5.hunger + by, Math.min(5, v5.pool)));
+  }
   syncV5();
 }
 
 // Tap a die to add one, hold (or right-click) to remove — and a die tapped in
 // the tray comes off too. Difficulty cycles unset → 1 … 10; below 1 returns to
 // unset, which the reducer treats differently from a difficulty of 1.
-bindTapHold(v5NormalFace, dir => v5Step('normal', dir));
+bindTapHold(v5PoolFace, dir => v5Step('pool', dir));
 bindTapHold(v5HungerFace, dir => v5Step('hunger', dir));
 // Difficulty opens the tactile roller, the one number-picker every system
 // shares, with a "Table sets it" release back to unset — the same control as
@@ -1675,7 +1683,7 @@ v5DiffChip.addEventListener('click', () => {
 function syncV5FromField() {
   try {
     const { pool, hunger, difficulty } = parseV5($('notation').value);
-    v5.normal = pool - hunger;
+    v5.pool = pool;
     v5.hunger = hunger;
     v5.difficulty = difficulty;
     syncV5({ writeField: false });
@@ -5352,7 +5360,7 @@ function systemStageDescriptors() {
   const add = (n, d) => { for (let i = 0; i < Math.max(0, n); i++) out.push(d); };
   switch (uiSystem) {
     case 'v5':
-      add(v5.normal, { sides: 10, kind: 'v5-normal' });
+      add(v5.pool - v5.hunger, { sides: 10, kind: 'v5-normal' });
       add(v5.hunger, { sides: 10, hunger: true, kind: 'v5-hunger' });
       break;
     case 'fate':
@@ -5493,8 +5501,10 @@ function stageSystemPool() {
 // tap on them is a gentle no-op rather than an error.
 function removeSystemStageKind(kind) {
   switch (kind) {
-    case 'v5-normal': v5.normal = Math.max(0, v5.normal - 1); syncV5(); return true;
-    case 'v5-hunger': v5.hunger = Math.max(0, v5.hunger - 1); syncV5(); return true;
+    // Tapping a white die off shrinks the pool. Tapping a red die off removes a
+    // Hunger die, so both the pool and the Hunger count drop with it.
+    case 'v5-normal': if (v5.pool > v5.hunger) v5.pool -= 1; syncV5(); return true;
+    case 'v5-hunger': if (v5.hunger > 0) { v5.hunger -= 1; v5.pool -= 1; } syncV5(); return true;
     case 'fate': fate.count = Math.max(1, fate.count - 1); syncFate(); return true;
     case 'ct': ct.dice = Math.max(0, ct.dice - 1); syncCt(); return true;
     case 'tor-success': tor.success = Math.max(0, tor.success - 1); syncTor(); return true;
