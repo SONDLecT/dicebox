@@ -1603,11 +1603,12 @@ for (const row of modeRows) {
 // source the notation field is written from; typing a `v5:` pool by hand feeds
 // back into it through syncV5FromField.
 
-// Pool is the action pool for the current roll; Hunger is the character's own
-// tracked state (0-5), the same shape as Mothership's Stress. Hunger is applied
-// to whatever pool you build — the red dice are min(Hunger, Pool) — so it never
-// grows the pool and, being your standing state, it survives a reload and a
-// pool clear the way Stress does.
+// Pool and Hunger are two independent stacks of dice that add together into the
+// throw: `pool` is the white pool dice you build for this roll, `hunger` the red
+// Hunger dice. Neither replaces the other. Hunger caps at 5 and is the character's
+// standing state — it survives a reload and a pool clear the way Mothership's
+// Stress does — and 0 means it is not being tracked, where a Rouse check is only
+// pass/fail.
 const V5_HUNGER_KEY = 'dicebox:v5:hunger';
 const v5 = { pool: 0, hunger: 0, difficulty: null };
 {
@@ -1619,8 +1620,8 @@ const v5HungerFace = $('v5HungerFace');
 const v5DiffChip = $('v5DiffChip');
 const v5DiffVal = $('v5Difficulty');
 
-// The pool and difficulty are this roll's setup and reset with it; Hunger is the
-// character's state and stays put.
+// Pool and difficulty are this roll's setup and reset with it; Hunger is standing
+// state and stays put.
 function resetV5() {
   v5.pool = 0;
   v5.difficulty = null;
@@ -1633,28 +1634,30 @@ function setHunger(n, { restage = true } = {}) {
   v5.hunger = Math.max(0, Math.min(5, Math.round(n)));
   store.set(V5_HUNGER_KEY, String(v5.hunger));
   if (restage) syncV5();
-  else if (v5.hunger > 0) v5HungerFace.dataset.count = String(v5.hunger);
-  else delete v5HungerFace.dataset.count;
+  else syncV5Hunger();
 }
 
-// Build the notation the pool represents. An empty pool writes nothing, so the
+// The Hunger die always shows its level (0-5) — it is the tracker — and CSS reads
+// a level of 0 as empty rather than loaded.
+function syncV5Hunger() {
+  v5HungerFace.dataset.count = String(v5.hunger);
+}
+
+// The notation is the whole throw, pool + Hunger dice, with the Hunger count noted
+// so the receiver can colour them back. An empty throw writes nothing, so the
 // readout stays idle rather than showing a "v5:0".
 function v5Notation() {
-  if (v5.pool < 1) return '';
-  let s = `v5:${v5.pool}`;
-  // Hunger can outrun a small pool, but the notation only ever rolls up to the
-  // pool size, so it carries the effective count (the parser rejects more).
-  const reds = Math.min(v5.hunger, v5.pool);
-  if (reds > 0) s += `h${reds}`;
+  const total = v5.pool + v5.hunger;
+  if (total < 1) return '';
+  let s = `v5:${total}`;
+  if (v5.hunger > 0) s += `h${v5.hunger}`;
   if (v5.difficulty !== null) s += `@${v5.difficulty}`;
   return s;
 }
 
-// Reflect the state onto the controls, and (by default) into the field. The Pool
-// button carries the total; the Hunger button carries how many of those are red.
 function syncV5({ writeField = true } = {}) {
   if (v5.pool > 0) v5PoolFace.dataset.count = String(v5.pool); else delete v5PoolFace.dataset.count;
-  if (v5.hunger > 0) v5HungerFace.dataset.count = String(v5.hunger); else delete v5HungerFace.dataset.count;
+  syncV5Hunger();
 
   if (v5.difficulty === null) {
     v5DiffVal.textContent = '—'; v5DiffVal.dataset.unset = '1'; v5DiffChip.classList.remove('is-set');
@@ -1666,23 +1669,15 @@ function syncV5({ writeField = true } = {}) {
   if (uiSystem === 'v5') stageSystemPool();
 }
 
-// The Pool button changes the total. The Hunger button moves the tracked Hunger
-// (0-5), which then colours min(Hunger, Pool) of the pool red — it never adds to
-// the total.
-function v5Step(kind, by) {
-  if (kind === 'pool') {
-    v5.pool = Math.max(0, Math.min(v5.pool + by, 100));
-    syncV5();
-  } else {
-    setHunger(v5.hunger + by);
-  }
-}
+// The Pool die adds white dice without bound; the Hunger die adds red ones up to
+// 5. Neither touches the other's count.
+function v5StepPool(by) { v5.pool = Math.max(0, Math.min(v5.pool + by, 100)); syncV5(); }
 
-// Tap a die to add one, hold (or right-click) to remove — and a die tapped in
-// the tray comes off too. Difficulty cycles unset → 1 … 10; below 1 returns to
-// unset, which the reducer treats differently from a difficulty of 1.
-bindTapHold(v5PoolFace, dir => v5Step('pool', dir));
-bindTapHold(v5HungerFace, dir => v5Step('hunger', dir));
+// Tap a die to add one, hold (or right-click) to remove; a die tapped in the tray
+// comes off too.
+bindTapHold(v5PoolFace, dir => v5StepPool(dir));
+bindTapHold(v5HungerFace, dir => setHunger(v5.hunger + dir));
+
 // Difficulty opens the tactile roller, the one number-picker every system
 // shares, with a "Table sets it" release back to unset — the same control as
 // the Mothership target and the custom die.
@@ -1696,18 +1691,22 @@ v5DiffChip.addEventListener('click', () => {
   });
 });
 
-// A Rouse check throws a single Hunger die on its own, outside the action pool.
-// A failure raises the tracked Hunger before the die is shown, so the readout
-// can name the new total; setHunger runs with restage off so it does not disturb
-// the die already in flight.
+// A Rouse check throws a single Hunger die on its own, outside the action pool. If
+// Hunger is being tracked (1-5) a failure raises it before the die is shown, so
+// the readout can name the new total; untracked (0) it is only pass/fail.
+// setHunger runs with restage off so it does not disturb the die already in flight.
 $('v5Rouse').addEventListener('click', () => {
   const result = rollRouse();
-  const before = v5.hunger;
-  if (result.summary.hungerGain) setHunger(v5.hunger + result.summary.hungerGain, { restage: false });
-  result.summary.hungerAfter = v5.hunger;
-  // A failed Rouse at Hunger 5 cannot climb higher, so the readout must not claim
-  // it did — that is the moment the Beast is closest, not a quiet tick upward.
-  result.summary.hungerRose = v5.hunger > before;
+  const tracked = v5.hunger > 0;
+  result.summary.tracked = tracked;
+  if (tracked) {
+    const before = v5.hunger;
+    if (result.summary.hungerGain) setHunger(v5.hunger + result.summary.hungerGain, { restage: false });
+    result.summary.hungerAfter = v5.hunger;
+    // A failed Rouse at Hunger 5 cannot climb higher, so the readout must not
+    // claim it did — that is the moment the Beast is closest, not a tick upward.
+    result.summary.hungerRose = v5.hunger > before;
+  }
   throwResult(result, { writeField: false });
 });
 
@@ -1716,10 +1715,9 @@ $('v5Rouse').addEventListener('click', () => {
 function syncV5FromField() {
   try {
     const { pool, hunger, difficulty } = parseV5($('notation').value);
-    v5.pool = pool;
+    // The notation total is pool + Hunger dice, so the white pool is the rest.
+    v5.pool = Math.max(0, pool - hunger);
     v5.difficulty = difficulty;
-    // A typed pool names the Hunger it wants, so it moves the tracker too (and
-    // persists it) rather than leaving the field and the tracked state at odds.
     setHunger(hunger, { restage: false });
     syncV5({ writeField: false });
   } catch { /* mid-type, not yet valid */ }
@@ -5394,12 +5392,10 @@ function systemStageDescriptors() {
   const out = [];
   const add = (n, d) => { for (let i = 0; i < Math.max(0, n); i++) out.push(d); };
   switch (uiSystem) {
-    case 'v5': {
-      const reds = Math.min(v5.hunger, v5.pool);
-      add(v5.pool - reds, { sides: 10, kind: 'v5-normal' });
-      add(reds, { sides: 10, hunger: true, kind: 'v5-hunger' });
+    case 'v5':
+      add(v5.pool, { sides: 10, kind: 'v5-normal' });
+      add(v5.hunger, { sides: 10, hunger: true, kind: 'v5-hunger' });
       break;
-    }
     case 'fate':
       add(fate.count, { sides: 6, kind: 'fate' });
       break;
@@ -5538,10 +5534,10 @@ function stageSystemPool() {
 // tap on them is a gentle no-op rather than an error.
 function removeSystemStageKind(kind) {
   switch (kind) {
-    // Either die taken off the tray shrinks the pool by one; Hunger is the
-    // character's tracked state, not pool setup, so it is left alone here.
+    // A white die taken off the tray drops a pool die; a red one lowers Hunger,
+    // since the two are independent stacks.
     case 'v5-normal': v5.pool = Math.max(0, v5.pool - 1); syncV5(); return true;
-    case 'v5-hunger': v5.pool = Math.max(0, v5.pool - 1); syncV5(); return true;
+    case 'v5-hunger': setHunger(v5.hunger - 1); return true;
     case 'fate': fate.count = Math.max(1, fate.count - 1); syncFate(); return true;
     case 'ct': ct.dice = Math.max(0, ct.dice - 1); syncCt(); return true;
     case 'tor-success': tor.success = Math.max(0, tor.success - 1); syncTor(); return true;

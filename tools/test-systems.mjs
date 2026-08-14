@@ -201,8 +201,16 @@ ok('rollAny defers numeric', rollAny('4d6').deferred === true && rollAny('4d6').
   ok('rouse hold headline', hold.text === 'Blood holds');
   const rise = v5Headline({ summary: { kind: 'rouse', value: 3, success: false, hungerGain: 1, hungerAfter: 3 } });
   ok('rouse rise headline names the new Hunger', rise.text === 'Hunger 3' && rise.variant === 'v5-hunger');
-  const riseTxt = describeV5({ summary: { kind: 'rouse', value: 3, success: false, hungerGain: 1, hungerAfter: 3 } });
+  const riseTxt = describeV5({ summary: { kind: 'rouse', value: 3, success: false, hungerGain: 1, hungerAfter: 3, tracked: true } });
   ok('rouse detail names the new Hunger', /Hunger rises to 3/.test(riseTxt));
+  // Untracked (tracked: false): a failure just reports the mechanical gain.
+  const untrackedHead = v5Headline({ summary: { kind: 'rouse', value: 3, success: false, hungerGain: 1, tracked: false } });
+  ok('untracked rouse fail headline is Hunger +1', untrackedHead.text === 'Hunger +1' && untrackedHead.variant === 'v5-hunger');
+  const untrackedTxt = describeV5({ summary: { kind: 'rouse', value: 3, success: false, hungerGain: 1, tracked: false } });
+  ok('untracked rouse fail detail says gain 1 Hunger', /gain 1 Hunger/.test(untrackedTxt));
+  // At Hunger 5 a tracked failure cannot climb: it names the Beast, not a rise.
+  const cappedTxt = describeV5({ summary: { kind: 'rouse', value: 3, success: false, hungerGain: 1, hungerAfter: 5, hungerRose: false, tracked: true } });
+  ok('capped rouse detail names the Beast', /the Beast stirs/.test(cappedTxt) && !/rises/.test(cappedTxt));
 }
 
 // ---- Fate / Fudge ----

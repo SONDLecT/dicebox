@@ -62,11 +62,14 @@ export function detectSystem(src) {
 export function parseV5(src) {
   const m = V5_REGEX.exec(String(src || '').trim().toLowerCase());
   if (!m) throw new Error('Expected V5 pool like "v5:8h3" or "v5:8h3@3"');
+  // `pool` is the whole throw; `hunger` is how many of those dice are red. The
+  // app builds the two counts additively (pool + hunger dice) and writes their
+  // sum here, so hunger is always 0-5 and never more than the pool.
   const pool = Number(m[1]);
   const hunger = m[2] === undefined ? 0 : Number(m[2]);
   const difficulty = m[3] === undefined ? null : Number(m[3]);
   if (pool < 1 || pool > 100) throw new Error('V5 pool must be 1-100');
-  if (hunger < 0 || hunger > pool) throw new Error('Hunger must be 0 to pool');
+  if (hunger < 0 || hunger > pool || hunger > 5) throw new Error('Hunger must be 0 to 5 and within the pool');
   if (difficulty !== null && (difficulty < 1 || difficulty > 10)) {
     throw new Error('Difficulty must be 1-10');
   }
@@ -75,8 +78,8 @@ export function parseV5(src) {
 
 export function rollV5(src) {
   const { pool, hunger, difficulty } = parseV5(src);
-  // Hunger dice replace pool dice: the first `hunger` dice are blood dice, the
-  // rest are ordinary d10s. `pool` is the fixed total, never pool+hunger.
+  // The first `hunger` of the `pool` dice are the red Hunger dice, the rest are
+  // ordinary d10s.
   const dice = [];
   for (let i = 0; i < pool; i++) {
     dice.push({
@@ -191,6 +194,8 @@ export function describeV5(result) {
   const s = result.summary;
   if (s.kind === 'rouse') {
     if (s.success) return `Rouse check · the Blood holds · rolled ${s.value}`;
+    // Untracked: no Hunger total to move, so it just names the mechanical result.
+    if (s.tracked === false) return `Rouse check · gain 1 Hunger · rolled ${s.value}`;
     const climb = s.hungerRose === false
       ? `Hunger stays at ${s.hungerAfter}, the Beast stirs`
       : `Hunger rises to ${s.hungerAfter}`;
@@ -222,9 +227,9 @@ export function describeV5(result) {
 export function v5Headline(result) {
   const s = result.summary;
   if (s.kind === 'rouse') {
-    return s.success
-      ? { kind: 'text', text: 'Blood holds' }
-      : { kind: 'text', text: `Hunger ${s.hungerAfter}`, variant: 'v5-hunger' };
+    if (s.success) return { kind: 'text', text: 'Blood holds' };
+    if (s.tracked === false) return { kind: 'text', text: 'Hunger +1', variant: 'v5-hunger' };
+    return { kind: 'text', text: `Hunger ${s.hungerAfter}`, variant: 'v5-hunger' };
   }
   if (s.outcome) {
     const text = s.outcome === 'success' && s.margin !== null
