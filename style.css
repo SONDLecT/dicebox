@@ -535,13 +535,17 @@ body {
 .v5-die-hunger[data-count="0"] .v5-die-name { color: var(--muted); }
 .v5-die-hunger[data-count="0"]::after { background: var(--muted); color: var(--paper); }
 
-/* Difficulty and the Rouse check share the row below the dice: the chip stretches,
-   the Rouse button sits at its side in the blood accent, since it spends Hunger. */
+/* Hunger and Difficulty are the two trackers, side by side below the dice; a set
+   Hunger reads in the blood accent. */
 .v5-lower { display: flex; gap: 10px; width: 100%; align-items: stretch; }
 .v5-lower .spin-chip { flex: 1 1 0; }
+.v5-hunger-chip .spin-chip-val:not([data-unset]) { color: var(--accent); }
+
+/* The Rouse check is its own action below the trackers, in the blood accent since
+   it spends Hunger. */
 .v5-rouse {
-  appearance: none; cursor: pointer; flex: 0 0 auto;
-  padding: 0 18px; border: 1px solid var(--accent); border-radius: 12px;
+  appearance: none; cursor: pointer; align-self: center; margin-top: 2px;
+  padding: 7px 22px; border: 1px solid var(--accent); border-radius: 999px;
   background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--line);
   font: 600 13px/1 inherit; letter-spacing: 0.02em;
   -webkit-tap-highlight-color: transparent; touch-action: manipulation;

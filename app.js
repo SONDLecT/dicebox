@@ -1617,6 +1617,8 @@ const v5 = { pool: 0, hunger: 0, difficulty: null };
 }
 const v5PoolFace = $('v5NormalFace');
 const v5HungerFace = $('v5HungerFace');
+const v5HungerChip = $('v5HungerChip');
+const v5HungerVal = $('v5Hunger');
 const v5DiffChip = $('v5DiffChip');
 const v5DiffVal = $('v5Difficulty');
 
@@ -1637,10 +1639,16 @@ function setHunger(n, { restage = true } = {}) {
   else syncV5Hunger();
 }
 
-// The Hunger die always shows its level (0-5) — it is the tracker — and CSS reads
-// a level of 0 as empty rather than loaded.
+// Hunger shows in two places that stay in step: the red die in the pool (its
+// badge, with CSS reading a level of 0 as empty) and the tracker pill beside
+// Difficulty, which reads "—" until Hunger is set.
 function syncV5Hunger() {
   v5HungerFace.dataset.count = String(v5.hunger);
+  if (v5.hunger > 0) {
+    v5HungerVal.textContent = String(v5.hunger); delete v5HungerVal.dataset.unset; v5HungerChip.classList.add('is-set');
+  } else {
+    v5HungerVal.textContent = '—'; v5HungerVal.dataset.unset = '1'; v5HungerChip.classList.remove('is-set');
+  }
 }
 
 // The notation is the whole throw, pool + Hunger dice, with the Hunger count noted
@@ -1678,6 +1686,15 @@ function v5StepPool(by) { v5.pool = Math.max(0, Math.min(v5.pool + by, 100)); sy
 bindTapHold(v5PoolFace, dir => v5StepPool(dir));
 bindTapHold(v5HungerFace, dir => setHunger(v5.hunger + dir));
 
+// The Hunger tracker pill sets the level directly — the way you would after a
+// hunt — on the same roller the dice use. 0 reads as untracked ("—").
+v5HungerChip.addEventListener('click', () => {
+  openNumberDial({
+    title: 'Hunger', value: v5.hunger, min: 0, max: 5,
+    actionLabel: 'Set Hunger', inputLabel: 'Hunger',
+    commit: value => setHunger(value),
+  });
+});
 // Difficulty opens the tactile roller, the one number-picker every system
 // shares, with a "Table sets it" release back to unset — the same control as
 // the Mothership target and the custom die.
@@ -5588,7 +5605,9 @@ function clearPool() {
   // they clear to nothing just like numeric.
   if (uiSystem !== 'numeric' && uiSystem !== 'dcc') {
     switch (uiSystem) {
-      case 'v5': resetV5(); syncV5(); break;
+      // The X sweeps the whole table, Hunger dice included, so it clears the
+      // tracker too — unlike a mode switch, which keeps Hunger as standing state.
+      case 'v5': setHunger(0, { restage: false }); resetV5(); syncV5(); break;
       case 'fate': resetFate(); syncFate(); break;
       case 'genesys': case 'starwars': resetGenesys(); syncGen(); break;
       case 'daggerheart': resetDaggerheart(); syncDh(); break;
