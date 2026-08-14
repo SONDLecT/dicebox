@@ -66,6 +66,7 @@ const SYSTEM_SLUGS = new Set([
   '/v5', '/vtm', '/daggerheart', '/cthulhutech', '/force', '/feat', '/mothership', '/ctech', '/tor', '/mosh',
   '/ironsworn', '/starforged', '/iron', '/dcc',
   '/yz', '/yearzero', '/alien', '/forbiddenlands', '/vaesen', '/coriolis', '/mutant',
+  '/brrpg', '/bladerunner',
 ]);
 
 export default {

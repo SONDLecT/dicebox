@@ -162,6 +162,12 @@
             <path d="M12 3.4C15.6 3.4 18.2 7.8 18.2 13 18.2 17.8 15.4 20.6 12 20.6 8.6 20.6 5.8 17.8 5.8 13 5.8 7.8 8.4 3.4 12 3.4Z"/>
             <path d="M12 5.4v3.4M10.3 7.1h3.4" stroke-width="1.3"/>
           </g>
+          <!-- Blade Runner: two step dice — a small d6 and a larger d12. -->
+          <g class="mode-ico" data-for="bladerunner" fill="none" stroke="currentColor"
+             stroke-width="1.6" stroke-linejoin="round">
+            <rect x="3" y="11.5" width="9" height="9" rx="1.6"/>
+            <path d="M15.5 3.4 21 7.4 18.9 13.9 12.1 13.9 10 7.4Z"/>
+          </g>
           <!-- Star Wars: a TIE fighter — cockpit between two hexagonal panels. -->
           <g class="mode-ico" data-for="starwars">
             <g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
@@ -436,6 +442,26 @@
         Miss, and you can <b>Push</b>: keep the 6s and 1s and reroll the rest. A push
         raises your Stress, so it <b>adds a Stress die</b> to the throw. A <b>1</b> on
         any Stress die is a <b>Panic</b> — look it up on the Panic table.
+      </p>
+      </div>
+
+      <div id="helpBladerunner" hidden>
+      <dl class="syntax">
+        <dt>br:12,8</dt>    <dd>Attribute d12 + Skill d8</dd>
+        <dt>br:12,8adv</dt> <dd>with advantage (a third die)</dd>
+        <dt>br:10,6dis</dt> <dd>with disadvantage (one die)</dd>
+      </dl>
+      <p class="note">
+        Blade Runner rolls two step dice: an <b>Attribute</b> die and a <b>Skill</b>
+        die, each d6 to d12. Count successes — a <b>6-9</b> is one, a <b>10+</b> is
+        two. One success passes, two or more is a critical. Tap a die to step it up,
+        hold to step down. <b>Advantage</b> adds a third die. <b>Disadvantage</b>
+        rolls only the larger.
+      </p>
+      <p class="note">
+        Miss, and you can <b>Push</b>: reroll every die that is not already a 6 or
+        higher. Any <b>1</b> locks and stays, and each 1 left showing costs a point of
+        <b>Health</b> on a physical roll or <b>Resolve</b> on a mental one.
       </p>
       </div>
 
@@ -784,6 +810,15 @@
         </svg>
         <span class="mode-row-name">Alien</span>
         <span class="mode-row-sub">d6 pool &middot; Stress &amp; Panic</span>
+      </button>
+      <button type="button" class="mode-row mode-bladerunner" data-system="bladerunner" aria-pressed="false">
+        <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true"
+             fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">
+          <rect x="3" y="11.5" width="9" height="9" rx="1.6"/>
+          <path d="M15.5 3.4 21 7.4 18.9 13.9 12.1 13.9 10 7.4Z"/>
+        </svg>
+        <span class="mode-row-name">BRRPG</span>
+        <span class="mode-row-sub">step dice &middot; count the sixes</span>
       </button>
             <button type="button" class="mode-row mode-callofcthulhu" data-system="callofcthulhu" aria-pressed="false">
         <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
@@ -1405,6 +1440,26 @@
         <span class="gen-chip-label">Stress</span>
       </button>
     </div>
+  </section>
+
+  <!-- Blade Runner: two step-die selectors (Attribute + Skill, each d6-d12) and
+       an advantage/disadvantage stepper. Tap a die to step up, hold to step down. -->
+  <section class="picker br-picker" id="brPicker" aria-label="Blade Runner roll" hidden>
+    <div class="br-dice">
+      <button type="button" class="br-die" id="br-attr" aria-label="Attribute die — tap to step up, hold to step down">
+        <span class="br-die-label">Attribute</span>
+        <span class="br-die-val" id="br-attr-val">d8</span>
+      </button>
+      <button type="button" class="br-die" id="br-skill" aria-label="Skill die — tap to step up, hold to step down">
+        <span class="br-die-label">Skill</span>
+        <span class="br-die-val" id="br-skill-val">d6</span>
+      </button>
+      <button type="button" class="br-die br-mod" id="brMod" data-state="even" aria-label="Odds — tap for advantage, hold for disadvantage">
+        <span class="br-die-label">Odds</span>
+        <span class="br-die-val" id="br-mod-val">Even odds</span>
+      </button>
+    </div>
+    <button type="button" class="yz-push" id="brPush" hidden>Push</button>
   </section>
 
   <!-- The One Ring: a Feat die is always rolled. The controls are the Success

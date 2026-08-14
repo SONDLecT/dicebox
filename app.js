@@ -8,6 +8,7 @@ import { rollGenesys, describeGenesys, genesysHeadline, parseGenesys } from './s
 import { rollDaggerheart, describeDaggerheart, daggerheartHeadline, parseDaggerheart } from './system-dice.js';
 import { rollCthulhuTech, describeCthulhuTech, cthulhutechHeadline, parseCthulhuTech } from './system-dice.js';
 import { rollYearZero, describeYearZero, yearzeroHeadline, parseYearZero, pushYearZero } from './system-dice.js';
+import { rollBladeRunner, describeBladeRunner, bladeRunnerHeadline, parseBladeRunner, pushBladeRunner } from './system-dice.js';
 import { rollMothership, describeMothership, mothershipHeadline, parseMothership, resolveMothershipStress } from './system-dice.js';
 import { rollCallOfCthulhu, describeCallOfCthulhu, callOfCthulhuHeadline, parseCallOfCthulhu } from './system-dice.js';
 import { rollDeltaGreen, describeDeltaGreen, deltaGreenHeadline, parseDeltaGreen } from './system-dice.js';
@@ -297,6 +298,18 @@ const SYSTEM_THEMES = {
       '--hair': '#D5D8DA', '--accent': '#9A5E14', '--danger': '#8C3A2E',
     },
   },
+  // Blade Runner — neon-noir: a cold rain-slick near-black under a teal neon
+  // readout. The step dice carry their own colours (below).
+  bladerunner: {
+    dark: {
+      '--paper': '#080A0D', '--face': '#10151B', '--line': '#D7E2E6', '--muted': '#63707A',
+      '--hair': '#1B2530', '--accent': '#38C6C6', '--danger': '#E0685F',
+    },
+    light: {
+      '--paper': '#E9EDEF', '--face': '#F5F8F9', '--line': '#14191E', '--muted': '#6B767E',
+      '--hair': '#D2DADE', '--accent': '#1B8C93', '--danger': '#8C3A2E',
+    },
+  },
   // Star Wars — like Genesys, the dice carry the colour; the chrome is a calm
   // starfield blue.
   starwars: {
@@ -526,6 +539,14 @@ const YZ_COLORS = {
   stress: '#D86A3A',
 };
 
+// Blade Runner step dice: the Attribute die takes the neon teal, the Skill die a
+// warm amber, and an advantage die a cool green.
+const BR_COLORS = {
+  attribute: '#38C6C6',
+  skill: '#D9A441',
+  advantage: '#5BA860',
+};
+
 function applySystemTheme(system) {
   const root = document.documentElement;
   const scheme = SYSTEM_THEMES[system];
@@ -725,6 +746,8 @@ function buildTrayDice(flat, result, { remote = false } = {}) {
     // Year Zero d6s are coloured by die type — Base/Skill/Gear/Stress — so a 1 on
     // a Base or Gear die (a bane) and a 1 on a Stress die (a Panic) read by colour.
     else if (result.system === 'yearzero') die.genColor = YZ_COLORS[f.yzType] || YZ_COLORS.base;
+    // Blade Runner: the Attribute die is teal, the Skill die amber, advantage green.
+    else if (result.system === 'bladerunner') die.genColor = BR_COLORS[f.role] || BR_COLORS.attribute;
     // One Ring: the Feat die shows a numeral, the Eye, or the Gandalf rune;
     // Success dice show their value, tinted (Tengwar 6 gold, Weary 1-3 faded).
     else if (result.system === 'onering') {
@@ -816,6 +839,7 @@ function doRoll(notation) {
       : sys === 'daggerheart' ? rollDaggerheart(notation)
       : sys === 'cthulhutech' ? rollCthulhuTech(notation)
       : sys === 'yearzero' ? rollYearZero(notation)
+      : sys === 'bladerunner' ? rollBladeRunner(notation)
       : sys === 'starwars' ? rollStarWars(notation)
       : sys === 'onering' ? rollOneRing(notation)
       : sys === 'pbta' ? rollPbta(notation)
@@ -927,6 +951,7 @@ function resultHeadline(result) {
   if (result.system === 'daggerheart') return daggerheartHeadline(result);
   if (result.system === 'cthulhutech') return cthulhutechHeadline(result);
   if (result.system === 'yearzero') return yearzeroHeadline(result);
+  if (result.system === 'bladerunner') return bladeRunnerHeadline(result);
   if (result.system === 'starwars') return starWarsHeadline(result);
   if (result.system === 'onering') return oneRingHeadline(result);
   if (result.system === 'pbta' || result.system === 'mist') return twod6Headline(result);
@@ -949,6 +974,7 @@ function resultDetail(result) {
   if (result.system === 'daggerheart') return describeDaggerheart(result);
   if (result.system === 'cthulhutech') return describeCthulhuTech(result);
   if (result.system === 'yearzero') return describeYearZero(result);
+  if (result.system === 'bladerunner') return describeBladeRunner(result);
   if (result.system === 'starwars') return describeStarWars(result);
   if (result.system === 'onering') return describeOneRing(result);
   if (result.system === 'pbta' || result.system === 'mist') return describe2d6(result);
@@ -995,6 +1021,7 @@ function finish(result) {
   // The name has done its job by the first roll; let the tray have the page.
   $('wordmark').dataset.faded = '1';
   updateYzPush();
+  updateBrPush();
 }
 
 // The visible log stays short, but the record does not: a session's worth of
@@ -1127,6 +1154,7 @@ $('notation').addEventListener('input', () => {
   if (typedSystem === 'daggerheart') { syncDhFromField(); return; }
   if (typedSystem === 'cthulhutech') { syncCtFromField(); return; }
   if (yzFamily(typedSystem)) { syncYzFromField(); return; }
+  if (typedSystem === 'bladerunner') { syncBrFromField(); return; }
   if (typedSystem === 'onering') { syncTorFromField(); return; }
   if (typedSystem === 'pbta') { pbtaCtl.fromField(); return; }
   if (typedSystem === 'mist') { mistCtl.fromField(); return; }
@@ -1212,6 +1240,7 @@ const SYSTEMS = {
   cthulhutech: { badge: 'CTech 2e' },
   yearzero: { badge: 'Year Zero' },
   alien: { badge: 'Alien' },
+  bladerunner: { badge: 'BRRPG' },
   starwars: { badge: 'SWRPG' },
   onering: { badge: 'TOR 2e' },
   pbta: { badge: 'PbtA' },
@@ -1240,6 +1269,7 @@ const SYSTEM_HINTS = {
   dcc: { idle: '', placeholder: 'Tap a die, or type d16' },
   yearzero: { idle: 'Build a d6 pool — every 6 is a success', placeholder: 'Tap the dice, or type yz:5b3s2g' },
   alien: { idle: 'Build a d6 pool — every 6 is a success', placeholder: 'Tap the dice, or type yz:5b1x' },
+  bladerunner: { idle: 'Set your Attribute and Skill dice, then roll', placeholder: 'Set the dice, or type br:12,8' },
   cards: { idle: 'Tap the deck to draw', placeholder: 'Tap the deck, or type deck:3' },
   tarot: { idle: 'Tap the deck to draw', placeholder: 'Tap the deck, or type tarot:3' },
   napoletane: { idle: 'Tocca il mazzo per pescare', placeholder: 'Tocca il mazzo, o scrivi nap:3' },
@@ -1260,10 +1290,11 @@ const SLUG_TO_SYSTEM = {
   v5: 'v5', vtm: 'v5', daggerheart: 'daggerheart', cthulhutech: 'cthulhutech', ctech: 'cthulhutech',
   yz: 'yearzero', yearzero: 'yearzero', forbiddenlands: 'yearzero', vaesen: 'yearzero', coriolis: 'yearzero', mutant: 'yearzero', tales: 'yearzero',
   alien: 'alien',
+  brrpg: 'bladerunner', bladerunner: 'bladerunner',
   force: 'starwars', feat: 'onering', tor: 'onering', mothership: 'mothership', mosh: 'mothership', coc: 'callofcthulhu', callofcthulhu: 'callofcthulhu', cthulhu: 'callofcthulhu', dg: 'deltagreen', deltagreen: 'deltagreen',
   ironsworn: 'ironsworn', iron: 'ironsworn', starforged: 'starforged', sf: 'starforged', dcc: 'dcc',
 };
-const SYSTEM_TO_SLUG = { cards: 'cards', tarot: 'tarot', napoletane: 'napoletane', hanafuda: 'hanafuda', utagaruta: 'utagaruta', v5: 'vtmv5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', yearzero: 'yz', alien: 'alien', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', mothership: 'mosh1e', callofcthulhu: 'coc', deltagreen: 'dg', ironsworn: 'ironsworn', starforged: 'starforged', dcc: 'dcc' };
+const SYSTEM_TO_SLUG = { cards: 'cards', tarot: 'tarot', napoletane: 'napoletane', hanafuda: 'hanafuda', utagaruta: 'utagaruta', v5: 'vtmv5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', yearzero: 'yz', alien: 'alien', bladerunner: 'brrpg', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', mothership: 'mosh1e', callofcthulhu: 'coc', deltagreen: 'dg', ironsworn: 'ironsworn', starforged: 'starforged', dcc: 'dcc' };
 
 function systemFromPath() {
   const seg = (location.pathname || '/').replace(/^\/+|\/+$/g, '').toLowerCase();
@@ -1352,6 +1383,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
   // out for the Stress chip.
   $('yzPicker').hidden = system !== 'yearzero' && system !== 'alien';
   $('yzPicker').classList.toggle('alien', system === 'alien');
+  $('brPicker').hidden = system !== 'bladerunner';
   torPicker.hidden = system !== 'onering';
   twod6Picker.hidden = system !== 'pbta' && system !== 'mist';
   msPicker.hidden = system !== 'mothership';
@@ -1399,6 +1431,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
   $('helpCthulhutech').hidden = system !== 'cthulhutech';
   $('helpYearzero').hidden = system !== 'yearzero';
   $('helpAlien').hidden = system !== 'alien';
+  $('helpBladerunner').hidden = system !== 'bladerunner';
   $('helpOnering').hidden = system !== 'onering';
   $('helpPbta').hidden = system !== 'pbta';
   $('helpMist').hidden = system !== 'mist';
@@ -1428,6 +1461,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
     resetDaggerheart();
     resetCthulhuTech();
     resetYearZero();
+    resetBladeRunner();
     resetOneRing();
     pbtaCtl.reset();
     mistCtl.reset();
@@ -1886,6 +1920,66 @@ function updateYzPush() {
   $('yzPush').hidden = !(yzFamily(uiSystem) && last && last.system === 'yearzero'
     && last.summary && last.summary.canPush && $('total').dataset.idle !== '1'
     && !state.pendingPush);
+}
+
+// ---- Blade Runner step dice ----
+//
+// Two die selectors — the Attribute die and the Skill die, each stepping through
+// d6/d8/d10/d12 — plus an advantage/disadvantage stepper. Advantage rolls a
+// third die, disadvantage rolls only the larger of the two.
+const BR_SIZES = [6, 8, 10, 12];
+const br = { attr: 8, skill: 6, mod: null };  // mod: null | 'adv' | 'dis'
+
+function resetBladeRunner() { br.attr = 8; br.skill = 6; br.mod = null; syncBr({ writeField: false }); }
+
+function brNotation() { return `br:${br.attr},${br.skill}${br.mod || ''}`; }
+
+function syncBr({ writeField = true } = {}) {
+  $('br-attr-val').textContent = `d${br.attr}`;
+  $('br-skill-val').textContent = `d${br.skill}`;
+  $('br-mod-val').textContent = br.mod === 'adv' ? 'Advantage' : br.mod === 'dis' ? 'Disadvantage' : 'Even odds';
+  $('brMod').dataset.state = br.mod || 'even';
+  if (writeField) $('notation').value = brNotation();
+  if (uiSystem === 'bladerunner') stageSystemPool();
+}
+
+function stepBrDie(which, dir) {
+  const i = BR_SIZES.indexOf(br[which]);
+  br[which] = BR_SIZES[(i + (dir > 0 ? 1 : BR_SIZES.length - 1)) % BR_SIZES.length];
+  syncBr();
+}
+
+// The advantage stepper walks disadvantage → even → advantage and stops at the ends.
+function stepBrMod(dir) {
+  const order = ['dis', null, 'adv'];
+  const i = order.indexOf(br.mod);
+  br.mod = order[Math.max(0, Math.min(order.length - 1, i + dir))];
+  syncBr();
+}
+
+function syncBrFromField() {
+  try {
+    const p = parseBladeRunner($('notation').value);
+    br.attr = p.attr; br.skill = p.skill; br.mod = p.mod;
+    syncBr({ writeField: false });
+  } catch { /* mid-type */ }
+}
+
+bindTapHold($('br-attr'), dir => stepBrDie('attr', dir));
+bindTapHold($('br-skill'), dir => stepBrDie('skill', dir));
+bindTapHold($('brMod'), dir => stepBrMod(dir));
+
+// Push rerolls the dice that are not already a 6+ (1s lock), replayed as a throw.
+$('brPush').addEventListener('click', () => {
+  const last = state.last;
+  if (!last || last.system !== 'bladerunner' || !last.summary.canPush) return;
+  throwResult(pushBladeRunner(last));
+});
+
+function updateBrPush() {
+  const last = state.last;
+  $('brPush').hidden = !(uiSystem === 'bladerunner' && last && last.system === 'bladerunner'
+    && last.summary && last.summary.canPush && $('total').dataset.idle !== '1');
 }
 
 // ---- Daggerheart pool ----
@@ -5184,6 +5278,15 @@ function systemStageDescriptors() {
     case 'alien':
       for (const t of YZ_TYPES) add(yz[t.type], { sides: 6, genColor: YZ_COLORS[t.type], kind: `yz-${t.type}` });
       break;
+    case 'bladerunner':
+      if (br.mod === 'dis') {
+        add(1, { sides: Math.max(br.attr, br.skill), genColor: BR_COLORS.attribute, kind: 'br' });
+      } else {
+        add(1, { sides: br.attr, genColor: BR_COLORS.attribute, kind: 'br' });
+        add(1, { sides: br.skill, genColor: BR_COLORS.skill, kind: 'br' });
+        if (br.mod === 'adv') add(1, { sides: Math.min(br.attr, br.skill), genColor: BR_COLORS.advantage, kind: 'br' });
+      }
+      break;
     case 'onering':
       add(tor.favour ? 2 : 1, { sides: 12, genColor: TOR_COLORS.feat, kind: 'tor-feat' });
       add(tor.success, { sides: 6, genColor: TOR_COLORS.success, kind: 'tor-success' });
@@ -5269,6 +5372,7 @@ function stageSystemPool() {
     : systemHint(uiSystem).idle;
   hideHint();
   updateYzPush();
+  updateBrPush();
 }
 
 // Take one staged die of `kind` back off the pool by stepping the owning
@@ -5334,6 +5438,7 @@ function clearPool() {
       case 'daggerheart': resetDaggerheart(); syncDh(); break;
       case 'cthulhutech': resetCthulhuTech(); syncCt(); break;
       case 'yearzero': case 'alien': resetYearZero(); syncYz(); break;
+      case 'bladerunner': resetBladeRunner(); syncBr(); break;
       case 'onering': resetOneRing(); syncTor(); break;
       case 'pbta': case 'mist': resetTwod6(); syncTwod6(); break;
       case 'mothership': resetMothership(); syncMs(); break;
@@ -6649,6 +6754,7 @@ function emptyTrayRoll() {
   if (uiSystem === 'daggerheart') return dhNotation();
   if (uiSystem === 'cthulhutech') return ctNotation() || ctExample();
   if (yzFamily(uiSystem)) return yzNotation() || 'yz:5';
+  if (uiSystem === 'bladerunner') return brNotation();
   if (uiSystem === 'pbta') return pbtaCtl.notation();
   if (uiSystem === 'mist') return mistCtl.notation();
   if (uiSystem === 'mothership') return msNotation();
@@ -6675,6 +6781,7 @@ function restageActiveSystem() {
     case 'daggerheart': syncDh(); break;
     case 'cthulhutech': syncCt(); break;
     case 'yearzero': case 'alien': syncYz(); break;
+    case 'bladerunner': syncBr(); break;
     case 'onering': syncTor(); break;
     case 'pbta': case 'mist': syncTwod6(); break;
     case 'mothership': syncMs(); break;

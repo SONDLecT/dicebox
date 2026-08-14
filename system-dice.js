@@ -37,6 +37,7 @@ export function detectSystem(src) {
   if (/^dh:/.test(s)) return 'daggerheart';
   if (/^ct:/.test(s)) return 'cthulhutech';
   if (/^yz:/.test(s)) return 'yearzero';
+  if (/^br:/.test(s)) return 'bladerunner';
   if (/^sw:/.test(s)) return 'starwars';
   if (/^tor:/.test(s)) return 'onering';
   if (/^pbta:/.test(s)) return 'pbta';
@@ -213,6 +214,7 @@ export function rollAny(src, uiSystem = 'numeric') {
   if (sys === 'daggerheart') return rollDaggerheart(src);
   if (sys === 'cthulhutech') return rollCthulhuTech(src);
   if (sys === 'yearzero') return rollYearZero(src);
+  if (sys === 'bladerunner') return rollBladeRunner(src);
   if (sys === 'starwars') return rollStarWars(src);
   if (sys === 'onering') return rollOneRing(src);
   if (sys === 'pbta') return rollPbta(src);
@@ -683,6 +685,90 @@ export function describeYearZero(result) {
   if (s.banes.gear) banes.push(`${s.banes.gear} gear`);
   if (s.banes.stress) banes.push(`${s.banes.stress} stress`);
   if (banes.length) parts.push(`banes: ${banes.join(', ')}`);
+  return parts.join(' · ');
+}
+
+// ---- Blade Runner (BRRPG) — the Year Zero step-die ----
+//
+// Two step dice — an Attribute die and a Skill die, each d6/d8/d10/d12. Count
+// successes: 6-9 is one, 10+ is two. One success passes; two or more is a crit,
+// zero is a failure. Advantage rolls a third die (a copy of the smaller base
+// die); disadvantage rolls only the larger of the two. Push rerolls every die
+// that is not already a 6+ and not a 1 (1s lock), and each 1 left showing is a
+// point of damage — to Health for a physical roll, Resolve for a mental one.
+//
+//   br:12,8       Attribute d12 + Skill d8
+//   br:12,8adv    the same, with advantage (a third die)
+//   br:10,6dis    with disadvantage (the larger die only)
+const BR_REGEX = /^br:(6|8|10|12),(6|8|10|12)(adv|dis)?$/;
+
+export function parseBladeRunner(src) {
+  const m = BR_REGEX.exec(String(src || '').trim().toLowerCase());
+  if (!m) throw new Error('Expected a Blade Runner roll like "br:12,8" or "br:12,8adv"');
+  return { attr: Number(m[1]), skill: Number(m[2]), mod: m[3] || null };
+}
+
+const brSuccesses = value => (value >= 10 ? 2 : value >= 6 ? 1 : 0);
+const makeBrDie = (sides, role) => ({ sides, value: randInt(sides), role, kept: true, rerolled: false, exploded: false });
+
+function bladeRunnerResult(notation, dice, pushed) {
+  return {
+    schema: 2,
+    system: 'bladerunner',
+    notation: String(notation),
+    groups: [{ kind: 'dice', dieType: 'bladerunner', sides: dice[0]?.sides ?? 6, count: dice.length, dice, subtotal: 0 }],
+    summary: summarizeBladeRunner(dice, pushed),
+  };
+}
+
+export function rollBladeRunner(src) {
+  const { attr, skill, mod } = parseBladeRunner(src);
+  let dice;
+  if (mod === 'dis') {
+    dice = [makeBrDie(Math.max(attr, skill), attr >= skill ? 'attribute' : 'skill')];
+  } else {
+    dice = [makeBrDie(attr, 'attribute'), makeBrDie(skill, 'skill')];
+    if (mod === 'adv') dice.push(makeBrDie(Math.min(attr, skill), 'advantage'));
+  }
+  return bladeRunnerResult(src, dice, false);
+}
+
+// Push rerolls every die that is not already a success (6+) and not locked on a 1.
+export function pushBladeRunner(result) {
+  const dice = result.groups[0].dice.map(d =>
+    (d.value >= 6 || d.value === 1) ? d : { ...d, value: randInt(d.sides), rerolled: true });
+  return bladeRunnerResult(result.notation, dice, true);
+}
+
+export function summarizeBladeRunner(dice, pushed = false) {
+  let successes = 0, ones = 0;
+  for (const d of dice) { successes += brSuccesses(d.value); if (d.value === 1) ones++; }
+  return {
+    kind: 'bladerunner',
+    successes,
+    ones,
+    outcome: successes >= 2 ? 'critical' : successes >= 1 ? 'success' : 'failure',
+    pushed,
+    canPush: !pushed,
+  };
+}
+
+// The readout is the success count: gold on a critical (2+), green on a plain
+// success, red on a miss.
+export function bladeRunnerHeadline(result) {
+  const s = result.summary;
+  const variant = s.outcome === 'critical' ? 'br-crit' : s.outcome === 'success' ? 'br-success' : 'br-fail';
+  return { kind: 'number', text: String(s.successes), variant };
+}
+
+export function describeBladeRunner(result) {
+  const s = result.summary;
+  const label = { critical: 'Critical', success: 'Success', failure: 'Failure' }[s.outcome];
+  const parts = [`${s.successes} success${s.successes === 1 ? '' : 'es'}`, label];
+  if (s.pushed) parts.splice(1, 0, 'pushed');
+  const dice = result.groups[0].dice.map(d => `d${d.sides}[${d.value}]`).join(' + ');
+  parts.push(dice);
+  if (s.pushed && s.ones) parts.push(`${s.ones} damage`);
   return parts.join(' · ');
 }
 

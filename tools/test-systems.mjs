@@ -10,6 +10,7 @@ import { parseGenesys, rollGenesys, summarizeGenesys, describeGenesys, genesysHe
 import { parseDaggerheart, rollDaggerheart, summarizeDaggerheart, describeDaggerheart, daggerheartHeadline } from '../system-dice.js';
 import { parseCthulhuTech, rollCthulhuTech, summarizeCthulhuTech, describeCthulhuTech, cthulhutechHeadline } from '../system-dice.js';
 import { parseYearZero, rollYearZero, pushYearZero, summarizeYearZero, describeYearZero, yearzeroHeadline } from '../system-dice.js';
+import { parseBladeRunner, rollBladeRunner, pushBladeRunner, summarizeBladeRunner, describeBladeRunner, bladeRunnerHeadline } from '../system-dice.js';
 import { parseStarWars, rollStarWars, summarizeStarWars, describeStarWars, starWarsHeadline } from '../system-dice.js';
 import { parseOneRing, rollOneRing, summarizeOneRing, describeOneRing, oneRingHeadline } from '../system-dice.js';
 import { parsePbta, parseMist, rollPbta, rollMist, summarize2d6, describe2d6, twod6Headline } from '../system-dice.js';
@@ -504,6 +505,57 @@ for (const bad of ['ct:', 'ct:0', 'ct:101', 'ct:8@0', 'dh:', '4dF']) {
     const txt = describeYearZero({ summary: summarizeYearZero(dice([6, 'base'], [1, 'base'], [1, 'stress']), true) });
     ok('yz describe reads successes, push, panic, banes',
       /1 success · pushed · Panic! · banes: 1 attribute, 1 stress/.test(txt));
+  }
+}
+
+// ---- Blade Runner (BRRPG step-die) ----
+{
+  ok('detect br', detectSystem('br:12,8') === 'bladerunner');
+  ok('detect br adv', detectSystem('br:12,8adv') === 'bladerunner');
+  ok('br not numeric', detectSystem('2d12') === 'numeric');
+  ok('parse br:12,8', eq(parseBladeRunner('br:12,8'), { attr: 12, skill: 8, mod: null }));
+  ok('parse br adv/dis', eq(parseBladeRunner('br:12,8adv'), { attr: 12, skill: 8, mod: 'adv' })
+    && eq(parseBladeRunner('br:10,6dis'), { attr: 10, skill: 6, mod: 'dis' }));
+  for (const bad of ['br:', 'br:12', 'br:7,8', 'br:5,6', 'br:12,8xyz', 'yz:5']) {
+    ok(`reject br ${bad}`, (() => { try { parseBladeRunner(bad); return false; } catch { return true; } })());
+  }
+
+  // 6-9 = one success, 10+ = two
+  const s = summarizeBladeRunner([{ sides: 12, value: 11 }, { sides: 8, value: 7 }, { sides: 6, value: 3 }]);
+  ok('br counts 6-9 as one, 10+ as two', s.successes === 3);
+  ok('br 2+ successes is a critical', s.outcome === 'critical');
+  ok('br one success passes', summarizeBladeRunner([{ sides: 8, value: 6 }, { sides: 6, value: 2 }]).outcome === 'success');
+  ok('br zero successes fails', summarizeBladeRunner([{ sides: 8, value: 5 }, { sides: 6, value: 2 }]).outcome === 'failure');
+  ok('br tallies ones for push damage', summarizeBladeRunner([{ sides: 8, value: 1 }, { sides: 6, value: 1 }]).ones === 2);
+
+  // roll shape: two dice, advantage adds smaller, disadvantage keeps larger
+  {
+    const r = rollBladeRunner('br:12,8');
+    ok('br system tag', r.system === 'bladerunner');
+    ok('br rolls two dice', r.groups[0].dice.length === 2 && r.groups[0].dice[0].sides === 12 && r.groups[0].dice[1].sides === 8);
+    const adv = rollBladeRunner('br:12,8adv');
+    ok('br advantage adds a third die (the smaller)', adv.groups[0].dice.length === 3 && adv.groups[0].dice[2].sides === 8);
+    const dis = rollBladeRunner('br:12,8dis');
+    ok('br disadvantage rolls only the larger', dis.groups[0].dice.length === 1 && dis.groups[0].dice[0].sides === 12);
+    ok('rollAny routes br', rollAny('br:8,8').system === 'bladerunner');
+  }
+
+  // push: rerolls dice below 6 that aren't 1s; 6+ and 1s lock
+  {
+    const r = rollBladeRunner('br:12,12');
+    const p = pushBladeRunner(r);
+    ok('push locks 6+ and 1s, rerolls the rest', r.groups[0].dice.every((d, i) =>
+      (d.value >= 6 || d.value === 1) ? p.groups[0].dice[i].value === d.value : true));
+    ok('push marks pushed, blocks a second push', p.summary.pushed === true && p.summary.canPush === false);
+  }
+
+  // headline + describe
+  {
+    ok('br crit headline is the success count', bladeRunnerHeadline({ summary: s }).text === '3');
+    ok('br crit variant', bladeRunnerHeadline({ summary: s }).variant === 'br-crit');
+    ok('br fail variant', bladeRunnerHeadline({ summary: summarizeBladeRunner([{ sides: 6, value: 2 }]) }).variant === 'br-fail');
+    const txt = describeBladeRunner({ summary: summarizeBladeRunner([{ sides: 12, value: 10 }, { sides: 8, value: 3 }], true), groups: [{ dice: [{ sides: 12, value: 10 }, { sides: 8, value: 3 }] }] });
+    ok('br describe reads successes, push, outcome, dice', /2 successes · pushed · Critical · d12\[10\] \+ d8\[3\]/.test(txt));
   }
 }
 

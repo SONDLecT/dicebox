@@ -437,6 +437,7 @@ body {
 #modeToggle[data-system="cthulhutech"] .mode-ico[data-for="cthulhutech"] { display: block; }
 #modeToggle[data-system="yearzero"] .mode-ico[data-for="yearzero"] { display: block; }
 #modeToggle[data-system="alien"] .mode-ico[data-for="alien"] { display: block; }
+#modeToggle[data-system="bladerunner"] .mode-ico[data-for="bladerunner"] { display: block; }
 #modeToggle[data-system="callofcthulhu"] .mode-ico[data-for="callofcthulhu"] { display: block; }
 #modeToggle[data-system="deltagreen"] .mode-ico[data-for="deltagreen"] { display: block; }
 #modeToggle[data-system="ironsworn"] .mode-ico[data-for="ironsworn"] { display: block; }
@@ -636,6 +637,30 @@ body {
 }
 .yz-push:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); }
 .yz-push:active { transform: scale(0.96); }
+
+/* Blade Runner: two step-die selectors (Attribute teal, Skill amber) and an odds
+   stepper that greens for advantage, reddens for disadvantage. */
+.br-picker { display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding: 0; }
+.br-dice { display: flex; gap: 8px; }
+.br-die {
+  flex: 1 1 0; min-width: 0; position: relative;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 9px 6px; border: 1px solid var(--hair); border-radius: 12px;
+  background: none; color: var(--line); font: inherit; cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease, transform 120ms ease;
+}
+.br-die:active { transform: scale(0.95); }
+.br-die-label { font-size: 9.5px; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; }
+.br-die-val { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+#br-attr { border-color: color-mix(in srgb, #38C6C6 45%, var(--hair)); }
+#br-attr .br-die-val { color: #38C6C6; }
+#br-skill { border-color: color-mix(in srgb, #D9A441 45%, var(--hair)); }
+#br-skill .br-die-val { color: #D9A441; }
+.br-mod .br-die-val { font-size: 12.5px; }
+.br-mod[data-state="adv"] { border-color: #5BA860; }
+.br-mod[data-state="adv"] .br-die-val { color: #5BA860; }
+.br-mod[data-state="dis"] { border-color: var(--danger); }
+.br-mod[data-state="dis"] .br-die-val { color: var(--danger); }
 
 /* A standalone die-add button — the Genesys rack's look, sized to sit inline
    rather than fill a row. Used where a pool is one die type (CthulhuTech d10,
@@ -898,6 +923,9 @@ body {
 .total[data-variant="yz-success"] { color: #5BA860; }
 .total[data-variant="yz-fail"] { color: var(--muted); }
 .total[data-variant="yz-panic"] { color: var(--accent); }
+.total[data-variant="br-crit"] { color: #D9A441; }
+.total[data-variant="br-success"] { color: #5BA860; }
+.total[data-variant="br-fail"] { color: var(--muted); }
 
 /* CthulhuTech's difficulty can be unset — just count the hits. */
 .ct-picker .count[data-unset="1"] { color: var(--muted); }
@@ -1533,6 +1561,7 @@ body {
 .mode-cthulhutech { --sys: #57B591; }
 .mode-yearzero { --sys: #8FA05C; }
 .mode-alien { --sys: #D9922E; }
+.mode-bladerunner { --sys: #38C6C6; }
 /* ---- Call of Cthulhu picker: skill dial and the two d10-shaped modifier keys
    all on one row — the keys are compact, so nothing needs its own line. */
 .coc-picker { flex-direction: row; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; }
