@@ -21,6 +21,12 @@ import {
 import {
   deriveRoom, newSender, encryptMessage, decryptMessage, PROTOCOL_VERSION,
 } from '../room-crypto.js';
+import {
+  rollV5, rollFate, rollGenesys, rollDaggerheart, rollCthulhuTech, rollStarWars,
+  rollOneRing, rollPbta, rollMist, rollMothership, rollCallOfCthulhu, rollDeltaGreen,
+  rollIronsworn, rollYearZero, rollBladeRunner, rollTwilight,
+  pushYearZero, pushBladeRunner, pushTwilight,
+} from '../system-dice.js';
 import { readFileSync } from 'node:fs';
 
 let pass = 0, fail = 0;
@@ -618,6 +624,45 @@ const sampleSystemRoll = {
     ...sampleSystemRoll,
     groups: Array(51).fill({ kind: 'dice', count: 1, subtotal: 0, dice: [{ value: 1, kept: true }] }),
   }));
+}
+
+// Every dice system a real roll can come from must survive the wire. share()
+// stamps result.system on the frame and the receiver checks it against the
+// allowlist, so a mode whose wire id was never added is dropped in silence —
+// exactly how Call of Cthulhu, the Year Zero family, Blade Runner, and Twilight
+// stopped sharing. This rolls each one for real and asserts it validates, which
+// fails the moment a new system's id is missing from SYSTEM_ROLL_KINDS.
+{
+  const rolled = {
+    'V5': rollV5('v5:3'),
+    'Fate': rollFate('4dF+1'),
+    'Genesys': rollGenesys('gen:1A'),
+    'Daggerheart': rollDaggerheart('dh:+0'),
+    'CthulhuTech': rollCthulhuTech('ct:3'),
+    'Star Wars': rollStarWars('sw:1A'),
+    'The One Ring': rollOneRing('tor:1'),
+    'PbtA': rollPbta('pbta:+1'),
+    'Mist': rollMist('mist:+0'),
+    'Mothership': rollMothership('ms:c@35'),
+    'Call of Cthulhu': rollCallOfCthulhu('coc:50'),
+    'Delta Green': rollDeltaGreen('dg:50'),
+    'Ironsworn / Starforged': rollIronsworn('iron:+1'),
+    'Year Zero': rollYearZero('yz:4b2s'),
+    'Alien': rollYearZero('yz:4b2s1x'),
+    'Blade Runner': rollBladeRunner('br:10,8'),
+    'Twilight 2000': rollTwilight('t2k:10,8,3'),
+  };
+  const pushed = {
+    'Year Zero (pushed)': pushYearZero(rolled['Year Zero']),
+    'Blade Runner (pushed)': pushBladeRunner(rolled['Blade Runner']),
+    'Twilight 2000 (pushed)': pushTwilight(rolled['Twilight 2000']),
+  };
+  for (const [label, res] of [...Object.entries(rolled), ...Object.entries(pushed)]) {
+    ok(`${label} survives the wire`, validateSystemRoll({
+      k: 'roll2', from: 'x', name: 'P', at: 1,
+      system: res.system, notation: res.notation, groups: res.groups, summary: res.summary,
+    }), `wire id "${res.system}" — is it in SYSTEM_ROLL_KINDS?`);
+  }
 }
 
 // An invalid roll is dropped in silence — no notice, no badge, no "suspicious

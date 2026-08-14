@@ -191,8 +191,13 @@ export function validateRoll(msg) {
 // glyph arrays — but everything is length- and range-capped. The summary is
 // trusted for display only (the room is end-to-end encrypted among people who
 // share the passphrase); the receiver still renders it inside a try/catch.
+// The id here is the one the reducer stamps on result.system and share() puts on
+// the wire, which is not always the picker's slug: Call of Cthulhu travels as
+// 'coc', and the two-game engines collapse to one id each — Alien rolls as
+// 'yearzero', Starforged as 'ironsworn'. Miss one and every roll from that mode
+// is silently dropped at the receiver.
 const SYSTEM_ROLL_KINDS = new Set([
-  'v5', 'fate', 'genesys', 'daggerheart', 'cthulhutech', 'starwars', 'onering', 'pbta', 'mist', 'mothership', 'callofcthulhu', 'deltagreen', 'cards', 'tarot', 'napoletane', 'hanafuda', 'utagaruta',
+  'v5', 'fate', 'genesys', 'daggerheart', 'cthulhutech', 'starwars', 'onering', 'pbta', 'mist', 'mothership', 'coc', 'deltagreen', 'ironsworn', 'yearzero', 'bladerunner', 'twilight', 'cards', 'tarot', 'napoletane', 'hanafuda', 'utagaruta',
 ]);
 
 export function validateSystemRoll(msg) {
