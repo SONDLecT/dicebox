@@ -6702,7 +6702,13 @@ function dropIdleCache() { idleCanvas = null; idleSize = null; idleSince = null;
 const REVEAL_MS = 450;
 function trayIdle() {
   return state.dice.length > 0
-    && state.dice.every(d => d.settled && d.value !== null)
+    // Settled in rotation AND arrived at its grid slot: a die keeps easing toward
+    // home after it settles (the tray tidying itself), so freezing the frame the
+    // instant rotation settles locks a die mid-slide. This waits for the sort to
+    // finish — it matters when a die settles far from home, as a push re-home or
+    // the settle backstop can leave it.
+    && state.dice.every(d => d.settled && d.value !== null
+        && (d.homeX === undefined || Math.hypot(d.homeX - d.x, d.homeY - d.y) < 0.5))
     && state.surface.bursts.length === 0
     && !trayCovered();
 }
