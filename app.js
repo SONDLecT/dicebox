@@ -1616,7 +1616,6 @@ const v5 = { pool: 0, hunger: 0, difficulty: null };
   if (Number.isFinite(saved) && saved >= 0 && saved <= 5) v5.hunger = Math.round(saved);
 }
 const v5PoolFace = $('v5NormalFace');
-const v5HungerFace = $('v5HungerFace');
 const v5HungerChip = $('v5HungerChip');
 const v5HungerVal = $('v5Hunger');
 const v5DiffChip = $('v5DiffChip');
@@ -1639,11 +1638,9 @@ function setHunger(n, { restage = true } = {}) {
   else syncV5Hunger();
 }
 
-// Hunger shows in two places that stay in step: the red die in the pool (its
-// badge, with CSS reading a level of 0 as empty) and the tracker pill beside
-// Difficulty, which reads "—" until Hunger is set.
+// Hunger is one control, the tracker pill beside Difficulty: it reads "—" until
+// set, and its level is what colours that many red dice into the pool.
 function syncV5Hunger() {
-  v5HungerFace.dataset.count = String(v5.hunger);
   if (v5.hunger > 0) {
     v5HungerVal.textContent = String(v5.hunger); delete v5HungerVal.dataset.unset; v5HungerChip.classList.add('is-set');
   } else {
@@ -1677,24 +1674,18 @@ function syncV5({ writeField = true } = {}) {
   if (uiSystem === 'v5') stageSystemPool();
 }
 
-// The Pool die adds white dice without bound; the Hunger die adds red ones up to
-// 5. Neither touches the other's count.
+// The Pool die adds white dice without bound. Building it never touches Hunger.
 function v5StepPool(by) { v5.pool = Math.max(0, Math.min(v5.pool + by, 100)); syncV5(); }
 
-// Tap a die to add one, hold (or right-click) to remove; a die tapped in the tray
-// comes off too.
+// Tap the Pool die to add one, hold (or right-click) to remove; a die tapped in
+// the tray comes off too.
 bindTapHold(v5PoolFace, dir => v5StepPool(dir));
-bindTapHold(v5HungerFace, dir => setHunger(v5.hunger + dir));
 
-// The Hunger tracker pill sets the level directly — the way you would after a
-// hunt — on the same roller the dice use. 0 reads as untracked ("—").
-v5HungerChip.addEventListener('click', () => {
-  openNumberDial({
-    title: 'Hunger', value: v5.hunger, min: 0, max: 5,
-    actionLabel: 'Set Hunger', inputLabel: 'Hunger',
-    commit: value => setHunger(value),
-  });
-});
+// Hunger is the one deliberate hunger control: tap to raise your level (a red die
+// joins the pool), hold to lower. It is standing state, so nothing about building
+// the pool moves it — only this and a Rouse check do.
+bindTapHold(v5HungerChip, dir => setHunger(v5.hunger + dir));
+
 // Difficulty opens the tactile roller, the one number-picker every system
 // shares, with a "Table sets it" release back to unset — the same control as
 // the Mothership target and the custom die.
@@ -5551,10 +5542,11 @@ function stageSystemPool() {
 // tap on them is a gentle no-op rather than an error.
 function removeSystemStageKind(kind) {
   switch (kind) {
-    // A white die taken off the tray drops a pool die; a red one lowers Hunger,
-    // since the two are independent stacks.
+    // A white die taken off the tray drops a pool die. Red dice mirror the Hunger
+    // level and are not removed from the tray — Hunger changes only at its pill —
+    // so a tap on one is a gentle no-op.
     case 'v5-normal': v5.pool = Math.max(0, v5.pool - 1); syncV5(); return true;
-    case 'v5-hunger': setHunger(v5.hunger - 1); return true;
+    case 'v5-hunger': return false;
     case 'fate': fate.count = Math.max(1, fate.count - 1); syncFate(); return true;
     case 'ct': ct.dice = Math.max(0, ct.dice - 1); syncCt(); return true;
     case 'tor-success': tor.success = Math.max(0, tor.success - 1); syncTor(); return true;

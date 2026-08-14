@@ -529,12 +529,6 @@ body {
 }
 .v5-die-btn:active { transform: scale(0.95); }
 
-/* The Hunger die always shows its level (0-5) as its tracker, but at 0 it reads as
-   an empty die rather than a loaded one. */
-.v5-die-hunger[data-count="0"] { border-color: var(--hair); background: none; }
-.v5-die-hunger[data-count="0"] .v5-die-name { color: var(--muted); }
-.v5-die-hunger[data-count="0"]::after { background: var(--muted); color: var(--paper); }
-
 /* Hunger and Difficulty are the two trackers, side by side below the dice; a set
    Hunger reads in the blood accent. */
 .v5-lower { display: flex; gap: 10px; width: 100%; align-items: stretch; }
