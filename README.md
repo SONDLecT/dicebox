@@ -4,23 +4,40 @@
   <img src="og.png" alt="Dicebox — a cross-platform, self-hosted open-source dice roller and card drawer that respects your privacy" width="720">
 </p>
 
-A cross-platform, self-hosted open-source dice roller and card drawer that
-respects your privacy.
+A tactile dice roller and card drawer that works on phones, tablets, and desktops.
 
-Try it at **[dicebox.cc](https://dicebox.cc)** — that is a
-demo instance, not a service. To keep a copy of your own, see
-[Getting it offline](#getting-it-offline): download it as a single file, install
-it from the browser, or host it yourself.
+**[Use Dicebox at dicebox.cc](https://dicebox.cc).** This is the primary hosted
+Dicebox service, not a temporary demo. It is free to use, needs no account, and
+is meant to be there when you need it.
 
-Out of the box it does more than plain dice: a dozen [game-system modes](#game-systems)
-— Vampire, Daggerheart, Mothership and the rest — and five
-[card decks](#card-decks), all of it local and offline.
+Dicebox is also open source and self-hostable. Install it as a PWA, download the
+whole app as a single HTML file, or run a copy on your own server. Those are not
+lesser versions: they are part of the point, and they keep working offline.
 
-It stays a local dice roller unless you ask for more. Optionally it will also
-share rolls with a table over an [end-to-end encrypted room](#rooms), and there
-is an [Owlbear Rodeo panel](#in-owlbear-rodeo) that joins one as an ordinary
-member. Both are opt-in, both are off until you open the Share panel, and
-neither is needed to roll dice.
+I built Dicebox because I could not find the thing I wanted: a simple, tactile
+dice roller that looked good, felt good to use, worked on whatever device was
+nearby, and did not turn every throw into someone else's data. It grew from
+there.
+
+With Dicebox you can:
+
+- put up to 500 dice in each notation term, using anything from d1 to d1000 in
+  the picker (typed notation accepts sides up to d10000);
+- build rolls by tapping or typing standard notation, with advantage,
+  disadvantage, keep/drop, exploding dice, and rerolls;
+- switch among **19 built-in game modes**, each with its own controls, dice,
+  result reading, colours, and short URL;
+- draw from **five card decks**, including the Woodcut playing cards and tarot,
+  carte napoletane, Hanafuda, and Uta-garuta;
+- share live rolls through an end-to-end encrypted Dicebox room; or
+- install the [hosted Owlbear Rodeo extension](#in-owlbear-rodeo) from
+  `vtt.dicebox.cc` and share automatically with the current Owlbear game.
+
+The standalone app keeps rolls and history on your device unless you join a
+shared room. Inside the Owlbear extension, game sharing is on by default and
+visibly indicated; it uses Owlbear's room broadcast rather than Dicebox's
+end-to-end encryption. [The sharing section](#rooms) explains both paths, how to
+leave an encrypted room, and how to stop sending rolls through Owlbear.
 
 <p align="center">
   <img src="docs/roll.png" alt="Rolling 2d20+3d6, with the total and each die's result" width="270">
@@ -36,13 +53,16 @@ neither is needed to roll dice.
 
 ## About
 
-This is a personal project. I kept running into the same problem — there was no
-clean, open source, offline-capable web app for rolling dice — so I built one.
-If you have had the same problem, you are welcome to it.
+Dicebox started as a personal project. I kept running into the same problem:
+there was no clean, open source, offline-capable dice app that felt as good to
+use as the physical thing. I built the version I wanted, then kept adding the
+games and decks my friends and I cared about. It is still a personal project,
+but `dicebox.cc` is a real hosted service and I want people to use it.
 
 It was made with Claude Code. If that is not your bag, that is completely fine:
-write your own, fork this, do whatever you want with it. Questions, comments,
-issues, pull requests and forks are all welcome.
+the source is here, the license is permissive, and you can inspect it, fork it,
+or run it without depending on me. Questions, bug reports, pull requests and
+forks are welcome.
 
 MIT licensed.
 
@@ -93,23 +113,30 @@ the switcher in the top bar — the icon beside the wordmark — and the tray, t
 picker and the notation all change to match.
 
 <p align="center">
-  <img src="docs/modes.png" alt="A grid of every Dicebox mode — numeric, Vampire V5, Fate, Genesys, Star Wars, Daggerheart, CthulhuTech, The One Ring, PbtA, Mist Engine, Mothership, Cards and Tarot — each with its own dice and colour palette" width="820">
+  <img src="docs/modes.png" alt="A selection of Dicebox modes, each with its own dice, controls and colour palette" width="820">
 </p>
 
 | System | Notation | What it rolls |
 | --- | --- | --- |
-| **Vampire V5** | `v5:8h3` | a d10 pool with Hunger, successes and messy criticals |
-| **Daggerheart** | `dh:+2@15` | the Hope and Fear duality dice |
-| **Fate / Fudge** | `4dF+2` | the four +/blank/− dice and the ladder |
-| **Genesys** | `gen:2A+1P+2D` | the narrative dice, symbols cancelling out |
-| **Star Wars** | `sw:2A+2D+1F` | the same narrative dice, plus the Force die |
-| **Mist Engine** | `mist:+1` | 2d6 + Power — City of Mist, Legend in the Mist |
-| **PbtA** | `pbta:+1` | 2d6 + stat, the 10+ / 7–9 / 6− ladder |
-| **The One Ring 2e** | `tor:3@14` | the Feat die and a pool of Success dice |
-| **CthulhuTech 2e** | `ct:8@4` | a d10 pool counting even-face hits |
-| **Mothership 1e** | `ms:c@35` | d100 roll-under, Panic, and tracked Stress |
+| **Alien RPG** | `yz:5b1x` | a Year Zero d6 pool with Stress, Panic and push |
+| **Blade Runner RPG** | `br:12,8` | Attribute and Skill step dice, advantage/disadvantage and push |
 | **Call of Cthulhu 7e** | `coc:65b` | d100 roll-under with bonus and penalty dice |
+| **CthulhuTech 2e** | `ct:8@4` | a d10 pool counting even-face hits |
+| **Dungeon Crawl Classics** | `d16` | the complete dice chain, with an active die that steps up and down |
 | **Delta Green** | `dg:50` | d100 roll-under, criticals on matching digits |
+| **Daggerheart** | `dh:+2@15` | the Hope and Fear duality dice |
+| **Fate / Fudge** | `4dF+2` | four +/blank/− dice and the ladder |
+| **Genesys** | `gen:2A+1P+2D` | narrative dice with symbol cancellation |
+| **Ironsworn** | `iron:+2` | action and progress rolls, plus the Ironsworn/Delve oracle library |
+| **Mist Engine** | `mist:+1` | 2d6 + Power for City of Mist and Legend in the Mist |
+| **Mothership 1e** | `ms:c@35` | d100 roll-under, Panic and tracked Stress |
+| **Powered by the Apocalypse** | `pbta:+1` | 2d6 + stat with the 10+ / 7–9 / 6− ladder |
+| **Starforged** | `iron:+2` | action and progress rolls, plus Starforged oracle tables |
+| **Star Wars RPG** | `sw:2A+2D+1F` | narrative dice with the Force die |
+| **Twilight: 2000 4e** | `t2k:12,8,3` | Attribute and Skill step dice with ammo dice and push |
+| **The One Ring 2e** | `tor:3@14` | the Feat die and a pool of Success dice |
+| **Vampire: The Masquerade V5** | `v5:8h3` | a d10 pool with Hunger, successes and messy criticals |
+| **Year Zero Engine** | `yz:5b3s2g` | Base, Skill and Gear d6 pools with push mechanics |
 
 Each mode has a picker built for its own dice — tap to build the pool, hold to
 adjust — and a help panel (the **?** in the top bar) with its full rules and
@@ -228,10 +255,11 @@ however you already talk to each other. The passphrase is what derives the
 encryption key, so it never travels over the network — the relay never receives
 it, is never sent it during a join, and has no way to ask for it.
 
-Rolling stays local whatever the network does. If the relay is unreachable your
-dice still land instantly; the app tells you it cannot share and carries on. No
-spinner, no queue, no waiting. A roll that arrives ten minutes late is worse
-than one that never arrives, so late rolls are dropped rather than held.
+In a Dicebox passphrase room, the roll itself never waits on the network. If the
+Dicebox relay is unreachable your dice still land instantly; the app tells you
+it cannot share and carries on. No spinner, no queue, no waiting. A roll that
+arrives ten minutes late is worse than one that never arrives, so late rolls are
+dropped rather than held.
 
 Rooms are ephemeral. Nothing is stored, so someone joining halfway through sees
 rolls from that moment on and no earlier. A room dies after 30 minutes idle, and
@@ -289,8 +317,9 @@ The `rooms` profile means the relay only starts when you ask for it — plain
 `docker compose up -d` brings up the static app exactly as before.
 
 The second is a Cloudflare Worker backed by Durable Objects, which is what the
-demo runs. It exists for one reason: a dice room is idle between rolls, and the
-hibernation API lets an idle room evict from memory while its sockets stay open.
+hosted service runs. It exists for one reason: a dice room is idle between
+rolls, and the hibernation API lets an idle room evict from memory while its
+sockets stay open.
 If you are not paying per-request for a public instance, you do not need it.
 
 ```sh
@@ -311,66 +340,175 @@ eight-character prefix the relay itself logs, and it stays there long after the
 room has expired. [`server/README.md`](server/README.md) has the configuration.
 
 That origin is **pinned to one exact host** rather than opened up to `wss:` or
-`*`, and it is worth saying why. The relay is never given key material by
-design; the pinned origin is what keeps that true even if the design fails.
-A build tampered with somewhere between the server and the browser still cannot
-send anything to a host that is not on that line, because the browser refuses
-the connection outright. Widening it to make a setup problem go away gives that
-protection up entirely.
+`*`. This limits a compromised build to the origins already allowed by the
+policy instead of letting it connect to an arbitrary third-party host. It is not
+a defence against a compromised Dicebox origin or relay: both `self` and the
+configured relay are permitted destinations. Widening the policy to make a
+setup problem go away gives up the narrower protection it does provide.
 
 [`server/README.md`](server/README.md) covers the configuration — limits,
 timeouts, origins — in full.
 
 ### In Owlbear Rodeo
 
-There is an Owlbear Rodeo panel, which joins a room as an ordinary member —
-same passphrase, same rolls, no special status. It is the same app built for an
-iframe rather than a second implementation.
+Dicebox is available as an [Owlbear Rodeo](https://www.owlbear.rodeo/)
+extension. It is the same roller in a compact action panel, with one additional
+sharing path: every running Dicebox panel in the same Owlbear game can exchange
+finished rolls over Owlbear's own [Broadcast API](https://docs.owlbear.rodeo/extensions/apis/broadcast/).
+The Owlbear game is the room, so there is no Dicebox passphrase to exchange.
 
-**To add the hosted panel:** in Owlbear Rodeo open **Profile → Add Extension**
-and paste
+#### Install the hosted extension
 
+1. In Owlbear Rodeo, open **Profile → Add Extension**.
+2. Paste this manifest URL:
+
+   ```text
+   https://vtt.dicebox.cc/manifest.json
+   ```
+
+3. Create a room, or edit an existing room, and enable **Dicebox** in its
+   extensions list.
+4. Open the room and click the Dicebox action in the top-left toolbar.
+
+This follows Owlbear's normal [extension installation flow](https://docs.owlbear.rodeo/extensions/tutorial-hello-world/install-your-extension/).
+The hosted manifest and panel are public static files; no Dicebox account is
+required.
+
+#### Sharing at the Owlbear table
+
+Owlbear sharing is **on by default inside the extension**. The Dicebox action
+popover must be open for its SDK listener and sender to be running; enabling the
+extension in a room is not enough by itself. Once Owlbear's SDK is ready,
+Dicebox subscribes the open panel to the game's roll channel. A roll completed
+in that panel is sent to the other open Dicebox panels in the same game and
+appears in their tray and roll history.
+
+To turn outgoing Owlbear sharing off:
+
+1. Open Dicebox's **Share rolls** menu.
+2. Clear **Share rolls with this Owlbear game**.
+
+The red light beside the switch is on while outgoing sharing is live. The choice
+is remembered in that browser/profile when local storage is available. If the
+browser denies storage, the switch still works for the open panel but returns to
+its default-on state the next time the panel loads. Turning it off stops **your
+outgoing Owlbear broadcasts only**: you continue to receive the other panels'
+rolls, and any passphrase room you joined continues independently. Re-enable the
+same switch to resume sending.
+
+Broadcasts are live events, not stored history. A receiving Dicebox panel must
+be running when the roll is sent; opening one later does not replay earlier
+rolls.
+
+#### Owlbear sharing versus Dicebox rooms
+
+These are separate transports with deliberately different trust boundaries:
+
+| | Owlbear game broadcast | Dicebox passphrase room |
+| --- | --- | --- |
+| Membership | The current Owlbear game | Anyone with the passphrase |
+| Activation | On by default in the Owlbear panel; send-only opt-out | Off until someone creates or joins a room |
+| Transport | Owlbear's extension Broadcast API | A Dicebox WebSocket relay |
+| End-to-end encrypted by Dicebox | **No** | **Yes** |
+| Useful outside Owlbear | No | Yes — browser tabs, phones, another table |
+| Stored backlog | None | None |
+
+Owlbear-broadcast payloads contain the roll in readable form. Owlbear carries
+that message, and another extension that deliberately listens on Dicebox's
+known channel can read it. The passphrase room instead encrypts the roll in the
+sender's browser before Dicebox's relay sees it; the relay receives ciphertext
+and never receives the key or passphrase.
+
+Both can be active at once. This is useful when the Owlbear players also want a
+phone or standalone browser in the table. Dicebox stamps one id on the local
+roll before sending it through either transport, so a panel that receives both
+copies displays one. A received roll is never re-broadcast onto the other
+transport: in particular, a private passphrase-room roll is not amplified into
+the Owlbear game.
+
+Neither system proves that a roll came from an unmodified client. Incoming data
+is checked for a valid, internally consistent Dicebox shape, which catches
+malformed or incompatible messages rather than cheating.
+
+#### For extension developers: broadcast contract
+
+The panel vendors `@owlbear-rodeo/sdk` as a self-contained browser ESM and loads
+it only in the Owlbear build. After `OBR.onReady`, it listens and sends on:
+
+```text
+cc.dicebox.rolls
 ```
-https://vtt.dicebox.cc/manifest.json
+
+A local completed roll is sent with:
+
+```js
+OBR.broadcast.sendMessage('cc.dicebox.rolls', payload, {
+  destination: 'REMOTE',
+});
 ```
 
-The Dicebox panel then appears in the room's toolbar. Everyone who wants the
-shared log joins the same room with the same passphrase — in the panel, in a
-browser tab, or on a phone; they are all the same kind of participant.
+`REMOTE` avoids echoing the message back to the sender. Receiving remains
+subscribed when the user's send switch is off. Consumers should register only
+after `OBR.onReady`, treat `event.data` as untrusted input, and should not assume
+that a message is authentic merely because its arithmetic is consistent.
 
-**To host your own panel** instead of using that one:
+The current payload is:
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `id` | string | Per-roll transport id used to deduplicate copies arriving over Owlbear and the encrypted room |
+| `system` | string | `numeric` or Dicebox's internal id for a game-system mode |
+| `notation` | string | The notation that produced the roll |
+| `groups` | array | Complete Dicebox roll groups, including individual outcomes; numeric groups follow `dice.js`, while game-system modes carry their bounded system-specific groups |
+| `summary` | object, optional | The mode-specific display summary; normally absent for a plain numeric roll |
+| `total` | number or `null` | Numeric total where the system has one |
+| `who` | string | Dicebox name, then Owlbear player name, falling back to `Someone`; receivers cap it at 40 characters |
+| `at` | number | Sender timestamp in Unix milliseconds |
+
+The receiver validates numeric rolls by recomputing kept dice and totals, and
+bounds system-mode fields before rendering. Roll ids are retained in a bounded
+400-entry dedupe window. Only locally completed rolls enter the send path;
+messages received from Owlbear or the encrypted relay do not.
+
+This wire format is the **current implementation, not yet a versioned public
+API**. If another extension wants to depend on it, open an issue so schema
+versioning and compatibility can be agreed before either side treats it as
+stable. The relevant implementation is in `broadcastToOwlbear`,
+`acceptOwlbearRoll`, and `initializeOwlbear` in [`app.js`](app.js).
+
+#### Host your own panel
 
 ```sh
 npm run build:owlbear -- --relay=wss://relay.example.com/ws --host=vtt.example.com
 npm run deploy:owlbear
 ```
 
-It has to be its **own origin**, not a path on the app's — the panel permits
-being framed by Owlbear and the app must never be, and the app's service worker
-would otherwise claim the panel as well. The deploy refuses to publish onto the
-app's hostname rather than relying on anyone to remember that.
+The relay argument serves the optional encrypted passphrase-room feature; the
+Owlbear game broadcast itself uses Owlbear's SDK. The panel must have its **own
+origin**, not a path on the main app's origin: its CSP permits Owlbear to frame
+it while the main app refuses all framing, and the main app's root-scoped
+service worker must never claim the panel. The build and deploy scripts enforce
+that separation.
 
-Rolls are *not* published into the Owlbear room, so players without the
-passphrase see nothing. Doing that would mean holding the room key and handing
-plaintext to Owlbear's servers, which is a different feature with a different
-privacy story rather than a convenience to add quietly.
-[`owlbear/README.md`](owlbear/README.md) covers hosting, headers and installing.
+[`owlbear/README.md`](owlbear/README.md) covers self-hosting, relay allowlists,
+CSP/CORS headers, SDK vendoring, deployment, and troubleshooting in depth.
 
-### What the privacy actually is
+### What passphrase-room privacy actually is
 
-Rolls are encrypted in your browser and decrypted in the other players'
-browsers. The relay only ever sees ciphertext. Names, notation, dice values and
-totals are all inside it.
+In a Dicebox passphrase room, rolls are encrypted in your browser and decrypted
+in the other players' browsers. The Dicebox relay only ever sees ciphertext.
+Names, notation, dice values and totals are all inside it. This section does not
+apply to the Owlbear game broadcast described above.
 
 **Self-hosting, or the downloaded single file, gives a real "we cannot see your
 rolls" guarantee.** You are running the code, and you can read it.
 
-**The hosted demo does not, and this is a genuine difference rather than a
-technicality.** [dicebox.cc](https://dicebox.cc) serves
+**The hosted service has a different trust boundary, and this is a genuine
+difference rather than a technicality.** [dicebox.cc](https://dicebox.cc) serves
 the JavaScript that does the encrypting. Encryption in the browser is only as
-trustworthy as the code the browser was handed, so using the demo means trusting
-me to keep serving honest code — not just today but on every load, since the app
-updates itself. I have no plans to do otherwise, but a promise is not a
+trustworthy as the code the browser was handed, so using the hosted app means
+trusting me to keep serving honest code — not just today but on every load, since
+the app updates itself. I have no plans to do otherwise, but a promise is not a
 guarantee, and you should not accept one where you can have the real thing. If
 that distinction matters for your table, self-host or use the single file. Both
 are a few minutes of work and are why they exist.
@@ -405,7 +543,10 @@ Every roll is kept for the session, with what each die landed on and when.
   counting faces or checking whether a die is drifting
 - **JSON** is the same data with the structure intact
 
-Nothing leaves the browser unless you export it.
+The stored log itself stays in the browser unless you export it. When sharing is
+active, the newly completed roll is also sent through the selected transport as
+described in [Rooms](#rooms) and [In Owlbear Rodeo](#in-owlbear-rodeo); opening or
+exporting the full log does not upload its earlier entries.
 
 ## Getting it offline
 
@@ -423,7 +564,7 @@ The help panel inside the app links to it too.
 
 ### Install it from the web
 
-Open [the demo](https://dicebox.cc) and install it. After the first
+Open [Dicebox](https://dicebox.cc) and install it. After the first
 load it runs offline, because a service worker keeps a local copy.
 
 | Browser | How |

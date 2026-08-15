@@ -1,8 +1,9 @@
 # Dicebox for Owlbear Rodeo
 
-Dicebox as an Owlbear Rodeo panel. It joins a room as an ordinary member: you
-type the same passphrase everyone else typed, you see their rolls, they see
-yours. There is nothing special about being the one in Owlbear.
+Dicebox as an Owlbear Rodeo panel. Panels in the same Owlbear game share rolls
+automatically over Owlbear's Broadcast API, with no Dicebox passphrase. The
+ordinary end-to-end encrypted passphrase-room controls remain available as a
+separate transport for phones, browser tabs, and players outside that game.
 
 It is the same app, not a reimplementation. `tools/build-owlbear.mjs` copies the
 files from the repo root and changes three things — the relay origin is baked
@@ -16,23 +17,27 @@ geometry rather than maintaining separate identities.
 
 ## What it is and is not
 
-**It is a shared table inside Owlbear.** Every panel in the same Owlbear game
-shares rolls automatically over Owlbear's own message bus — no passphrase, the
-game is the room. On by default, with a toggle in the share menu to turn it off
-and a red light while it is live. This is the one place Dicebox deliberately
-leaves its encrypted channel: Owlbear relays the bus, so those rolls are visible
-to the whole table and to any extension listening, not end-to-end encrypted.
-Being at an Owlbear table is already a choice to share one, and the toggle and
-the light say so out loud. Rolls carry an id and are deduped, and a roll heard on
-the bus is never re-published, so nothing loops and no encrypted roll leaks out.
+**It is a shared table inside Owlbear.** Every open panel in the same Owlbear
+game shares rolls automatically over Owlbear's own message bus — no passphrase,
+the game is the room. Sending is on by default, with a toggle in the share menu
+and a red light while it is live. Turning the toggle off stops this panel from
+sending to Owlbear; it remains subscribed and still receives the other panels'
+rolls. This is the one place Dicebox deliberately leaves its encrypted channel:
+Owlbear relays the bus, so those rolls are visible to the whole table and to any
+extension listening, not end-to-end encrypted. Being at an Owlbear table is
+already a choice to share one, and the toggle and the light say so out loud.
+Rolls carry an id and are deduped, and a roll heard on the bus is never
+re-published, so nothing loops and no encrypted roll leaks out.
 
 **It is also a peer.** The manual passphrase room is still here, end-to-end
 encrypted, for anyone NOT in the Owlbear game — a phone, a browser tab, a player
 at a different table. The table creates a room and everyone joins it; the Owlbear
 players are then on both transports at once, which the id dedupe cleans up.
 
-**Rolls stay local if the relay is unreachable.** Same as everywhere else. The
-dice land instantly and the panel says it cannot share.
+**The two transports fail independently.** If the Dicebox WebSocket relay is
+unreachable, a passphrase-room roll still lands locally and that room reports it
+cannot share. Owlbear Broadcast does not use that relay and can continue sharing
+readable rolls with the current game.
 
 ## Build it
 
@@ -46,7 +51,7 @@ and keeping a copy in the tree would mean two versions of the app drifting apart
 | Flag | Meaning |
 | --- | --- |
 | `--relay` | **Required.** The relay this panel talks to. Baked into the build and pinned in its `connect-src`: a panel has no settings screen, and an iframe is not a place to be configuring origins. |
-| `--site` | Where a full copy of Dicebox lives, for the help panel's links. Defaults to the public demo. |
+| `--site` | Where a full copy of Dicebox lives, for the help panel's links. Defaults to the hosted service. |
 | `--out` | Where to build. Defaults to `owlbear/dist`. |
 
 `wss://` rather than `ws://`. Owlbear is served over HTTPS, so a browser blocks
@@ -117,12 +122,11 @@ This is also why the panel belongs on **its own origin**, and why `owlbear` is
 in `.assetsignore`. Serving a framable copy from the same host as the copy that
 refuses to be framed gives up the protection for both.
 
-**`connect-src 'self' wss://<your relay>`.** Pinned to one exact host, for the
-reason given at length in `worker.js`: the relay is never given key material by
-design, and the pin is what keeps that true if the design fails. A build
-tampered with between your server and a player's browser still cannot post a
-derived key anywhere, because the browser refuses the connection before the
-request leaves. `wss:` would allow every relay on the internet.
+**`connect-src 'self' wss://<your relay>`.** Pinning the relay prevents a
+compromised build from connecting to arbitrary third-party origins. It does not
+protect against a compromised panel origin or relay: `self` and that relay are
+still allowed destinations. Using `wss:` instead would widen the policy to
+every secure WebSocket relay on the internet.
 
 ### Let the relay accept the panel
 
@@ -176,7 +180,9 @@ the passphrase becomes uncopyable at the exact moment everyone needs it.
 **Storage may be partitioned or denied.** An embedded copy can have
 `localStorage` throw on access rather than return null. Dicebox reads it at
 load, so this used to be capable of blanking the panel with no visible error;
-it now goes through a guard. Losing the theme preference is the whole cost.
+it now goes through a guard. The panel still runs, but the theme and outgoing
+Owlbear-sharing preferences cannot persist. The sharing switch works for the
+open panel and returns to its default-on state after a reload.
 
 **No service worker.** The app skips registering one when it detects it is
 framed. A panel with no address bar and no reload button, quietly serving a
