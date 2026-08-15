@@ -67,24 +67,29 @@ ok('every file the page references was built', dangling.length === 0, dangling.j
 // STATIC graph has to be walked, not just app.js's first level. A file missing
 // anywhere in it stops the entry module evaluating with no error to see, which
 // is exactly how the panel once shipped rendering its shell and wiring nothing.
-// Dynamic import() (the card-art modules) is deliberately excluded: those are
-// large, loaded on demand, and not part of the graph the app needs to start.
-function staticImports(name) {
-  try {
-    const src = readFileSync(join(ROOT, name), 'utf8');
-    return [...src.matchAll(/from '\.\/([^']+\.js)'/g)].map(m => m[1]);
-  } catch { return []; }
+function moduleSrc(name) {
+  try { return readFileSync(join(ROOT, name), 'utf8'); } catch { return ''; }
 }
 const graph = new Set();
 const queue = ['app.js'];
 while (queue.length) {
-  for (const dep of staticImports(queue.shift())) {
-    if (!graph.has(dep)) { graph.add(dep); queue.push(dep); }
+  const src = moduleSrc(queue.shift());
+  for (const m of src.matchAll(/from '\.\/([^']+\.js)'/g)) {
+    if (!graph.has(m[1])) { graph.add(m[1]); queue.push(m[1]); }
   }
 }
 ok('app.js has an import graph to check', graph.size > 5);
 const missingImports = [...graph].filter(f => !present.has(f));
 ok('every module in app.js\'s static import graph was built', missingImports.length === 0, missingImports.join(', '));
+
+// The lazily import()'d modules — the card-deck art — cost nothing until a deck
+// is opened, but a missing one is that deck dead in the panel with no warning.
+// They are shipped, so they are checked; a literal import('./x.js') is required
+// present. (The oracle modules load through a variable and are covered above by
+// their place in the copy list.)
+const dynamic = [...moduleSrc('app.js').matchAll(/import\('\.\/([^']+\.js)'\)/g)].map(m => m[1]);
+const missingDynamic = dynamic.filter(f => !present.has(f));
+ok('every lazily-imported module was built', missingDynamic.length === 0, missingDynamic.join(', '));
 
 // Every element app.js reaches for has to survive the build. The PWA stripping
 // works by deleting whole lines from the markup, and a regex that matched one
