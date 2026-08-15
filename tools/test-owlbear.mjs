@@ -39,7 +39,7 @@ const present = new Set(readdirSync(OUT));
 
 for (const file of ['index.html', 'app.js', 'dice.js', 'render.js', 'room.js',
                     'room-crypto.js', 'style.css', 'icon.svg', 'manifest.json',
-                    '_headers', 'worker.js', 'wrangler.jsonc']) {
+                    '_headers', 'worker.js', 'wrangler.jsonc', 'obr-sdk.js']) {
   ok(`${file} is built`, present.has(file));
 }
 

@@ -117,6 +117,13 @@ mkdirSync(OUT, { recursive: true });
 for (const file of APP_FILES) copyFileSync(join(ROOT, file), join(OUT, file));
 copyFileSync(BRAND_ICON, join(OUT, 'icon.svg'));
 
+// The Owlbear SDK, vendored (owlbear/obr-sdk.js, a self-contained esbuild bundle
+// of @owlbear-rodeo/sdk — regenerate with owlbear/README's "update the SDK"). It
+// exists ONLY in the panel build: app.js loads it lazily, gated on the
+// dicebox-owlbear meta below, so the site never fetches it and the broadcast code
+// never runs anywhere but here.
+copyFileSync(join(SRC, 'obr-sdk.js'), join(OUT, 'obr-sdk.js'));
+
 // --- the page ---
 
 let html = readFileSync(join(ROOT, 'index.html'), 'utf8');
@@ -130,6 +137,13 @@ if (html === before) {
   console.error('could not find the dicebox-relay meta tag in index.html');
   process.exit(1);
 }
+
+// The flag app.js keys the Owlbear broadcast off. Only the panel build carries
+// it, so the SDK loads and the broadcast toggle appears here and nowhere else —
+// the site's index.html never has this tag.
+html = html.replace(
+  /(<meta name="dicebox-relay"[^>]*>)/,
+  '$1\n  <meta name="dicebox-owlbear" content="1">');
 
 // The PWA wiring, removed. manifest.webmanifest and the icons are not copied to
 // the extension origin, so leaving these would be three 404s on every open, and

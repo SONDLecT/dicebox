@@ -1,6 +1,6 @@
 import { roll, describe } from './dice.js';
 import { Die, Surface, separate, beginFrame } from './render.js';
-import { createRoom, parsePassphraseFromHash } from './room.js';
+import { createRoom, parsePassphraseFromHash, validateRoll, validateSystemRoll } from './room.js';
 import { generatePassphrase, normalizePassphrase } from './room-crypto.js';
 import { rollV5, rollRouse, describeV5, v5Headline, detectSystem, v5Face, parseV5 } from './system-dice.js';
 import { rollFate, describeFate, fateHeadline, fateFace, parseFate } from './system-dice.js';
@@ -123,6 +123,13 @@ const store = {
     try { localStorage.setItem(key, value); } catch { /* see above */ }
   },
 };
+
+// A stable id per roll: a random per-session prefix so two tables never collide,
+// then a counter. Stamped on every roll that leaves this device so a peer hearing
+// it on two transports at once can drop the duplicate.
+const ROLL_SESSION = Math.random().toString(36).slice(2, 8);
+let rollSeq = 0;
+function nextRollId() { return `${ROLL_SESSION}-${++rollSeq}`; }
 
 const stored = store.get('dicebox:theme');
 if (stored === 'dark' || stored === 'light') document.documentElement.dataset.theme = stored;
@@ -1043,7 +1050,14 @@ function finish(result) {
   // place in the log. share() is synchronous and a no-op when there is no room,
   // which is what keeps this line off the critical path. It picks the wire
   // schema by system: numeric rolls go as `roll`, the system modes as `roll2`.
+  // One id per roll, stamped before it goes anywhere, so a peer who hears it on
+  // both the relay room and the Owlbear bus shows it once.
+  result.rollId = nextRollId();
   roomLink.share(result);
+  // Owlbear panel only, and only your own rolls (this runs for local throws; a
+  // peer's roll goes through showRemoteRoll and is never re-broadcast). A no-op
+  // unless the panel is inside Owlbear and broadcasting is on.
+  broadcastToOwlbear(result);
   // The name has done its job by the first roll; let the tray have the page.
   $('wordmark').dataset.faded = '1';
   updateYzPush();
@@ -7355,7 +7369,21 @@ const roomLink = createRoom({
 //
 // The one thing this must not do is interrupt a throw of your own, which the
 // dataset.rolling guard below covers.
+// Roll ids already shown, so a peer heard on both the relay room and the Owlbear
+// bus lands once. Bounded, because a long table would otherwise grow it forever;
+// the window only needs to cover the gap between the two transports, which is
+// milliseconds, so a few hundred is generous.
+const seenRolls = new Set();
+function alreadyShown(id) {
+  if (!id) return false;
+  if (seenRolls.has(id)) return true;
+  seenRolls.add(id);
+  if (seenRolls.size > 400) seenRolls.delete(seenRolls.values().next().value);
+  return false;
+}
+
 function showRemoteRoll(roll) {
+  if (alreadyShown(roll.id)) return;
   // Rebuild the shape the formatters and the tray expect. A numeric roll travels
   // as a total; a system roll (V5, Fate, …) travels with its system id and the
   // summary its headline and detail are rendered from.
@@ -7689,3 +7717,94 @@ setSystem(systemFromPath(), { url: false });
 
 // Back/forward moves between the systems the address has visited.
 window.addEventListener('popstate', () => setSystem(systemFromPath(), { url: false }));
+
+// ---- Owlbear Rodeo shared table ----
+//
+// A deliberate exception to everything else in this app. Rolls otherwise stay on
+// this device or inside the end-to-end-encrypted room; here every panel in the
+// same Owlbear game shares rolls automatically, over Owlbear's own message bus,
+// with no passphrase — the game IS the room. That bus is not end-to-end
+// encrypted (Owlbear relays it), but being at an Owlbear table is already a
+// choice to share one, so it is on by default with a visible toggle and a live
+// light. The manual room below still exists for anyone NOT in the game — a phone,
+// a browser tab — which is the one thing Owlbear cannot reach.
+//
+// It runs ONLY in the Owlbear panel; the SDK it needs is loaded only here, never
+// on the site. Send is your rolls; receive is everyone else's, rendered by the
+// same showRemoteRoll the relay room uses, so the shared tray, the history and
+// the dedupe all come along for free.
+const owlbearPanel = !!document.querySelector('meta[name="dicebox-owlbear"]');
+const OBR_BROADCAST_KEY = 'dicebox:obr:broadcast';
+const OBR_CHANNEL = 'cc.dicebox.rolls';
+let obr = null;                                            // the SDK, once ready inside Owlbear
+let obrPlayerName = null;
+let obrBroadcast = store.get(OBR_BROADCAST_KEY) !== '0';   // default on — opt out, not in
+
+// Called from finish() for every local roll. A no-op unless the panel is inside
+// Owlbear and broadcasting is on. Carries the full roll — the same fields the
+// relay room sends — so a receiving panel renders it exactly like any peer's.
+function broadcastToOwlbear(result) {
+  if (!obr || !obrBroadcast) return;
+  try {
+    obr.broadcast.sendMessage(OBR_CHANNEL, {
+      id: result.rollId,
+      system: result.system || 'numeric',
+      notation: result.notation,
+      groups: result.groups,
+      summary: result.summary,
+      total: result.total ?? null,
+      who: selfName() || obrPlayerName || 'Someone',
+      at: Date.now(),
+    }, { destination: 'REMOTE' }).catch(() => {});
+  } catch { /* the table just doesn't see this one */ }
+}
+
+// A roll off the bus is as untrusted as one off the relay, so it goes through the
+// same shape guards before the renderer sees it. Numeric rolls re-derive their
+// total; system rolls pass the permissive system-roll check.
+function acceptOwlbearRoll(d) {
+  if (!d || typeof d !== 'object' || typeof d.notation !== 'string') return;
+  const sys = d.system || 'numeric';
+  const wire = sys === 'numeric'
+    ? { notation: d.notation, total: d.total, groups: d.groups }
+    : { system: sys, notation: d.notation, groups: d.groups, summary: d.summary };
+  if (sys === 'numeric' ? !validateRoll(wire) : !validateSystemRoll(wire)) return;
+  showRemoteRoll({
+    id: typeof d.id === 'string' ? d.id : null,
+    name: typeof d.who === 'string' ? d.who.slice(0, 40) : 'Someone',
+    at: Number.isFinite(d.at) ? d.at : Date.now(),
+    system: sys === 'numeric' ? undefined : sys,
+    notation: d.notation,
+    groups: d.groups,
+    summary: d.summary,
+    total: d.total,
+  });
+}
+
+if (owlbearPanel) {
+  const roomObr = $('roomObr');
+  const obrToggle = $('obrBroadcast');
+  if (obrToggle) {
+    obrToggle.checked = obrBroadcast;   // the light follows :checked in CSS
+    obrToggle.addEventListener('change', () => {
+      obrBroadcast = obrToggle.checked;
+      store.set(OBR_BROADCAST_KEY, obrBroadcast ? '1' : '0');
+    });
+  }
+  // The SDK file exists only in the panel build. If Owlbear is really the parent
+  // it answers the handshake and onReady fires; framed by anything else it never
+  // does, so the toggle stays hidden and nothing is ever shared.
+  import('./obr-sdk.js').then(m => {
+    const OBR = m.default;
+    // Receiving is always on — you want to see the table's rolls even with your
+    // own broadcasting off — so it is wired before ready and left alone.
+    OBR.broadcast.onMessage(OBR_CHANNEL, event => {
+      try { acceptOwlbearRoll(event.data); } catch { /* one bad roll, not the panel */ }
+    });
+    OBR.onReady(() => {
+      obr = OBR;
+      OBR.player.getName().then(n => { obrPlayerName = n; }).catch(() => {});
+      if (roomObr) roomObr.hidden = false;
+    });
+  }).catch(() => { /* no SDK, no shared table; the rest of the panel is unaffected */ });
+}

@@ -433,6 +433,7 @@ export function createRoom(options = {}) {
       try {
         onRoll({
           from: msg.from,
+          id: typeof msg.id === 'string' ? msg.id : null,
           name: clean || 'Someone',
           at: Number.isFinite(msg.at) ? msg.at : at,
           notation: msg.notation,
@@ -450,6 +451,7 @@ export function createRoom(options = {}) {
       try {
         onRoll({
           from: msg.from,
+          id: typeof msg.id === 'string' ? msg.id : null,
           name: clean || 'Someone',
           at: Number.isFinite(msg.at) ? msg.at : at,
           system: msg.system,
@@ -750,11 +752,15 @@ export function createRoom(options = {}) {
       // out as roll2 carrying its summary. Numeric rolls keep the original roll
       // schema, so a client still serving the old bundle from cache reads them
       // unchanged (and silently ignores the roll2 it doesn't know).
+      // `id`, when present, lets a receiver on two transports at once (the relay
+      // room and the Owlbear bus) drop the second copy. Optional, so an older
+      // client that never sets it is unaffected.
       const sys = result.system;
       if (sys && sys !== 'numeric') {
         sendEncrypted({
           k: 'roll2',
           at: now(),
+          id: result.rollId,
           name,
           system: sys,
           notation: result.notation,
@@ -766,6 +772,7 @@ export function createRoom(options = {}) {
       sendEncrypted({
         k: 'roll',
         at: now(),
+        id: result.rollId,
         name,
         notation: result.notation,
         total: result.total,

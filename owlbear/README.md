@@ -16,17 +16,20 @@ geometry rather than maintaining separate identities.
 
 ## What it is and is not
 
-**It is a peer.** Everyone who wants the shared log needs the passphrase and
-their own copy of Dicebox — in this panel, in a browser tab, or on a phone. They
-are all the same kind of participant.
+**It is a shared table inside Owlbear.** Every panel in the same Owlbear game
+shares rolls automatically over Owlbear's own message bus — no passphrase, the
+game is the room. On by default, with a toggle in the share menu to turn it off
+and a red light while it is live. This is the one place Dicebox deliberately
+leaves its encrypted channel: Owlbear relays the bus, so those rolls are visible
+to the whole table and to any extension listening, not end-to-end encrypted.
+Being at an Owlbear table is already a choice to share one, and the toggle and
+the light say so out loud. Rolls carry an id and are deduped, and a roll heard on
+the bus is never re-published, so nothing loops and no encrypted roll leaks out.
 
-**It is not a bridge.** Rolls are not published into the Owlbear room, so
-players without the passphrase see nothing. That is deliberate. A bridge would
-have to hold the room key and republish plaintext to Owlbear's servers, which
-would quietly break the promise the rest of this project makes — the relay never
-sees a roll, and neither should anyone else's. If you want that anyway, it is a
-different feature and it needs saying out loud in the privacy documentation
-rather than appearing as a convenience.
+**It is also a peer.** The manual passphrase room is still here, end-to-end
+encrypted, for anyone NOT in the Owlbear game — a phone, a browser tab, a player
+at a different table. The table creates a room and everyone joins it; the Owlbear
+players are then on both transports at once, which the id dedupe cleans up.
 
 **Rolls stay local if the relay is unreachable.** Same as everywhere else. The
 dice land instantly and the panel says it cannot share.
@@ -180,10 +183,23 @@ framed. A panel with no address bar and no reload button, quietly serving a
 build from three deploys ago, is not something you can talk a player through
 fixing.
 
-**The SDK is not used.** Owlbear's SDK exists for talking to the room — scene
-items, player metadata, broadcasts — and a thin peer talks to none of that. So
-the panel has no dependencies, which keeps it the same code as the app it was
-built from. If a bridge is ever built, that is where the SDK comes in.
+**The SDK, vendored.** The shared table uses Owlbear's `broadcast` API, so the
+panel loads Owlbear's SDK — but only the panel, never the site. `obr-sdk.js` is a
+self-contained esbuild bundle of `@owlbear-rodeo/sdk`, committed here and copied
+into the build; `app.js` imports it lazily, gated on the `dicebox-owlbear` meta
+tag the build injects, so the site never fetches it and the broadcast code never
+runs anywhere else.
+
+Regenerate it when bumping the SDK:
+
+```sh
+npm install @owlbear-rodeo/sdk --no-save
+node_modules/.bin/esbuild node_modules/@owlbear-rodeo/sdk/lib/index.js \
+  --bundle --format=esm --platform=browser --minify --outfile=owlbear/obr-sdk.js
+```
+
+It bundles clean — no node built-ins survive — so it needs no polyfills. It uses
+`window`, so it runs in the browser panel and cannot be imported under Node.
 
 **Sixteen connections per room.** The relay's default. Someone running the panel
 and a phone counts twice.
