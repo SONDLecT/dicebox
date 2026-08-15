@@ -220,24 +220,34 @@ should be enjoyable; it should not be what decides the roll.
 The same goes for the tidying afterwards — dice drift into a sorted grid, group
 by type and order high to low. That is presentation.
 
-### Why a d100 does not have exactly 100 faces you can count
+### Why a d1000 really does have a thousand faces
 
-Each die is drawn as a real solid whose face count matches its side count, up to
-a point. From d3 to d120 that holds for 108 of the 118 possible dice — a d17 has
-seventeen faces, a d100 has a hundred.
+Dicebox used to stop detailed geometry at 120 facets. It no longer does. From
+d4 through d1000, every die has one legal outcome face for each side. In almost
+every case the raw solid also contains exactly that many polygonal faces: a d17
+has seventeen, a d100 has a hundred and a d1000 has a thousand.
 
-Past that, the limit is your eyes rather than the maths. At the size a die is
-drawn on a phone, facets start landing closer together than a pixel, and the
-wireframe stops reading as an object and becomes a grey smudge. Dice above ~120
-sides therefore get a representative shape: still a distinct, consistent solid
-for that number, but no longer one facet per side. A d1000 drawn honestly would
-be a circle.
+The d5 and d7 are deliberate visual exceptions, not approximations. The d5 has
+five legal landing faces plus bevel polygons; the d7 has seven landing faces
+cut into a smooth shell. Those extra polygons shape the die but never create
+extra results.
 
-Shape matters too, not just count. A trapezohedron — the classic d10 form — runs
-every facet to one of two points, so its edges converge and it is already
-crowded at 24 faces. A banded drum spreads its vertices evenly and stays
-countable past 120. That is why dice above 22 sides change family: not for
-decoration, but because it is the shape that survives being small.
+The d1, d2 and d3 have to work differently because a closed solid cannot
+literally have one, two or three faces. The d1 is an obliquely cut cylinder whose
+two landing caps both read 1. The d2 is a coin with two outcome faces and a
+modelled rim. The d3 is a cube with its three outcomes repeated on opposite face
+pairs.
+
+At high counts the challenge is displaying the geometry, not generating it.
+For d101 and above, Dicebox keeps the die's final tumble pose, draws its
+silhouette more strongly than its interior edges and places the result over the
+centre. That keeps an exact d1000 legible and smooth on a phone without quietly
+replacing it with a lower-faced solid. Typed dice above d1000 still roll normally
+(up to d10000), but their visual body is capped at 1000 faces.
+
+Low-sided dice use recognisable dedicated solids while high-sided dice spread
+their facets evenly over a rounded form. The shape family changes so the die
+survives being small; the facet count stays honest through d1000.
 
 ## Rooms
 
