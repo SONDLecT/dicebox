@@ -62,11 +62,29 @@ const refs = [...html.matchAll(/(?:src|href)="(?!https?:|data:|#)([^"]+)"/g)].ma
 const dangling = refs.filter(r => r !== '/' && !present.has(r.replace(/^\.\//, '')));
 ok('every file the page references was built', dangling.length === 0, dangling.join(', '));
 
-// app.js imports its modules directly; index.html never mentions them.
-const imports = [...appJs.matchAll(/from '\.\/([^']+)'/g)].map(m => m[1]);
-ok('app.js has imports to check', imports.length > 0);
-const missingImports = imports.filter(f => !present.has(f));
-ok('every module app.js imports was built', missingImports.length === 0, missingImports.join(', '));
+// app.js imports its modules directly; index.html never mentions them. And those
+// modules import their own — render.js pulls in under30-gap.js — so the whole
+// STATIC graph has to be walked, not just app.js's first level. A file missing
+// anywhere in it stops the entry module evaluating with no error to see, which
+// is exactly how the panel once shipped rendering its shell and wiring nothing.
+// Dynamic import() (the card-art modules) is deliberately excluded: those are
+// large, loaded on demand, and not part of the graph the app needs to start.
+function staticImports(name) {
+  try {
+    const src = readFileSync(join(ROOT, name), 'utf8');
+    return [...src.matchAll(/from '\.\/([^']+\.js)'/g)].map(m => m[1]);
+  } catch { return []; }
+}
+const graph = new Set();
+const queue = ['app.js'];
+while (queue.length) {
+  for (const dep of staticImports(queue.shift())) {
+    if (!graph.has(dep)) { graph.add(dep); queue.push(dep); }
+  }
+}
+ok('app.js has an import graph to check', graph.size > 5);
+const missingImports = [...graph].filter(f => !present.has(f));
+ok('every module in app.js\'s static import graph was built', missingImports.length === 0, missingImports.join(', '));
 
 // Every element app.js reaches for has to survive the build. The PWA stripping
 // works by deleting whole lines from the markup, and a regex that matched one
