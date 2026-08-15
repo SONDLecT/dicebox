@@ -81,7 +81,7 @@ async function load(historyImpl, hash = '#' + PHRASE) {
     getElementById: id => store.get(id) || null,
     createElement: () => makeEl(),
     createTextNode: text => ({ nodeType: 3, textContent: String(text) }),
-    querySelector: () => makeEl(),
+    querySelector: selector => selector === 'meta[name="dicebox-owlbear"]' ? null : makeEl(),
     querySelectorAll: () => [],
     addEventListener(){},
   };

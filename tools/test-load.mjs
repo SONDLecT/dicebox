@@ -72,10 +72,19 @@ globalThis.document = {
   getElementById: id => store.get(id) || null,
   createElement: () => makeEl(),
   createTextNode: text => ({ nodeType: 3, textContent: String(text) }),
-  querySelector: () => makeEl(),
+  querySelector: selector => selector === 'meta[name="dicebox-owlbear"]' ? null : makeEl(),
   querySelectorAll: () => [],
   addEventListener(){},
 };
+
+// The source page is the standalone site, not the panel build. If this shim
+// invents the build-only flag, app.js takes an impossible SDK path and the load
+// test emits a false initialization error instead of exercising the real page.
+if (!html.includes('meta name="dicebox-owlbear"') &&
+    document.querySelector('meta[name="dicebox-owlbear"]') !== null) {
+  console.log('DOM SHIM FAILED: standalone markup invented the Owlbear panel flag');
+  process.exit(1);
+}
 
 const missing = [];
 const origGet = document.getElementById;

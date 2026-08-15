@@ -22,12 +22,15 @@ const ok = (name, cond, extra = '') => {
   else { fail++; console.log(`  FAIL  ${name}${extra ? ' — ' + extra : ''}`); }
 };
 
-// The guard, lifted from source. Anchored on showRemoteRoll so a rename or a
-// move fails here rather than quietly testing nothing.
+// The tray-ownership guard, lifted from source. showRemoteRoll now has a separate
+// dedupe guard before it, so select the condition by the state it is meant to
+// exercise rather than assuming it will always be the function's first return.
 const fn = app.slice(app.indexOf('function showRemoteRoll'));
-const guard = fn.slice(0, fn.indexOf('\n}')).match(/if \((.+?)\) return;/);
+const guardLine = fn.split('\n').find(line =>
+  line.includes("$('total').dataset.rolling") && line.includes('return;'));
+const guard = guardLine?.match(/if \((.*)\) return;/);
 
-ok('the guard is still where this test expects it', !!guard);
+ok('the tray-ownership guard is still where this test expects it', !!guard);
 
 if (guard) {
   const condition = guard[1];

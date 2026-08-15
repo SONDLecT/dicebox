@@ -208,6 +208,90 @@ ok('clipboard-write is requested', perms.includes('clipboard-write'), perms.join
 ok('every permission carries a reason',
    (manifest.permissions || []).every(p => typeof p.reason === 'string' && p.reason.length > 0));
 
+// --- the Owlbear SDK waits for the parent handshake ---
+//
+// Exercise the production initializer itself rather than merely checking the
+// order of strings. This catches both the original pre-ready subscription and
+// delayed callback failures that would otherwise leave the sharing UI lying
+// about whether broadcast is active.
+function extractNamedFunction(source, name) {
+  const start = source.indexOf(`function ${name}(`);
+  if (start < 0) return '';
+  const open = source.indexOf('{', start);
+  let depth = 0;
+  for (let i = open; i < source.length; i++) {
+    if (source[i] === '{') depth++;
+    else if (source[i] === '}' && --depth === 0) return source.slice(start, i + 1);
+  }
+  return '';
+}
+
+const initializeOwlbearSource = extractNamedFunction(appJs, 'initializeOwlbear');
+ok('the shared table has a testable production initializer', !!initializeOwlbearSource);
+if (initializeOwlbearSource) {
+  const makeHarness = () => {
+    const errors = [];
+    const factory = new Function('captureError', `
+      const OBR_CHANNEL = 'cc.dicebox.rolls';
+      let obr = null;
+      let obrPlayerName = '';
+      let accepted = 0;
+      const acceptOwlbearRoll = () => { accepted++; };
+      const console = {
+        error: (...args) => captureError(args),
+        warn: () => {},
+      };
+      ${initializeOwlbearSource}
+      return {
+        initializeOwlbear,
+        state: () => ({ obr, obrPlayerName, accepted }),
+      };
+    `);
+    return { ...factory(args => errors.push(args)), errors };
+  };
+
+  {
+    const harness = makeHarness();
+    const room = { hidden: true };
+    let ready = null, subscriptions = 0, playerReads = 0;
+    const sdk = {
+      onReady(callback) { ready = callback; },
+      broadcast: { onMessage() { subscriptions++; } },
+      player: { getName() { playerReads++; return Promise.resolve('Ready Player'); } },
+    };
+    harness.initializeOwlbear(sdk, room);
+    ok('broadcast is not subscribed before OBR_READY', subscriptions === 0);
+    ok('the sharing row stays hidden before OBR_READY', room.hidden === true);
+    ready();
+    await Promise.resolve();
+    ok('broadcast subscribes after OBR_READY', subscriptions === 1);
+    ok('successful subscription reveals and activates Owlbear sharing',
+       room.hidden === false && harness.state().obr === sdk);
+    ok('the player name is read only after readiness',
+       playerReads === 1 && harness.state().obrPlayerName === 'Ready Player');
+    ok('successful delayed initialization emits no SDK error', harness.errors.length === 0);
+  }
+
+  {
+    const harness = makeHarness();
+    const room = { hidden: true };
+    let ready = null, playerReads = 0;
+    const sdk = {
+      onReady(callback) { ready = callback; },
+      broadcast: { onMessage() { throw new Error('subscription failed'); } },
+      player: { getName() { playerReads++; return Promise.resolve('Never read'); } },
+    };
+    harness.initializeOwlbear(sdk, room);
+    ready();
+    ok('failed subscription leaves Owlbear sharing hidden and inactive',
+       room.hidden === true && harness.state().obr === null && playerReads === 0);
+    ok('failed delayed initialization is reported',
+       harness.errors.length === 1 &&
+       harness.errors[0][0] === '[Dicebox/Owlbear] SDK initialization failed' &&
+       harness.errors[0][1]?.message === 'subscription failed');
+  }
+}
+
 // --- the panel knows it is embedded ---
 
 ok('the app detects being embedded', /window\.top !== window\.self/.test(appJs));

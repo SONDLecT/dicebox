@@ -7781,6 +7781,38 @@ function acceptOwlbearRoll(d) {
   });
 }
 
+function initializeOwlbear(OBR, roomObr) {
+  OBR.onReady(() => {
+    try {
+      // SDK subscriptions send through Owlbear's message bus, so they must be
+      // registered only after OBR_READY gives that bus its connection reference.
+      // Receiving stays on even when this panel's own broadcast toggle is off.
+      OBR.broadcast.onMessage(OBR_CHANNEL, event => {
+        try { acceptOwlbearRoll(event.data); } catch { /* one bad roll, not the panel */ }
+      });
+      // Do not activate automatic sending or advertise the toggle until receive
+      // subscription succeeds. A partial initialization must fail closed.
+      obr = OBR;
+      if (roomObr) roomObr.hidden = false;
+    } catch (error) {
+      obr = null;
+      if (roomObr) roomObr.hidden = true;
+      console.error('[Dicebox/Owlbear] SDK initialization failed', error);
+      return;
+    }
+
+    // The display name improves attribution but is not required for sharing.
+    // Keep a name lookup failure from disabling an otherwise healthy channel.
+    try {
+      Promise.resolve(OBR.player.getName())
+        .then(n => { obrPlayerName = n; })
+        .catch(error => console.warn('[Dicebox/Owlbear] Player name unavailable', error));
+    } catch (error) {
+      console.warn('[Dicebox/Owlbear] Player name unavailable', error);
+    }
+  });
+}
+
 if (owlbearPanel) {
   const roomObr = $('roomObr');
   const obrToggle = $('obrBroadcast');
@@ -7795,16 +7827,8 @@ if (owlbearPanel) {
   // it answers the handshake and onReady fires; framed by anything else it never
   // does, so the toggle stays hidden and nothing is ever shared.
   import('./obr-sdk.js').then(m => {
-    const OBR = m.default;
-    // Receiving is always on — you want to see the table's rolls even with your
-    // own broadcasting off — so it is wired before ready and left alone.
-    OBR.broadcast.onMessage(OBR_CHANNEL, event => {
-      try { acceptOwlbearRoll(event.data); } catch { /* one bad roll, not the panel */ }
-    });
-    OBR.onReady(() => {
-      obr = OBR;
-      OBR.player.getName().then(n => { obrPlayerName = n; }).catch(() => {});
-      if (roomObr) roomObr.hidden = false;
-    });
-  }).catch(() => { /* no SDK, no shared table; the rest of the panel is unaffected */ });
+    initializeOwlbear(m.default, roomObr);
+  }).catch(error => {
+    console.error('[Dicebox/Owlbear] SDK initialization failed', error);
+  });
 }

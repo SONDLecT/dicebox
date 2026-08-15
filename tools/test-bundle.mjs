@@ -80,7 +80,7 @@ globalThis.document = {
   getElementById: id => { const el = store.get(id) || null; if (!el) missing.push(id); return el; },
   createElement: () => makeEl(),
   createTextNode: t => ({nodeType:3,textContent:String(t)}),
-  querySelector: () => makeEl(),
+  querySelector: selector => selector === 'meta[name="dicebox-owlbear"]' ? null : makeEl(),
   querySelectorAll: () => [],
   addEventListener(){},
 };
