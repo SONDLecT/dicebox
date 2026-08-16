@@ -133,22 +133,60 @@ function historyPayloads(history, requestId, state) {
   }));
 }
 
-function loadDeckState(storage, key, fallback) {
-  try {
-    const saved = JSON.parse(safeGet(storage, key) || 'null');
-    return saved && typeof saved === 'object' && !Array.isArray(saved)
-      ? { ...fallback, ...saved }
-      : { ...fallback };
-  } catch {
-    return { ...fallback };
-  }
+
+
+// The table's decks. Inside a real Owlbear room the deck state lives in ROOM
+// METADATA — shared by every player and persisted with the room — so there is
+// one deck on the table: anyone may shuffle it, every draw comes off the same
+// stack, and no card exists twice. localStorage keeps a local copy as cache and
+// as the whole store where the metadata API is absent (tests, degraded hosts).
+// Draws are read-modify-write with last-write-wins; at human pace that is the
+// honest trade, and a clash costs a re-shuffle, not a corrupted room.
+function createSharedDecks(OBR, storage) {
+  const META_PREFIX = 'cc.dicebox/deck:';
+  const mirror = new Map();
+  const shared = typeof OBR?.room?.getMetadata === 'function'
+    && typeof OBR?.room?.setMetadata === 'function';
+  let unsubscribe = null;
+  const absorb = metadata => {
+    for (const [k, v] of Object.entries(metadata || {})) {
+      if (!k.startsWith(META_PREFIX)) continue;
+      const key = k.slice(META_PREFIX.length);
+      if (v && typeof v === 'object' && !Array.isArray(v)) mirror.set(key, v);
+    }
+  };
+  const ready = (async () => {
+    if (!shared) return;
+    try { absorb(await OBR.room.getMetadata()); } catch { /* local cache serves */ }
+    try {
+      if (typeof OBR.room.onMetadataChange === 'function') {
+        unsubscribe = OBR.room.onMetadataChange(absorb);
+      }
+    } catch { /* no live sync; the next read is only as stale as the last write */ }
+  })();
+  return {
+    ready,
+    get(key) {
+      if (mirror.has(key)) return structuredClone(mirror.get(key));
+      try {
+        const saved = JSON.parse(safeGet(storage, key) || 'null');
+        if (saved && typeof saved === 'object' && !Array.isArray(saved)) return saved;
+      } catch { /* fresh deck */ }
+      return null;
+    },
+    set(key, state) {
+      mirror.set(key, structuredClone(state));
+      safeSet(storage, key, JSON.stringify(state));
+      if (shared) {
+        try { Promise.resolve(OBR.room.setMetadata({ [META_PREFIX + key]: state })).catch(() => {}); }
+        catch { /* the local copy still serves this client */ }
+      }
+    },
+    dispose() { if (unsubscribe) { try { unsubscribe(); } catch { /* gone */ } } },
+  };
 }
 
-function saveDeckState(storage, key, state) {
-  safeSet(storage, key, JSON.stringify(state));
-}
-
-async function drawPlayingCards(storage, notation, memory, assertActive) {
+async function drawPlayingCards(decks, notation, assertActive) {
   const parsed = parseCards(notation);
   const art = await import('./cards-art.js');
   assertActive();
@@ -157,15 +195,13 @@ async function drawPlayingCards(storage, notation, memory, assertActive) {
     order: [], pos: 0, jokers: false, replace: false, draw: 1,
     pile: [], hand: [], handReplace: false,
   };
-  let state = memory.has(key) ? structuredClone(memory.get(key)) : fresh;
-  try {
-    const saved = memory.has(key) ? null : JSON.parse(safeGet(storage, key) || 'null');
-    if (saved && Array.isArray(saved.order) && saved.order.every(id => typeof id === 'string')) {
-      state = { ...fresh, ...saved };
-      if (!Array.isArray(state.pile)) state.pile = [];
-      if (!Array.isArray(state.hand)) state.hand = [];
-    }
-  } catch { /* fresh deck */ }
+  let state = { ...fresh };
+  const saved = decks.get(key);
+  if (saved && Array.isArray(saved.order) && saved.order.every(id => typeof id === 'string')) {
+    state = { ...fresh, ...saved };
+    if (!Array.isArray(state.pile)) state.pile = [];
+    if (!Array.isArray(state.hand)) state.hand = [];
+  }
 
   const ids = () => art.CARD_IDS.slice(0, state.jokers ? 54 : 52);
   const shuffle = () => {
@@ -196,8 +232,7 @@ async function drawPlayingCards(storage, notation, memory, assertActive) {
   state.hand = drawnIds.slice();
   state.handReplace = state.replace;
   assertActive();
-  memory.set(key, structuredClone(state));
-  safeSet(storage, key, JSON.stringify(state));
+  decks.set(key, state);
 
   const drawn = drawnIds.map(id => {
     const meta = art.cardMeta(id);
@@ -216,7 +251,7 @@ async function drawPlayingCards(storage, notation, memory, assertActive) {
   };
 }
 
-async function drawTarot(storage, notation, memory, assertActive) {
+async function drawTarot(decks, notation, assertActive) {
   const parsed = parseTarot(notation);
   const art = await import('./tarot-art.js');
   assertActive();
@@ -225,16 +260,14 @@ async function drawTarot(storage, notation, memory, assertActive) {
     order: [], revs: [], pos: 0, reversals: true, majors: false,
     replace: false, draw: 1, pile: [], hand: [], handReplace: false,
   };
-  let state = memory.has(key) ? structuredClone(memory.get(key)) : fresh;
-  try {
-    const saved = memory.has(key) ? null : JSON.parse(safeGet(storage, key) || 'null');
-    if (saved && Array.isArray(saved.order) && saved.order.every(id => typeof id === 'string')) {
-      state = { ...fresh, ...saved };
-      if (!Array.isArray(state.revs)) state.revs = [];
-      if (!Array.isArray(state.pile)) state.pile = [];
-      if (!Array.isArray(state.hand)) state.hand = [];
-    }
-  } catch { /* fresh deck */ }
+  let state = { ...fresh };
+  const saved = decks.get(key);
+  if (saved && Array.isArray(saved.order) && saved.order.every(id => typeof id === 'string')) {
+    state = { ...fresh, ...saved };
+    if (!Array.isArray(state.revs)) state.revs = [];
+    if (!Array.isArray(state.pile)) state.pile = [];
+    if (!Array.isArray(state.hand)) state.hand = [];
+  }
   const ids = () => state.majors ? art.TAROT_IDS.slice(0, 22) : art.TAROT_IDS.slice();
   const shuffle = () => {
     state.order = newDeckOrder(ids());
@@ -266,8 +299,7 @@ async function drawTarot(storage, notation, memory, assertActive) {
   state.hand = cards.map(card => ({ ...card }));
   state.handReplace = state.replace;
   assertActive();
-  memory.set(key, structuredClone(state));
-  safeSet(storage, key, JSON.stringify(state));
+  decks.set(key, state);
 
   const drawn = cards.map(card => {
     const meta = art.tarotMeta(card.id);
@@ -289,7 +321,7 @@ async function drawTarot(storage, notation, memory, assertActive) {
   };
 }
 
-async function drawSimpleDeck(storage, notation, config, memory, assertActive) {
+async function drawSimpleDeck(decks, notation, config, assertActive) {
   const parsed = config.parse(notation);
   const art = await import(config.module);
   assertActive();
@@ -300,15 +332,13 @@ async function drawSimpleDeck(storage, notation, config, memory, assertActive) {
     pile: [], hand: [], handReplace: false,
     ...(config.lang ? { lang: 'both' } : {}),
   };
-  let state = memory.has(config.key) ? structuredClone(memory.get(config.key)) : fresh;
-  try {
-    const saved = memory.has(config.key) ? null : JSON.parse(safeGet(storage, config.key) || 'null');
-    if (saved && Array.isArray(saved.order) && saved.order.every(id => typeof id === 'string')) {
-      state = { ...fresh, ...saved };
-      if (!Array.isArray(state.pile)) state.pile = [];
-      if (!Array.isArray(state.hand)) state.hand = [];
-    }
-  } catch { /* fresh deck */ }
+  let state = { ...fresh };
+  const saved = decks.get(config.key);
+  if (saved && Array.isArray(saved.order) && saved.order.every(id => typeof id === 'string')) {
+    state = { ...fresh, ...saved };
+    if (!Array.isArray(state.pile)) state.pile = [];
+    if (!Array.isArray(state.hand)) state.hand = [];
+  }
   state.replace = parsed.replace;
   state.draw = parsed.draw;
   if (config.lang) state.lang = parsed.lang;
@@ -332,8 +362,7 @@ async function drawSimpleDeck(storage, notation, config, memory, assertActive) {
   state.hand = drawnIds.slice();
   state.handReplace = state.replace;
   assertActive();
-  memory.set(config.key, structuredClone(state));
-  safeSet(storage, config.key, JSON.stringify(state));
+  decks.set(config.key, state);
 
   const drawn = drawnIds.map(id => ({ id, label: meta(id).label, red: false }));
   const remaining = Math.max(0, state.order.length - state.pos);
@@ -388,20 +417,19 @@ async function drawOracle(notation, game, assertActive) {
   };
 }
 
-async function resetDeck(storage, deck, memory, assertActive, notation = null) {
+async function resetDeck(decks, deck, assertActive, notation = null) {
+  const merged = (key, defaults) => ({ ...defaults, ...(decks.get(key) || {}) });
   let key, state, ids;
   if (deck === 'cards') {
     key = 'dicebox:deck:v1';
-    let saved = memory.has(key) ? structuredClone(memory.get(key))
-      : loadDeckState(storage, key, { jokers: false, replace: false, draw: 1 });
+    let saved = merged(key, { jokers: false, replace: false, draw: 1 });
     if (notation) saved = { ...saved, ...parseCards(notation) };
     const art = await import('./cards-art.js');
     ids = art.CARD_IDS.slice(0, saved.jokers ? 54 : 52);
     state = { ...saved, order: newDeckOrder(ids), pos: 0, pile: [], hand: [], handReplace: false };
   } else if (deck === 'tarot') {
     key = 'dicebox:tarot:v1';
-    let saved = memory.has(key) ? structuredClone(memory.get(key))
-      : loadDeckState(storage, key, { majors: false, reversals: true, replace: false, draw: 1 });
+    let saved = merged(key, { majors: false, reversals: true, replace: false, draw: 1 });
     if (notation) saved = { ...saved, ...parseTarot(notation) };
     const art = await import('./tarot-art.js');
     ids = art.TAROT_IDS.slice(0, saved.majors ? 22 : 78);
@@ -414,16 +442,14 @@ async function resetDeck(storage, deck, memory, assertActive, notation = null) {
     const config = SIMPLE_DECKS[deck];
     if (!config) throw new Error('Unknown Dicebox deck');
     key = config.key;
-    let saved = memory.has(key) ? structuredClone(memory.get(key))
-      : loadDeckState(storage, key, { replace: false, draw: 1, lang: 'both' });
+    let saved = merged(key, { replace: false, draw: 1, lang: 'both' });
     if (notation) saved = { ...saved, ...config.parse(notation) };
     const art = await import(config.module);
     ids = art[config.ids].slice();
     state = { ...saved, order: newDeckOrder(ids), pos: 0, pile: [], hand: [], handReplace: false };
   }
   assertActive();
-  memory.set(key, structuredClone(state));
-  saveDeckState(storage, key, state);
+  decks.set(key, state);
   return { deck, remaining: ids.length, total: ids.length };
 }
 
@@ -470,7 +496,11 @@ export async function initializeOwlbearBackground(OBR, options = {}) {
   const makeId = options.makeId ?? (() => globalThis.crypto.randomUUID());
   const rollAnyFn = options.rollAny ?? rollAny;
   const rollRouseFn = options.rollRouse ?? rollRouse;
-  const deckMemory = new Map();
+  // One deck on the table: state shared through room metadata when the API is
+  // there, this client's storage otherwise. Its first metadata read is awaited
+  // briefly so the opening draw comes off the room's deck, not a stale local.
+  const decks = createSharedDecks(OBR, storage);
+  try { await withTimeout(() => decks.ready, 1_500); } catch { /* local decks serve */ }
   const storedHunger = Number(safeGet(storage, 'dicebox:v5:hunger'));
   const storedStress = Number(safeGet(storage, 'dicebox:ms:stress'));
   const trackedState = {
@@ -670,9 +700,9 @@ export async function initializeOwlbearBackground(OBR, options = {}) {
       }
     }
     if (system === 'oracle') return drawOracle(notation, request.game, assertActive);
-    if (system === 'cards') return drawPlayingCards(storage, notation, deckMemory, assertActive);
-    if (system === 'tarot') return drawTarot(storage, notation, deckMemory, assertActive);
-    if (SIMPLE_DECKS[system]) return drawSimpleDeck(storage, notation, SIMPLE_DECKS[system], deckMemory, assertActive);
+    if (system === 'cards') return drawPlayingCards(decks, notation, assertActive);
+    if (system === 'tarot') return drawTarot(decks, notation, assertActive);
+    if (SIMPLE_DECKS[system]) return drawSimpleDeck(decks, notation, SIMPLE_DECKS[system], assertActive);
 
     let authoritativeNotation = notation;
     if (system === 'v5') {
@@ -704,10 +734,7 @@ export async function initializeOwlbearBackground(OBR, options = {}) {
   };
 
   const compactDeckState = (key, defaults, total) => {
-    let saved = deckMemory.has(key) ? deckMemory.get(key) : null;
-    if (!saved) {
-      try { saved = JSON.parse(safeGet(storage, key) || 'null'); } catch { saved = null; }
-    }
+    const saved = decks.get(key);
     const state = saved && typeof saved === 'object' ? { ...defaults, ...saved } : defaults;
     const size = Array.isArray(state.order) && state.order.length ? state.order.length : total;
     const pos = Number.isInteger(state.pos) ? Math.max(0, Math.min(size, state.pos)) : 0;
@@ -884,7 +911,7 @@ export async function initializeOwlbearBackground(OBR, options = {}) {
       }
       if (data.action === 'shuffle' || data.action === 'reset') {
         let deckState;
-        try { deckState = await withTimeout(assertActive => resetDeck(storage, data.deck, deckMemory, assertActive, data.notation), requestTimeoutMs); }
+        try { deckState = await withTimeout(assertActive => resetDeck(decks, data.deck, assertActive, data.notation), requestTimeoutMs); }
         catch (error) {
           await failRequest(data.requestId, signature,
             error instanceof BridgeTimeoutError ? 'timeout' : 'invalid_request', error);
@@ -1017,6 +1044,7 @@ export async function initializeOwlbearBackground(OBR, options = {}) {
   return {
     dispose() {
       closed = true;
+      decks.dispose();
       if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
       if (typeof unsubscribe === 'function') unsubscribe();
       if (typeof historyStore.close === 'function') historyStore.close();

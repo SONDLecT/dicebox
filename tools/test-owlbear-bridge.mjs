@@ -866,5 +866,74 @@ async function bridgeHarness(options = {}) {
   h.service.dispose();
 }
 
+
+// One deck on the table: with the room-metadata API present, a shuffle in one
+// session lands in the shared metadata, and a second session — different
+// storage, same room — draws from exactly that deck.
+{
+  const makeRoomMetadata = () => {
+    const store = {};
+    const listeners = new Set();
+    return {
+      store,
+      api: {
+        get id() { return 'shared-deck-room'; },
+        async getMetadata() { return { ...store }; },
+        async setMetadata(update) {
+          Object.assign(store, update);
+          for (const cb of listeners) cb({ ...store });
+        },
+        onMetadataChange(cb) { listeners.add(cb); return () => listeners.delete(cb); },
+      },
+    };
+  };
+  const room = makeRoomMetadata();
+  const session = async (connectionId) => {
+    const sent = [];
+    let listener = null;
+    const OBR = {
+      broadcast: {
+        onMessage(_c, cb) { listener = cb; return () => { listener = null; }; },
+        async sendMessage(_c, data, options) { sent.push({ data, options }); },
+      },
+      player: {
+        async getConnectionId() { return connectionId; },
+        async getName() { return connectionId; },
+      },
+      room: room.api,
+      popover: undefined,
+    };
+    const service = await initializeOwlbearBackground(OBR, { storage: memoryStorage() });
+    return { sent, service, emit: event => listener(event) };
+  };
+
+  const a = await session('conn-a');
+  await a.emit({ connectionId: 'conn-a', data: { v: 1, type: 'action.request', requestId: 'shuffle-1', action: 'shuffle', deck: 'cards', notation: 'deck:1' } });
+  const shuffled = a.sent.find(m => m.data?.type === 'action.result');
+  ok('session A shuffles the table deck', shuffled?.data?.remaining === 52);
+  const metaKeys = Object.keys(room.store);
+  ok('the shuffle landed in room metadata', metaKeys.some(k => k === 'cc.dicebox/deck:dicebox:deck:v1'), metaKeys.join(','));
+  const orderA = room.store['cc.dicebox/deck:dicebox:deck:v1'].order.slice();
+
+  const b = await session('conn-b');
+  await b.emit({ connectionId: 'conn-b', data: { v: 1, type: 'roll.request', requestId: 'draw-1', notation: 'deck:2' } });
+  const drawn = b.sent.find(m => m.data?.type === 'roll.result');
+  ok('session B draws from the same room deck',
+     Array.isArray(drawn?.data?.groups?.[0]?.cards)
+     && drawn.data.groups[0].cards.map(c => c.id).join(',') === orderA.slice(0, 2).join(','),
+     JSON.stringify(drawn?.data?.groups?.[0]?.cards));
+  ok('the draw advanced the shared position', room.store['cc.dicebox/deck:dicebox:deck:v1'].pos === 2);
+
+  // A draws next: it must come off position 2, not restart at the top.
+  await a.emit({ connectionId: 'conn-a', data: { v: 1, type: 'roll.request', requestId: 'draw-2', notation: 'deck:1' } });
+  const second = a.sent.filter(m => m.data?.type === 'roll.result').pop();
+  ok('session A continues from the shared position',
+     second?.data?.groups?.[0]?.cards?.[0]?.id === orderA[2],
+     JSON.stringify(second?.data?.groups?.[0]?.cards));
+
+  a.service.dispose();
+  b.service.dispose();
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);
