@@ -2703,6 +2703,9 @@ function applyDeckFlags({ jokers, replace }) {
 function drawDeckCards(n) {
   let ids;
   deckState.draw = n;
+  // A fabricated Owlbear count-stub order ('obr-…' ids) holds no real cards;
+  // dealt as-is it crashed the local fallback. Treat it as an empty deck.
+  if (deckState.order.some(id => typeof id === 'string' && id.startsWith('obr-'))) deckState.order = [];
   if (deckState.order.length === 0) reshuffleDeck();
   if (deckState.replace) {
     // Independent picks from what is still in the deck — not the full 52.
@@ -3501,6 +3504,7 @@ function reshuffleTarot() {
 function drawTarotCards(n) {
   let picks;
   tarotState.draw = n;
+  if (tarotState.order.some(id => typeof id === 'string' && id.startsWith('obr-'))) tarotState.order = [];
   if (tarotState.order.length === 0) { reshuffleTarot(); syncTarotUI({ writeField: false, restage: false }); }
   if (tarotState.replace) {
     // Independent picks from what is still in the deck; the discard stays out
@@ -3827,6 +3831,7 @@ function reshuffleNap() {
 function drawNapCards(n) {
   let ids;
   napState.draw = n;
+  if (napState.order.some(id => typeof id === 'string' && id.startsWith('obr-'))) napState.order = [];
   if (napState.order.length === 0) reshuffleNap();
   if (napState.replace) {
     const pool = napState.order.slice(napState.pos);
@@ -4120,6 +4125,7 @@ function reshuffleHana() {
 function drawHanaCards(n) {
   let ids;
   hanaState.draw = n;
+  if (hanaState.order.some(id => typeof id === 'string' && id.startsWith('obr-'))) hanaState.order = [];
   if (hanaState.order.length === 0) reshuffleHana();
   if (hanaState.replace) {
     const pool = hanaState.order.slice(hanaState.pos);
@@ -4413,6 +4419,7 @@ function reshuffleUta() {
 function drawUtaCards(n) {
   let ids;
   utaState.draw = n;
+  if (utaState.order.some(id => typeof id === 'string' && id.startsWith('obr-'))) utaState.order = [];
   if (utaState.order.length === 0) reshuffleUta();
   if (utaState.replace) {
     const pool = utaState.order.slice(utaState.pos);
