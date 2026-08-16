@@ -9,6 +9,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const html = readFileSync(join(root, 'index.html'), 'utf8');
 const css = readFileSync(join(root, 'style.css'), 'utf8');
 const js = readFileSync(join(root, 'app.js'), 'utf8');
+const themesJs = readFileSync(join(root, 'system-themes.js'), 'utf8');
 const sw = readFileSync(join(root, 'sw.js'), 'utf8');
 
 let pass = 0, fail = 0;
@@ -74,7 +75,7 @@ ok('numeric strip follows the Mothership signature picker',
 
 // WCAG AA for the new theme's small 10–13px labels. Test the exact CSS-variable
 // combinations used by inactive text and the tinted Roll control.
-const msTheme = /mothership:\s*\{\s*dark:\s*\{([^}]*)\},\s*light:\s*\{([^}]*)\}/.exec(js);
+const msTheme = /mothership:\s*\{\s*dark:\s*\{([^}]*)\},\s*light:\s*\{([^}]*)\}/.exec(themesJs);
 const themeColor = (block, name) => new RegExp(`'--${name}':\\s*'(#[0-9A-Fa-f]{6})'`).exec(block)?.[1];
 const rgb = hex => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255);
 const luminance = hex => {

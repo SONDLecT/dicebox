@@ -5,6 +5,7 @@
 // and, on click, asks for its own close.
 import { Die, Surface, separate, beginFrame } from '/render.js';
 import { stampTrayDie } from '/tray-faces.js';
+import { SYSTEM_THEMES } from '/system-themes.js';
 
 const params = new URLSearchParams(location.search);
 const put = (id, key) => {
@@ -14,6 +15,35 @@ const put = (id, key) => {
 put('who', 'who');
 put('head', 'head');
 put('sub', 'sub');
+
+// The window wears the roll's own system palette — its dark scheme, the way the
+// panel retints itself — so a V5 toast is blood-on-black, Mothership acid green.
+const system = (() => {
+  try { return JSON.parse(params.get('r') || params.get('c') || 'null')?.system || 'numeric'; }
+  catch { return 'numeric'; }
+})();
+const scheme = SYSTEM_THEMES[system]?.dark || {};
+const theme = {
+  paper: scheme['--paper'] || '#141413',
+  line: scheme['--line'] || '#F2F0EA',
+  muted: scheme['--muted'] || '#6E6A62',
+  accent: scheme['--accent'] || '#8FB79A',
+  hair: scheme['--hair'] || '#2A2A27',
+};
+{
+  const toastEl = document.getElementById('toast');
+  if (toastEl) {
+    toastEl.style.background = theme.paper;
+    toastEl.style.borderColor = theme.hair;
+    toastEl.style.color = theme.line;
+  }
+  const head = document.getElementById('head');
+  if (head) head.style.color = theme.accent;
+  for (const id of ['who', 'sub']) {
+    const el = document.getElementById(id);
+    if (el) el.style.color = theme.muted;
+  }
+}
 
 document.getElementById('toast')?.addEventListener('click', () => {
   import('/obr-sdk.js')
@@ -73,6 +103,19 @@ if (draw && cardRow) {
         img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
         img.alt = card.id;
         if (card.rev) img.classList.add('rev');
+        // Tapping a card opens the panel with that card's close-up — the toast
+        // asks its own panel over the local bus, then opens the action.
+        img.addEventListener('click', event => {
+          event.stopPropagation();
+          import('/obr-sdk.js').then(m => {
+            const OBR = m.default;
+            Promise.resolve(OBR.broadcast.sendMessage('cc.dicebox.rolls', {
+              v: 1, type: 'card.focus', system: draw.system, id: card.id, ...(card.rev ? { rev: true } : {}),
+            }, { destination: 'LOCAL' })).catch(() => {});
+            Promise.resolve(OBR.action.open()).catch(() => {});
+            Promise.resolve(OBR.popover.close('cc.dicebox/toast')).catch(() => {});
+          }).catch(() => {});
+        });
         cardRow.appendChild(img);
       } catch { /* one bad card, not the window */ }
     }
@@ -113,7 +156,6 @@ if (draw && cardRow) {
   });
 
   const surface = new Surface();
-  const theme = { paper: '#17181a', line: '#E6E4DD', muted: '#9a978f', accent: '#8FB79A' };
   let last = performance.now();
   let stillFor = 0;
   const frame = now => {

@@ -26,6 +26,7 @@ const ASSETS = [
   './render.js',
   './under30-gap.js',
   './tray-faces.js',
+  './system-themes.js',
   './result-text.js',
   './system-dice.js',
   './oracle-dice.js',
