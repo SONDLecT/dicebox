@@ -1,5 +1,6 @@
 /* The roll toast: one dark card, Dicebox's own palette, sized to its popover.
-   The canvas replays the throw; the row beneath reads it. */
+   The canvas replays a throw, the cards row shows a draw; beneath them the
+   headline row and the full detail line, exactly the readout's words. */
 html, body { margin: 0; height: 100%; background: transparent; }
 .toast {
   box-sizing: border-box;
@@ -17,6 +18,13 @@ html, body { margin: 0; height: 100%; background: transparent; }
   overflow: hidden;
 }
 #tray { width: 100%; flex: 1 1 auto; min-height: 0; display: block; }
+.cards {
+  flex: 1 1 auto; min-height: 0;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  overflow: hidden;
+}
+.cards img { height: 100%; max-height: 96px; width: auto; border-radius: 4px; }
+.cards img.rev { transform: rotate(180deg); }
 .row {
   flex: 0 0 auto;
   display: flex;
@@ -37,13 +45,18 @@ html, body { margin: 0; height: 100%; background: transparent; }
   font-weight: 700;
   color: #8FB79A;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  flex: 0 0 auto;
+  flex: 1 1 auto;
 }
+/* The full detail line, allowed to wrap once before it trims — the whole
+   arithmetic is the point of this line. */
 .sub {
+  flex: 0 0 auto;
   font-size: 11px;
+  line-height: 1.35;
   color: #9a978f;
   font-family: ui-monospace, monospace;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  flex: 1 1 auto;
-  text-align: right;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }

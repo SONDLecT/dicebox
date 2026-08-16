@@ -1,16 +1,15 @@
-// Fills the toast from its query string: a text row always, and — when the roll
-// carried dice — a replay of the throw on the panel's own renderer, tumbling in
-// and settling on the real values, painted by the same shared stamping the tray
-// uses (system colours, Genesys symbols, V5 glyphs, percentile labels). The
-// background owns opening and closing; this page only displays and, on click,
-// asks for its own close.
+// Fills the toast from its query string: the headline row and the full detail
+// line always; above them, dice replay their throw on the panel's own renderer
+// and card draws show the cards themselves, from the same art modules the panel
+// deals with. The background owns opening and closing; this page only displays
+// and, on click, asks for its own close.
 import { Die, Surface, separate, beginFrame } from '/render.js';
 import { stampTrayDie } from '/tray-faces.js';
 
 const params = new URLSearchParams(location.search);
 const put = (id, key) => {
   const el = document.getElementById(id);
-  if (el) el.textContent = (params.get(key) || '').slice(0, 80);
+  if (el) el.textContent = (params.get(key) || '').slice(0, 200);
 };
 put('who', 'who');
 put('head', 'head');
@@ -22,9 +21,34 @@ document.getElementById('toast')?.addEventListener('click', () => {
     .catch(() => { /* the timed close still lands */ });
 });
 
-// The roll rides in as JSON: its system, the summary fields the tints read, and
+const canvas = document.getElementById('tray');
+const cardRow = document.getElementById('cards');
+
+// A draw rides in as `c`: the deck system and the drawn card ids (tarot adds a
+// reversal flag). The art modules are the panel's own, loaded on demand; a card
+// renders as an inline SVG data image, upside down when reversed.
+const DECK_ART = {
+  cards: ['/cards-art.js', 'cardSVG'],
+  tarot: ['/tarot-art.js', 'tarotSVG'],
+  napoletane: ['/nap-art.js', 'napSVG'],
+  hanafuda: ['/hana-art.js', 'hanaSVG'],
+  utagaruta: ['/uta-art.js', 'utaSVG'],
+};
+
+let draw = null;
+try {
+  const parsed = JSON.parse(params.get('c') || 'null');
+  if (parsed && DECK_ART[parsed.system] && Array.isArray(parsed.cards)) {
+    draw = {
+      system: parsed.system,
+      cards: parsed.cards.filter(card => card && typeof card.id === 'string').slice(0, 6),
+    };
+  }
+} catch { /* text rows only */ }
+
+// The roll rides in as `r`: its system, the summary fields the tints read, and
 // the tray's own flattened paint list. Anything malformed just leaves the text
-// row to do the talking.
+// rows to do the talking.
 let roll = null;
 try {
   const parsed = JSON.parse(params.get('r') || 'null');
@@ -35,12 +59,29 @@ try {
     };
     roll.flat = parsed.flat.filter(f => f && Number.isFinite(f.value)).slice(0, 14);
   }
-} catch { /* text row only */ }
+} catch { /* text rows only */ }
 
-const canvas = document.getElementById('tray');
-if (!roll || !roll.flat.length) {
+if (draw && cardRow) {
   canvas?.remove();
+  const [module, fn] = DECK_ART[draw.system];
+  import(module).then(art => {
+    cardRow.hidden = false;
+    for (const card of draw.cards) {
+      try {
+        const svg = art[fn](card.id, { dark: true });
+        const img = document.createElement('img');
+        img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+        img.alt = card.id;
+        if (card.rev) img.classList.add('rev');
+        cardRow.appendChild(img);
+      } catch { /* one bad card, not the window */ }
+    }
+  }).catch(() => { cardRow.remove(); });
+} else if (!roll || !roll.flat.length) {
+  canvas?.remove();
+  cardRow?.remove();
 } else if (canvas) {
+  cardRow?.remove();
   const ctx = canvas.getContext('2d');
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const W = canvas.clientWidth || 248, H = canvas.clientHeight || 84;

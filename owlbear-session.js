@@ -437,8 +437,22 @@ function toastText(roll) {
   try { sub = String(formatDetail(shaped)); } catch { sub = null; }
   return {
     head: (head || String(roll.total ?? roll.notation ?? 'Roll')).slice(0, 60),
-    sub: (sub || String(roll.notation || '')).slice(0, 110),
+    sub: (sub || String(roll.notation || '')).slice(0, 170),
   };
+}
+
+// Card systems the toast can show the actual cards for, with the drawn ids
+// (and tarot's reversal flag) as its payload.
+const TOAST_DECKS = new Set(['cards', 'tarot', 'napoletane', 'hanafuda', 'utagaruta']);
+function toastCards(roll) {
+  if (!TOAST_DECKS.has(roll.system) || !Array.isArray(roll.groups)) return null;
+  const cards = roll.groups
+    .filter(group => group && group.kind === 'cards' && Array.isArray(group.cards))
+    .flatMap(group => group.cards)
+    .filter(card => card && typeof card.id === 'string')
+    .slice(0, 6)
+    .map(card => ({ id: card.id, ...(card.rev ? { rev: true } : {}) }));
+  return cards.length ? { system: roll.system, cards } : null;
 }
 
 export async function initializeOwlbearBackground(OBR, options = {}) {
@@ -539,6 +553,7 @@ export async function initializeOwlbearBackground(OBR, options = {}) {
         ? flattenRollDice(roll).filter(die => Number.isFinite(die.value)).slice(0, 14)
         : [];
       const text = toastText(roll);
+      const cards = toastCards(roll);
       const query = new URLSearchParams({
         who: String(roll.who || 'Someone').slice(0, 40),
         head: text.head,
@@ -555,11 +570,12 @@ export async function initializeOwlbearBackground(OBR, options = {}) {
           flat,
         }));
       }
+      if (cards) query.set('c', JSON.stringify(cards));
       Promise.resolve(OBR.popover.open({
         id: TOAST_ID,
         url: `/toast.html?${query}`,
         width: 272,
-        height: flat.length ? 158 : 78,
+        height: flat.length || cards ? 182 : 96,
         // Anchored to a point far past the page corner and clamped back inside
         // it, which is what pins the window bottom-right at any viewport size.
         anchorReference: 'POSITION',
