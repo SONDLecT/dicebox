@@ -1,8 +1,11 @@
 // Fills the toast from its query string: a text row always, and — when the roll
 // carried dice — a replay of the throw on the panel's own renderer, tumbling in
-// and settling on the real values. The background owns opening and closing;
-// this page only displays and, on click, asks for its own close.
+// and settling on the real values, painted by the same shared stamping the tray
+// uses (system colours, Genesys symbols, V5 glyphs, percentile labels). The
+// background owns opening and closing; this page only displays and, on click,
+// asks for its own close.
 import { Die, Surface, separate, beginFrame } from '/render.js';
+import { stampTrayDie } from '/tray-faces.js';
 
 const params = new URLSearchParams(location.search);
 const put = (id, key) => {
@@ -19,16 +22,23 @@ document.getElementById('toast')?.addEventListener('click', () => {
     .catch(() => { /* the timed close still lands */ });
 });
 
-// The dice come as "sides:value" pairs, an 'h' after the sides marking a Hunger
-// die: "10h:1,10:7,6:4". Anything malformed just leaves the text row to do the
-// talking.
-const spec = (params.get('d') || '').split(',').map(part => {
-  const m = /^(\d{1,4})(h?):(-?\d{1,7})$/.exec(part.trim());
-  return m ? { sides: Number(m[1]), hunger: m[2] === 'h', value: Number(m[3]) } : null;
-}).filter(Boolean).slice(0, 14);
+// The roll rides in as JSON: its system, the summary fields the tints read, and
+// the tray's own flattened paint list. Anything malformed just leaves the text
+// row to do the talking.
+let roll = null;
+try {
+  const parsed = JSON.parse(params.get('r') || 'null');
+  if (parsed && typeof parsed === 'object' && Array.isArray(parsed.flat)) {
+    roll = {
+      system: typeof parsed.system === 'string' ? parsed.system : 'numeric',
+      summary: parsed.summary && typeof parsed.summary === 'object' ? parsed.summary : {},
+    };
+    roll.flat = parsed.flat.filter(f => f && Number.isFinite(f.value)).slice(0, 14);
+  }
+} catch { /* text row only */ }
 
 const canvas = document.getElementById('tray');
-if (!spec.length) {
+if (!roll || !roll.flat.length) {
   canvas?.remove();
 } else if (canvas) {
   const ctx = canvas.getContext('2d');
@@ -39,6 +49,7 @@ if (!spec.length) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const bounds = { left: 6, right: W - 6, top: 6, floor: H - 10 };
 
+  const spec = roll.flat;
   const size = spec.length <= 4 ? 34 : spec.length <= 8 ? 26 : 20;
   const perRow = Math.max(1, Math.floor((W - 12) / (size + 6)));
   const rows = Math.ceil(spec.length / perRow);
@@ -47,10 +58,14 @@ if (!spec.length) {
     const inRow = Math.min(perRow, spec.length - row * perRow);
     const homeX = W / 2 + (i % perRow - (inRow - 1) / 2) * (size + 6);
     const homeY = H / 2 + (row - (rows - 1) / 2) * (size + 4);
-    const die = new Die(f.sides, f.value, -size, homeY + (Math.random() - 0.5) * 20, size);
+    const die = new Die(Number.isInteger(f.sides) ? f.sides : 10, f.value, -size, homeY + (Math.random() - 0.5) * 20, size);
     die.homeX = homeX;
     die.homeY = homeY;
-    if (f.hunger) { die.hunger = true; die.genColor = '#A63A38'; }
+    die.kept = f.kept;
+    die.exploded = f.exploded;
+    die.rerolled = f.rerolled;
+    if (f.hunger) die.hunger = true;
+    stampTrayDie(die, f, roll);
     die.throwWith((homeX - die.x) * 2.4, (homeY - die.y) * 2.4);
     return die;
   });

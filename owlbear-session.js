@@ -11,6 +11,7 @@ import {
 import { validateRoll, validateSystemRoll } from './room.js';
 import { rollOracle, oracleSlug, findOracleBySlug } from './oracle-dice.js';
 import { createOwlbearHistoryStore } from './owlbear-history.js';
+import { flattenRollDice } from './tray-faces.js';
 import { getOrCreateLocalAuthSecret, signLocalPayload, signedLocalWireBytes } from './owlbear-auth.js';
 
 export const OBR_CHANNEL = 'cc.dicebox.rolls';
@@ -532,32 +533,34 @@ export async function initializeOwlbearBackground(OBR, options = {}) {
   const showToast = roll => {
     if (closed || !OBR.popover?.open || !roll) return;
     try {
-      // The dice travel as compact sides:value pairs so the toast can replay
-      // the throw itself — the peek at the tray the corner window is for. An
-      // 'h' marks a Hunger die so it lands red. Card draws carry no dice and
-      // get the shorter, text-only window.
-      const dice = (Array.isArray(roll.groups) ? roll.groups : [])
-        .filter(group => group && group.kind === 'dice' && Array.isArray(group.dice))
-        .flatMap(group => group.dice.map(die => ({
-          sides: Number.isInteger(die.sides) ? die.sides : group.sides,
-          hunger: !!die.hunger,
-          value: die.value,
-        })))
-        .filter(die => Number.isInteger(die.sides) && Number.isInteger(die.value))
-        .slice(0, 14);
+      // The dice travel as the tray's own paint list — flattenRollDice output,
+      // pruned — plus the summary fields the shared stamping tints from, so the
+      // toast replays the throw in the exact colours and faces the roller's
+      // tray showed. Card draws carry no dice and get the text-only window.
+      const flat = Array.isArray(roll.groups)
+        ? flattenRollDice(roll).filter(die => Number.isFinite(die.value)).slice(0, 14)
+        : [];
       const query = new URLSearchParams({
         who: String(roll.who || 'Someone').slice(0, 40),
         head: toastHeadline(roll),
         sub: String(roll.notation || '').slice(0, 40),
       });
-      if (dice.length) {
-        query.set('d', dice.map(die => `${die.sides}${die.hunger ? 'h' : ''}:${die.value}`).join(','));
+      if (flat.length) {
+        const s = roll.summary && typeof roll.summary === 'object' ? roll.summary : {};
+        query.set('r', JSON.stringify({
+          system: roll.system || 'numeric',
+          summary: {
+            weary: s.weary, band: s.band, outcome: s.outcome, success: s.success,
+            modifier: s.modifier, mode: s.mode, panicked: s.panicked,
+          },
+          flat,
+        }));
       }
       Promise.resolve(OBR.popover.open({
         id: TOAST_ID,
         url: `/toast.html?${query}`,
         width: 272,
-        height: dice.length ? 158 : 78,
+        height: flat.length ? 158 : 78,
         // Anchored to a point far past the page corner and clamped back inside
         // it, which is what pins the window bottom-right at any viewport size.
         anchorReference: 'POSITION',

@@ -81,6 +81,7 @@ const script = [
   moduleScope('dice.js'),
   moduleScope('under30-gap.js'),
   moduleScope('system-dice.js'),
+  moduleScope('tray-faces.js'),
   moduleScope('oracle-dice.js', ['randInt']),
   moduleScope('ironsworn-oracles.js'),
   moduleScope('starforged-oracles.js'),
