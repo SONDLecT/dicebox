@@ -1151,21 +1151,9 @@
     <div class="room-pop" id="roomPanel" hidden role="dialog" aria-labelledby="roomTitle">
         <p class="pop-title" id="roomTitle">Share rolls</p>
 
-        <!-- Owlbear panel only: app.js reveals this once Owlbear answers. On by
-             default at a VTT table; the light is the reminder that these rolls
-             leave the encrypted channel and reach the whole room. -->
+        <!-- Owlbear panel only: app.js reveals this after the SDK is ready. -->
         <div class="room-block room-obr" id="roomObr" hidden>
-          <label class="obr-toggle">
-            <input type="checkbox" id="obrBroadcast" checked>
-            <span class="obr-light" aria-hidden="true"></span>
-            <span class="obr-toggle-text">Share rolls with this Owlbear game</span>
-          </label>
-          <p class="room-hint">
-            Everyone in the game sees your rolls and you see theirs, no passphrase
-            needed. Owlbear carries this, so unlike the room below it is not
-            end-to-end encrypted. The room is for anyone not in the game — a phone
-            or a browser tab.
-          </p>
+          <p class="room-hint room-obr-note"><strong>Owlbear mode</strong> · Rolls are shared with this game.</p>
         </div>
 
         <!-- Before joining. -->

@@ -109,6 +109,9 @@ const APP_FILES = [
   // (all vector SVG — the weight is trace detail, not resolution).
   'oracle-dice.js', 'ironsworn-oracles.js', 'starforged-oracles.js',
   'cards-art.js', 'tarot-art.js', 'nap-art.js', 'hana-art.js', 'uta-art.js',
+  // Owlbear-only headless request/history service. The standalone page never
+  // imports this module; it is copied solely into the extension artifact.
+  'owlbear-session.js', 'owlbear-history.js', 'owlbear-auth.js',
 ];
 
 rmSync(OUT, { recursive: true, force: true });
@@ -123,6 +126,8 @@ copyFileSync(BRAND_ICON, join(OUT, 'icon.svg'));
 // dicebox-owlbear meta below, so the site never fetches it and the broadcast code
 // never runs anywhere but here.
 copyFileSync(join(SRC, 'obr-sdk.js'), join(OUT, 'obr-sdk.js'));
+copyFileSync(join(SRC, 'background.html'), join(OUT, 'background.html'));
+copyFileSync(join(SRC, 'background.js'), join(OUT, 'background.js'));
 
 // --- the page ---
 
@@ -138,9 +143,8 @@ if (html === before) {
   process.exit(1);
 }
 
-// The flag app.js keys the Owlbear broadcast off. Only the panel build carries
-// it, so the SDK loads and the broadcast toggle appears here and nowhere else —
-// the site's index.html never has this tag.
+// The marker app.js uses to recognize the Owlbear-only build. Only this artifact
+// imports the SDK and exposes the compact always-on Owlbear mode notice.
 html = html.replace(
   /(<meta name="dicebox-relay"[^>]*>)/,
   '$1\n  <meta name="dicebox-owlbear" content="1">');

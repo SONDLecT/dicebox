@@ -36,6 +36,21 @@ const ctx = canvas.getContext('2d');
 const embedded = (() => {
   try { return window.top !== window.self; } catch { return true; }
 })();
+// Build-time marker: only the Owlbear artifact contains this meta tag. Keeping
+// the gate near startup lets every roll/action path fail closed before local RNG.
+const owlbearPanel = !!document.querySelector('meta[name="dicebox-owlbear"]');
+let getOrCreateLocalAuthSecret = null;
+let verifyLocalPayload = null;
+const OBR_CHANNEL = 'cc.dicebox.rolls';
+const OBR_PROTOCOL_VERSION = 1;
+const OBR_MAX_WIRE_BYTES = 12_000;
+const OBR_MAX_HYDRATION_BYTES = 2_000_000;
+let obr = null;
+let obrPlayerName = null;
+let obrConnectionId = null;
+let obrHistorySync = null;
+const obrOutstanding = new Map();
+const pendingOwlbearState = {};
 
 // One row of dice, ordered by size: the standard RPG set plus every Dungeon
 // Crawl Classics chain rung, plus d100. Gaps like d9 and d11 are deliberate —
@@ -92,6 +107,9 @@ const state = {
   // the locked 6s/1s so they can be unlocked when the throw lands.
   pendingPush: null,
   pushKept: null,
+  // Last completed result currently represented on a remote/shared tray. Used
+  // only to decide whether a following push transition can reuse those exact dice.
+  remoteRollId: null,
 };
 
 // ---- theme ----
@@ -850,6 +868,7 @@ function buildTrayDice(flat, result, { remote = false } = {}) {
 }
 
 function doRoll(notation) {
+  if (owlbearPanel) { requestOwlbearRoll(notation); return; }
   let result;
   try {
     // An explicit system token ("v5:…", "4dF") routes to that system's roller;
@@ -910,6 +929,7 @@ function doRoll(notation) {
 function throwResult(result, { writeField = true } = {}) {
   state.last = result;
   state.pendingPush = null; state.pushKept = null;   // a fresh throw cancels any half-done push
+  state.remoteRollId = null;
   // Quick one-off rolls (an oracle draw, a progress roll) leave the field on the
   // mode's primary expression so the Roll button keeps doing the action roll;
   // typed and dice-engine rolls write themselves in as the current expression.
@@ -1029,6 +1049,15 @@ function resultDetail(result) {
   return describe(result.groups);
 }
 
+function safeResultHeadline(result) {
+  try { return resultHeadline(result); }
+  catch { return { kind: 'number', text: result.total != null ? String(result.total) : '—' }; }
+}
+function safeResultDetail(result) {
+  try { return resultDetail(result); }
+  catch { return typeof result.notation === 'string' ? result.notation : 'Unrenderable result'; }
+}
+
 // Write a headline to the big readout, carrying its kind so words and numbers
 // get their own type sizes, and an optional variant (Daggerheart's Hope/Fear
 // tint) that colours the total.
@@ -1054,10 +1083,6 @@ function finish(result) {
   // both the relay room and the Owlbear bus shows it once.
   result.rollId = nextRollId();
   roomLink.share(result);
-  // Owlbear panel only, and only your own rolls (this runs for local throws; a
-  // peer's roll goes through showRemoteRoll and is never re-broadcast). A no-op
-  // unless the panel is inside Owlbear and broadcasting is on.
-  broadcastToOwlbear(result);
   // The name has done its job by the first roll; let the tray have the page.
   $('wordmark').dataset.faded = '1';
   updateYzPush();
@@ -1089,9 +1114,9 @@ function selfName() {
 // and a peer's now carry a name, so the name can no longer be the thing that
 // says whose roll it was, and the log's left rule and the export's 'you' both
 // depend on knowing.
-function recordRoll(result, who = null, mine = false) {
+function recordRoll(result, who = null, mine = false, at = null) {
   history.push({
-    at: new Date().toISOString(),
+    at: Number.isFinite(at) ? new Date(at).toISOString() : new Date().toISOString(),
     who,
     mine,
     notation: result.notation,
@@ -1100,8 +1125,8 @@ function recordRoll(result, who = null, mine = false) {
     // Only numeric rolls carry a scalar total; system rolls store a formatted
     // headline instead and leave this null.
     total: result.total ?? null,
-    headline: resultHeadline(result).text,
-    detail: resultDetail(result),
+    headline: safeResultHeadline(result).text,
+    detail: safeResultDetail(result),
     dice: result.groups
       .filter(g => g.kind === 'dice')
       .flatMap(g => g.dice.map(d => ({
@@ -1122,8 +1147,8 @@ function recordRoll(result, who = null, mine = false) {
 // ever reaches the DOM through textContent — the name is whatever a peer put in
 // a payload, and rendering that as markup would be a real bug even among
 // friends.
-function addHistory(result, who = null, mine = false) {
-  recordRoll(result, who, mine);
+function addHistory(result, who = null, mine = false, at = null) {
+  recordRoll(result, who, mine, at);
   const li = document.createElement('li');
   if (who && !mine) li.dataset.remote = '1';
 
@@ -1144,7 +1169,7 @@ function addHistory(result, who = null, mine = false) {
   label.append(result.notation);
 
   const val = document.createElement('b');
-  val.textContent = resultHeadline(result).text;
+  val.textContent = safeResultHeadline(result).text;
 
   top.append(label, val);
   li.append(top);
@@ -1152,7 +1177,7 @@ function addHistory(result, who = null, mine = false) {
   // What each die actually landed on, not just the total. The breakdown was
   // already computed for the readout and then discarded, so a past roll could
   // not be checked — "17" tells you nothing about which die produced it.
-  const detail = resultDetail(result);
+  const detail = safeResultDetail(result);
   if (detail && detail !== result.notation) {
     const rolls = document.createElement('span');
     rolls.className = 'log-detail';
@@ -1645,9 +1670,10 @@ function resetV5() {
 
 // Move the tracked Hunger and persist it. `restage` is skipped mid-roll, when a
 // Rouse check is already throwing its own die and the pool must not re-stage.
-function setHunger(n, { restage = true } = {}) {
+function setHunger(n, { restage = true, fromOwlbear = false } = {}) {
   v5.hunger = Math.max(0, Math.min(5, Math.round(n)));
-  store.set(V5_HUNGER_KEY, String(v5.hunger));
+  if (owlbearPanel && !fromOwlbear) requestOwlbearAction('state.set', { state: { hunger: v5.hunger } });
+  else store.set(V5_HUNGER_KEY, String(v5.hunger));
   if (restage) syncV5();
   else syncV5Hunger();
 }
@@ -1718,6 +1744,7 @@ v5DiffChip.addEventListener('click', () => {
 // the readout can name the new total; untracked (0) it is only pass/fail.
 // setHunger runs with restage off so it does not disturb the die already in flight.
 $('v5Rouse').addEventListener('click', () => {
+  if (owlbearPanel) { requestOwlbearRoll('v5:rouse', { writeField: false }); return; }
   const result = rollRouse();
   const tracked = v5.hunger > 0;
   result.summary.tracked = tracked;
@@ -1910,6 +1937,10 @@ $('yzPush').addEventListener('click', preparePush);
 
 function preparePush() {
   const last = state.last;
+  if (owlbearPanel) {
+    if (last?.rollId) requestOwlbearAction('push', { rollId: last.rollId });
+    return;
+  }
   if (!last || !last.summary || !last.summary.canPush || state.pendingPush) return;
   if (!['yearzero', 'bladerunner', 'twilight'].includes(last.system)) return;
   // Each engine keeps its own dice: Year Zero holds 6s and 1s, Blade Runner and
@@ -1919,6 +1950,14 @@ function preparePush() {
     : last.system === 'twilight' ? pushTwilight(last)
     : pushYearZero(last);
   const pushedFlat = flattenRollDice(pushed);
+  const held = [], rerolled = [], added = [];
+  pushedFlat.forEach((die, index) => {
+    if (index >= last.groups[0].dice.length) added.push(index);
+    else if (die.rerolled) rerolled.push(index);
+    else held.push(index);
+  });
+  pushed.parentId = last.rollId;
+  pushed.transition = { kind: 'push', held, rerolled, added };
   const prev = state.dice;
   const size = prev.length ? prev[0].size : 40;
 
@@ -1946,7 +1985,6 @@ function preparePush() {
 
   const { left, right, top, floor } = state.bounds;
   const span = right - left, gap = span * 0.05;
-  packInto(kept,   left + gap, left + span * 0.44, top + gap, floor - gap);
   packInto(picked, left + span * 0.56, right - gap, top + gap, floor - gap);
   for (const d of picked) if (d.freshPick) { d.x = d.homeX; d.y = d.homeY; delete d.freshPick; }
 
@@ -1969,10 +2007,10 @@ function rollPendingPush() {
   state.pendingPush = null;
   state.last = pushed;
   const pushedFlat = flattenRollDice(pushed);
-  for (const d of (state.pushKept || [])) d.locked = false;
+  const held = state.pushKept || [];
   state.pushKept = null;
 
-  rehomeGrid(state.dice);
+  rehomeUnlockedGrid(state.dice);
   state.dice.forEach((d, i) => {
     if (!d.picked) return;
     d.picked = false;
@@ -1984,7 +2022,10 @@ function rollPendingPush() {
   });
   $('total').dataset.rolling = '1';
   dropIdleCache();
-  setTimeout(() => finish(pushed), 760);
+  setTimeout(() => {
+    for (const d of held) d.locked = false;
+    finish(pushed);
+  }, 760);
   if (navigator.vibrate) navigator.vibrate([8, 40, 12]);
 }
 
@@ -2013,6 +2054,24 @@ function rehomeGrid(dice) {
   const cw = w / cols, ch = h / rows;
   const size = Math.max(26, Math.min(96, Math.min(cw, ch) * 0.78));
   [...dice].sort((a, b) => (a.y - b.y) || (a.x - b.x)).forEach((d, i) => {
+    const c = i % cols, r = Math.floor(i / cols);
+    d.homeX = left + cw * (c + 0.5);
+    d.homeY = top + ch * (r + 0.5);
+    d.size = size;
+  });
+}
+
+// During a push, locked dice are authoritative held outcomes. Rehome only the
+// rerolled/added dice so the held dice do not slide toward new targets.
+function rehomeUnlockedGrid(dice) {
+  const { left, right, top, floor } = state.bounds;
+  const w = right - left, h = floor - top;
+  const cols = Math.ceil(Math.sqrt(dice.length * (w / Math.max(h, 1))));
+  const rows = Math.ceil(dice.length / cols);
+  const cw = w / cols, ch = h / rows;
+  const size = Math.max(26, Math.min(96, Math.min(cw, ch) * 0.78));
+  [...dice].sort((a, b) => (a.y - b.y) || (a.x - b.x)).forEach((d, i) => {
+    if (d.locked) return;
     const c = i % cols, r = Math.floor(i / cols);
     d.homeX = left + cw * (c + 0.5);
     d.homeY = top + ch * (r + 0.5);
@@ -2490,9 +2549,10 @@ function msNotation() {
 // Stress lives in localStorage so it survives a reload. `restage` is skipped when
 // a roll drives the bump — there the tray already holds the settling dice, so we
 // only refresh the chip and persist, never re-stage over the result.
-function setStress(n, { restage = true } = {}) {
+function setStress(n, { restage = true, fromOwlbear = false } = {}) {
   ms.stress = Math.max(2, Math.min(20, Math.round(n)));
-  store.set(MS_STRESS_KEY, String(ms.stress));
+  if (owlbearPanel && !fromOwlbear) requestOwlbearAction('state.set', { state: { stress: ms.stress } });
+  else store.set(MS_STRESS_KEY, String(ms.stress));
   if (restage) syncMs();
   else msStressDial.textContent = String(ms.stress);
 }
@@ -3062,7 +3122,7 @@ const deckState = {
     }
   } catch { /* fresh deck */ }
 }
-const persistDeck = () => store.set(DECK_KEY, JSON.stringify(deckState));
+const persistDeck = () => { if (!owlbearPanel) store.set(DECK_KEY, JSON.stringify(deckState)); };
 
 const DECK_RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 function deckIds() {
@@ -3769,6 +3829,7 @@ bindTapHold($('deckCountChip'), dir => {
   syncCardsUI({ restage: false });
 });
 $('deckShuffle').addEventListener('click', () => {
+  if (owlbearPanel) { requestOwlbearAction('shuffle', { deck: 'cards', notation: deckNotation() }); return; }
   ensureCardArt().then(() => {
     // Everything on the table and in the discard visibly flows back into the
     // deck, and the riffle starts once they arrive.
@@ -3864,7 +3925,7 @@ const tarotState = {
     }
   } catch { /* fresh deck */ }
 }
-const persistTarot = () => store.set(TAROT_KEY, JSON.stringify(tarotState));
+const persistTarot = () => { if (!owlbearPanel) store.set(TAROT_KEY, JSON.stringify(tarotState)); };
 
 // The 78 ids, generated locally so the deck can shuffle before the art module
 // arrives: 22 trumps then each suit's Ace-Ten and Page/Knight/Queen/King.
@@ -4128,6 +4189,7 @@ bindTapHold($('tarotCountChip'), dir => {
   syncTarotUI({ restage: false });
 });
 $('tarotShuffle').addEventListener('click', () => {
+  if (owlbearPanel) { requestOwlbearAction('shuffle', { deck: 'tarot', notation: tarotNotation() }); return; }
   ensureTarotArt().then(() => {
     const prevCards = state.dice.filter(d => d.isCard && !d.isStack && !d.isDiscard && !d.gone && d.phase === 'idle');
     const hadDiscard = tarotState.pile.length > 0;
@@ -4217,7 +4279,7 @@ const napState = {
     }
   } catch { /* fresh deck */ }
 }
-const persistNap = () => store.set(NAP_KEY, JSON.stringify(napState));
+const persistNap = () => { if (!owlbearPanel) store.set(NAP_KEY, JSON.stringify(napState)); };
 
 function napDeckIds() {
   const ids = [];
@@ -4441,6 +4503,7 @@ bindTapHold($('napCountChip'), dir => {
   syncNapUI({ restage: false });
 });
 $('napShuffle').addEventListener('click', () => {
+  if (owlbearPanel) { requestOwlbearAction('shuffle', { deck: 'napoletane', notation: napNotation() }); return; }
   ensureNapArt().then(() => {
     const prevCards = state.dice.filter(d => d.isCard && !d.isStack && !d.isDiscard && !d.gone && d.phase === 'idle');
     const hadDiscard = napState.pile.length > 0;
@@ -4513,7 +4576,7 @@ const hanaState = {
     }
   } catch { /* fresh deck */ }
 }
-const persistHana = () => store.set(HANA_KEY, JSON.stringify(hanaState));
+const persistHana = () => { if (!owlbearPanel) store.set(HANA_KEY, JSON.stringify(hanaState)); };
 
 // The id list lives in the art module; every caller that shuffles has already
 // awaited ensureHanaArt, so this never races the import.
@@ -4731,6 +4794,7 @@ bindTapHold($('hanaCountChip'), dir => {
   syncHanaUI({ restage: false });
 });
 $('hanaShuffle').addEventListener('click', () => {
+  if (owlbearPanel) { requestOwlbearAction('shuffle', { deck: 'hanafuda', notation: hanaNotation() }); return; }
   ensureHanaArt().then(() => {
     const prevCards = state.dice.filter(d => d.isCard && !d.isStack && !d.isDiscard && !d.gone && d.phase === 'idle');
     const hadDiscard = hanaState.pile.length > 0;
@@ -4805,7 +4869,7 @@ const utaState = {
     }
   } catch { /* fresh deck */ }
 }
-const persistUta = () => store.set(UTA_KEY, JSON.stringify(utaState));
+const persistUta = () => { if (!owlbearPanel) store.set(UTA_KEY, JSON.stringify(utaState)); };
 
 function utaDeckIds() { return utaArt.UTA_IDS.slice(); }
 const utaTotal = () => 100;
@@ -5073,6 +5137,7 @@ bindTapHold($('utaCountChip'), dir => {
   syncUtaUI({ restage: false });
 });
 $('utaShuffle').addEventListener('click', () => {
+  if (owlbearPanel) { requestOwlbearAction('shuffle', { deck: 'utagaruta', notation: utaNotation() }); return; }
   ensureUtaArt().then(() => {
     const prevCards = state.dice.filter(d => d.isCard && !d.isStack && !d.isDiscard && !d.gone && d.phase === 'idle');
     const hadDiscard = utaState.pile.length > 0;
@@ -7382,6 +7447,95 @@ function alreadyShown(id) {
   return false;
 }
 
+function showRemotePushTransition(roll, result) {
+  const transition = roll.transition;
+  if (!transition || transition.kind !== 'push' || state.remoteRollId !== roll.parentId) return false;
+  if ($('total').dataset.rolling) return false;
+  const flat = flattenRollDice(result);
+  if (!flat.length || flat.length > ANIMATE_LIMIT) return false;
+  const heldIndexes = Array.isArray(transition.held) ? transition.held : [];
+  const rerolledIndexes = Array.isArray(transition.rerolled) ? transition.rerolled : [];
+  const addedIndexes = Array.isArray(transition.added) ? transition.added : [];
+  const all = [...heldIndexes, ...rerolledIndexes, ...addedIndexes];
+  if (all.some(i => !Number.isInteger(i) || i < 0 || i >= flat.length) || new Set(all).size !== all.length) return false;
+  const beforeCount = flat.length - addedIndexes.length;
+  if (heldIndexes.some(i => i >= beforeCount) || rerolledIndexes.some(i => i >= beforeCount)
+      || addedIndexes.some(i => i < beforeCount)) return false;
+  if (state.dice.length !== beforeCount) return false;
+  if (heldIndexes.length + rerolledIndexes.length !== beforeCount) return false;
+  if (!heldIndexes.every(index => {
+    const current = state.dice[index];
+    const next = flat[index];
+    return current && next && current.value === next.value && current.sides === next.sides;
+  })) return false;
+
+  const heldSet = new Set(heldIndexes), rerolledSet = new Set(rerolledIndexes);
+  const kept = [], picked = [];
+  state.dice.forEach((d, index) => {
+    if (heldSet.has(index)) {
+      d.locked = true;
+      d.picked = false;
+      kept.push(d);
+    } else if (rerolledSet.has(index)) {
+      d.value = null;
+      d.rerolled = false;
+      d.picked = true;
+      d.locked = false;
+      picked.push(d);
+    }
+  });
+  const size = state.dice[0]?.size || 40;
+  for (const index of addedIndexes) {
+    const d = buildTrayDice([flat[index]], result, { remote: true })[0];
+    d.size = size;
+    d.value = null;
+    d.settled = true; d.settling = true; d.settleT = 1;
+    d.rot = [0.5, 0.6, 0.1];
+    d.picked = true;
+    state.dice.push(d);
+    picked.push(d);
+  }
+
+  const { left, right, top, floor } = state.bounds;
+  const span = right - left, gap = span * 0.05;
+  packInto(picked, left + span * 0.56, right - gap, top + gap, floor - gap);
+  const claim = {};
+  state.remoteClaim = claim;
+  state.remoteRollId = roll.id;
+  $('total').dataset.rolling = '1';
+  $('total').dataset.idle = '1';
+  $('total').textContent = '—';
+  $('breakdown').textContent = `${roll.name} · pushed dice picked up`;
+  dropIdleCache();
+
+  setTimeout(() => {
+    if (state.remoteClaim !== claim) return;
+    rehomeUnlockedGrid(state.dice);
+    state.dice.forEach((d, index) => {
+      if (!d.picked) return;
+      d.picked = false;
+      d.value = flat[index].value;
+      d.rerolled = true;
+      d.rerollShown = true;
+      d.throwWith((d.homeX - d.x) * 2.4, (d.homeY - d.y) * 2.4);
+    });
+    delete $('total').dataset.idle;
+    setTimeout(() => {
+      if (state.remoteClaim !== claim) return;
+      for (const d of kept) d.locked = false;
+      delete $('total').dataset.rolling;
+      try {
+        setTotal(resultHeadline(result));
+        $('breakdown').textContent = `${roll.name} · ${resultDetail(result)}`;
+      } catch {
+        setTotal({ kind: 'number', text: result.total != null ? String(result.total) : '—' });
+        $('breakdown').textContent = `${roll.name} · ${result.notation}`;
+      }
+    }, 760);
+  }, 320);
+  return true;
+}
+
 function showRemoteRoll(roll) {
   if (alreadyShown(roll.id)) return;
   // Rebuild the shape the formatters and the tray expect. A numeric roll travels
@@ -7394,7 +7548,7 @@ function showRemoteRoll(roll) {
     total: roll.total,
     summary: roll.summary,
   };
-  addHistory(result, roll.name);
+  addHistory(result, roll.name, false, roll.at);
 
   // A peer's draw deals through the card dealer, exactly like their own tray:
   // stack, flight, flip — remote only steers the haptics away. finish() is
@@ -7414,6 +7568,8 @@ function showRemoteRoll(roll) {
     return;
   }
 
+  if (showRemotePushTransition(roll, result)) return;
+
   // Yield to a throw of your own, but not to another remote roll. Testing
   // dataset.rolling alone treated both the same, so once remote rolls started
   // animating, a second one arriving inside the first one's flight was dropped
@@ -7425,6 +7581,7 @@ function showRemoteRoll(roll) {
 
   const flat = flattenRollDice(result);
   if (!flat.length || flat.length > ANIMATE_LIMIT) return;
+  state.remoteRollId = roll.id;
 
   // Someone else's dice, stamped with their system's faces and colours so they
   // look exactly like a local roll; `remote` only steers haptics away.
@@ -7733,101 +7890,322 @@ window.addEventListener('popstate', () => setSystem(systemFromPath(), { url: fal
 // on the site. Send is your rolls; receive is everyone else's, rendered by the
 // same showRemoteRoll the relay room uses, so the shared tray, the history and
 // the dedupe all come along for free.
-const owlbearPanel = !!document.querySelector('meta[name="dicebox-owlbear"]');
-const OBR_BROADCAST_KEY = 'dicebox:obr:broadcast';
-const OBR_CHANNEL = 'cc.dicebox.rolls';
-let obr = null;                                            // the SDK, once ready inside Owlbear
-let obrPlayerName = null;
-let obrBroadcast = store.get(OBR_BROADCAST_KEY) !== '0';   // default on — opt out, not in
 
-// Called from finish() for every local roll. A no-op unless the panel is inside
-// Owlbear and broadcasting is on. Carries the full roll — the same fields the
-// relay room sends — so a receiving panel renders it exactly like any peer's.
-function broadcastToOwlbear(result) {
-  if (!obr || !obrBroadcast) return;
-  try {
-    obr.broadcast.sendMessage(OBR_CHANNEL, {
-      id: result.rollId,
-      system: result.system || 'numeric',
-      notation: result.notation,
-      groups: result.groups,
-      summary: result.summary,
-      total: result.total ?? null,
-      who: selfName() || obrPlayerName || 'Someone',
-      at: Date.now(),
-    }, { destination: 'REMOTE' }).catch(() => {});
-  } catch { /* the table just doesn't see this one */ }
+function owlbearWireBytes(value) {
+  try { return new TextEncoder().encode(JSON.stringify(value)).length; }
+  catch { return Infinity; }
 }
 
-// A roll off the bus is as untrusted as one off the relay, so it goes through the
-// same shape guards before the renderer sees it. Numeric rolls re-derive their
-// total; system rolls pass the permissive system-roll check.
-function acceptOwlbearRoll(d) {
-  if (!d || typeof d !== 'object' || typeof d.notation !== 'string') return;
-  const sys = d.system || 'numeric';
-  const wire = sys === 'numeric'
+function clearOwlbearRequest(requestId) {
+  const pending = obrOutstanding.get(requestId);
+  if (pending?.timer) clearTimeout(pending.timer);
+  obrOutstanding.delete(requestId);
+  return pending;
+}
+
+function sendOwlbearRequest(payload, pending) {
+  if (!obr || !obrConnectionId) {
+    showError('Owlbear is still connecting');
+    return null;
+  }
+  const requestId = `dicebox-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  const message = { v: OBR_PROTOCOL_VERSION, ...payload, requestId };
+  if (owlbearWireBytes(message) > OBR_MAX_WIRE_BYTES) {
+    showError('Dicebox request exceeds Owlbear’s message limit');
+    return null;
+  }
+  const timer = setTimeout(() => {
+    if (!obrOutstanding.has(requestId)) return;
+    obrOutstanding.delete(requestId);
+    if (pending.kind !== 'history') showError('Dicebox background did not respond');
+  }, 4_500);
+  obrOutstanding.set(requestId, { ...pending, timer });
+  try {
+    Promise.resolve(obr.broadcast.sendMessage(OBR_CHANNEL, message, { destination: 'LOCAL' }))
+      .catch(error => {
+        clearOwlbearRequest(requestId);
+        showError(error?.message || 'Could not reach the Dicebox background');
+      });
+  } catch (error) {
+    clearOwlbearRequest(requestId);
+    showError(error?.message || 'Could not reach the Dicebox background');
+    return null;
+  }
+  return requestId;
+}
+
+function requestOwlbearRoll(notation, options = {}) {
+  if (typeof notation !== 'string' || !notation.trim()) { showError('Enter a roll'); return; }
+  const game = detectSystem(notation) === 'oracle'
+    ? (uiSystem === 'starforged' ? 'starforged' : 'ironsworn') : undefined;
+  sendOwlbearRequest({ type: 'roll.request', notation, ...(game ? { game } : {}) }, {
+    kind: 'roll', writeField: options.writeField !== false,
+  });
+}
+
+function requestOwlbearAction(action, fields = {}) {
+  if (!obr || !obrConnectionId) {
+    if (action === 'state.set' && fields.state) Object.assign(pendingOwlbearState, fields.state);
+    else showError('Owlbear is still connecting');
+    return;
+  }
+  sendOwlbearRequest({ type: 'action.request', action, ...fields }, { kind: 'action', action });
+}
+
+function requestOwlbearHistory() {
+  const requestId = sendOwlbearRequest({ type: 'history.request' }, { kind: 'history' });
+  if (requestId) obrHistorySync = {
+    requestId, pages: new Map(), pageCount: null, bytes: 0, records: 0, live: false, state: null,
+  };
+}
+
+function syncOwlbearOwnedState(data) {
+  if (!data || typeof data !== 'object') return;
+  const snapshot = data.state && typeof data.state === 'object' ? data.state : data;
+  if (Number.isInteger(snapshot.hunger) && snapshot.hunger >= 0 && snapshot.hunger <= 5) {
+    setHunger(snapshot.hunger, { restage: false, fromOwlbear: true });
+  } else if (data.summary?.kind === 'rouse' && Number.isFinite(data.summary.hungerAfter)) {
+    setHunger(data.summary.hungerAfter, { restage: false, fromOwlbear: true });
+  }
+  if (Number.isInteger(snapshot.stress) && snapshot.stress >= 2 && snapshot.stress <= 20) {
+    setStress(snapshot.stress, { restage: false, fromOwlbear: true });
+  } else if (data.system === 'mothership' && Number.isFinite(data.summary?.stressAfter)) {
+    setStress(data.summary.stressAfter, { restage: false, fromOwlbear: true });
+  }
+
+  const decks = {
+    cards: [DECK_KEY, deckState, syncCardsUI, 52],
+    tarot: [TAROT_KEY, tarotState, syncTarotUI, 78],
+    napoletane: [NAP_KEY, napState, syncNapUI, 40],
+    hanafuda: [HANA_KEY, hanaState, syncHanaUI, 48],
+    utagaruta: [UTA_KEY, utaState, syncUtaUI, 100],
+  };
+  const wanted = snapshot.decks && typeof snapshot.decks === 'object'
+    ? Object.keys(decks) : [data.deck || data.system].filter(Boolean);
+  for (const system of wanted) {
+    const entry = decks[system];
+    if (!entry) continue;
+    let saved = null;
+    try { saved = JSON.parse(store.get(entry[0]) || 'null'); } catch { saved = null; }
+    if (saved && Array.isArray(saved.order)) {
+      Object.assign(entry[1], saved);
+    } else {
+      const compact = snapshot.decks?.[system];
+      if (!compact || !Number.isInteger(compact.total) || !Number.isInteger(compact.remaining)) continue;
+      const total = Math.max(0, Math.min(entry[3], compact.total));
+      const remaining = Math.max(0, Math.min(total, compact.remaining));
+      Object.assign(entry[1], compact, {
+        order: Array.from({ length: total }, (_, index) => `obr-${index}`),
+        pos: total - remaining,
+        pile: [], hand: [], handReplace: false,
+      });
+    }
+    entry[2]({ writeField: false, restage: false });
+  }
+}
+
+function normalizeOwlbearResult(d) {
+  if (!d || typeof d !== 'object' || typeof d.notation !== 'string') return null;
+  const system = d.system || 'numeric';
+  const wire = system === 'numeric'
     ? { notation: d.notation, total: d.total, groups: d.groups }
-    : { system: sys, notation: d.notation, groups: d.groups, summary: d.summary };
-  if (sys === 'numeric' ? !validateRoll(wire) : !validateSystemRoll(wire)) return;
-  showRemoteRoll({
-    id: typeof d.id === 'string' ? d.id : null,
-    name: typeof d.who === 'string' ? d.who.slice(0, 40) : 'Someone',
-    at: Number.isFinite(d.at) ? d.at : Date.now(),
-    system: sys === 'numeric' ? undefined : sys,
+    : {
+      system, notation: d.notation, groups: d.groups, summary: d.summary,
+      parentId: d.parentId, transition: d.transition,
+    };
+  if (system === 'numeric' ? !validateRoll(wire) : !validateSystemRoll(wire)) return null;
+  return {
+    system,
     notation: d.notation,
     groups: d.groups,
     summary: d.summary,
     total: d.total,
+    rollId: typeof d.id === 'string' ? d.id : null,
+    parentId: typeof d.parentId === 'string' ? d.parentId : null,
+    transition: d.transition && typeof d.transition === 'object' ? d.transition : null,
+  };
+}
+
+function archiveOwlbearRoll(d) {
+  const result = normalizeOwlbearResult(d);
+  if (!result) return false;
+  const id = result.rollId;
+  if (id && seenRolls.has(id)) return false;
+  try {
+    addHistory(result, typeof d.who === 'string' ? d.who.slice(0, 40) : 'Someone',
+      !!obrPlayerName && d.who === obrPlayerName, Number.isFinite(d.at) ? d.at : null);
+    alreadyShown(id);
+    return true;
+  } catch {
+    if (id) seenRolls.delete(id);
+    return false;
+  }
+}
+
+// A roll off the bus is as untrusted as one off the relay, so it goes through the
+// same shape guards before the renderer sees it. Numeric rolls re-derive their
+// total; system rolls pass the bounded system-roll check.
+function acceptOwlbearRoll(d) {
+  if (!normalizeOwlbearResult(d)) return false;
+  try {
+    showRemoteRoll({
+      id: typeof d.id === 'string' ? d.id : null,
+      name: typeof d.who === 'string' ? d.who.slice(0, 40) : 'Someone',
+      at: Number.isFinite(d.at) ? d.at : Date.now(),
+      system: (d.system || 'numeric') === 'numeric' ? undefined : d.system,
+      notation: d.notation,
+      groups: d.groups,
+      summary: d.summary,
+      total: d.total,
+      parentId: typeof d.parentId === 'string' ? d.parentId : null,
+      transition: d.type === 'roll.transition' && d.transition && typeof d.transition === 'object'
+        ? d.transition : null,
+    });
+    return true;
+  } catch {
+    if (typeof d.id === 'string') seenRolls.delete(d.id);
+    return false;
+  }
+}
+
+function presentOwlbearResult(data, pending) {
+  const result = normalizeOwlbearResult(data);
+  if (!result) { showError('Dicebox background returned an invalid result'); return; }
+  clearError();
+  syncOwlbearOwnedState(data);
+  state.last = result;
+  state.pendingPush = null;
+  state.pushKept = null;
+  if (pending.writeField !== false) $('notation').value = result.notation;
+  // The background already archived and published this outcome to Owlbear. The
+  // panel may still mirror its own correlated intent into an explicitly joined
+  // passphrase room; unsolicited extension requests never enter that transport.
+  roomLink.share(result);
+  acceptOwlbearRoll({ ...data, who: obrPlayerName || data.who || 'You', type: data.transition ? 'roll.transition' : 'roll.event' });
+  updateYzPush();
+  updateBrPush();
+  updateT2kPush();
+}
+
+function completeOwlbearHistory(data) {
+  const sync = obrHistorySync;
+  if (!sync || data.requestId !== sync.requestId) return;
+  if (owlbearWireBytes(data) > OBR_MAX_WIRE_BYTES
+      || !Number.isInteger(data.page) || data.page < 0
+      || !Number.isInteger(data.pageCount) || data.pageCount < 1 || data.pageCount > 500
+      || data.page >= data.pageCount || typeof data.done !== 'boolean'
+      || data.done !== (data.page === data.pageCount - 1)
+      || !Array.isArray(data.rolls) || data.rolls.length > 500
+      || sync.pages.has(data.page)
+      || (sync.pageCount !== null && sync.pageCount !== data.pageCount)) {
+    clearOwlbearRequest(data.requestId);
+    obrHistorySync = null;
+    return;
+  }
+  const bytes = owlbearWireBytes(data);
+  if (sync.bytes + bytes > OBR_MAX_HYDRATION_BYTES || sync.records + data.rolls.length > 500) {
+    clearOwlbearRequest(data.requestId);
+    obrHistorySync = null;
+    return;
+  }
+  sync.pageCount = data.pageCount;
+  sync.pages.set(data.page, data.rolls);
+  sync.bytes += bytes;
+  sync.records += data.rolls.length;
+  if (data.page === 0 && data.state && typeof data.state === 'object') sync.state = data.state;
+  if (sync.pages.size !== sync.pageCount) return;
+  for (let page = 0; page < sync.pageCount; page++) if (!sync.pages.has(page)) return;
+
+  clearOwlbearRequest(data.requestId);
+  obrHistorySync = null;
+  if (sync.state && !sync.live) syncOwlbearOwnedState({ state: sync.state });
+  const records = Array.from({ length: sync.pageCount }, (_, page) => sync.pages.get(page)).flat();
+  records.forEach((saved, index) => {
+    const latest = !sync.live && index === records.length - 1;
+    if (latest) acceptOwlbearRoll(saved);
+    else archiveOwlbearRoll(saved);
   });
 }
 
-function initializeOwlbear(OBR, roomObr) {
-  OBR.onReady(() => {
-    try {
-      // SDK subscriptions send through Owlbear's message bus, so they must be
-      // registered only after OBR_READY gives that bus its connection reference.
-      // Receiving stays on even when this panel's own broadcast toggle is off.
-      OBR.broadcast.onMessage(OBR_CHANNEL, event => {
-        try { acceptOwlbearRoll(event.data); } catch { /* one bad roll, not the panel */ }
-      });
-      // Do not activate automatic sending or advertise the toggle until receive
-      // subscription succeeds. A partial initialization must fail closed.
-      obr = OBR;
-      if (roomObr) roomObr.hidden = false;
-    } catch (error) {
-      obr = null;
-      if (roomObr) roomObr.hidden = true;
-      console.error('[Dicebox/Owlbear] SDK initialization failed', error);
+async function handleOwlbearMessage(event) {
+  try {
+    const data = event?.data;
+    if (!data || typeof data !== 'object') return;
+    const localResponse = ['history.result', 'action.result', 'roll.result', 'roll.error'].includes(data.type);
+    if (localResponse) {
+      if (data.v !== OBR_PROTOCOL_VERSION || event.connectionId !== obrConnectionId
+          || typeof data.requestId !== 'string') return;
+      if (!verifyLocalPayload || !getOrCreateLocalAuthSecret) return;
+      if (!(await verifyLocalPayload(getOrCreateLocalAuthSecret(localStorage), data))) return;
+      const pending = obrOutstanding.get(data.requestId);
+      if (!pending) return;
+      if (data.type === 'history.result') {
+        if (pending.kind === 'history') completeOwlbearHistory(data);
+        return;
+      }
+      clearOwlbearRequest(data.requestId);
+      if (data.type === 'roll.error') {
+        showError(typeof data.message === 'string' ? data.message : 'Dicebox background rejected the request');
+        return;
+      }
+      if (data.type === 'action.result') {
+        if (pending.kind !== 'action') return;
+        if (obrHistorySync) obrHistorySync.live = true;
+        syncOwlbearOwnedState(data);
+        clearError();
+        return;
+      }
+      if (!['roll', 'action'].includes(pending.kind)) return;
+      if (obrHistorySync) obrHistorySync.live = true;
+      presentOwlbearResult(data, pending);
       return;
     }
 
-    // The display name improves attribution but is not required for sharing.
-    // Keep a name lookup failure from disabling an otherwise healthy channel.
+    const typedRoll = data.v === OBR_PROTOCOL_VERSION
+      && ['roll.event', 'roll.transition'].includes(data.type);
+    const legacyRoll = data.type === undefined && data.v === undefined;
+    if (!typedRoll && !legacyRoll) return;
+    if (acceptOwlbearRoll(data) && obrHistorySync) obrHistorySync.live = true;
+  } catch { /* one bad message, not the panel */ }
+}
+
+function initializeOwlbear(OBR, roomObr) {
+  OBR.onReady(async () => {
     try {
-      Promise.resolve(OBR.player.getName())
-        .then(n => { obrPlayerName = n; })
-        .catch(error => console.warn('[Dicebox/Owlbear] Player name unavailable', error));
+      const [connection, player] = await Promise.all([
+        OBR.player.getConnectionId(),
+        Promise.resolve(OBR.player.getName()).catch(() => null),
+      ]);
+      if (typeof connection !== 'string' || !connection) throw new Error('Missing Owlbear connection identity');
+      obr = OBR;
+      obrConnectionId = connection;
+      obrPlayerName = typeof player === 'string' ? player.slice(0, 40) : null;
+      OBR.broadcast.onMessage(OBR_CHANNEL, handleOwlbearMessage);
+      if (roomObr) roomObr.hidden = false;
+      for (const [key, value] of Object.entries(pendingOwlbearState)) {
+        requestOwlbearAction('state.set', { state: { [key]: value } });
+        delete pendingOwlbearState[key];
+      }
+      requestOwlbearHistory();
     } catch (error) {
-      console.warn('[Dicebox/Owlbear] Player name unavailable', error);
+      obr = null;
+      obrConnectionId = null;
+      if (roomObr) roomObr.hidden = true;
+      console.error('[Dicebox/Owlbear] SDK initialization failed', error);
     }
   });
 }
 
 if (owlbearPanel) {
   const roomObr = $('roomObr');
-  const obrToggle = $('obrBroadcast');
-  if (obrToggle) {
-    obrToggle.checked = obrBroadcast;   // the light follows :checked in CSS
-    obrToggle.addEventListener('change', () => {
-      obrBroadcast = obrToggle.checked;
-      store.set(OBR_BROADCAST_KEY, obrBroadcast ? '1' : '0');
-    });
-  }
   // The SDK file exists only in the panel build. If Owlbear is really the parent
   // it answers the handshake and onReady fires; framed by anything else it never
-  // does, so the toggle stays hidden and nothing is ever shared.
-  import('./obr-sdk.js').then(m => {
-    initializeOwlbear(m.default, roomObr);
+  // does, so the Owlbear notice stays hidden and no SDK traffic starts.
+  Promise.all([import('./obr-sdk.js'), import('./owlbear-auth.js')]).then(([sdk, auth]) => {
+    getOrCreateLocalAuthSecret = auth.getOrCreateLocalAuthSecret;
+    verifyLocalPayload = auth.verifyLocalPayload;
+    getOrCreateLocalAuthSecret(localStorage);
+    initializeOwlbear(sdk.default, roomObr);
   }).catch(error => {
     console.error('[Dicebox/Owlbear] SDK initialization failed', error);
   });

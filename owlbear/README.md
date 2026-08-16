@@ -17,17 +17,18 @@ geometry rather than maintaining separate identities.
 
 ## What it is and is not
 
-**It is a shared table inside Owlbear.** Every open panel in the same Owlbear
-game shares rolls automatically over Owlbear's own message bus — no passphrase,
-the game is the room. Sending is on by default, with a toggle in the share menu
-and a red light while it is live. Turning the toggle off stops this panel from
-sending to Owlbear; it remains subscribed and still receives the other panels'
-rolls. This is the one place Dicebox deliberately leaves its encrypted channel:
-Owlbear relays the bus, so those rolls are visible to the whole table and to any
-extension listening, not end-to-end encrypted. Being at an Owlbear table is
-already a choice to share one, and the toggle and the light say so out loud.
-Rolls carry an id and are deduped, and a roll heard on the bus is never
-re-published, so nothing loops and no encrypted roll leaks out.
+**It is a shared table inside Owlbear.** Enabling Dicebox enables table sending
+and listening; there is no separate switch. The manifest-owned background page
+waits for its own `OBR.onReady()` and remains active while the action popover is
+closed. It receives completed rolls, retains bounded room-local history, and
+answers typed requests from other extensions on this player's local Owlbear
+connection. The Share rolls menu has only a small Owlbear-mode notice.
+
+Owlbear relays readable Broadcast messages to the current game, so these rolls
+are not Dicebox end-to-end encrypted and can be read by an extension listening
+on the known channel. Rolls carry stable ids, incoming messages are deduplicated,
+and received events are never republished, so neither Owlbear nor the encrypted
+room transport forms a loop.
 
 **It is also a peer.** The manual passphrase room is still here, end-to-end
 encrypted, for anyone NOT in the Owlbear game — a phone, a browser tab, a player
@@ -177,24 +178,32 @@ use unless the extension declares `clipboard-write`. It is in `manifest.json`
 with its reason. Without it those buttons fail silently, which at a table means
 the passphrase becomes uncopyable at the exact moment everyone needs it.
 
-**Storage may be partitioned or denied.** An embedded copy can have
-`localStorage` throw on access rather than return null. Dicebox reads it at
-load, so this used to be capable of blanking the panel with no visible error;
-it now goes through a guard. The panel still runs, but the theme and outgoing
-Owlbear-sharing preferences cannot persist. The sharing switch works for the
-open panel and returns to its default-on state after a reload.
+**Storage may be partitioned or denied.** An embedded copy can have synchronous
+storage APIs throw instead of returning null, so all fallbacks are guarded.
+Background history primarily uses IndexedDB and is bounded by count and bytes;
+when IndexedDB is unavailable it falls back to the guarded room-local cache.
+The panel still rolls if persistence is unavailable, but retained history and
+other preferences may not survive a reload.
 
 **No service worker.** The app skips registering one when it detects it is
 framed. A panel with no address bar and no reload button, quietly serving a
 build from three deploys ago, is not something you can talk a player through
 fixing.
 
-**The SDK, vendored.** The shared table uses Owlbear's `broadcast` API, so the
-panel loads Owlbear's SDK — but only the panel, never the site. `obr-sdk.js` is a
-self-contained esbuild bundle of `@owlbear-rodeo/sdk`, committed here and copied
-into the build; `app.js` imports it lazily, gated on the `dicebox-owlbear` meta
-tag the build injects, so the site never fetches it and the broadcast code never
-runs anywhere else.
+**The SDK, vendored.** The VTT artifact loads Owlbear's SDK in two independent
+contexts. The action panel imports it lazily behind the build-only
+`dicebox-owlbear` marker; `background.html` loads its own entry point and waits
+for its own `OBR.onReady()`. The SDK, background entries, coordinator, and
+IndexedDB repository are copied only by `tools/build-owlbear.mjs`; the ordinary
+site and offline bundle do not initialize them.
+
+The typed version-1 request/result contract uses only `cc.dicebox.rolls`.
+Requests and correlated responses are `LOCAL`; completed table events and push
+transitions are explicitly `REMOTE`. Dicebox keeps 4 KiB of headroom below
+Owlbear's 16 KiB Broadcast ceiling, pages history, serialises stateful work, and
+returns explicit timeout, rate, queue, validation, and payload-limit errors.
+See the root README's **For extension developers** section for schemas and trust
+limits.
 
 Regenerate it when bumping the SDK:
 

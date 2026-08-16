@@ -2523,25 +2523,10 @@ body {
   padding-top: 4px;
 }
 
-/* Owlbear shared-table toggle (panel only). The light is the honest bit: it
-   glows red while your rolls are leaving the encrypted channel for the table. */
+/* Owlbear mode notice (panel only). Sharing is part of the extension contract,
+   so this is intentionally information rather than a preference control. */
 .room-obr { border-top: 0; padding-top: 4px; }
-.obr-toggle {
-  display: flex; align-items: center; gap: 9px;
-  cursor: pointer; font-size: 13.5px; color: var(--line);
-  -webkit-tap-highlight-color: transparent;
-}
-.obr-toggle input { flex: 0 0 auto; accent-color: var(--accent); width: 15px; height: 15px; margin: 0; }
-.obr-light {
-  flex: 0 0 auto; width: 9px; height: 9px; border-radius: 50%;
-  background: var(--muted);
-  transition: background 160ms ease, box-shadow 160ms ease;
-}
-.obr-toggle input:checked ~ .obr-light {
-  background: #E0463C;
-  box-shadow: 0 0 0 3px color-mix(in srgb, #E0463C 22%, transparent);
-}
-.obr-toggle-text { flex: 1 1 auto; }
+.room-obr-note { margin: 0; font-size: 11px; line-height: 1.35; }
 
 /* The privacy note, now at the foot of the panel rather than in front of it.
    Set apart and quieter than the controls: it is there to be found, not to be

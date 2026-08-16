@@ -1,11 +1,12 @@
 {
   "name": "Dicebox",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "manifest_version": 1,
-  "description": "Shared dice for a table. Rolls are encrypted with a passphrase before they leave your device.",
+  "description": "Authoritative dice, cards and oracles for Owlbear Rodeo, with shared results and local extension requests.",
   "author": "Dicebox",
   "icon": "/icon.svg",
   "homepage_url": "https://github.com/SONDLecT/dicebox",
+  "background_url": "/background.html",
   "action": {
     "title": "Dicebox",
     "icon": "/icon.svg",

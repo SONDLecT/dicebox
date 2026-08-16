@@ -28,3 +28,6 @@ Vector-Cards-Version-3.2.zip
 # it from here would put a framable copy of the app on the same host as the one
 # that refuses to be framed, which gives up the protection entirely.
 owlbear
+owlbear-auth.js
+owlbear-session.js
+owlbear-history.js

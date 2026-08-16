@@ -31,17 +31,24 @@ if (!existsSync(OUT)) {
 
 const html = readFileSync(join(OUT, 'index.html'), 'utf8');
 const appJs = readFileSync(join(OUT, 'app.js'), 'utf8');
+const sessionJs = readFileSync(join(OUT, 'owlbear-session.js'), 'utf8');
 const headers = readFileSync(join(OUT, '_headers'), 'utf8');
 const manifest = JSON.parse(readFileSync(join(OUT, 'manifest.json'), 'utf8'));
 const present = new Set(readdirSync(OUT));
+const mainAssetIgnore = readFileSync(join(ROOT, '.assetsignore'), 'utf8').split('\n').map(line => line.trim());
 
 // --- the panel is complete ---
 
 for (const file of ['index.html', 'app.js', 'dice.js', 'render.js', 'room.js',
                     'room-crypto.js', 'style.css', 'icon.svg', 'manifest.json',
-                    '_headers', 'worker.js', 'wrangler.jsonc', 'obr-sdk.js']) {
+                    '_headers', 'worker.js', 'wrangler.jsonc', 'obr-sdk.js',
+                    'background.html', 'background.js', 'owlbear-session.js',
+                    'owlbear-history.js', 'owlbear-auth.js']) {
   ok(`${file} is built`, present.has(file));
 }
+
+ok('Owlbear-only protocol modules are excluded from the standalone site deployment',
+   ['owlbear-auth.js', 'owlbear-session.js', 'owlbear-history.js'].every(file => mainAssetIgnore.includes(file)));
 
 // Branding has one source of truth. The Owlbear action must be byte-for-byte the
 // same d20 mark used to generate the PWA and dashboard icons, or the project
@@ -100,6 +107,18 @@ const wanted = [...new Set([...appJs.matchAll(/\$\('([^']+)'\)/g)].map(m => m[1]
 ok('there are elements to check', wanted.length > 10);
 const lost = wanted.filter(id => !html.includes(`id="${id}"`));
 ok('the build kept every element app.js uses', lost.length === 0, lost.join(', '));
+ok('the VTT panel shows only a compact always-on Owlbear notice',
+   html.includes('Owlbear mode') && html.includes('Rolls are shared with this game') &&
+   !html.includes('id="obrBroadcast"') && !html.includes('id="obrRequests"'));
+ok('the VTT app has no stale Owlbear sharing or request preference switches',
+   !appJs.includes('OBR_BROADCAST_KEY') && !appJs.includes('OBR_REQUESTS_KEY'));
+ok('the action panel asks the background for retained history',
+   appJs.includes("type: 'history.request'"));
+ok('local panel rolls send typed intent to the background without using the relay',
+   appJs.includes("type: 'roll.request'") && appJs.includes("destination: 'LOCAL'")
+   && !appJs.includes("type: 'roll.publish'"));
+ok('local background responses are authenticated before the panel accepts them',
+   appJs.includes('verifyLocalPayload') && sessionJs.includes('signLocalPayload'));
 
 // --- the relay is baked in ---
 
@@ -190,8 +209,9 @@ ok('a preflight is answered', /OPTIONS/.test(worker));
 // --- the manifest ---
 
 ok('the manifest targets a known manifest version', manifest.manifest_version === 1);
-ok('the unified-branding release bumps the extension version', manifest.version === '1.0.2', manifest.version);
+ok('the background-bridge release bumps the extension version', manifest.version === '1.1.0', manifest.version);
 ok('the manifest has an action', !!manifest.action && typeof manifest.action.popover === 'string');
+ok('the manifest keeps an always-on background context', manifest.background_url === '/background.html', manifest.background_url);
 // Silently truncated by Owlbear rather than rejected, so it has to be caught here.
 ok('the name is within Owlbear\'s 45 characters', manifest.name.length <= 45, `${manifest.name.length}`);
 ok('the description is within Owlbear\'s 128 characters',
@@ -233,8 +253,14 @@ if (initializeOwlbearSource) {
     const errors = [];
     const factory = new Function('captureError', `
       const OBR_CHANNEL = 'cc.dicebox.rolls';
+      const OBR_PROTOCOL_VERSION = 1;
       let obr = null;
+      let obrConnectionId = null;
       let obrPlayerName = '';
+      const pendingOwlbearState = {};
+      const requestOwlbearAction = () => {};
+      const requestOwlbearHistory = () => {};
+      const handleOwlbearMessage = () => {};
       let accepted = 0;
       const acceptOwlbearRoll = () => { accepted++; };
       const console = {
@@ -256,13 +282,19 @@ if (initializeOwlbearSource) {
     let ready = null, subscriptions = 0, playerReads = 0;
     const sdk = {
       onReady(callback) { ready = callback; },
-      broadcast: { onMessage() { subscriptions++; } },
-      player: { getName() { playerReads++; return Promise.resolve('Ready Player'); } },
+      broadcast: {
+        onMessage() { subscriptions++; },
+        sendMessage() { return Promise.resolve(); },
+      },
+      player: {
+        getConnectionId() { return Promise.resolve('local-connection'); },
+        getName() { playerReads++; return Promise.resolve('Ready Player'); },
+      },
     };
     harness.initializeOwlbear(sdk, room);
     ok('broadcast is not subscribed before OBR_READY', subscriptions === 0);
     ok('the sharing row stays hidden before OBR_READY', room.hidden === true);
-    ready();
+    await ready();
     await Promise.resolve();
     ok('broadcast subscribes after OBR_READY', subscriptions === 1);
     ok('successful subscription reveals and activates Owlbear sharing',
@@ -279,12 +311,15 @@ if (initializeOwlbearSource) {
     const sdk = {
       onReady(callback) { ready = callback; },
       broadcast: { onMessage() { throw new Error('subscription failed'); } },
-      player: { getName() { playerReads++; return Promise.resolve('Never read'); } },
+      player: {
+        getConnectionId() { return Promise.resolve('local-connection'); },
+        getName() { playerReads++; return Promise.resolve('Never read'); },
+      },
     };
     harness.initializeOwlbear(sdk, room);
-    ready();
+    await ready();
     ok('failed subscription leaves Owlbear sharing hidden and inactive',
-       room.hidden === true && harness.state().obr === null && playerReads === 0);
+       room.hidden === true && harness.state().obr === null && playerReads === 1);
     ok('failed delayed initialization is reported',
        harness.errors.length === 1 &&
        harness.errors[0][0] === '[Dicebox/Owlbear] SDK initialization failed' &&

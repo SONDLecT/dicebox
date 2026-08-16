@@ -150,11 +150,14 @@ function rollTerm(term) {
   return { dice, total };
 }
 
-export function roll(notation) {
+export function parseNotation(notation) {
   const src = String(notation || '').trim();
   if (!src) throw new Error('Enter something like 3d6 or 1d20+5');
+  return { notation: src, terms: new Parser(src).parse() };
+}
 
-  const terms = new Parser(src).parse();
+export function roll(notation) {
+  const { notation: src, terms } = parseNotation(notation);
   let total = 0;
   const groups = [];
 

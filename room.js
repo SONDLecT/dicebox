@@ -197,13 +197,22 @@ export function validateRoll(msg) {
 // 'yearzero', Starforged as 'ironsworn'. Miss one and every roll from that mode
 // is silently dropped at the receiver.
 const SYSTEM_ROLL_KINDS = new Set([
-  'v5', 'fate', 'genesys', 'daggerheart', 'cthulhutech', 'starwars', 'onering', 'pbta', 'mist', 'mothership', 'coc', 'deltagreen', 'ironsworn', 'yearzero', 'bladerunner', 'twilight', 'cards', 'tarot', 'napoletane', 'hanafuda', 'utagaruta',
+  'v5', 'fate', 'genesys', 'daggerheart', 'cthulhutech', 'starwars', 'onering', 'pbta', 'mist', 'mothership', 'coc', 'deltagreen', 'ironsworn', 'oracle', 'yearzero', 'bladerunner', 'twilight', 'cards', 'tarot', 'napoletane', 'hanafuda', 'utagaruta',
 ]);
 
 export function validateSystemRoll(msg) {
   if (!msg || typeof msg !== 'object') return false;
   if (typeof msg.system !== 'string' || !SYSTEM_ROLL_KINDS.has(msg.system)) return false;
   if (typeof msg.notation !== 'string' || !msg.notation || msg.notation.length > 200) return false;
+  if (msg.parentId != null && (typeof msg.parentId !== 'string' || msg.parentId.length > 96)) return false;
+  if (msg.transition != null) {
+    const t = msg.transition;
+    if (!t || typeof t !== 'object' || t.kind !== 'push') return false;
+    for (const key of ['held', 'rerolled', 'added']) {
+      if (!Array.isArray(t[key]) || t[key].length > 100
+          || t[key].some(index => !Number.isInteger(index) || index < 0 || index >= 100)) return false;
+    }
+  }
   if (!msg.summary || typeof msg.summary !== 'object' || Array.isArray(msg.summary)) return false;
   if (!Array.isArray(msg.groups) || msg.groups.length === 0 || msg.groups.length > 50) return false;
 
@@ -458,6 +467,8 @@ export function createRoom(options = {}) {
           notation: msg.notation,
           groups: msg.groups,
           summary: msg.summary,
+          parentId: typeof msg.parentId === 'string' ? msg.parentId : null,
+          transition: msg.transition && typeof msg.transition === 'object' ? msg.transition : null,
         });
       } catch { /* see setState */ }
       return;
@@ -766,6 +777,8 @@ export function createRoom(options = {}) {
           notation: result.notation,
           groups: result.groups,
           summary: result.summary,
+          ...(typeof result.parentId === 'string' ? { parentId: result.parentId } : {}),
+          ...(result.transition && typeof result.transition === 'object' ? { transition: result.transition } : {}),
         });
         return;
       }
