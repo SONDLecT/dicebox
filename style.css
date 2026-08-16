@@ -272,6 +272,13 @@ body {
 .help .colophon {
   margin: 10px 0 0;
   font-size: 12px;
+  /* A wrapping row rather than flowing text: a link that no longer fits moves
+     to the next line whole instead of breaking mid-phrase against the edge. */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 6px;
+  row-gap: 4px;
 }
 
 /* Which build is loaded. Quiet and monospaced — it is a serial number, not
@@ -279,6 +286,7 @@ body {
    when a cached copy is lying about what it is. */
 .build {
   display: block;
+  flex-basis: 100%;
   margin-top: 6px;
   font-family: "Iosevka Etoile", ui-monospace, monospace;
   font-size: 10.5px;
@@ -289,7 +297,6 @@ body {
 
 .colophon-sep {
   color: var(--muted);
-  margin: 0 6px;
 }
 
 /* The fine print: trademark/affiliation notice and the credits the publishers'
@@ -307,6 +314,7 @@ body {
   text-decoration: none;
   border-bottom: 1px solid currentColor;
   padding-bottom: 1px;
+  white-space: nowrap;
 }
 
 /* ---- tray ---- */
