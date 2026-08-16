@@ -1093,6 +1093,12 @@ function finish(result) {
   // both the relay room and the Owlbear bus shows it once.
   result.rollId = nextRollId();
   roomLink.share(result);
+  // finish() only ever runs for rolls the background did NOT produce — its own
+  // results present through presentOwlbearResult — so inside Owlbear this is the
+  // fallback path, and the table still has to see the roll. Published in the
+  // legacy top-level shape every listener already accepts: other panels render
+  // it, other backgrounds remember it.
+  publishLocalRollToOwlbear(result);
   // The name has done its job by the first roll; let the tray have the page.
   $('wordmark').dataset.faded = '1';
   updateYzPush();
@@ -7918,6 +7924,29 @@ function clearOwlbearRequest(requestId) {
   if (pending?.timer) clearTimeout(pending.timer);
   obrOutstanding.delete(requestId);
   return pending;
+}
+
+// A locally-finished roll inside Owlbear still belongs to the table. With a
+// healthy background this never fires for its rolls (they present through
+// presentOwlbearResult, not finish); this is what keeps two panels sharing when
+// the background is missing, exactly as the pre-bridge panel did.
+function publishLocalRollToOwlbear(result) {
+  if (!owlbearPanel || !obr) return;
+  try {
+    const payload = {
+      id: result.rollId,
+      system: result.system || 'numeric',
+      notation: result.notation,
+      groups: result.groups,
+      summary: result.summary ?? null,
+      total: result.total ?? null,
+      who: obrPlayerName || selfName() || 'Someone',
+      at: Date.now(),
+    };
+    if (owlbearWireBytes(payload) > OBR_MAX_WIRE_BYTES) return;
+    Promise.resolve(obr.broadcast.sendMessage(OBR_CHANNEL, payload, { destination: 'REMOTE' }))
+      .catch(() => {});
+  } catch { /* the table just doesn't see this one */ }
 }
 
 // The dice must land even with no background to ask — an install that predates
