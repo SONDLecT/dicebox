@@ -128,6 +128,10 @@ copyFileSync(BRAND_ICON, join(OUT, 'icon.svg'));
 copyFileSync(join(SRC, 'obr-sdk.js'), join(OUT, 'obr-sdk.js'));
 copyFileSync(join(SRC, 'background.html'), join(OUT, 'background.html'));
 copyFileSync(join(SRC, 'background.js'), join(OUT, 'background.js'));
+// The corner roll window the background opens for each completed roll.
+copyFileSync(join(SRC, 'toast.html'), join(OUT, 'toast.html'));
+copyFileSync(join(SRC, 'toast.css'), join(OUT, 'toast.css'));
+copyFileSync(join(SRC, 'toast.js'), join(OUT, 'toast.js'));
 
 // --- the page ---
 

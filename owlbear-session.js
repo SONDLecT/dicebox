@@ -423,6 +423,23 @@ async function resetDeck(storage, deck, memory, assertActive, notation = null) {
   return { deck, remaining: ids.length, total: ids.length };
 }
 
+// The one-line reading a toast leads with. Not the full per-system formatter the
+// panel carries — a corner window gets the strongest single fact: a success
+// count, a resolved outcome, the drawn cards, or the plain total.
+function toastHeadline(roll) {
+  const s = roll.summary && typeof roll.summary === 'object' ? roll.summary : {};
+  if (roll.system === 'numeric' && Number.isFinite(roll.total)) return String(roll.total);
+  if (Number.isFinite(s.successes)) return `${s.successes} success${s.successes === 1 ? '' : 'es'}`;
+  if (typeof s.outcome === 'string' && s.outcome) return s.outcome.replace(/-/g, ' ');
+  const group = Array.isArray(roll.groups) ? roll.groups[0] : null;
+  if (group && (group.kind === 'cards' || group.kind === 'tarot') && Array.isArray(group.cards)) {
+    return group.cards.map(card => card.label + (card.rev ? ' (rev)' : '')).join(', ').slice(0, 44);
+  }
+  if (typeof s.result === 'string' && s.result) return s.result.slice(0, 44);
+  if (Number.isFinite(roll.total)) return String(roll.total);
+  return String(roll.notation || 'Roll').slice(0, 24);
+}
+
 export async function initializeOwlbearBackground(OBR, options = {}) {
   if (!OBR?.broadcast?.onMessage || !OBR?.broadcast?.sendMessage) {
     throw new Error('Owlbear Broadcast API is unavailable');
@@ -489,6 +506,44 @@ export async function initializeOwlbearBackground(OBR, options = {}) {
     });
   };
   if (!hasStoredHistory && history.length) schedulePersistence();
+
+  // The corner roll window, the way the native dice app shows results: a small
+  // popover the background opens over the game for every completed roll — yours
+  // and the table's — so rolls read without the panel open. One at a time, a
+  // few seconds each, click to dismiss. Guarded on the API so a host (or test)
+  // without popovers simply never shows one.
+  const TOAST_ID = 'cc.dicebox/toast';
+  const TOAST_MS = 5_000;
+  let toastTimer = null;
+  const showToast = roll => {
+    if (closed || !OBR.popover?.open || !roll) return;
+    try {
+      const query = new URLSearchParams({
+        who: String(roll.who || 'Someone').slice(0, 40),
+        head: toastHeadline(roll),
+        sub: String(roll.notation || '').slice(0, 40),
+      });
+      Promise.resolve(OBR.popover.open({
+        id: TOAST_ID,
+        url: `/toast.html?${query}`,
+        width: 260,
+        height: 78,
+        // Anchored to a point far past the page corner and clamped back inside
+        // it, which is what pins the window bottom-right at any viewport size.
+        anchorReference: 'POSITION',
+        anchorPosition: { left: 1_000_000, top: 1_000_000 },
+        transformOrigin: { horizontal: 'RIGHT', vertical: 'BOTTOM' },
+        hidePaper: true,
+        disableClickAway: true,
+        marginThreshold: 16,
+      })).catch(() => {});
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toastTimer = null;
+        try { Promise.resolve(OBR.popover.close(TOAST_ID)).catch(() => {}); } catch { /* gone */ }
+      }, TOAST_MS);
+    } catch { /* a roll without its window is still a roll */ }
+  };
 
   const remember = async data => {
     const roll = normalizeRoll(data);
@@ -728,6 +783,7 @@ export async function initializeOwlbearBackground(OBR, options = {}) {
         ...published,
         type: 'roll.event',
       }, { destination: 'REMOTE' });
+      showToast(completed);
       return;
     }
 
@@ -861,6 +917,7 @@ export async function initializeOwlbearBackground(OBR, options = {}) {
         type: 'roll.transition',
         transition: { kind: 'push', held, rerolled, added },
       }, { destination: 'REMOTE' });
+      showToast(completed);
       return;
     }
 
@@ -881,7 +938,10 @@ export async function initializeOwlbearBackground(OBR, options = {}) {
     const legacyCompleted = data.type === undefined && data.v === undefined;
     const currentCompleted = data.v === OBR_PROTOCOL_VERSION &&
       (data.type === 'roll.event' || data.type === 'roll.transition');
-    if ((legacyCompleted || currentCompleted) && admitPublishedEvent()) await remember(data);
+    if ((legacyCompleted || currentCompleted) && admitPublishedEvent()) {
+      const roll = await remember(data);
+      showToast(roll);
+    }
   };
 
   let serial = Promise.resolve();
@@ -909,6 +969,7 @@ export async function initializeOwlbearBackground(OBR, options = {}) {
   return {
     dispose() {
       closed = true;
+      if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
       if (typeof unsubscribe === 'function') unsubscribe();
       if (typeof historyStore.close === 'function') historyStore.close();
     },

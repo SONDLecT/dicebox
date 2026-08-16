@@ -43,7 +43,8 @@ for (const file of ['index.html', 'app.js', 'dice.js', 'render.js', 'room.js',
                     'room-crypto.js', 'style.css', 'icon.svg', 'manifest.json',
                     '_headers', 'worker.js', 'wrangler.jsonc', 'obr-sdk.js',
                     'background.html', 'background.js', 'owlbear-session.js',
-                    'owlbear-history.js', 'owlbear-auth.js']) {
+                    'owlbear-history.js', 'owlbear-auth.js',
+                    'toast.html', 'toast.css', 'toast.js']) {
   ok(`${file} is built`, present.has(file));
 }
 

@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="referrer" content="no-referrer">
+  <title>Dicebox roll</title>
+  <link rel="stylesheet" href="/toast.css">
+</head>
+<body>
+  <!-- The little roll window the background opens over the game, in the corner
+       the native dice app uses. One roll at a time; the background replaces and
+       closes it. Clicking it dismisses it early. -->
+  <div class="toast" id="toast" role="status">
+    <span class="who" id="who"></span>
+    <span class="head" id="head"></span>
+    <span class="sub" id="sub"></span>
+  </div>
+  <script type="module" src="/toast.js"></script>
+</body>
+</html>
