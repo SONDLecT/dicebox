@@ -51,6 +51,10 @@ let obrConnectionId = null;
 let obrHistorySync = null;
 const obrOutstanding = new Map();
 const pendingOwlbearState = {};
+// The background answered recently. Until it has failed once, a roll waits the
+// full timeout for it; after a failure the panel stops waiting and rolls
+// locally at once, and any later verified response marks it back up.
+let obrBackgroundUp = true;
 
 // One row of dice, ordered by size: the standard RPG set plus every Dungeon
 // Crawl Classics chain rung, plus d100. Gaps like d9 and d11 are deliberate —
@@ -867,8 +871,14 @@ function buildTrayDice(flat, result, { remote = false } = {}) {
   });
 }
 
-function doRoll(notation) {
-  if (owlbearPanel) { requestOwlbearRoll(notation); return; }
+function doRoll(notation, { viaOwlbear = true } = {}) {
+  // In the panel the background service is the authority, so the roll goes to it
+  // — but only as the preferred route, never a dependency. If the background is
+  // missing (an install that predates it, a browser that denies the frames a
+  // shared key) the request times out and requestOwlbearRoll re-enters here with
+  // viaOwlbear:false to roll locally, because dice that do not land is the one
+  // failure this app does not accept.
+  if (owlbearPanel && viaOwlbear) { requestOwlbearRoll(notation); return; }
   let result;
   try {
     // An explicit system token ("v5:…", "4dF") routes to that system's roller;
@@ -1672,7 +1682,7 @@ function resetV5() {
 // Rouse check is already throwing its own die and the pool must not re-stage.
 function setHunger(n, { restage = true, fromOwlbear = false } = {}) {
   v5.hunger = Math.max(0, Math.min(5, Math.round(n)));
-  if (owlbearPanel && !fromOwlbear) requestOwlbearAction('state.set', { state: { hunger: v5.hunger } });
+  if (owlbearPanel && !fromOwlbear && obrBackgroundUp) requestOwlbearAction('state.set', { state: { hunger: v5.hunger } });
   else store.set(V5_HUNGER_KEY, String(v5.hunger));
   if (restage) syncV5();
   else syncV5Hunger();
@@ -1743,8 +1753,7 @@ v5DiffChip.addEventListener('click', () => {
 // Hunger is being tracked (1-5) a failure raises it before the die is shown, so
 // the readout can name the new total; untracked (0) it is only pass/fail.
 // setHunger runs with restage off so it does not disturb the die already in flight.
-$('v5Rouse').addEventListener('click', () => {
-  if (owlbearPanel) { requestOwlbearRoll('v5:rouse', { writeField: false }); return; }
+function rollRouseLocally() {
   const result = rollRouse();
   const tracked = v5.hunger > 0;
   result.summary.tracked = tracked;
@@ -1757,6 +1766,11 @@ $('v5Rouse').addEventListener('click', () => {
     result.summary.hungerRose = v5.hunger > before;
   }
   throwResult(result, { writeField: false });
+}
+
+$('v5Rouse').addEventListener('click', () => {
+  if (owlbearPanel) { requestOwlbearRoll('v5:rouse', { writeField: false }); return; }
+  rollRouseLocally();
 });
 
 // A `v5:` pool typed into the field drives the controls, so the two never
@@ -1937,8 +1951,11 @@ $('yzPush').addEventListener('click', preparePush);
 
 function preparePush() {
   const last = state.last;
-  if (owlbearPanel) {
-    if (last?.rollId) requestOwlbearAction('push', { rollId: last.rollId });
+  // A roll the background produced is pushed there too, so the whole table sees
+  // the transition. A roll that landed through the local fallback is unknown to
+  // the background and pushes locally, exactly as on the site.
+  if (owlbearPanel && last?.fromOwlbear && last?.rollId) {
+    requestOwlbearAction('push', { rollId: last.rollId });
     return;
   }
   if (!last || !last.summary || !last.summary.canPush || state.pendingPush) return;
@@ -2551,7 +2568,7 @@ function msNotation() {
 // only refresh the chip and persist, never re-stage over the result.
 function setStress(n, { restage = true, fromOwlbear = false } = {}) {
   ms.stress = Math.max(2, Math.min(20, Math.round(n)));
-  if (owlbearPanel && !fromOwlbear) requestOwlbearAction('state.set', { state: { stress: ms.stress } });
+  if (owlbearPanel && !fromOwlbear && obrBackgroundUp) requestOwlbearAction('state.set', { state: { stress: ms.stress } });
   else store.set(MS_STRESS_KEY, String(ms.stress));
   if (restage) syncMs();
   else msStressDial.textContent = String(ms.stress);
@@ -3829,7 +3846,7 @@ bindTapHold($('deckCountChip'), dir => {
   syncCardsUI({ restage: false });
 });
 $('deckShuffle').addEventListener('click', () => {
-  if (owlbearPanel) { requestOwlbearAction('shuffle', { deck: 'cards', notation: deckNotation() }); return; }
+  if (owlbearPanel && obrBackgroundUp) { requestOwlbearAction('shuffle', { deck: 'cards', notation: deckNotation() }); return; }
   ensureCardArt().then(() => {
     // Everything on the table and in the discard visibly flows back into the
     // deck, and the riffle starts once they arrive.
@@ -4189,7 +4206,7 @@ bindTapHold($('tarotCountChip'), dir => {
   syncTarotUI({ restage: false });
 });
 $('tarotShuffle').addEventListener('click', () => {
-  if (owlbearPanel) { requestOwlbearAction('shuffle', { deck: 'tarot', notation: tarotNotation() }); return; }
+  if (owlbearPanel && obrBackgroundUp) { requestOwlbearAction('shuffle', { deck: 'tarot', notation: tarotNotation() }); return; }
   ensureTarotArt().then(() => {
     const prevCards = state.dice.filter(d => d.isCard && !d.isStack && !d.isDiscard && !d.gone && d.phase === 'idle');
     const hadDiscard = tarotState.pile.length > 0;
@@ -4503,7 +4520,7 @@ bindTapHold($('napCountChip'), dir => {
   syncNapUI({ restage: false });
 });
 $('napShuffle').addEventListener('click', () => {
-  if (owlbearPanel) { requestOwlbearAction('shuffle', { deck: 'napoletane', notation: napNotation() }); return; }
+  if (owlbearPanel && obrBackgroundUp) { requestOwlbearAction('shuffle', { deck: 'napoletane', notation: napNotation() }); return; }
   ensureNapArt().then(() => {
     const prevCards = state.dice.filter(d => d.isCard && !d.isStack && !d.isDiscard && !d.gone && d.phase === 'idle');
     const hadDiscard = napState.pile.length > 0;
@@ -4794,7 +4811,7 @@ bindTapHold($('hanaCountChip'), dir => {
   syncHanaUI({ restage: false });
 });
 $('hanaShuffle').addEventListener('click', () => {
-  if (owlbearPanel) { requestOwlbearAction('shuffle', { deck: 'hanafuda', notation: hanaNotation() }); return; }
+  if (owlbearPanel && obrBackgroundUp) { requestOwlbearAction('shuffle', { deck: 'hanafuda', notation: hanaNotation() }); return; }
   ensureHanaArt().then(() => {
     const prevCards = state.dice.filter(d => d.isCard && !d.isStack && !d.isDiscard && !d.gone && d.phase === 'idle');
     const hadDiscard = hanaState.pile.length > 0;
@@ -5137,7 +5154,7 @@ bindTapHold($('utaCountChip'), dir => {
   syncUtaUI({ restage: false });
 });
 $('utaShuffle').addEventListener('click', () => {
-  if (owlbearPanel) { requestOwlbearAction('shuffle', { deck: 'utagaruta', notation: utaNotation() }); return; }
+  if (owlbearPanel && obrBackgroundUp) { requestOwlbearAction('shuffle', { deck: 'utagaruta', notation: utaNotation() }); return; }
   ensureUtaArt().then(() => {
     const prevCards = state.dice.filter(d => d.isCard && !d.isStack && !d.isDiscard && !d.gone && d.phase === 'idle');
     const hadDiscard = utaState.pile.length > 0;
@@ -7903,9 +7920,22 @@ function clearOwlbearRequest(requestId) {
   return pending;
 }
 
+// The dice must land even with no background to ask — an install that predates
+// it, or a browser that keeps the frames from sharing a key. A roll request
+// that cannot be delivered or times out re-enters the local engines, which the
+// panel carries in full. Rouse is the one notation only the background parses.
+function runLocalRollFallback(pending) {
+  if (pending?.kind !== 'roll' || typeof pending.notation !== 'string') return false;
+  obrBackgroundUp = false;
+  clearError();
+  if (pending.notation.trim().toLowerCase() === 'v5:rouse') rollRouseLocally();
+  else doRoll(pending.notation, { viaOwlbear: false });
+  return true;
+}
+
 function sendOwlbearRequest(payload, pending) {
   if (!obr || !obrConnectionId) {
-    showError('Owlbear is still connecting');
+    if (!runLocalRollFallback(pending)) showError('Owlbear is still connecting');
     return null;
   }
   const requestId = `dicebox-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
@@ -7917,6 +7947,10 @@ function sendOwlbearRequest(payload, pending) {
   const timer = setTimeout(() => {
     if (!obrOutstanding.has(requestId)) return;
     obrOutstanding.delete(requestId);
+    // Any timeout marks the background down, so the startup history request
+    // going unanswered is what flips later rolls to the instant local path.
+    obrBackgroundUp = false;
+    if (runLocalRollFallback(pending)) return;
     if (pending.kind !== 'history') showError('Dicebox background did not respond');
   }, 4_500);
   obrOutstanding.set(requestId, { ...pending, timer });
@@ -7924,11 +7958,12 @@ function sendOwlbearRequest(payload, pending) {
     Promise.resolve(obr.broadcast.sendMessage(OBR_CHANNEL, message, { destination: 'LOCAL' }))
       .catch(error => {
         clearOwlbearRequest(requestId);
+        if (runLocalRollFallback(pending)) return;
         showError(error?.message || 'Could not reach the Dicebox background');
       });
   } catch (error) {
     clearOwlbearRequest(requestId);
-    showError(error?.message || 'Could not reach the Dicebox background');
+    if (!runLocalRollFallback(pending)) showError(error?.message || 'Could not reach the Dicebox background');
     return null;
   }
   return requestId;
@@ -7936,11 +7971,14 @@ function sendOwlbearRequest(payload, pending) {
 
 function requestOwlbearRoll(notation, options = {}) {
   if (typeof notation !== 'string' || !notation.trim()) { showError('Enter a roll'); return; }
+  const pending = { kind: 'roll', writeField: options.writeField !== false, notation };
+  // A background that already failed is not waited on again — the roll lands
+  // locally at once. Every popover open is a fresh page and a fresh try, which
+  // is retry cadence enough at a table.
+  if (!obrBackgroundUp) { runLocalRollFallback(pending); return; }
   const game = detectSystem(notation) === 'oracle'
     ? (uiSystem === 'starforged' ? 'starforged' : 'ironsworn') : undefined;
-  sendOwlbearRequest({ type: 'roll.request', notation, ...(game ? { game } : {}) }, {
-    kind: 'roll', writeField: options.writeField !== false,
-  });
+  sendOwlbearRequest({ type: 'roll.request', notation, ...(game ? { game } : {}) }, pending);
 }
 
 function requestOwlbearAction(action, fields = {}) {
@@ -8073,6 +8111,9 @@ function presentOwlbearResult(data, pending) {
   if (!result) { showError('Dicebox background returned an invalid result'); return; }
   clearError();
   syncOwlbearOwnedState(data);
+  // Marked so a follow-up action (a push) knows the background holds this roll;
+  // a local-fallback roll lacks the mark and its actions stay local.
+  result.fromOwlbear = true;
   state.last = result;
   state.pendingPush = null;
   state.pushKept = null;
@@ -8137,6 +8178,9 @@ async function handleOwlbearMessage(event) {
           || typeof data.requestId !== 'string') return;
       if (!verifyLocalPayload || !getOrCreateLocalAuthSecret) return;
       if (!(await verifyLocalPayload(getOrCreateLocalAuthSecret(localStorage), data))) return;
+      // A verified answer, whatever it carries, is proof of life: stop routing
+      // rolls to the local fallback.
+      obrBackgroundUp = true;
       const pending = obrOutstanding.get(data.requestId);
       if (!pending) return;
       if (data.type === 'history.result') {
