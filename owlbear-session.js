@@ -572,8 +572,31 @@ export async function initializeOwlbearBackground(OBR, options = {}) {
   const TOAST_ID = 'cc.dicebox/toast';
   const TOAST_MS = 5_000;
   let toastTimer = null;
+  // The toast stands in for a closed panel. With the action popover open the
+  // roll is already animating full-size on the tray, so the corner window
+  // would only repeat it — the background watches the popover's open state and
+  // holds its toasts while it shows.
+  let actionOpen = false;
+  let unsubscribeAction = null;
+  try {
+    if (typeof OBR.action?.isOpen === 'function') {
+      Promise.resolve(OBR.action.isOpen()).then(open => { actionOpen = !!open; }).catch(() => {});
+    }
+    if (typeof OBR.action?.onOpenChange === 'function') {
+      unsubscribeAction = OBR.action.onOpenChange(open => {
+        actionOpen = !!open;
+        // Opening the panel also retires a toast already on screen — the roll
+        // it shows is about to be on the tray.
+        if (actionOpen && toastTimer) {
+          clearTimeout(toastTimer);
+          toastTimer = null;
+          try { Promise.resolve(OBR.popover.close(TOAST_ID)).catch(() => {}); } catch { /* gone */ }
+        }
+      });
+    }
+  } catch { /* no open-state signal; toasts simply always show */ }
   const showToast = roll => {
-    if (closed || !OBR.popover?.open || !roll) return;
+    if (closed || actionOpen || !OBR.popover?.open || !roll) return;
     try {
       // The dice travel as the tray's own paint list — flattenRollDice output,
       // pruned — plus the summary fields the shared stamping tints from, so the
@@ -1045,6 +1068,7 @@ export async function initializeOwlbearBackground(OBR, options = {}) {
     dispose() {
       closed = true;
       decks.dispose();
+      if (typeof unsubscribeAction === 'function') { try { unsubscribeAction(); } catch { /* gone */ } }
       if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
       if (typeof unsubscribe === 'function') unsubscribe();
       if (typeof historyStore.close === 'function') historyStore.close();
