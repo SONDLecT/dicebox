@@ -7944,7 +7944,11 @@ function publishLocalRollToOwlbear(result) {
       at: Date.now(),
     };
     if (owlbearWireBytes(payload) > OBR_MAX_WIRE_BYTES) return;
-    Promise.resolve(obr.broadcast.sendMessage(OBR_CHANNEL, payload, { destination: 'REMOTE' }))
+    // ALL rather than REMOTE so this player's own background hears it too — that
+    // is what lets it remember and toast a fallback roll. The panel would then
+    // re-render its own roll off the bus, so the id is marked seen first.
+    alreadyShown(result.rollId);
+    Promise.resolve(obr.broadcast.sendMessage(OBR_CHANNEL, payload, { destination: 'ALL' }))
       .catch(() => {});
   } catch { /* the table just doesn't see this one */ }
 }

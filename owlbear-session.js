@@ -444,7 +444,13 @@ export async function initializeOwlbearBackground(OBR, options = {}) {
   if (!OBR?.broadcast?.onMessage || !OBR?.broadcast?.sendMessage) {
     throw new Error('Owlbear Broadcast API is unavailable');
   }
-  const storage = options.storage ?? globalThis.localStorage;
+  // Reaching localStorage can itself throw inside a third-party iframe with
+  // strict storage settings; the popover guards this and the background must
+  // too, or the whole service dies on the read. Memory alone still serves.
+  let storage = options.storage;
+  if (storage === undefined) {
+    try { storage = globalThis.localStorage; } catch { storage = null; }
+  }
   const now = options.now ?? Date.now;
   const makeId = options.makeId ?? (() => globalThis.crypto.randomUUID());
   const rollAnyFn = options.rollAny ?? rollAny;
