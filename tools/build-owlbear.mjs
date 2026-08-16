@@ -270,6 +270,22 @@ export default {
       });
     }
 
+    // Owlbear embeds these by their exact .html URLs, and the assets layer
+    // would 307 them to the extensionless path. A background frame that lands
+    // on a different URL than the manifest registered is a frame Owlbear may
+    // not complete its handshake with, so both are served straight through —
+    // the same dodge the app's worker does for /dicebox.html.
+    const url = new URL(request.url);
+    if (path === '/background.html' || path === '/toast.html') {
+      const direct = new URL(path.replace(/\\.html$/, '') + url.search, url);
+      const page = await env.ASSETS.fetch(direct);
+      const pageHeaders = new Headers(page.headers);
+      for (const [k, v] of Object.entries(HEADERS)) pageHeaders.set(k, v);
+      pageHeaders.set('Content-Type', 'text/html; charset=utf-8');
+      pageHeaders.set('Cache-Control', 'no-cache');
+      return new Response(page.body, { status: page.status, headers: pageHeaders });
+    }
+
     const res = await env.ASSETS.fetch(request);
     const headers = new Headers(res.headers);
     for (const [k, v] of Object.entries(HEADERS)) headers.set(k, v);

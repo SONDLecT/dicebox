@@ -464,11 +464,17 @@ export async function initializeOwlbearBackground(OBR, options = {}) {
   };
   const requestTimeoutMs = Number.isFinite(options.requestTimeoutMs)
     ? Math.max(1, Math.min(10_000, options.requestTimeoutMs)) : 4_000;
-  const [connectionId, roomId, playerName] = await Promise.all([
+  const [connectionId, playerName] = await Promise.all([
     OBR.player.getConnectionId(),
-    OBR.room.getId(),
-    Promise.resolve(OBR.player.getName()).catch(() => 'Someone'),
+    Promise.resolve().then(() => OBR.player.getName()).catch(() => 'Someone'),
   ]);
+  // The room id is a PROPERTY on the SDK's RoomApi (`get id`), not a getId()
+  // method — calling the method that does not exist was a TypeError that killed
+  // this whole service at init on every real client, while the test mock
+  // happily supplied one. Accept either shape so a future SDK can move it.
+  const roomId = typeof OBR.room?.id === 'string' && OBR.room.id
+    ? OBR.room.id
+    : (typeof OBR.room?.getId === 'function' ? await OBR.room.getId() : '');
   if (typeof roomId !== 'string' || !roomId.trim() || roomId.length > 128) {
     throw new Error('Owlbear room identity is unavailable');
   }

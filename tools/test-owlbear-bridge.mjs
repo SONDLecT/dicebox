@@ -31,7 +31,7 @@ async function bridgeHarness(options = {}) {
       async getConnectionId() { return options.connectionId ?? 'mine'; },
       async getName() { return options.playerName ?? 'Tester'; },
     },
-    room: { async getId() { return options.roomId === undefined ? 'test-room' : options.roomId; } },
+    room: { get id() { return options.roomId === undefined ? 'test-room' : options.roomId; } },
   };
   const service = await initializeOwlbearBackground(OBR, {
     storage: options.storage ?? memoryStorage(),
@@ -56,7 +56,7 @@ async function bridgeHarness(options = {}) {
       async getConnectionId() { return 'local-connection'; },
       async getName() { return 'Local Player'; },
     },
-    room: { async getId() { return 'room-one'; } },
+    room: { id: 'room-one' },
   };
 
   const service = await initializeOwlbearBackground(OBR, { storage: memoryStorage(), now: () => 1000 });
@@ -107,7 +107,7 @@ async function bridgeHarness(options = {}) {
       },
     },
     player: { async getConnectionId() { return 'mine'; }, async getName() { return 'Archivist'; } },
-    room: { async getId() { return 'paged-room'; } },
+    room: { id: 'paged-room' },
   };
   await initializeOwlbearBackground(OBR, { storage });
   await listener({ connectionId: 'mine', data: {
@@ -140,7 +140,7 @@ async function bridgeHarness(options = {}) {
       async sendMessage() {},
     },
     player: { async getConnectionId() { return 'mine'; }, async getName() { return 'Persistent'; } },
-    room: { async getId() { return 'idb-room'; } },
+    room: { id: 'idb-room' },
   };
   const service = await initializeOwlbearBackground(OBR, { storage: memoryStorage(), historyStore });
   const result = roll('1d6');
@@ -170,7 +170,7 @@ async function bridgeHarness(options = {}) {
       async sendMessage() {},
     },
     player: { async getConnectionId() { return 'mine'; }, async getName() { return 'Bounded'; } },
-    room: { async getId() { return 'event-rate-room'; } },
+    room: { id: 'event-rate-room' },
   };
   await initializeOwlbearBackground(OBR, {
     storage: memoryStorage(), historyStore, now: () => 1000,
@@ -201,7 +201,7 @@ async function bridgeHarness(options = {}) {
       async getConnectionId() { return 'mine'; },
       async getName() { return 'Bridge Roller'; },
     },
-    room: { async getId() { return 'bridge-room'; } },
+    room: { id: 'bridge-room' },
   };
   await initializeOwlbearBackground(OBR, {
     storage, now: () => 2000, makeId: () => 'bridge-roll-1',
@@ -276,7 +276,7 @@ async function bridgeHarness(options = {}) {
       async sendMessage(_channel, data, options) { sent.push({ data, options }); },
     },
     player: { async getConnectionId() { return 'mine'; }, async getName() { return 'Dealer'; } },
-    room: { async getId() { return 'card-room'; } },
+    room: { id: 'card-room' },
   };
   await initializeOwlbearBackground(OBR, { storage, makeId: () => `card-roll-${++seq}` });
   for (const requestId of ['draw-1', 'draw-2']) {
@@ -346,7 +346,7 @@ async function bridgeHarness(options = {}) {
       async sendMessage(_channel, data, options) { sent.push({ data, options }); },
     },
     player: { async getConnectionId() { return 'mine'; }, async getName() { return 'Pusher'; } },
-    room: { async getId() { return 'push-room'; } },
+    room: { id: 'push-room' },
   };
   await initializeOwlbearBackground(OBR, {
     storage,
@@ -457,7 +457,7 @@ async function bridgeHarness(options = {}) {
       async sendMessage(_channel, data) { sent.push(data); },
     },
     player: { async getConnectionId() { return 'mine'; }, async getName() { return 'Tracker'; } },
-    room: { async getId() { return 'state-room'; } },
+    room: { id: 'state-room' },
   };
   await initializeOwlbearBackground(OBR, {
     storage, makeId: () => `state-${++id}`, rollRouse: rouseFailure,
@@ -510,7 +510,7 @@ async function bridgeHarness(options = {}) {
       async sendMessage(_channel, data) { sent.push(data); },
     },
     player: { async getConnectionId() { return 'mine'; }, async getName() { return 'Oracle'; } },
-    room: { async getId() { return 'oracle-room'; } },
+    room: { id: 'oracle-room' },
   };
   await initializeOwlbearBackground(OBR, { storage: memoryStorage(), makeId: () => 'oracle-roll' });
   await listener({ connectionId: 'mine', data: {
@@ -539,7 +539,7 @@ async function bridgeHarness(options = {}) {
       async sendMessage(_channel, data, options) { sent.push({ data, options }); },
     },
     player: { async getConnectionId() { return 'mine'; }, async getName() { return 'Matrix'; } },
-    room: { async getId() { return 'matrix-room'; } },
+    room: { id: 'matrix-room' },
   };
   await initializeOwlbearBackground(OBR, {
     storage: memoryStorage(), makeId: () => `matrix-${++seq}`, now: () => 9_000,
@@ -580,7 +580,7 @@ async function bridgeHarness(options = {}) {
       async sendMessage(_channel, data, options) { sent.push({ data, options }); },
     },
     player: { async getConnectionId() { return 'mine'; }, async getName() { return 'Bounded'; } },
-    room: { async getId() { return 'bounded-room'; } },
+    room: { id: 'bounded-room' },
   };
   await initializeOwlbearBackground(OBR, { storage: memoryStorage(), rollAny: oversized });
   await listener({ connectionId: 'mine', data: {
@@ -604,7 +604,7 @@ async function bridgeHarness(options = {}) {
       async sendMessage(_channel, data) { sent.push(data); },
     },
     player: { async getConnectionId() { return 'mine'; }, async getName() { return 'Timeout'; } },
-    room: { async getId() { return 'timeout-room'; } },
+    room: { id: 'timeout-room' },
   };
   await initializeOwlbearBackground(OBR, {
     storage: memoryStorage(), requestTimeoutMs: 5,
@@ -640,7 +640,7 @@ async function bridgeHarness(options = {}) {
       async sendMessage(_channel, data) { sent.push(data); },
     },
     player: { async getConnectionId() { return 'mine'; }, async getName() { return 'Queue'; } },
-    room: { async getId() { return 'queue-room'; } },
+    room: { id: 'queue-room' },
   };
   await initializeOwlbearBackground(OBR, {
     storage: memoryStorage(), now: () => 5000,
