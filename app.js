@@ -5,6 +5,7 @@ import { generatePassphrase, normalizePassphrase } from './room-crypto.js';
 import { rollV5, rollRouse, describeV5, v5Headline, detectSystem, v5Face, parseV5 } from './system-dice.js';
 import { formatHeadline, formatDetail } from './result-text.js';
 import { SYSTEM_THEMES } from './system-themes.js';
+import { createSharedDecks } from './shared-decks.js';
 import { flattenRollDice, stampTrayDie, BAND_COLORS, FORCE_COLORS, TOR_COLORS, CT_COLORS, DH_COLORS, MS_COLORS, GEN_COLORS, YZ_COLORS, BR_COLORS, T2K_COLORS, COC_COLORS, DG_COLORS, IRON_COLORS } from './tray-faces.js';
 import { rollFate, describeFate, fateHeadline, fateFace, parseFate } from './system-dice.js';
 import { rollGenesys, describeGenesys, genesysHeadline, parseGenesys } from './system-dice.js';
@@ -58,6 +59,9 @@ const pendingOwlbearState = {};
 // full timeout for it; after a failure the panel stops waiting and rolls
 // locally at once, and any later verified response marks it back up.
 let obrBackgroundUp = true;
+// The room's shared decks, readable and writable by the panel itself — what
+// keeps a fallback draw on the same stack as everyone else's.
+let panelDecks = null;
 
 // One row of dice, ordered by size: the standard RPG set plus every Dungeon
 // Crawl Classics chain rung, plus d100. Gaps like d9 and d11 are deliberate —
@@ -2634,7 +2638,12 @@ const deckState = {
     }
   } catch { /* fresh deck */ }
 }
-const persistDeck = () => { if (!owlbearPanel) store.set(DECK_KEY, JSON.stringify(deckState)); };
+const persistDeck = () => {
+  // In the panel a local mutation (a fallback draw, a shuffle) writes the
+  // ROOM's deck, so the table stays on one stack whichever path dealt.
+  if (owlbearPanel) panelDecks?.set(DECK_KEY, deckState);
+  else store.set(DECK_KEY, JSON.stringify(deckState));
+};
 
 const DECK_RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 function deckIds() {
@@ -3304,6 +3313,9 @@ function dealCardsFlowRemote(result, claim) {
 // in line with them (reshuffling and clearing the table if what the deck holds
 // changed), exactly as if the buttons had been set, then deals.
 function dealFromNotation(notation) {
+  // A local deal in the panel starts from the room's shared deck, so the
+  // fallback path deals the same stack the background would have.
+  if (owlbearPanel) hydrateSharedDeck('cards');
   let parsed;
   try { parsed = parseCards(notation); } catch (err) { showError(err.message); return; }
   clearError();
@@ -3440,7 +3452,12 @@ const tarotState = {
     }
   } catch { /* fresh deck */ }
 }
-const persistTarot = () => { if (!owlbearPanel) store.set(TAROT_KEY, JSON.stringify(tarotState)); };
+const persistTarot = () => {
+  // In the panel a local mutation (a fallback draw, a shuffle) writes the
+  // ROOM's deck, so the table stays on one stack whichever path dealt.
+  if (owlbearPanel) panelDecks?.set(TAROT_KEY, tarotState);
+  else store.set(TAROT_KEY, JSON.stringify(tarotState));
+};
 
 // The 78 ids, generated locally so the deck can shuffle before the art module
 // arrives: 22 trumps then each suit's Ace-Ten and Page/Knight/Queen/King.
@@ -3663,6 +3680,9 @@ function dealTarotFlowRemote(result, claim) {
 }
 
 function dealFromTarotNotation(notation) {
+  // A local deal in the panel starts from the room's shared deck, so the
+  // fallback path deals the same stack the background would have.
+  if (owlbearPanel) hydrateSharedDeck('tarot');
   let parsed;
   try { parsed = parseTarot(notation); } catch (err) { showError(err.message); return; }
   clearError();
@@ -3795,7 +3815,12 @@ const napState = {
     }
   } catch { /* fresh deck */ }
 }
-const persistNap = () => { if (!owlbearPanel) store.set(NAP_KEY, JSON.stringify(napState)); };
+const persistNap = () => {
+  // In the panel a local mutation (a fallback draw, a shuffle) writes the
+  // ROOM's deck, so the table stays on one stack whichever path dealt.
+  if (owlbearPanel) panelDecks?.set(NAP_KEY, napState);
+  else store.set(NAP_KEY, JSON.stringify(napState));
+};
 
 function napDeckIds() {
   const ids = [];
@@ -3981,6 +4006,9 @@ function dealNapFlowRemote(result, claim) {
 }
 
 function dealFromNapNotation(notation) {
+  // A local deal in the panel starts from the room's shared deck, so the
+  // fallback path deals the same stack the background would have.
+  if (owlbearPanel) hydrateSharedDeck('napoletane');
   let parsed;
   try { parsed = parseNapoletane(notation); } catch (err) { showError(err.message); return; }
   clearError();
@@ -4093,7 +4121,12 @@ const hanaState = {
     }
   } catch { /* fresh deck */ }
 }
-const persistHana = () => { if (!owlbearPanel) store.set(HANA_KEY, JSON.stringify(hanaState)); };
+const persistHana = () => {
+  // In the panel a local mutation (a fallback draw, a shuffle) writes the
+  // ROOM's deck, so the table stays on one stack whichever path dealt.
+  if (owlbearPanel) panelDecks?.set(HANA_KEY, hanaState);
+  else store.set(HANA_KEY, JSON.stringify(hanaState));
+};
 
 // The id list lives in the art module; every caller that shuffles has already
 // awaited ensureHanaArt, so this never races the import.
@@ -4273,6 +4306,9 @@ function dealHanaFlowRemote(result, claim) {
 }
 
 function dealFromHanaNotation(notation) {
+  // A local deal in the panel starts from the room's shared deck, so the
+  // fallback path deals the same stack the background would have.
+  if (owlbearPanel) hydrateSharedDeck('hanafuda');
   let parsed;
   try { parsed = parseHanafuda(notation); } catch (err) { showError(err.message); return; }
   clearError();
@@ -4387,7 +4423,12 @@ const utaState = {
     }
   } catch { /* fresh deck */ }
 }
-const persistUta = () => { if (!owlbearPanel) store.set(UTA_KEY, JSON.stringify(utaState)); };
+const persistUta = () => {
+  // In the panel a local mutation (a fallback draw, a shuffle) writes the
+  // ROOM's deck, so the table stays on one stack whichever path dealt.
+  if (owlbearPanel) panelDecks?.set(UTA_KEY, utaState);
+  else store.set(UTA_KEY, JSON.stringify(utaState));
+};
 
 function utaDeckIds() { return utaArt.UTA_IDS.slice(); }
 const utaTotal = () => 100;
@@ -4611,6 +4652,9 @@ function dealUtaFlowRemote(result, claim) {
 }
 
 function dealFromUtaNotation(notation) {
+  // A local deal in the panel starts from the room's shared deck, so the
+  // fallback path deals the same stack the background would have.
+  if (owlbearPanel) hydrateSharedDeck('utagaruta');
   let parsed;
   try { parsed = parseUtagaruta(notation); } catch (err) { showError(err.message); return; }
   clearError();
@@ -7526,6 +7570,34 @@ function requestOwlbearHistory() {
   };
 }
 
+
+// Every deck the panel tracks: shared-state key, the local state object, the
+// UI sync, and the deck's full size. One registry for hydration, live count
+// updates, and the owned-state sync below.
+const PANEL_DECKS = {
+  cards: () => [DECK_KEY, deckState, syncCardsUI, 52],
+  tarot: () => [TAROT_KEY, tarotState, syncTarotUI, 78],
+  napoletane: () => [NAP_KEY, napState, syncNapUI, 40],
+  hanafuda: () => [HANA_KEY, hanaState, syncHanaUI, 48],
+  utagaruta: () => [UTA_KEY, utaState, syncUtaUI, 100],
+};
+
+// Pull the room's real deck state into the panel's local copy. This is what a
+// fallback draw deals from and what the stack's count reads, so it must be the
+// same stack everyone else is on — never a fabricated stand-in.
+function hydrateSharedDeck(system, { refreshUi = false } = {}) {
+  const entry = PANEL_DECKS[system]?.();
+  if (!entry || !panelDecks) return false;
+  const saved = panelDecks.get(entry[0]);
+  if (!saved || !Array.isArray(saved.order)) return false;
+  if (saved.order.some(id => typeof id === 'string' && id.startsWith('obr-'))) return false;
+  Object.assign(entry[1], saved);
+  if (!Array.isArray(entry[1].pile)) entry[1].pile = [];
+  if (!Array.isArray(entry[1].hand)) entry[1].hand = [];
+  if (refreshUi) entry[2]({ writeField: false, restage: false });
+  return true;
+}
+
 function syncOwlbearOwnedState(data) {
   if (!data || typeof data !== 'object') return;
   const snapshot = data.state && typeof data.state === 'object' ? data.state : data;
@@ -7540,18 +7612,15 @@ function syncOwlbearOwnedState(data) {
     setStress(data.summary.stressAfter, { restage: false, fromOwlbear: true });
   }
 
-  const decks = {
-    cards: [DECK_KEY, deckState, syncCardsUI, 52],
-    tarot: [TAROT_KEY, tarotState, syncTarotUI, 78],
-    napoletane: [NAP_KEY, napState, syncNapUI, 40],
-    hanafuda: [HANA_KEY, hanaState, syncHanaUI, 48],
-    utagaruta: [UTA_KEY, utaState, syncUtaUI, 100],
-  };
   const wanted = snapshot.decks && typeof snapshot.decks === 'object'
-    ? Object.keys(decks) : [data.deck || data.system].filter(Boolean);
+    ? Object.keys(PANEL_DECKS) : [data.deck || data.system].filter(Boolean);
   for (const system of wanted) {
-    const entry = decks[system];
+    const entry = PANEL_DECKS[system]?.();
     if (!entry) continue;
+    // The room's shared deck is the truth; the background's own localStorage
+    // writes are the cache behind it. Only when neither exists does the
+    // compact snapshot get a count-only stand-in.
+    if (hydrateSharedDeck(system)) { entry[2]({ writeField: false, restage: false }); continue; }
     let saved = null;
     try { saved = JSON.parse(store.get(entry[0]) || 'null'); } catch { saved = null; }
     if (saved && Array.isArray(saved.order)) {
@@ -7781,6 +7850,19 @@ function initializeOwlbear(OBR, roomObr) {
       obr = OBR;
       obrConnectionId = connection;
       obrPlayerName = typeof player === 'string' ? player.slice(0, 40) : null;
+      // The panel reads and writes the room's shared decks itself, so fallback
+      // draws stay on the table's stack and the counts tick live as anyone at
+      // the table draws or shuffles.
+      panelDecks = createSharedDecks(OBR, localStorage, {
+        onChange: key => {
+          for (const system of Object.keys(PANEL_DECKS)) {
+            if (PANEL_DECKS[system]()[0] === key) hydrateSharedDeck(system, { refreshUi: uiSystem === system });
+          }
+        },
+      });
+      panelDecks.ready.then(() => {
+        for (const system of Object.keys(PANEL_DECKS)) hydrateSharedDeck(system, { refreshUi: uiSystem === system });
+      }).catch(() => {});
       OBR.broadcast.onMessage(OBR_CHANNEL, handleOwlbearMessage);
       if (roomObr) roomObr.hidden = false;
       for (const [key, value] of Object.entries(pendingOwlbearState)) {

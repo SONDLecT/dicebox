@@ -77,6 +77,7 @@ const ROOM_CRYPTO_EXPORTS = [
 const ROOM_EXPORTS = ['createRoom', 'parsePassphraseFromHash'];
 const RESULT_TEXT_EXPORTS = ['formatHeadline', 'formatDetail'];
 const SYSTEM_THEME_EXPORTS = ['SYSTEM_THEMES'];
+const SHARED_DECK_EXPORTS = ['createSharedDecks'];
 
 // room-crypto.js before room.js before app.js: each pulls only from the ones
 // above it. Omitting these two entirely is what made an earlier bundle a dead
@@ -89,6 +90,7 @@ const script = [
   moduleScope('system-dice.js'),
   moduleScope('tray-faces.js', ['v5Face', 'fateFace']),
   moduleScope('system-themes.js'),
+  moduleScope('shared-decks.js'),
   moduleScope('oracle-dice.js', ['randInt']),
   moduleScope('result-text.js', [...DICE_EXPORTS, ...SYSTEM_EXPORTS, 'oracleReading']),
   moduleScope('ironsworn-oracles.js'),
@@ -102,7 +104,7 @@ const script = [
   moduleScope('room-crypto.js'),
   moduleScope('room.js', ROOM_CRYPTO_EXPORTS),
   moduleScope('app.js', [
-    ...DICE_EXPORTS, ...SYSTEM_EXPORTS, ...RESULT_TEXT_EXPORTS, ...SYSTEM_THEME_EXPORTS, ...ORACLE_EXPORTS, ...IRON_ORACLE_EXPORTS, ...CARDS_ART_EXPORTS, ...TAROT_ART_EXPORTS, ...NAP_ART_EXPORTS, ...HANA_ART_EXPORTS, ...UTA_ART_EXPORTS, ...RENDER_EXPORTS, ...ROOM_CRYPTO_EXPORTS, ...ROOM_EXPORTS,
+    ...DICE_EXPORTS, ...SYSTEM_EXPORTS, ...RESULT_TEXT_EXPORTS, ...SYSTEM_THEME_EXPORTS, ...SHARED_DECK_EXPORTS, ...ORACLE_EXPORTS, ...IRON_ORACLE_EXPORTS, ...CARDS_ART_EXPORTS, ...TAROT_ART_EXPORTS, ...NAP_ART_EXPORTS, ...HANA_ART_EXPORTS, ...UTA_ART_EXPORTS, ...RENDER_EXPORTS, ...ROOM_CRYPTO_EXPORTS, ...ROOM_EXPORTS,
   ]),
 ].join('\n\n');
 

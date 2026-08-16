@@ -262,6 +262,14 @@ if (initializeOwlbearSource) {
       const requestOwlbearAction = () => {};
       const requestOwlbearHistory = () => {};
       const handleOwlbearMessage = () => {};
+      // The panel's shared-deck view, stubbed: the initializer creates it and
+      // hydrates on ready, which must not require a room API in this harness.
+      let panelDecks = null;
+      let uiSystem = 'numeric';
+      const localStorage = undefined;
+      const PANEL_DECKS = {};
+      const hydrateSharedDeck = () => false;
+      const createSharedDecks = () => ({ ready: Promise.resolve(), get: () => null, set: () => {}, dispose: () => {} });
       let accepted = 0;
       const acceptOwlbearRoll = () => { accepted++; };
       const console = {
