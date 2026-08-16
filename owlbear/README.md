@@ -1,9 +1,16 @@
 # Dicebox for Owlbear Rodeo
 
 Dicebox as an Owlbear Rodeo panel. Panels in the same Owlbear game share rolls
-automatically over Owlbear's Broadcast API, with no Dicebox passphrase. The
-ordinary end-to-end encrypted passphrase-room controls remain available as a
-separate transport for phones, browser tabs, and players outside that game.
+automatically over Owlbear's Broadcast API, with no Dicebox passphrase; a
+corner roll window replays each throw in its system's own dice and colours;
+and the deck lives in the room itself, so the whole table draws from one
+stack. The ordinary end-to-end encrypted passphrase-room controls remain
+available as a separate transport for phones, browser tabs, and players
+outside that game.
+
+This document covers building, hosting, and operating the panel. The broadcast
+protocol other extensions use to request rolls from Dicebox is documented in
+[`API.md`](API.md).
 
 It is the same app, not a reimplementation. `tools/build-owlbear.mjs` copies the
 files from the repo root and changes three things — the relay origin is baked

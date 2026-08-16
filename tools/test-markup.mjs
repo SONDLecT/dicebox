@@ -322,7 +322,7 @@ ok('the served note does not claim to be the file on disk',
 // signal. "Find out more" would not: it promises detail, not limits.
 const moreLink = html.match(/<p class="room-note room-note-more">([\s\S]*?)<\/p>/)?.[1] || '';
 ok('the privacy section is linked from the panel',
-   /#what-the-privacy-actually-is/.test(moreLink));
+   /#what-passphrase-room-privacy-actually-is/.test(moreLink));
 ok('the link says there are limits',
    /does\s?n.t guarantee|cannot|limits|actually/i.test(moreLink), moreLink.trim());
 

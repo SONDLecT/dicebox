@@ -31,7 +31,9 @@ With Dicebox you can:
   carte napoletane, Hanafuda, and Uta-garuta;
 - share live rolls through an end-to-end encrypted Dicebox room; or
 - install the [hosted Owlbear Rodeo extension](#in-owlbear-rodeo) from
-  `vtt.dicebox.cc` and share automatically with the current Owlbear game.
+  `vtt.dicebox.cc`: rolls shared automatically with the Owlbear game, a corner
+  roll window, one deck on the whole table, and an API other extensions can
+  call.
 
 The standalone app keeps rolls and history on your device unless you join a
 shared room. Inside the Owlbear extension, game broadcasting and listening are
@@ -336,201 +338,23 @@ If you are not paying per-request for a public instance, you do not need it.
 node tools/deploy-relay.mjs              # needs .env, see .env.example
 ```
 
-[`server/README.md`](server/README.md) covers both, what differs between them, and why.
-
 It binds loopback by default, so a fresh install is not reachable from the
-network until you decide it should be. Put it behind whatever TLS terminator you
-already run, then point the app at it by changing the relay origin in
+network until you decide it should be. Put it behind whatever TLS terminator
+you already run, then point the app at it by changing the relay origin in
 `docker/security-headers.conf` (self-hosted) or `worker.js` (Cloudflare).
 
-One thing to set while you are there: **turn off access logging on whatever
-terminates TLS in front of the relay.** The room id travels in the request URL,
-so nginx and Caddy both write it to disk by default — the full id, not the
-eight-character prefix the relay itself logs, and it stays there long after the
-room has expired. [`server/README.md`](server/README.md) has the configuration.
-
-That origin is **pinned to one exact host** rather than opened up to `wss:` or
-`*`. This limits a compromised build to the origins already allowed by the
-policy instead of letting it connect to an arbitrary third-party host. It is not
-a defence against a compromised Dicebox origin or relay: both `self` and the
-configured relay are permitted destinations. Widening the policy to make a
-setup problem go away gives up the narrower protection it does provide.
-
-[`server/README.md`](server/README.md) covers the configuration — limits,
-timeouts, origins — in full.
-
-### In Owlbear Rodeo
-
-Dicebox is available as an [Owlbear Rodeo](https://www.owlbear.rodeo/)
-extension. It is the same roller in a compact action panel, with one additional
-sharing path: every running Dicebox panel in the same Owlbear game can exchange
-finished rolls over Owlbear's own [Broadcast API](https://docs.owlbear.rodeo/extensions/apis/broadcast/).
-The Owlbear game is the room, so there is no Dicebox passphrase to exchange.
-
-#### Install the hosted extension
-
-1. In Owlbear Rodeo, open **Profile → Add Extension**.
-2. Paste this manifest URL:
-
-   ```text
-   https://vtt.dicebox.cc/manifest.json
-   ```
-
-3. Create a room, or edit an existing room, and enable **Dicebox** in its
-   extensions list.
-4. Open the room and click the Dicebox action in the top-left toolbar.
-
-This follows Owlbear's normal [extension installation flow](https://docs.owlbear.rodeo/extensions/tutorial-hello-world/install-your-extension/).
-The hosted manifest and panel are public static files; no Dicebox account is
-required.
-
-#### Sharing at the Owlbear table
-
-Enabling Dicebox in an Owlbear game enables Owlbear sharing and listening. There
-is no separate opt-in or opt-out switch: this is the VTT extension, and table
-interoperability is part of that mode. The Share rolls menu shows only a compact
-**Owlbear mode · Rolls are shared with this game** note.
-
-Dicebox declares a manifest `background_url`. That background page starts when
-Owlbear enables the extension, waits for its own `OBR.onReady()`, and remains the
-transport and state coordinator while the Dicebox action popover is closed. It
-receives completed table rolls, retains bounded room-local history, and can
-answer requests from other extensions running on the same local Owlbear client.
-Opening the action later hydrates its history and current tracked state; it does
-not reroll those authoritative results.
-
-History is local to this browser and Owlbear room, not server or cross-device
-synchronisation. The primary cache is IndexedDB, bounded to 500 records and 2
-MiB; a guarded local-storage cache is used only when IndexedDB is unavailable.
-History replies are paged below Dicebox's 12 KiB wire ceiling because Owlbear
-Broadcast has a hard 16 KiB message limit.
-
-#### Owlbear sharing versus Dicebox rooms
-
-These are separate transports with deliberately different trust boundaries:
-
-| | Owlbear game broadcast | Dicebox passphrase room |
-| --- | --- | --- |
-| Membership | The current Owlbear game | Anyone with the passphrase |
-| Activation | Always active when the extension is enabled | Off until someone creates or joins a room |
-| Transport | Owlbear's extension Broadcast API | A Dicebox WebSocket relay |
-| End-to-end encrypted by Dicebox | **No** | **Yes** |
-| Useful outside Owlbear | No | Yes — browser tabs, phones, another table |
-| Stored backlog | Bounded, local room cache | None |
-
-Owlbear-broadcast payloads contain the roll in readable form. Owlbear carries
-that message, and another extension that deliberately listens on Dicebox's
-known channel can read it. The passphrase room instead encrypts the roll in the
-sender's browser before Dicebox's relay sees it; the relay receives ciphertext
-and never receives the key or passphrase.
-
-Both transports can be active at once. Dicebox stamps one id on a locally
-completed roll before publishing it, deduplicates arrivals, and never forwards
-an incoming Owlbear event into the passphrase room or an incoming encrypted-room
-roll into Owlbear. There is no relay amplification loop.
-
-Neither transport proves that a roll came from an unmodified client. Incoming
-data is checked for a valid, bounded Dicebox shape. Owlbear connection metadata
-limits request execution to this player's local connection, but it is not a
-cryptographic identity and does not reveal which local extension sent a
-request.
-
-#### For extension developers: versioned broadcast contract
-
-Every Owlbear iframe is a separate SDK context. Wait for `OBR.onReady()` in your
-own context, then use the single channel:
-
-```text
-cc.dicebox.rolls
-```
-
-Protocol messages carry `v: 1` and a typed `type`. Requests and their correlated
-responses are local RPC:
-
-```js
-await OBR.broadcast.sendMessage('cc.dicebox.rolls', {
-  v: 1,
-  type: 'roll.request',
-  requestId: 'forms-123',
-  notation: 'yz:5b3s2g'
-}, { destination: 'LOCAL' });
-```
-
-A stateful follow-up references a Dicebox-owned authoritative roll id:
-
-```js
-await OBR.broadcast.sendMessage('cc.dicebox.rolls', {
-  v: 1,
-  type: 'action.request',
-  requestId: 'forms-124',
-  action: 'push',
-  rollId: 'dicebox-roll-789'
-}, { destination: 'LOCAL' });
-```
-
-| Type | Purpose | Correlated response |
-| --- | --- | --- |
-| `roll.request` | Numeric notation, all built-in systems, five deck modes, Rouse checks, and Ironsworn/Starforged oracles | `roll.result` or `roll.error` |
-| `action.request` | `push` by authoritative `rollId`, or Dicebox-owned deck `shuffle`/`reset` | `roll.result`, `action.result`, or `roll.error` |
-| `history.request` | Ask the local background for retained room history | One or more paged `history.result` messages |
-
-`requestId` is 1–96 characters and is echoed only in local responses. Dicebox
-owns RNG, interpretation, Hunger, Stress, decks, oracle lookup, push eligibility,
-history, timestamps, roll ids, and player attribution. Callers provide intent,
-not precomputed outcomes. Stateful requests are serialised through a bounded
-queue, deduplicated, rate-limited, and time out explicitly. Reusing one
-`requestId` for different work fails with `request_id_conflict`.
-
-Completed table events are published with explicit `destination: 'REMOTE'` as
-`roll.event`. Pushes use `roll.transition` with `parentId` and exact `held`,
-`rerolled`, and `added` indexes so receiving Dicebox panels preserve held dice
-and animate only changed or new dice. Incoming events are displayed and archived
-but never republished. Legacy untyped completed-roll payloads remain readable
-during the v1 migration.
-
-Owlbear Broadcast messages must be JSON-serialisable and cannot exceed 16 KiB.
-Dicebox uses a 12 KiB application ceiling for envelope headroom. Oversized
-requests/results receive correlated `request_too_large` or `result_too_large`
-errors rather than disappearing. History is split into bounded pages. The public
-bridge caps numeric requests at 100 dice across 64 terms, while the standalone
-notation engine still permits up to 500 dice per term. Completed-event retention
-also admits at most 100 new Broadcast events per ten seconds before persistence.
-
-`sendMessage()` resolving means Owlbear accepted the SDK command; it is not a
-receiver acknowledgement. Use the correlated result/error message as the
-application-level answer. Broadcast is ephemeral, so do not expect Owlbear to
-replay anything you missed; Dicebox's retained history is its own bounded local
-cache.
-
-The implementation lives in [`owlbear-session.js`](owlbear-session.js),
-[`owlbear-history.js`](owlbear-history.js), and the Owlbear-only background entry
-point under [`owlbear/`](owlbear/). Those assets are copied only into the VTT
-artifact. Ordinary `dicebox.cc`, the PWA, offline bundles, and standalone
-self-hosted builds do not initialize the bridge.
-
-#### Host your own panel
-
-```sh
-npm run build:owlbear -- --relay=wss://relay.example.com/ws --host=vtt.example.com
-npm run deploy:owlbear
-```
-
-The relay argument serves the optional encrypted passphrase-room feature; the
-Owlbear game broadcast itself uses Owlbear's SDK. The panel must have its **own
-origin**, not a path on the main app's origin: its CSP permits Owlbear to frame
-it while the main app refuses all framing, and the main app's root-scoped
-service worker must never claim the panel. The build and deploy scripts enforce
-that separation.
-
-[`owlbear/README.md`](owlbear/README.md) covers self-hosting, relay allowlists,
-CSP/CORS headers, SDK vendoring, deployment, and troubleshooting in depth.
+[`server/README.md`](server/README.md) covers the rest — both implementations
+and what differs between them, limits, timeouts, origin allowlists, why the
+relay origin is pinned to one exact host, and the one logging setting worth
+changing on your TLS terminator so room ids stay out of your access logs.
 
 ### What passphrase-room privacy actually is
 
 In a Dicebox passphrase room, rolls are encrypted in your browser and decrypted
 in the other players' browsers. The Dicebox relay only ever sees ciphertext.
 Names, notation, dice values and totals are all inside it. This section does not
-apply to the Owlbear game broadcast described above.
+apply to the Owlbear game broadcast, which is covered in
+[its own section](#in-owlbear-rodeo) below.
 
 **Self-hosting, or the downloaded single file, gives a real "we cannot see your
 rolls" guarantee.** You are running the code, and you can read it.
@@ -563,6 +387,70 @@ catch a determined one. There are deliberately no "verified roll" badges,
 because they would suggest a guarantee that does not exist. Rooms are for
 friends. If you need dice nobody at the table could have tampered with, you need
 someone else holding them.
+
+## In Owlbear Rodeo
+
+Dicebox is also an [Owlbear Rodeo](https://www.owlbear.rodeo/) extension: the
+same roller in an action panel, plus a background service that makes the
+Owlbear game itself the table. No Dicebox account, no passphrase — being in
+the game is the membership.
+
+1. In Owlbear Rodeo, open **Profile → Add Extension**.
+2. Paste this manifest URL:
+
+   ```text
+   https://vtt.dicebox.cc/manifest.json
+   ```
+
+3. Create a room, or edit an existing room, and enable **Dicebox** in its
+   extensions list.
+4. Open the room and click the Dicebox action in the top-left toolbar.
+
+What the table gets:
+
+- **Rolls shared with the game, automatically.** Everyone running the panel
+  sees everyone else's rolls — full tray animation, names, history. The Share
+  menu shows a compact *Owlbear mode* note; enabling the extension is the
+  switch.
+- **A corner roll window**, the way the native dice app has one: every
+  completed roll pops a small card that replays the throw in the rolling
+  system's own dice and colours, with the same headline and detail line the
+  panel reads — visible even with the panel closed. Tap a drawn card in it and
+  the panel opens with that card's close-up.
+- **One deck on the table.** Deck state lives in the Owlbear room itself:
+  anyone shuffles it, every draw comes off the same stack, and the room keeps
+  the deck between sessions.
+- **A background service other extensions can use.** It answers roll, draw,
+  push, and history requests on a versioned broadcast channel, with Dicebox
+  keeping authority over the dice. The contract is documented in
+  [`owlbear/API.md`](owlbear/API.md).
+- **Rolls that never wait.** If the background is unreachable the panel rolls
+  locally and still shares what it can — dice landing is the one thing that is
+  never allowed to fail.
+
+Owlbear sharing and Dicebox's encrypted rooms are separate transports with
+deliberately different trust boundaries, and both can run at once — the
+passphrase room is how a phone or a player outside Owlbear joins the same
+table:
+
+| | Owlbear game broadcast | Dicebox passphrase room |
+| --- | --- | --- |
+| Membership | The current Owlbear game | Anyone with the passphrase |
+| Activation | Always active when the extension is enabled | Off until someone creates or joins a room |
+| Transport | Owlbear's extension Broadcast API | A Dicebox WebSocket relay |
+| End-to-end encrypted by Dicebox | **No** | **Yes** |
+| Useful outside Owlbear | No | Yes — browser tabs, phones, another table |
+| Stored backlog | Bounded, local room cache | None |
+
+Owlbear carries broadcast payloads in readable form, and another extension
+that deliberately listens on Dicebox's channel can read them — that is what
+makes the interoperability work, and it is why the encrypted room exists as
+the alternative. Dicebox never forwards an Owlbear event into a passphrase
+room or an encrypted-room roll into Owlbear.
+
+To host the panel on your own origin — it must be its own origin, never a path
+on the app's — see [`owlbear/README.md`](owlbear/README.md), which covers the
+build, relay allowlists, headers, and deployment in depth.
 
 ## The roll log
 
