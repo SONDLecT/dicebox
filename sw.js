@@ -26,6 +26,7 @@ const ASSETS = [
   './render.js',
   './under30-gap.js',
   './tray-faces.js',
+  './result-text.js',
   './system-dice.js',
   './oracle-dice.js',
   // The deck art modules — big (cards ~1.1MB, tarot ~4.5MB), so the app pulls

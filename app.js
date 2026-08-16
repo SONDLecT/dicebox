@@ -3,6 +3,7 @@ import { Die, Surface, separate, beginFrame } from './render.js';
 import { createRoom, parsePassphraseFromHash, validateRoll, validateSystemRoll } from './room.js';
 import { generatePassphrase, normalizePassphrase } from './room-crypto.js';
 import { rollV5, rollRouse, describeV5, v5Headline, detectSystem, v5Face, parseV5 } from './system-dice.js';
+import { formatHeadline, formatDetail } from './result-text.js';
 import { flattenRollDice, stampTrayDie, BAND_COLORS, FORCE_COLORS, TOR_COLORS, CT_COLORS, DH_COLORS, MS_COLORS, GEN_COLORS, YZ_COLORS, BR_COLORS, T2K_COLORS, COC_COLORS, DG_COLORS, IRON_COLORS } from './tray-faces.js';
 import { rollFate, describeFate, fateHeadline, fateFace, parseFate } from './system-dice.js';
 import { rollGenesys, describeGenesys, genesysHeadline, parseGenesys } from './system-dice.js';
@@ -821,58 +822,14 @@ function rerollDelay(flat) {
 // `number`, set at the big numeral size; a resolved V5 outcome is `text`, a
 // phrase set smaller so "Bestial Failure" does not overrun the readout. The
 // `kind` reaches the DOM as a data attribute the stylesheet keys off.
-function resultHeadline(result) {
-  if (result.system === 'v5') return v5Headline(result);
-  if (result.system === 'fate') return fateHeadline(result);
-  if (result.system === 'genesys') return genesysHeadline(result);
-  if (result.system === 'daggerheart') return daggerheartHeadline(result);
-  if (result.system === 'cthulhutech') return cthulhutechHeadline(result);
-  if (result.system === 'yearzero') return yearzeroHeadline(result);
-  if (result.system === 'bladerunner') return bladeRunnerHeadline(result);
-  if (result.system === 'twilight') return twilightHeadline(result);
-  if (result.system === 'starwars') return starWarsHeadline(result);
-  if (result.system === 'onering') return oneRingHeadline(result);
-  if (result.system === 'pbta' || result.system === 'mist') return twod6Headline(result);
-  if (result.system === 'mothership') return mothershipHeadline(result);
-  if (result.system === 'coc') return callOfCthulhuHeadline(result);
-  if (result.system === 'deltagreen') return deltaGreenHeadline(result);
-  if (result.system === 'ironsworn') return ironswornHeadline(result);
-  if (result.system === 'oracle') return { kind: 'text', text: oracleReading(result.summary), variant: 'oracle' };
-  if (result.system === 'cards') return cardsHeadline(result);
-  if (result.system === 'tarot') return tarotHeadline(result);
-  if (result.system === 'napoletane') return cardsHeadline(result);
-  if (result.system === 'hanafuda') return cardsHeadline(result);
-  if (result.system === 'utagaruta') return cardsHeadline(result);
-  return { kind: 'number', text: String(result.total) };
-}
+// The words for a roll come from the shared formatter, so the Owlbear toast
+// reads a roll exactly as this readout does. Uta-garuta is the one override:
+// its detail quotes the poem, which needs the art module and the language
+// setting only this file has.
+function resultHeadline(result) { return formatHeadline(result); }
 function resultDetail(result) {
-  if (result.system === 'v5') return describeV5(result);
-  if (result.system === 'fate') return describeFate(result);
-  if (result.system === 'genesys') return describeGenesys(result);
-  if (result.system === 'daggerheart') return describeDaggerheart(result);
-  if (result.system === 'cthulhutech') return describeCthulhuTech(result);
-  if (result.system === 'yearzero') return describeYearZero(result);
-  if (result.system === 'bladerunner') return describeBladeRunner(result);
-  if (result.system === 'twilight') return describeTwilight(result);
-  if (result.system === 'starwars') return describeStarWars(result);
-  if (result.system === 'onering') return describeOneRing(result);
-  if (result.system === 'pbta' || result.system === 'mist') return describe2d6(result);
-  if (result.system === 'mothership') return describeMothership(result);
-  if (result.system === 'coc') return describeCallOfCthulhu(result);
-  if (result.system === 'deltagreen') return describeDeltaGreen(result);
-  if (result.system === 'ironsworn') return describeIronsworn(result);
-  if (result.system === 'oracle') {
-    const o = result.summary;
-    let s = `${o.name} · d${o.sides} = ${o.roll}`;
-    if (o.suggested && o.suggested.length) s += ' · may also roll ' + o.suggested.map(x => x.name + (x.n > 1 ? ` ×${x.n}` : '')).join(', ');
-    return s;
-  }
-  if (result.system === 'cards') return describeCards(result);
-  if (result.system === 'tarot') return describeTarot(result);
-  if (result.system === 'napoletane') return describeCards(result);
-  if (result.system === 'hanafuda') return describeCards(result);
   if (result.system === 'utagaruta') return describeUta(result);
-  return describe(result.groups);
+  return formatDetail(result);
 }
 
 function safeResultHeadline(result) {

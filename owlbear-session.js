@@ -12,6 +12,7 @@ import { validateRoll, validateSystemRoll } from './room.js';
 import { rollOracle, oracleSlug, findOracleBySlug } from './oracle-dice.js';
 import { createOwlbearHistoryStore } from './owlbear-history.js';
 import { flattenRollDice } from './tray-faces.js';
+import { formatHeadline, formatDetail } from './result-text.js';
 import { getOrCreateLocalAuthSecret, signLocalPayload, signedLocalWireBytes } from './owlbear-auth.js';
 
 export const OBR_CHANNEL = 'cc.dicebox.rolls';
@@ -426,21 +427,18 @@ async function resetDeck(storage, deck, memory, assertActive, notation = null) {
   return { deck, remaining: ids.length, total: ids.length };
 }
 
-// The one-line reading a toast leads with. Not the full per-system formatter the
-// panel carries — a corner window gets the strongest single fact: a success
-// count, a resolved outcome, the drawn cards, or the plain total.
-function toastHeadline(roll) {
-  const s = roll.summary && typeof roll.summary === 'object' ? roll.summary : {};
-  if (roll.system === 'numeric' && Number.isFinite(roll.total)) return String(roll.total);
-  if (Number.isFinite(s.successes)) return `${s.successes} success${s.successes === 1 ? '' : 'es'}`;
-  if (typeof s.outcome === 'string' && s.outcome) return s.outcome.replace(/-/g, ' ');
-  const group = Array.isArray(roll.groups) ? roll.groups[0] : null;
-  if (group && (group.kind === 'cards' || group.kind === 'tarot') && Array.isArray(group.cards)) {
-    return group.cards.map(card => card.label + (card.rev ? ' (rev)' : '')).join(', ').slice(0, 44);
-  }
-  if (typeof s.result === 'string' && s.result) return s.result.slice(0, 44);
-  if (Number.isFinite(roll.total)) return String(roll.total);
-  return String(roll.notation || 'Roll').slice(0, 24);
+// The toast reads a roll with the same formatters the panel's readout uses —
+// headline on top, the detail line beneath — falling back to the notation only
+// if a malformed roll makes them throw.
+function toastText(roll) {
+  const shaped = { ...roll, system: roll.system || 'numeric' };
+  let head, sub;
+  try { head = String(formatHeadline(shaped).text); } catch { head = null; }
+  try { sub = String(formatDetail(shaped)); } catch { sub = null; }
+  return {
+    head: (head || String(roll.total ?? roll.notation ?? 'Roll')).slice(0, 60),
+    sub: (sub || String(roll.notation || '')).slice(0, 110),
+  };
 }
 
 export async function initializeOwlbearBackground(OBR, options = {}) {
@@ -540,10 +538,11 @@ export async function initializeOwlbearBackground(OBR, options = {}) {
       const flat = Array.isArray(roll.groups)
         ? flattenRollDice(roll).filter(die => Number.isFinite(die.value)).slice(0, 14)
         : [];
+      const text = toastText(roll);
       const query = new URLSearchParams({
         who: String(roll.who || 'Someone').slice(0, 40),
-        head: toastHeadline(roll),
-        sub: String(roll.notation || '').slice(0, 40),
+        head: text.head,
+        sub: text.sub,
       });
       if (flat.length) {
         const s = roll.summary && typeof roll.summary === 'object' ? roll.summary : {};

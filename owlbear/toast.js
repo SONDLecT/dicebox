@@ -50,7 +50,8 @@ if (!roll || !roll.flat.length) {
   const bounds = { left: 6, right: W - 6, top: 6, floor: H - 10 };
 
   const spec = roll.flat;
-  const size = spec.length <= 4 ? 34 : spec.length <= 8 ? 26 : 20;
+  // As large as the little tray can carry: shrink only when the count forces it.
+  const size = spec.length <= 4 ? 40 : spec.length <= 8 ? 30 : 22;
   const perRow = Math.max(1, Math.floor((W - 12) / (size + 6)));
   const rows = Math.ceil(spec.length / perRow);
   const dice = spec.map((f, i) => {

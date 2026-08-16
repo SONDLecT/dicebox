@@ -57,6 +57,10 @@ const SYSTEM_EXPORTS = [
   'parseCards', 'newDeckOrder', 'summarizeCards', 'cardsHeadline', 'describeCards',
   'parseTarot', 'summarizeTarot', 'tarotHeadline', 'describeTarot',
   'parseNapoletane', 'parseHanafuda', 'parseUtagaruta',
+  'rollYearZero', 'describeYearZero', 'yearzeroHeadline', 'parseYearZero', 'pushYearZero',
+  'rollBladeRunner', 'describeBladeRunner', 'bladeRunnerHeadline', 'parseBladeRunner', 'pushBladeRunner',
+  'rollTwilight', 'describeTwilight', 'twilightHeadline', 'parseTwilight', 'pushTwilight',
+  'rollIronsworn', 'describeIronsworn', 'ironswornHeadline', 'parseIronsworn', 'rollRouse',
 ];
 const CARDS_ART_EXPORTS = ['cardSVG', 'CARD_IDS', 'cardMeta', 'SUIT_NAMES', 'RANKS'];
 const TAROT_ART_EXPORTS = ['tarotSVG', 'TAROT_IDS', 'tarotMeta', 'TAROT_SUITS'];
@@ -71,6 +75,7 @@ const ROOM_CRYPTO_EXPORTS = [
   'normalizePassphrase', 'generatePassphrase', 'PROTOCOL_VERSION',
 ];
 const ROOM_EXPORTS = ['createRoom', 'parsePassphraseFromHash'];
+const RESULT_TEXT_EXPORTS = ['formatHeadline', 'formatDetail'];
 
 // room-crypto.js before room.js before app.js: each pulls only from the ones
 // above it. Omitting these two entirely is what made an earlier bundle a dead
@@ -81,8 +86,9 @@ const script = [
   moduleScope('dice.js'),
   moduleScope('under30-gap.js'),
   moduleScope('system-dice.js'),
-  moduleScope('tray-faces.js'),
+  moduleScope('tray-faces.js', ['v5Face', 'fateFace']),
   moduleScope('oracle-dice.js', ['randInt']),
+  moduleScope('result-text.js', [...DICE_EXPORTS, ...SYSTEM_EXPORTS, 'oracleReading']),
   moduleScope('ironsworn-oracles.js'),
   moduleScope('starforged-oracles.js'),
   moduleScope('cards-art.js'),
@@ -94,7 +100,7 @@ const script = [
   moduleScope('room-crypto.js'),
   moduleScope('room.js', ROOM_CRYPTO_EXPORTS),
   moduleScope('app.js', [
-    ...DICE_EXPORTS, ...SYSTEM_EXPORTS, ...ORACLE_EXPORTS, ...IRON_ORACLE_EXPORTS, ...CARDS_ART_EXPORTS, ...TAROT_ART_EXPORTS, ...NAP_ART_EXPORTS, ...HANA_ART_EXPORTS, ...UTA_ART_EXPORTS, ...RENDER_EXPORTS, ...ROOM_CRYPTO_EXPORTS, ...ROOM_EXPORTS,
+    ...DICE_EXPORTS, ...SYSTEM_EXPORTS, ...RESULT_TEXT_EXPORTS, ...ORACLE_EXPORTS, ...IRON_ORACLE_EXPORTS, ...CARDS_ART_EXPORTS, ...TAROT_ART_EXPORTS, ...NAP_ART_EXPORTS, ...HANA_ART_EXPORTS, ...UTA_ART_EXPORTS, ...RENDER_EXPORTS, ...ROOM_CRYPTO_EXPORTS, ...ROOM_EXPORTS,
   ]),
 ].join('\n\n');
 
