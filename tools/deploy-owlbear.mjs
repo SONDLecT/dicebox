@@ -37,6 +37,25 @@ if (!existsSync(join(DIST, 'wrangler.jsonc'))) {
   process.exit(1);
 }
 
+// A stale dist deploys without complaint and ships yesterday's panel — which
+// has happened, and the only symptom was a missing feature nobody could
+// explain. If any source the build copies is newer than the built shell,
+// refuse and say why.
+{
+  const builtAt = statSync(join(DIST, 'index.html')).mtimeMs;
+  const stale = ['index.html', 'app.js', 'style.css', 'system-dice.js', 'render.js',
+    'room.js', 'tray-faces.js', 'result-text.js', 'system-themes.js',
+    'owlbear-session.js', 'owlbear-auth.js', 'owlbear-history.js',
+    join('owlbear', 'toast.js'), join('owlbear', 'toast.css'), join('owlbear', 'toast.html'),
+    join('owlbear', 'background.js'), join('owlbear', 'manifest.json')]
+    .filter(f => existsSync(join(ROOT, f)) && statSync(join(ROOT, f)).mtimeMs > builtAt);
+  if (stale.length) {
+    console.error('owlbear/dist is older than: ' + stale.join(', ') + '\n' +
+      'Rebuild first:\n  npm run build:owlbear -- --relay=wss://... --host=vtt.example.com');
+    process.exit(1);
+  }
+}
+
 const config = JSON.parse(
   readFileSync(join(DIST, 'wrangler.jsonc'), 'utf8')
     .replace(/^\s*\/\/.*$/gm, '')
