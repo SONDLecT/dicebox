@@ -1,6 +1,6 @@
 ---
 title: Dicebox
-description: Tactile dice, cards, and 19 game systems, shared with the whole table
+description: Dice rolling and card drawing with built-in rules and trays for 19 game systems. Open source and self-hostable.
 author: SONDLecT
 image: https://raw.githubusercontent.com/SONDLecT/dicebox/master/og.png
 icon: https://dicebox.cc/icons/icon-512.png
@@ -12,10 +12,11 @@ learn-more: https://github.com/SONDLecT/dicebox
 
 # Dicebox
 
-A tactile dice roller and card drawer for the whole table. Tap dice to build a
-pool, flick the tray to throw, and every completed roll is shared with the
-Owlbear game automatically — no account, no passphrase, being in the game is
-the membership.
+Roll dice and draw cards with the whole table. Every system Dicebox supports
+gets a real tray of its own — the dice, the symbols, and the reading of the
+result are built in — and every roll is shared with the Owlbear game
+automatically. No account, no passphrase: being in the game is the
+membership.
 
 ![Rolling a mixed handful of dice](https://raw.githubusercontent.com/SONDLecT/dicebox/master/docs/dark.png)
 
