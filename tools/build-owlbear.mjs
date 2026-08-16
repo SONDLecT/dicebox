@@ -291,7 +291,13 @@ export default {
     for (const [k, v] of Object.entries(HEADERS)) headers.set(k, v);
 
     if (PUBLIC.has(path)) headers.set('Access-Control-Allow-Origin', '*');
-    if (FRESH.has(path)) headers.set('Cache-Control', 'no-cache');
+    // Every asset revalidates, not just the shell. The panel has no service
+    // worker on purpose, so with no Cache-Control the browser HEURISTICALLY
+    // caches the modules — and after a deploy each player runs whatever mix of
+    // old and new files their cache holds, which presents as one browser
+    // "working" and another silently broken. An ETag 304 costs a header
+    // round-trip; version skew costs an evening.
+    headers.set('Cache-Control', 'no-cache');
 
     return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
   },
