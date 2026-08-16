@@ -228,7 +228,9 @@ export function validateSystemRoll(msg) {
       if (!Array.isArray(g.cards) || g.cards.length === 0 || g.cards.length > 12) return false;
       for (const card of g.cards) {
         if (!card || typeof card !== 'object') return false;
-        if (typeof card.id !== 'string' || card.id.length > 4) return false;
+        // Hanafuda ids run to eleven characters; the old cap of 4 silently
+        // rejected every hanafuda draw a peer sent.
+        if (typeof card.id !== 'string' || card.id.length > 16) return false;
         if (typeof card.label !== 'string' || card.label.length > 24) return false;
         if (card.rev !== undefined && typeof card.rev !== 'boolean') return false;
       }

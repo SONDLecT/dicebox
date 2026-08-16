@@ -608,6 +608,23 @@ const sampleSystemRoll = {
     ] }],
   }));
 
+  // Hanafuda ids run long ('sakura-hikari' shapes, up to eleven characters);
+  // the validator once capped ids at four and silently dropped every draw.
+  ok('a hanafuda draw with a long id validates', validateSystemRoll({
+    system: 'hanafuda', notation: 'hana:1',
+    summary: { drawn: [{ id: 'willow-rain', label: '柳に小野道風', red: false }], remaining: 47, total: 48 },
+    groups: [{ kind: 'cards', count: 1, cards: [
+      { id: 'willow-rain', label: '柳に小野道風', red: false },
+    ] }],
+  }));
+  ok('an absurdly long card id is still rejected', !validateSystemRoll({
+    system: 'hanafuda', notation: 'hana:1',
+    summary: {},
+    groups: [{ kind: 'cards', count: 1, cards: [
+      { id: 'x'.repeat(40), label: 'card', red: false },
+    ] }],
+  }));
+
   ok('a wildly out-of-range die value is rejected', !validateSystemRoll({
     ...sampleSystemRoll,
     groups: [{ kind: 'dice', sides: 10, count: 1, subtotal: 0, dice: [{ value: 1e9, kept: true }] }],

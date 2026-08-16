@@ -8,12 +8,17 @@
 </head>
 <body>
   <!-- The little roll window the background opens over the game, in the corner
-       the native dice app uses. One roll at a time; the background replaces and
-       closes it. Clicking it dismisses it early. -->
+       the native dice app uses. The canvas replays the throw with the panel's
+       own dice renderer, settling on the real values; the row below reads it.
+       One roll at a time; the background replaces and closes it. Clicking it
+       dismisses it early. -->
   <div class="toast" id="toast" role="status">
-    <span class="who" id="who"></span>
-    <span class="head" id="head"></span>
-    <span class="sub" id="sub"></span>
+    <canvas id="tray" width="248" height="84"></canvas>
+    <div class="row">
+      <span class="who" id="who"></span>
+      <span class="head" id="head"></span>
+      <span class="sub" id="sub"></span>
+    </div>
   </div>
   <script type="module" src="/toast.js"></script>
 </body>
