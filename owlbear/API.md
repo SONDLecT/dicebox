@@ -87,8 +87,8 @@ term. Completed-event retention admits at most 100 new Broadcast events per
 ten seconds before persistence.
 
 History is local to the browser and Owlbear room, not server or cross-device
-synchronisation. The primary cache is IndexedDB, bounded to 500 records and
-2 MiB; a guarded local-storage cache is used only when IndexedDB is
+synchronisation. The primary cache is IndexedDB, bounded to 20,000 records and
+8 MiB; a guarded local-storage cache is used only when IndexedDB is
 unavailable.
 
 ## Trust

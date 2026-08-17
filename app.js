@@ -604,7 +604,10 @@ function finish(result) {
 
 // The visible log stays short, but the record does not: a session's worth of
 // rolls is the interesting artifact, and truncating at twelve threw it away.
-const HISTORY_LIMIT = 500;
+// The session roll log lives in memory and is what Full History shows and
+// exports. The cap is only a runaway backstop — a real table never approaches
+// it — so it sits high enough to never trim a genuine session's rolls.
+const HISTORY_LIMIT = 1_000_000;
 const history = [];
 
 // Your own display name, but only while a room is live. Rolling alone, a log

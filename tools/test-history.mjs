@@ -18,7 +18,9 @@ const ok = (name, cond, extra = '') => {
   else { fail++; console.log(`  FAIL  ${name}${extra ? ' — ' + extra : ''}`); }
 };
 
-// Mirrors app.js.
+// A small fixture value so the capping test runs fast — the shape of the
+// trim is what is under test, not the number. Production (app.js) sits at
+// 1,000,000, a runaway backstop a real session never reaches.
 const HISTORY_LIMIT = 500;
 
 function recordRoll(history, result, at, who = null, mine = false) {

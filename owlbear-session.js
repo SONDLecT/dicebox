@@ -18,12 +18,18 @@ import { getOrCreateLocalAuthSecret, signLocalPayload, signedLocalWireBytes } fr
 
 export const OBR_CHANNEL = 'cc.dicebox.rolls';
 export const OBR_PROTOCOL_VERSION = 1;
-const HISTORY_LIMIT = 500;
+// The per-room synced history is a shared, persisted cache: it lives in
+// IndexedDB, and a panel re-pages the whole of it on open. So it is bounded
+// generously — tens of thousands of rolls, far past the old 500 — but not
+// unbounded, since every byte here is re-synced on each panel open and stored
+// per room. The standalone app's own visible log is capped separately and far
+// higher.
+const HISTORY_LIMIT = 20_000;
 const HISTORY_PREFIX = 'dicebox:obr:history:v1:';
 // Owlbear's hard Broadcast ceiling is 16 KiB. Keep substantial room for its
 // routing envelope and future protocol fields rather than balancing on the cap.
 const MAX_WIRE_BYTES = 12_000;
-const MAX_HISTORY_BYTES = 2_000_000;
+const MAX_HISTORY_BYTES = 8_000_000;
 const MAX_PUBLIC_DICE = 100;
 const MAX_PUBLIC_TERMS = 64;
 // Reroll-below modifiers can turn a small encoded pool into millions of random
@@ -485,6 +491,11 @@ export async function initializeOwlbearBackground(OBR, options = {}) {
   const history = (hasStoredHistory ? storedHistory : legacyHistory)
     .map(normalizeRoll).filter(Boolean).slice(-HISTORY_LIMIT);
   const ids = new Set(history.map(roll => roll.id).filter(Boolean));
+  // The serialized size is tracked incrementally — one wireBytes per roll as it
+  // arrives or leaves — so the byte cap costs nothing per roll no matter how
+  // large the history grows. Re-encoding the whole array on every roll would
+  // have made a big cap quadratic.
+  let historyBytes = history.reduce((sum, roll) => sum + wireBytes(roll), 0);
   let closed = false, persistInFlight = false, persistDirty = false, fallbackScheduled = false;
 
   // History mutation is synchronous and persistence is one coalesced writer.
@@ -603,11 +614,12 @@ export async function initializeOwlbearBackground(OBR, options = {}) {
     if (!Number.isFinite(roll.at)) roll.at = now();
     history.push(roll);
     if (roll.id) ids.add(roll.id);
-    let serialized = JSON.stringify(history);
-    while (history.length > HISTORY_LIMIT || new TextEncoder().encode(serialized).length > MAX_HISTORY_BYTES) {
+    historyBytes += wireBytes(roll);
+    while (history.length > HISTORY_LIMIT || historyBytes > MAX_HISTORY_BYTES) {
       const dropped = history.shift();
-      if (dropped?.id && !history.some(item => item.id === dropped.id)) ids.delete(dropped.id);
-      serialized = JSON.stringify(history);
+      if (!dropped) break;
+      historyBytes -= wireBytes(dropped);
+      if (dropped.id && !history.some(item => item.id === dropped.id)) ids.delete(dropped.id);
     }
     schedulePersistence();
     return roll;
