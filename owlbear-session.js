@@ -654,8 +654,8 @@ export async function initializeOwlbearBackground(OBR, options = {}) {
     if (typeof notation !== 'string' || notation.length === 0 || notation.length > 512) {
       throw new Error('Notation must be 1 to 512 characters');
     }
-    if (notation.trim().toLowerCase() === 'v5:rouse') {
-      const result = rollRouseFn();
+    if (/^v5:rouse2?$/i.test(notation.trim())) {
+      const result = rollRouseFn(/2$/i.test(notation.trim()) ? 2 : 1);
       const hunger = trackedState.hunger;
       const tracked = hunger > 0;
       result.summary.tracked = tracked;

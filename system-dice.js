@@ -102,16 +102,20 @@ export function rollV5(src) {
 // so it carries a 'rouse' summary the headline and detail read on their own.
 // `hungerAfter` is filled in by the caller once it has moved the tracked Hunger,
 // since the die alone does not know the new total.
-export function rollRouse() {
-  const value = randInt(10);
+export function rollRouse(diceCount = 1) {
+  // Discipline level and Blood Potency can let a Rouse be rolled with two dice,
+  // keeping the better — the check holds if EITHER die shows 6+.
+  const n = diceCount === 2 ? 2 : 1;
+  const values = Array.from({ length: n }, () => randInt(10));
+  const value = Math.max(...values);
   const success = value >= 6;
   return {
     schema: 2,
     system: 'v5',
-    notation: 'v5:rouse',
-    groups: [{ kind: 'dice', dieType: 'v5', count: 1,
-      dice: [{ value, hunger: true, kept: true, rerolled: false, exploded: false, crit: null }], subtotal: 0 }],
-    summary: { kind: 'rouse', value, success, hungerGain: success ? 0 : 1, hungerAfter: null },
+    notation: n === 2 ? 'v5:rouse2' : 'v5:rouse',
+    groups: [{ kind: 'dice', dieType: 'v5', count: n,
+      dice: values.map(v => ({ value: v, hunger: true, kept: v === value, rerolled: false, exploded: false, crit: null })), subtotal: 0 }],
+    summary: { kind: 'rouse', value, values, success, hungerGain: success ? 0 : 1, hungerAfter: null },
   };
 }
 
@@ -228,13 +232,15 @@ export function v5Dice(result) {
 export function describeV5(result) {
   const s = result.summary;
   if (s.kind === 'rouse') {
-    if (s.success) return `Rouse check · the Blood holds · rolled ${s.value}`;
+    const rolled = Array.isArray(s.values) && s.values.length === 2
+      ? `rolled ${s.values.join(' and ')}, kept ${s.value}` : `rolled ${s.value}`;
+    if (s.success) return `Rouse check · the Blood holds · ${rolled}`;
     // Untracked: no Hunger total to move, so it just names the mechanical result.
-    if (s.tracked === false) return `Rouse check · gain 1 Hunger · rolled ${s.value}`;
+    if (s.tracked === false) return `Rouse check · gain 1 Hunger · ${rolled}`;
     const climb = s.hungerRose === false
       ? `Hunger stays at ${s.hungerAfter}, the Beast stirs`
       : `Hunger rises to ${s.hungerAfter}`;
-    return `Rouse check · ${climb} · rolled ${s.value}`;
+    return `Rouse check · ${climb} · ${rolled}`;
   }
   const parts = [];
   if (s.outcome && OUTCOME_LABEL[s.outcome]) parts.push(OUTCOME_LABEL[s.outcome]);
@@ -267,9 +273,14 @@ export function v5Headline(result) {
     return { kind: 'text', text: `Hunger ${s.hungerAfter}`, variant: 'v5-hunger' };
   }
   if (s.outcome) {
-    const text = s.outcome === 'success' && s.margin !== null
+    let text = s.outcome === 'success' && s.margin !== null
       ? `Success +${s.margin}`
       : (OUTCOME_LABEL[s.outcome] || 'Roll');
+    // The book's Total Failure: not one success in the pool. Alongside a
+    // Hunger 1 both facts are true at once, so both are said — the rules are
+    // silent on the combination and the table rules it.
+    if (s.totalFailure && s.outcome === 'failure') text = 'Total Failure';
+    if (s.totalFailure && s.outcome === 'bestial-failure') text = 'Total Bestial Failure';
     return { kind: 'text', text };
   }
   return { kind: 'number', text: String(s.successes) };

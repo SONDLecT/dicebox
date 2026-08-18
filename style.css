@@ -711,8 +711,11 @@ body {
   transition: border-color 140ms ease, transform 120ms ease;
 }
 .spin-chip-label { color: var(--muted); letter-spacing: 0.01em; }
-.spin-chip-val { color: var(--line); font-size: 16px; font-variant-numeric: tabular-nums; }
-.spin-chip-val[data-unset="1"] { color: var(--muted); font-size: 12.5px; }
+/* One line-height for both states: the unset dash is smaller type, and without
+   the shared line box the chip changed height when a value landed — which
+   shifted the whole picker under a scrolled thumb. */
+.spin-chip-val { color: var(--line); font-size: 16px; line-height: 20px; font-variant-numeric: tabular-nums; }
+.spin-chip-val[data-unset="1"] { color: var(--muted); font-size: 12.5px; line-height: 20px; }
 .spin-chip.is-set { border-color: color-mix(in srgb, var(--accent) 55%, var(--hair)); }
 .spin-chip:active { transform: scale(0.96); }
 

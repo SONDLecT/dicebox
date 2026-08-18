@@ -155,6 +155,15 @@ if (draw && cardRow) {
     return die;
   });
 
+  // The reading waits for the dice: the headline and detail fade in only when
+  // the throw has settled, so the little window keeps the tray's tension
+  // instead of spoiling the result mid-tumble.
+  const reveal = [];
+  for (const id of ['who', 'head', 'sub']) {
+    const el = document.getElementById(id);
+    if (el) { el.style.opacity = '0'; el.style.transition = 'opacity 240ms ease'; reveal.push(el); }
+  }
+  let revealed = false;
   const surface = new Surface();
   let last = performance.now();
   let stillFor = 0;
@@ -171,6 +180,7 @@ if (draw && cardRow) {
     // The window outlives the throw, so the loop stops once everything has
     // settled for a moment rather than spinning until the popover closes.
     stillFor = dice.every(d => d.settled) ? stillFor + dt : 0;
+    if (!revealed && stillFor > 0.05) { revealed = true; for (const el of reveal) el.style.opacity = '1'; }
     if (stillFor < 0.6) requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);

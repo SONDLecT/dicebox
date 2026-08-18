@@ -54,6 +54,10 @@ let obrPlayerName = null;
 let obrConnectionId = null;
 let obrHistorySync = null;
 const obrOutstanding = new Map();
+// Requests of ours that timed out: a late verified answer to one of these must
+// not display as an external extension's roll — the local fallback already
+// rolled in its place. Bounded, oldest-first.
+const obrTimedOutRequests = new Set();
 const pendingOwlbearState = {};
 // The background answered recently. Until it has failed once, a roll waits the
 // full timeout for it; after a failure the panel stops waiting and rolls
@@ -414,10 +418,10 @@ function doRoll(notation, { viaOwlbear = true } = {}) {
   // A staged Rouse is consumed the instant it is thrown, whichever route it
   // takes — the panel sends it to the background and never returns through the
   // local resolver, so the staging flag and field are cleared here for both.
-  if (typeof notation === 'string' && /^v5:rouse$/i.test(notation.trim())) {
-    v5.rouse = false;
+  if (typeof notation === 'string' && /^v5:rouse2?$/i.test(notation.trim())) {
+    v5.rouse = 0;
     v5RouseBtn.classList.remove('is-staged');
-    if ($('notation').value.trim().toLowerCase() === 'v5:rouse') $('notation').value = v5Notation();
+    if (/^v5:rouse2?$/i.test($('notation').value.trim())) $('notation').value = v5Notation();
   }
   // In the panel the background service is the authority, so the roll goes to it
   // — but only as the preferred route, never a dependency. If the background is
@@ -436,7 +440,7 @@ function doRoll(notation, { viaOwlbear = true } = {}) {
     // A staged Rouse resolves as its own single-die check, with the Hunger
     // tracking, not as a one-die pool roll. (The panel routes v5:rouse through
     // the background before ever reaching here.)
-    if (sys === 'v5' && /^v5:rouse$/i.test(notation.trim())) { rollRouseLocally(); return; }
+    if (sys === 'v5' && /^v5:rouse2?$/i.test(notation.trim())) { rollRouseLocally(/2$/.test(notation.trim()) ? 2 : 1); return; }
     if (sys === 'cards') { dealFromNotation(notation); return; }
     if (sys === 'tarot') { dealFromTarotNotation(notation); return; }
     if (sys === 'napoletane') { dealFromNapNotation(notation); return; }
@@ -727,6 +731,13 @@ function clearError() { $('error').hidden = true; }
 
 $('entry').addEventListener('submit', e => {
   e.preventDefault();
+  // While a Willpower reroll is armed with dice picked, Roll IS the reroll —
+  // the same throw a tray tap makes, so the button never surprises. Armed with
+  // nothing picked, the player wanted a fresh roll: the arming stands down.
+  if (state.willpowerArmed) {
+    if (state.willpowerPicks && state.willpowerPicks.size > 0) { performWillpowerReroll(); $('notation').blur(); return; }
+    cancelWillpower({ restore: false });
+  }
   doRoll($('notation').value);
   $('notation').blur();
 });
@@ -1198,7 +1209,7 @@ const v5DiffVal = $('v5Difficulty');
 function resetV5() {
   v5.pool = 0;
   v5.difficulty = null;
-  v5.rouse = false;
+  v5.rouse = 0;
   syncV5({ writeField: false });
 }
 
@@ -1224,7 +1235,7 @@ function syncV5Hunger() {
 // receiver can colour them back. An empty throw writes nothing, so the readout
 // stays idle rather than showing a "v5:0".
 function v5Notation() {
-  if (v5.rouse) return 'v5:rouse';
+  if (v5.rouse) return v5.rouse === 2 ? 'v5:rouse2' : 'v5:rouse';
   const total = v5.pool + v5.hunger;
   if (total < 1) return '';
   let s = `v5:${total}`;
@@ -1236,7 +1247,8 @@ function v5Notation() {
 function syncV5({ writeField = true } = {}) {
   if (v5.pool > 0) v5PoolFace.dataset.count = String(v5.pool); else delete v5PoolFace.dataset.count;
   syncV5Hunger();
-  v5RouseBtn.classList.toggle('is-staged', v5.rouse);
+  v5RouseBtn.classList.toggle('is-staged', !!v5.rouse);
+  if (v5.rouse === 2) v5RouseBtn.dataset.count = '2'; else delete v5RouseBtn.dataset.count;
 
   if (v5.difficulty === null) {
     v5DiffVal.textContent = '—'; v5DiffVal.dataset.unset = '1'; v5DiffChip.classList.remove('is-set');
@@ -1292,9 +1304,9 @@ v5DiffChip.addEventListener('click', () => {
 // Hunger is being tracked (1-5) a failure raises it before the die is shown, so
 // the readout can name the new total; untracked (0) it is only pass/fail.
 // setHunger runs with restage off so it does not disturb the die already in flight.
-function rollRouseLocally() {
-  v5.rouse = false;   // the staged die is being thrown; the mode is spent
-  const result = rollRouse();
+function rollRouseLocally(diceCount = 1) {
+  v5.rouse = 0;   // the staged dice are being thrown; the mode is spent
+  const result = rollRouse(diceCount);
   const tracked = v5.hunger > 0;
   result.summary.tracked = tracked;
   if (tracked) {
@@ -1312,9 +1324,11 @@ function rollRouseLocally() {
 
 // Rouse pulls a Hunger die into hand — it stages a lone die to throw, the way
 // every other die button stages its dice, rather than rolling on the click.
-// Tapping it again, tapping the staged die, or building the pool puts it back.
+// A second tap adds the advantage die (Discipline level and Blood Potency can
+// grant a two-die Rouse, keeping the better); a third puts them back. Tapping
+// a staged die or building the pool also leaves the mode.
 v5RouseBtn.addEventListener('click', () => {
-  v5.rouse = !v5.rouse;
+  v5.rouse = (Number(v5.rouse) + 1) % 3;
   syncV5();
 });
 
@@ -5249,8 +5263,8 @@ function systemStageDescriptors() {
   const add = (n, d) => { for (let i = 0; i < Math.max(0, n); i++) out.push(d); };
   switch (uiSystem) {
     case 'v5':
-      // A staged Rouse is a single Hunger die in hand, thrown on its own.
-      if (v5.rouse) { add(1, { sides: 10, hunger: true, kind: 'v5-rouse' }); break; }
+      // A staged Rouse is one Hunger die in hand — or two, keeping the better.
+      if (v5.rouse) { add(v5.rouse, { sides: 10, hunger: true, kind: 'v5-rouse' }); break; }
       add(v5.pool, { sides: 10, kind: 'v5-normal' });
       add(v5.hunger, { sides: 10, hunger: true, kind: 'v5-hunger' });
       break;
@@ -5400,7 +5414,7 @@ function removeSystemStageKind(kind) {
     // tap is the stronger rule, and the tracker is one tap to restore.)
     case 'v5-normal': v5.pool = Math.max(0, v5.pool - 1); syncV5(); return true;
     case 'v5-hunger': setHunger(v5.hunger - 1); return true;
-    case 'v5-rouse': v5.rouse = false; syncV5(); return true;
+    case 'v5-rouse': v5.rouse = Math.max(0, Number(v5.rouse) - 1); syncV5(); return true;
     // Optional extras come back off the tray the way they went on: the Blade
     // Runner advantage die clears the Odds, a Twilight ammo die drops the pool
     // by one, a Mothership advantage copy clears Advantage/Disadvantage, and a
@@ -7755,7 +7769,7 @@ function runLocalRollFallback(pending) {
   if (pending?.kind !== 'roll' || typeof pending.notation !== 'string') return false;
   obrBackgroundUp = false;
   clearError();
-  if (pending.notation.trim().toLowerCase() === 'v5:rouse') rollRouseLocally();
+  if (/^v5:rouse2?$/i.test(pending.notation.trim())) rollRouseLocally(/2$/i.test(pending.notation.trim()) ? 2 : 1);
   else doRoll(pending.notation, { viaOwlbear: false });
   return true;
 }
@@ -7774,6 +7788,8 @@ function sendOwlbearRequest(payload, pending) {
   const timer = setTimeout(() => {
     if (!obrOutstanding.has(requestId)) return;
     obrOutstanding.delete(requestId);
+    obrTimedOutRequests.add(requestId);
+    if (obrTimedOutRequests.size > 100) obrTimedOutRequests.delete(obrTimedOutRequests.values().next().value);
     // Any timeout marks the background down, so the startup history request
     // going unanswered is what flips later rolls to the instant local path.
     obrBackgroundUp = false;
@@ -8035,7 +8051,17 @@ async function handleOwlbearMessage(event) {
       // rolls to the local fallback.
       obrBackgroundUp = true;
       const pending = obrOutstanding.get(data.requestId);
-      if (!pending) return;
+      if (!pending) {
+        // Not ours — another extension asked our background to roll. The table
+        // activity belongs on the tray, so it displays like any completed roll
+        // (the toast is suppressed while the panel is open, so this is the only
+        // place it would appear). Our own timed-out requests are excluded: the
+        // fallback already rolled for those, and a late answer would double.
+        if (data.type === 'roll.result' && !obrTimedOutRequests.has(data.requestId)) {
+          acceptOwlbearRoll({ ...data, who: obrPlayerName || 'You', type: 'roll.event' });
+        }
+        return;
+      }
       if (data.type === 'history.result') {
         if (pending.kind === 'history') completeOwlbearHistory(data);
         return;
