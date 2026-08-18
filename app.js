@@ -8330,6 +8330,17 @@ function initializeOwlbear(OBR, roomObr) {
       obr = OBR;
       obrConnectionId = connection;
       obrPlayerName = typeof player === 'string' ? player.slice(0, 40) : null;
+      // The connection id rotates on reconnect; the panel gates its
+      // background's responses on it, so keep the cache fresh or a network
+      // blip would silently strand every later request on the local fallback.
+      try {
+        if (typeof OBR.player?.onChange === 'function') {
+          OBR.player.onChange(p => {
+            if (typeof p?.connectionId === 'string' && p.connectionId) obrConnectionId = p.connectionId;
+            if (typeof p?.name === 'string' && p.name) obrPlayerName = p.name.slice(0, 40);
+          });
+        }
+      } catch { /* the init-time id serves, as before */ }
       // The panel reads and writes the room's shared decks itself, so fallback
       // draws stay on the table's stack and the counts tick live as anyone at
       // the table draws or shuffles.

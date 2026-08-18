@@ -469,7 +469,7 @@ export async function initializeOwlbearBackground(OBR, options = {}) {
   };
   const requestTimeoutMs = Number.isFinite(options.requestTimeoutMs)
     ? Math.max(1, Math.min(10_000, options.requestTimeoutMs)) : 4_000;
-  const [connectionId, playerName] = await Promise.all([
+  let [connectionId, playerName] = await Promise.all([
     OBR.player.getConnectionId(),
     Promise.resolve().then(() => OBR.player.getName()).catch(() => 'Someone'),
   ]);
@@ -483,6 +483,18 @@ export async function initializeOwlbearBackground(OBR, options = {}) {
   if (typeof roomId !== 'string' || !roomId.trim() || roomId.length > 128) {
     throw new Error('Owlbear room identity is unavailable');
   }
+  // The connection id rotates on every disconnect/reconnect, and requests are
+  // gated on it — a stale cache would make the service reject its own player's
+  // panel until the room reloaded. The local player listener keeps it fresh.
+  let unsubscribePlayer = null;
+  try {
+    if (typeof OBR.player?.onChange === 'function') {
+      unsubscribePlayer = OBR.player.onChange(p => {
+        if (typeof p?.connectionId === 'string' && p.connectionId) connectionId = p.connectionId;
+        if (typeof p?.name === 'string' && p.name) playerName = p.name;
+      });
+    }
+  } catch { /* a fixed id serves until the next reload, as before */ }
   const historyKey = HISTORY_PREFIX + roomId;
   const historyStore = options.historyStore ?? createOwlbearHistoryStore();
   // Ensure this origin has provisioned a key before the first local response.
@@ -1062,6 +1074,7 @@ export async function initializeOwlbearBackground(OBR, options = {}) {
   return {
     dispose() {
       closed = true;
+      if (typeof unsubscribePlayer === 'function') { try { unsubscribePlayer(); } catch { /* gone */ } }
       decks.dispose();
       if (typeof unsubscribeAction === 'function') { try { unsubscribeAction(); } catch { /* gone */ } }
       if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
