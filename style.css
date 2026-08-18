@@ -777,8 +777,70 @@ body[data-torchlit] .breakdown {
 .ds-count .ds-chev-two { opacity: 0.18; }
 .ds-count[data-count="2"] .ds-chev-two { opacity: 1; }
 .ds-effect { min-width: 34px; text-align: right; }
-.ds-picker { display: flex; gap: 10px; justify-content: center; align-items: center; }
+.ds-picker { display: flex; gap: 10px; align-items: center; }
 .ds-count { position: relative; }
+
+/* Row-overflow guard for the one-row system pickers — the Mothership rail
+   precedent (DESIGN.md: wide content scrolls in its own container, never
+   clips): no wrap, touch scroll, scrollbar hidden, and content-edge padding
+   so an end control never sits flush on the screen edge. `safe center` is
+   the load-bearing word: plain `center` is what CLIPPED the Draw Steel row —
+   centred overflow hangs past the LEFT edge, where no scroll can reach it —
+   while `safe` falls back to flex-start the moment the row outgrows the
+   viewport. */
+.ds-picker, .crows-picker, .sd-picker {
+  justify-content: safe center;
+  flex-wrap: nowrap;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  padding-inline: 10px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.ds-picker::-webkit-scrollbar, .crows-picker::-webkit-scrollbar, .sd-picker::-webkit-scrollbar { display: none; }
+
+/* Flanks around the Power Roll tile — the Duality precedent: the primary
+   action in the middle, its modifiers either side. At width the flanks go
+   equal-flex (min-width: 0 zeroes their hypothetical size, which is what
+   makes the shares equal), so the tile sits dead centre; the breakpoints
+   below are each picker's point where an equal share still covers the
+   wider flank's content — under them the flanks fall back to content size
+   and the whole cluster centres as a group, because an equal-flex flank
+   narrower than its content doesn't scroll, it CLIPS. The lead side hugs
+   the centre from the left, the trail side from the right. */
+.pick-side { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
+.pick-side-lead { justify-content: flex-end; }
+.pick-side-trail { justify-content: flex-start; }
+@media (min-width: 431px) {
+  .crows-picker .pick-side { flex: 1 1 0; min-width: 0; }
+}
+@media (min-width: 610px) {
+  .ds-picker .pick-side { flex: 1 1 0; min-width: 0; }
+}
+
+/* Honest abbreviation under pressure: the widest labels shorten at phone
+   widths; every abbreviated button's aria-label keeps the full word. */
+.lbl-narrow { display: none; }
+@media (max-width: 430px) {
+  .lbl-wide { display: none; }
+  .lbl-narrow { display: inline; }
+  /* Cheap compressions before the scroll has to earn its keep: tighter
+     gaps and chip padding, narrower value slots, and the Edge/Bane
+     chevron icons yield to their words (the tint and count badge still
+     colour the state; the aria-labels never shorten). */
+  .ds-picker { gap: 6px; padding-inline: 6px; }
+  .pick-side { gap: 6px; }
+  .ds-picker .spin-chip { padding: 8px 8px; gap: 5px; }
+  .ds-picker .power-roll { padding: 8px 10px 6px; }
+  .ds-count .ds-count-ico { display: none; }
+  .ds-effect { min-width: 14px; }
+  .crows-picker { gap: 8px; }
+  .sd-picker { gap: 6px; }
+  .sd-picker .spin-chip { padding: 5px 8px 4px; }
+  .sd-adv { padding: 5px 4px 4px; }
+  .sd-torch { padding: 5px 8px 4px; }
+}
 
 /* The Power Roll tile, shared by Draw Steel and Crows: buttons that add dice
    are shaped like the dice, and this one selects a PAIR, so it wears both
@@ -789,10 +851,18 @@ body[data-torchlit] .breakdown {
    which of the two rolls Roll will throw was a real point of confusion. */
 .die-btn .die-ico.power-ico { width: 40px; height: 30px; }
 .power-die-rear { opacity: 0.55; }
+/* The Power Roll is the primary action, so it wears the accent at rest —
+   the Duality precedent, exactly. Draw Steel's tile (no aria-pressed) also
+   carries the tinted well full-time; Crows' keeps the well for its pressed
+   state, so the accent border says "this is THE action" while the fill
+   still says which of the two rolls holds the tray. */
+.power-roll { border-color: var(--accent); }
+.power-roll .die-btn-label { color: var(--accent); }
+.power-roll:not([aria-pressed]),
 .power-roll[aria-pressed="true"] {
-  border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
+.power-roll:not([aria-pressed]) .die-btn-label,
 .power-roll[aria-pressed="true"] .die-btn-label { color: var(--line); }
 .ds-edge { --dc: #57B591; }
 .ds-bane { --dc: #C0453F; }
@@ -820,7 +890,7 @@ body[data-torchlit] .breakdown {
 /* Crows: the 2d10 stage themselves, so one row — the usage d6 (which builds an
    item's pool instead) and the single resolved-modifier chip. The pips on the
    usage die are stroke dots, one faded: a die already burning down. */
-.crows-picker { display: flex; gap: 14px; justify-content: center; align-items: center; }
+.crows-picker { display: flex; gap: 14px; align-items: center; }
 .crows-picker .die-btn { --dc: #98A08A; }
 .crows-pip { fill: none; stroke-width: 3; stroke-linecap: round; }
 .crows-pip-fading { opacity: 0.35; }
@@ -836,11 +906,12 @@ body[data-torchlit] .breakdown {
 
 /* The rail is a fixed-position overlay anchored to the chip from JS — never
    in the picker's layout, so nothing shifts when it appears. The shell owns
-   only anchoring and the fade; the rows live in an inner column that JS
-   slides — on the drag's remainder or the wheel's row-per-notch roll — so
-   the two transforms never share a property. The values are dice data, so
-   they speak mono; each row wears a faint paper pill so the numbers stay
-   legible over whatever the tray has behind them. */
+   only anchoring and the fade; inside it the rows hang on a wireframe DRUM:
+   JS poses each one from the cylinder math in scrub-math.js (translateY on
+   R·sin θ, scaleY on cos θ), so the gesture visibly turns a rotary drum and
+   the rows curve over its tangents as they enter and leave. The values are
+   dice data, so they speak mono; each row wears a faint paper pill so the
+   numbers stay legible over whatever the tray has behind them. */
 .scrub-rail {
   position: fixed;
   z-index: 40;
@@ -850,13 +921,29 @@ body[data-torchlit] .breakdown {
   transition: opacity 150ms ease;
 }
 .scrub-rail[data-show="1"] { opacity: 1; }
+/* The drum's viewport: sized to the cylinder (2 × DRUM_R plus a row's
+   height of breathing room) so the fixed shell centres it on the chip.
+   Rows and tangent rules position absolutely inside. */
 .scrub-rail-col {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
+  position: relative;
+  width: 150px;
+  height: 212px;
+}
+/* The drum's near-tangent edges: two hairline rules just above and below
+   the selection window (the chip itself), full rail width — the minimal
+   stroke-only cue that the rows ride a cylinder. JS sets each one's `top`
+   to hug the chip at show time. */
+.scrub-rail-edge {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px solid var(--hair);
 }
 .scrub-rail-val {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -879,16 +966,14 @@ body[data-torchlit] .breakdown {
   letter-spacing: 0.01em;
   color: var(--muted);
 }
-/* Fading with distance: the rail suggests a wheel, not a menu. */
+/* Fading with distance: the drum's far rows dim as they curve away. */
 .scrub-d1 { opacity: 0.6; }
 .scrub-d2 { opacity: 0.35; }
 .scrub-d3 { opacity: 0.15; }
-/* The hole the pill shows through; JS sizes it to the chip at show time. */
-.scrub-rail-gap { flex: none; }
 @media (prefers-reduced-motion: reduce) {
-  /* The rail still appears — it is information — but nothing fades or
-     slides: JS also zeroes the drag nudge and skips the wheel's roll under
-     this query, so the column steps in place. */
+  /* The drum still appears — its geometry is information: foreshortened
+     rows and tangent rules say what the gesture does — but nothing fades
+     or turns: JS pins the rotation at zero, so steps snap in place. */
   .scrub-rail { transition: none; }
 }
 
@@ -898,7 +983,7 @@ body[data-torchlit] .breakdown {
    keep-pair flags (Mothership's icon language on d20 hexagons — chevrons
    point where the kept NUMBER goes), the torch, and the Modifier/DC chips
    restacked vertically to match. */
-.sd-picker { display: flex; gap: 8px; justify-content: center; align-items: stretch; }
+.sd-picker { display: flex; gap: 8px; align-items: stretch; }
 .sd-picker .spin-chip {
   flex-direction: column;
   align-items: center;

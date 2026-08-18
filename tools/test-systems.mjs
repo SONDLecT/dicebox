@@ -24,7 +24,7 @@ import { parseTarot, summarizeTarot, tarotHeadline, describeTarot } from '../sys
 import { parseNapoletane } from '../system-dice.js';
 import { parseIronsworn, rollIronsworn, summarizeIronsworn, describeIronsworn, ironswornHeadline } from '../system-dice.js';
 import * as systemModule from '../system-dice.js';
-import { scrubValue, wheelStep, wheelValue, SCRUB_PX_PER_STEP } from '../scrub-math.js';
+import { scrubValue, wheelStep, wheelValue, drumRow, DRUM_R, DRUM_STEP, SCRUB_PX_PER_STEP } from '../scrub-math.js';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, extra = '') => {
@@ -1338,12 +1338,15 @@ for (const bad of ['iron:p11', 'iron:21', 'iron:-10', 'iron:xyz', 'ironx', 'dg:6
 // ---- the scrub dial's step math (UI prototype; the math is kept pure) ----
 // The pointer work lives in app.js, but every pixels-to-steps decision runs
 // through scrub-math.js so a regression here fails a suite instead of
-// feeling like a sticky dial at a table.
+// feeling like a sticky dial at a table. The drag is DOWN-positive — the
+// drum reading: higher values hang above the window, dragging the drum's
+// face down rolls them toward you — while the wheel keeps notch-up = +1.
 {
   ok('a scrub inside the dead zone holds the value',
      eq(scrubValue(0, 10, -20, 20), { value: 0, remainder: 10 }));
-  ok('28px up is one step up', scrubValue(0, 28, -20, 20).value === 1);
-  ok('56px down is two steps down', eq(scrubValue(0, -56, -20, 20), { value: -2, remainder: 0 }));
+  ok('28px down is one step up — the drum rolls toward you',
+     scrubValue(0, 28, -20, 20).value === 1);
+  ok('56px up is two steps down', eq(scrubValue(0, -56, -20, 20), { value: -2, remainder: 0 }));
   ok('the remainder carries the fraction toward the next step',
      eq(scrubValue(0, 34, -20, 20), { value: 1, remainder: 6 }));
   ok('a negative remainder mirrors it', eq(scrubValue(0, -34, -20, 20), { value: -1, remainder: -6 }));
@@ -1368,6 +1371,26 @@ for (const bad of ['iron:p11', 'iron:21', 'iron:-10', 'iron:xyz', 'ironx', 'dg:6
      wheelValue(30, -1, 1, 30, { enter: 12 }) === 30);
   ok('without unset the wheel is plain wheelStep',
      wheelValue(1, 1, 1, 30) === 1 && wheelValue(5, -1, 1, 30) === 6);
+  // The drum geometry: given a row offset and the live rotation, drumRow
+  // says where the row sits and how squashed it is. These pins are what the
+  // rendered cylinder is made of, so they are asserted dry.
+  const near = (a, b) => Math.abs(a - b) < 1e-9;
+  ok('the window row sits on the drum axis, full size',
+     near(drumRow(0).y, 0) && near(drumRow(0).scale, 1) && drumRow(0).visible);
+  ok('row +1 hangs above, foreshortened',
+     drumRow(1).y < 0 && drumRow(1).scale < 1 &&
+     near(drumRow(1).y, -DRUM_R * Math.sin(DRUM_STEP)) &&
+     near(drumRow(1).scale, Math.cos(DRUM_STEP)));
+  ok('the drum is symmetric about the window',
+     near(drumRow(-2).y, -drumRow(2).y) && near(drumRow(-2).scale, drumRow(2).scale));
+  ok('foreshortening compresses monotonically toward the tangents',
+     drumRow(3).scale < drumRow(2).scale && drumRow(2).scale < drumRow(1).scale);
+  ok('a half-step drag down carries the window value downward',
+     drumRow(0, 0.5).y > 0);
+  ok('a half-step drag down pulls the next value toward the window',
+     drumRow(1, 0.5).y > drumRow(1).y && drumRow(1, 0.5).scale > drumRow(1).scale);
+  ok('rows past the tangent hide on the far side of the drum',
+     drumRow(4).visible === false && drumRow(-4).visible === false);
 }
 
 console.log(`\nsystem-dice: ${pass} passed, ${fail} failed`);

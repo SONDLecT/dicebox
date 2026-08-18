@@ -1780,7 +1780,32 @@
        numeric damage pool took the tray — then the characteristic spinner and
        the Edge and Bane tap-counters. Edges and banes are conditions, not
        dice, so they wear count badges rather than die silhouettes. -->
+  <!-- The Power Roll sits centred between equal flex flanks — the Duality
+       precedent: the primary action in the middle, its modifiers around it.
+       Characteristic and Edge share the lead side (the numbers you bring),
+       Bane trails (what the situation costs you) — Edge and Bane still read
+       as the up/down pair either side of the action. -->
   <section class="picker ds-picker" id="dsPicker" aria-label="Draw Steel roll" hidden>
+    <div class="pick-side pick-side-lead">
+      <!-- "Char." at every width, "Characteristic" in the aria-label and the
+           help: the full word is 133px of chip, and the flank budget that
+           keeps the Power Roll dead-centred inside the 620px app column is
+           215px with Edge already taking 129 — the word and the centring
+           cannot coexist at any real viewport, and the centring is the
+           owner's call. -->
+      <button type="button" class="spin-chip" id="dsCharChip" aria-label="Characteristic — tap to raise, hold to lower">
+        <span class="spin-chip-label">Char.</span>
+        <span class="spin-chip-val" id="dsChar">0</span>
+      </button>
+      <button type="button" class="spin-chip ds-count ds-edge" id="dsEdgeChip" aria-label="Edges — tap to raise, hold to lower, two at most">
+        <svg class="ds-count-ico" viewBox="0 0 16 16" aria-hidden="true">
+          <path class="ds-chev-one" d="M4 10 8 6 12 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          <path class="ds-chev-two" d="M4 13 8 9 12 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="spin-chip-label">Edge</span>
+        <span class="spin-chip-val ds-effect" id="dsEdgeVal" data-unset="1">—</span>
+      </button>
+    </div>
     <button type="button" class="die-btn power-roll" id="dsPowerRoll" aria-label="Power Roll — stages the 2d10 power roll. It never rolls: Roll or a tap on the tray throws it">
       <svg class="die-ico power-ico" viewBox="0 0 40 30" aria-hidden="true">
         <path class="power-die-rear" d="M29 2 37.5 10.2 29 22.4 20.5 10.2Z"/>
@@ -1788,36 +1813,37 @@
       </svg>
       <span class="die-btn-label">Power Roll</span>
     </button>
-    <button type="button" class="spin-chip" id="dsCharChip" aria-label="Characteristic — tap to raise, hold to lower">
-      <span class="spin-chip-label">Characteristic</span>
-      <span class="spin-chip-val" id="dsChar">0</span>
-    </button>
-    <button type="button" class="spin-chip ds-count ds-edge" id="dsEdgeChip" aria-label="Edges — tap to raise, hold to lower, two at most">
-      <svg class="ds-count-ico" viewBox="0 0 16 16" aria-hidden="true">
-        <path class="ds-chev-one" d="M4 10 8 6 12 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-        <path class="ds-chev-two" d="M4 13 8 9 12 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-      <span class="spin-chip-label">Edge</span>
-      <span class="spin-chip-val ds-effect" id="dsEdgeVal" data-unset="1">—</span>
-    </button>
-    <button type="button" class="spin-chip ds-count ds-bane" id="dsBaneChip" aria-label="Banes — tap to raise, hold to lower, two at most">
-      <svg class="ds-count-ico ds-ico-down" viewBox="0 0 16 16" aria-hidden="true">
-        <path class="ds-chev-one" d="M4 6 8 10 12 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-        <path class="ds-chev-two" d="M4 3 8 7 12 3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-      <span class="spin-chip-label">Bane</span>
-      <span class="spin-chip-val ds-effect" id="dsBaneVal" data-unset="1">—</span>
-    </button>
+    <div class="pick-side pick-side-trail">
+      <button type="button" class="spin-chip ds-count ds-bane" id="dsBaneChip" aria-label="Banes — tap to raise, hold to lower, two at most">
+        <svg class="ds-count-ico ds-ico-down" viewBox="0 0 16 16" aria-hidden="true">
+          <path class="ds-chev-one" d="M4 6 8 10 12 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          <path class="ds-chev-two" d="M4 3 8 7 12 3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="spin-chip-label">Bane</span>
+        <span class="spin-chip-val ds-effect" id="dsBaneVal" data-unset="1">—</span>
+      </button>
+    </div>
   </section>
 
-  <!-- Crows: the 2d10 power roll stages itself, so the row is the Power Roll
-       tile — the paired d10s, select-and-stage, and the way BACK from a usage
-       pool: it wears aria-pressed so a glance says which of the two rolls the
-       tray holds — then the usage d6, which builds an item's pool instead,
-       and the one modifier chip (characteristic + skill + circumstance,
-       resolved by the player; the scrub-dial prototype). The d6 shows a die
-       burning down: two pips solid, one already fading. -->
+  <!-- Crows: the 2d10 power roll stages itself, and its tile sits centred —
+       the primary action between its neighbours, the Duality precedent. The
+       usage d6 leads (it builds an item's pool instead), the modifier chip
+       trails (characteristic + skill + circumstance, resolved by the player;
+       the scrub-dial prototype). The tile wears aria-pressed so a glance
+       says which of the two rolls the tray holds — lit for the power roll,
+       dark while a usage pool has it. The d6 shows a die burning down: two
+       pips solid, one already fading. -->
   <section class="picker crows-picker" id="crowsPicker" aria-label="Crows roll" hidden>
+    <div class="pick-side pick-side-lead">
+      <button type="button" class="die-btn" id="crowsUsage" aria-label="Usage — build an item's pool of d6, hold to remove one">
+        <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true">
+          <rect x="5" y="5" width="20" height="20" rx="4.5"/>
+          <path class="crows-pip" d="M20 10h.01M15 15h.01"/>
+          <path class="crows-pip crows-pip-fading" d="M10 20h.01"/>
+        </svg>
+        <span class="die-btn-label">Usage</span>
+      </button>
+    </div>
     <button type="button" class="die-btn power-roll" id="crowsPowerRoll" aria-pressed="true" aria-label="Power Roll — stages the 2d10 power roll, setting any usage pool aside. It never rolls: Roll or a tap on the tray throws it">
       <svg class="die-ico power-ico" viewBox="0 0 40 30" aria-hidden="true">
         <path class="power-die-rear" d="M29 2 37.5 10.2 29 22.4 20.5 10.2Z"/>
@@ -1825,18 +1851,12 @@
       </svg>
       <span class="die-btn-label">Power Roll</span>
     </button>
-    <button type="button" class="die-btn" id="crowsUsage" aria-label="Usage — build an item's pool of d6, hold to remove one">
-      <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true">
-        <rect x="5" y="5" width="20" height="20" rx="4.5"/>
-        <path class="crows-pip" d="M20 10h.01M15 15h.01"/>
-        <path class="crows-pip crows-pip-fading" d="M10 20h.01"/>
-      </svg>
-      <span class="die-btn-label">Usage</span>
-    </button>
-    <button type="button" class="spin-chip scrub-dial" id="crowsModChip" aria-label="Modifier — characteristic plus skill plus circumstance. Tap to raise, drag or scroll to scrub up and down">
-      <span class="spin-chip-label">Modifier</span>
-      <span class="spin-chip-val" id="crowsMod">0</span>
-    </button>
+    <div class="pick-side pick-side-trail">
+      <button type="button" class="spin-chip scrub-dial" id="crowsModChip" aria-label="Modifier — characteristic plus skill plus circumstance. Tap to raise, drag or scroll to scrub up and down">
+        <span class="spin-chip-label">Modifier</span>
+        <span class="spin-chip-val" id="crowsMod">0</span>
+      </button>
+    </div>
   </section>
 
   <!-- Shadowdark: the check d20 stages itself, so the row is the two keep-pair
@@ -1852,7 +1872,7 @@
         <path class="keep" d="M14 15.5 21.8 20v9L14 33.5 6.2 29v-9Z"/>
         <g class="chev"><path d="m10 28 4-4 4 4"/><path d="m10 32 4-4 4 4"/></g>
       </svg>
-      <span class="sd-adv-label">Advantage</span>
+      <span class="sd-adv-label"><span class="lbl-wide">Advantage</span><span class="lbl-narrow">Adv.</span></span>
     </button>
     <button type="button" class="die-btn sd-torch" id="sdTorchBtn" aria-label="Light the torch — it burns for one hour of real time">
       <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true">
@@ -1876,7 +1896,7 @@
         <path class="keep" d="M26 3.5 33.8 8v9L26 21.5 18.2 17V8Z"/>
         <g class="chev"><path d="m22 11 4 4 4-4"/><path d="m22 15 4 4 4-4"/></g>
       </svg>
-      <span class="sd-adv-label">Disadvantage</span>
+      <span class="sd-adv-label"><span class="lbl-wide">Disadvantage</span><span class="lbl-narrow">Disadv.</span></span>
     </button>
   </section>
 

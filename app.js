@@ -26,7 +26,7 @@ import { rollPbta, rollMist, twod6Headline, describe2d6, parsePbta, parseMist } 
 import { rollDrawSteel, describeDrawSteel, drawSteelHeadline, parseDrawSteel } from './system-dice.js';
 import { rollCrows, describeCrows, crowsHeadline, parseCrows } from './system-dice.js';
 import { rollShadowdark, parseShadowdark, torchRemaining, torchLabel } from './system-dice.js';
-import { scrubValue, wheelValue } from './scrub-math.js';
+import { scrubValue, wheelValue, drumRow, SCRUB_PX_PER_STEP } from './scrub-math.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('tray');
@@ -2327,15 +2327,18 @@ function bindTapHold(el, step, { onHold = null } = {}) {
 //
 // Three ways in, ordered by how much they ask a player to learn: a plain tap
 // still bumps +1 (the zero-learning fallback); hovering plus a wheel notch
-// steps ±1; and a press-drag scrubs — ~28px of vertical travel a step, up is
-// positive, the value committing live as each step crosses. Both moving
-// gestures raise the same ghost rail of neighbouring values around the pill,
-// fading with distance, so the player sees where the value is headed without
-// the pill ever moving (an overlay, never a layout shift). The drag slides
-// the rail on its remainder, finger-tracked; the wheel rolls it a full row
-// per notch — the rotary-wheel beat, the passing value visibly rolling
-// through the pill — then fades it out after ~600ms of quiet. The old
-// hold-to-decrement is deliberately gone here: the drag IS the way down.
+// steps ±1 (notch up = +1, the desktop mapping the owner approved); and a
+// press-drag scrubs — ~28px of vertical travel a step, DOWN is positive,
+// the value committing live as each step crosses. Both moving gestures
+// raise the same ghost rail around the pill, and the rail is drawn as a
+// wireframe rotary DRUM: neighbouring values curve away above and below
+// the selection window, foreshortened and fading, and the gesture visibly
+// turns the cylinder — which is why drag-down increments: the higher
+// values hang above the window, and pulling the drum's face down rolls
+// them toward you into it. The drag rotates it live on the remainder; the
+// wheel eases it a detent per notch; ~600ms of quiet fades it out. The old
+// hold-to-decrement is deliberately gone here: the drag IS the way down
+// the line, in whichever direction the drum offers it.
 //
 // `unset: { enter }` teaches the dial a table-judged "—" below min: get()
 // may return null, scrubbing down past min lands there, and the first step
@@ -2347,12 +2350,15 @@ function bindScrubDial(el, { get, set, min, max, format = v => String(v), unset 
   const clamp = v => Math.max(min, Math.min(max, v));
 
   // The rail is built once, lazily, and re-anchored to the chip on every
-  // show — position: fixed keeps it out of the picker's layout entirely. The
-  // rows live in an inner column so movement (the drag's nudge, the wheel's
-  // roll) never touches the shell's transform: the shell owns anchoring and
-  // the fade, and the two can't fight over one style property.
-  let rail = null, railCol = null, railRows = null, railGap = null;
-  let railHideTimer = null, wheelIdleTimer = null;
+  // show — position: fixed keeps it out of the picker's layout entirely.
+  // It renders as a WIREFRAME DRUM (the owner's metaphor made explicit): the
+  // rows hang on a rotary cylinder seen edge-on — drumRow gives each one its
+  // R·sin(θ) drop and cos(θ) squash — and two hairline rules mark the near
+  // tangents around the selection window, which is the chip itself, at full
+  // size and full opacity between them. The drum's rotation is one number in
+  // steps: the drag's live remainder, or the wheel's eased notch.
+  let rail = null, railCol = null, railRows = null, railHideTimer = null;
+  let wheelIdleTimer = null, drumAnim = null;
   const buildRail = () => {
     rail = document.createElement('div');
     rail.className = 'scrub-rail';
@@ -2360,21 +2366,33 @@ function bindScrubDial(el, { get, set, min, max, format = v => String(v), unset 
     railCol.className = 'scrub-rail-col';
     rail.append(railCol);
     railRows = [];
-    for (const off of [3, 2, 1, 0, -1, -2, -3]) {
-      if (off === 0) {
-        // The hole the pill shows through — sized to the chip at show time.
-        railGap = document.createElement('div');
-        railGap.className = 'scrub-rail-gap';
-        railCol.append(railGap);
-        continue;
-      }
+    for (const off of [3, 2, 1, -1, -2, -3]) {
       const row = document.createElement('div');
       row.className = `scrub-rail-val scrub-d${Math.abs(off)}`;
       railCol.append(row);
       railRows.push({ row, off });
     }
+    // The drum's near-tangent edges, sized to the window at show time.
+    for (const side of ['top', 'bottom']) {
+      const edge = document.createElement('div');
+      edge.className = 'scrub-rail-edge';
+      edge.dataset.side = side;
+      railCol.append(edge);
+    }
   };
-  const updateRail = (value, remainder, floor) => {
+  // Pose every row on the drum at the given rotation (in steps, positive =
+  // surface moving down toward the viewer). Reduced motion pins the rotation
+  // at zero: the drum's geometry still reads — foreshortened rows, tangent
+  // rules — but steps snap instead of turning.
+  const poseDrum = rot => {
+    const r = reduceMotion.matches ? 0 : rot;
+    for (const { row, off } of railRows) {
+      const g = drumRow(off, r);
+      row.style.visibility = g.visible ? '' : 'hidden';
+      row.style.transform = `translate(-50%, -50%) translateY(${g.y}px) scaleY(${g.scale})`;
+    }
+  };
+  const updateRail = (value, rotationSteps, floor) => {
     if (!rail) return;
     for (const { row, off } of railRows) {
       const v = value + off;
@@ -2389,32 +2407,26 @@ function bindScrubDial(el, { get, set, min, max, format = v => String(v), unset 
         row.append(s);
       }
     }
-    // The drag remainder nudges the whole column a few px — the iOS-wheel
-    // feel on the cheap. Dragging up pulls the next value down toward the
-    // finger. Transition off so the column tracks the finger dead, not on a
-    // lag. Reduced motion gets a rock-steady rail: the numbers still change,
-    // nothing slides.
-    const shift = reduceMotion.matches ? 0 : Math.max(-9, Math.min(9, remainder * 0.35));
-    railCol.style.transition = 'none';
-    railCol.style.transform = `translateY(${shift}px)`;
+    poseDrum(rotationSteps);
   };
-  // The wheel's rotary beat: the column starts a full row out of place and
-  // slides home in one control-tempo move (120ms — DESIGN.md's answer tempo),
-  // so each notch visibly rolls the passing value through the pill instead of
-  // teleporting it. Reduced motion keeps the rail — it is information — and
-  // swaps the slide for a plain step.
+  // The wheel's rotary beat: a notch re-centres the content on the new value
+  // with the drum still turned a full step toward the OLD one, then eases
+  // the rotation home over the control tempo (120ms), so the passing value
+  // visibly curves over the drum and into the window instead of teleporting.
+  // Driven by rAF because every row's transform depends on the angle — a CSS
+  // transition can only tween one property, not a cylinder.
   const rollRail = (value, dir, floor) => {
-    updateRail(value, 0, floor);
+    if (drumAnim) { cancelAnimationFrame(drumAnim); drumAnim = null; }
+    updateRail(value, reduceMotion.matches ? 0 : -dir, floor);
     if (reduceMotion.matches) return;
-    const a = railRows[0].row.getBoundingClientRect();
-    const b = railRows[1].row.getBoundingClientRect();
-    const stepH = Math.abs(b.top - a.top) || 26;
-    railCol.style.transform = `translateY(${-dir * stepH}px)`;
-    // Reflow commits the out-of-place start, so the transition has a real
-    // "from" instead of collapsing into a no-op.
-    void railCol.offsetHeight;
-    railCol.style.transition = 'transform 120ms ease-out';
-    railCol.style.transform = 'translateY(0)';
+    const t0 = performance.now();
+    const tick = now => {
+      const k = Math.min(1, (now - t0) / 120);
+      const e = 1 - (1 - k) ** 3;
+      poseDrum(-dir * (1 - e));
+      drumAnim = k < 1 ? requestAnimationFrame(tick) : null;
+    };
+    drumAnim = requestAnimationFrame(tick);
   };
   const showRail = () => {
     if (railHideTimer) { clearTimeout(railHideTimer); railHideTimer = null; }
@@ -2423,16 +2435,19 @@ function bindScrubDial(el, { get, set, min, max, format = v => String(v), unset 
     if (wheelIdleTimer) { clearTimeout(wheelIdleTimer); wheelIdleTimer = null; }
     if (!rail) buildRail();
     const r = el.getBoundingClientRect();
-    railGap.style.height = `${Math.round(r.height)}px`;
+    // The tangent rules hug the selection window — the chip plus a breath.
+    const half = Math.round(r.height / 2) + 3;
+    for (const edge of railCol.querySelectorAll('.scrub-rail-edge')) {
+      edge.style.top = edge.dataset.side === 'top' ? `calc(50% - ${half}px)` : `calc(50% + ${half}px)`;
+    }
     rail.style.left = `${Math.round(r.left + r.width / 2)}px`;
     rail.style.top = `${Math.round(r.top + r.height / 2)}px`;
-    railCol.style.transition = 'none';
-    railCol.style.transform = 'translateY(0)';
     document.body.append(rail);
     // Two frames so the opacity transition has a "from" to leave.
     requestAnimationFrame(() => requestAnimationFrame(() => { if (rail.isConnected) rail.dataset.show = '1'; }));
   };
   const hideRail = () => {
+    if (drumAnim) { cancelAnimationFrame(drumAnim); drumAnim = null; }
     if (!rail || !rail.isConnected) return;
     delete rail.dataset.show;
     // The fade matches the control tempo (120–160ms); reduced motion snaps.
@@ -2476,9 +2491,9 @@ function bindScrubDial(el, { get, set, min, max, format = v => String(v), unset 
     const v0 = get();
     // A drag that starts from "—" walks in at the entry value: its virtual
     // start sits one step under `enter`, and its floor IS that start, so
-    // dragging down from unset goes nowhere and one step up lands on 12 —
-    // not on DC 1. A drag from a set value floors one under min, where the
-    // dial falls off the line back into "—".
+    // scrubbing further toward the floor goes nowhere and the first step in
+    // lands on 12 — not on DC 1. A drag from a set value floors one under
+    // min, where the dial falls off the line back into "—".
     const fromUnset = unset && v0 === null;
     scrub = {
       y0: e.clientY,
@@ -2492,7 +2507,11 @@ function bindScrubDial(el, { get, set, min, max, format = v => String(v), unset 
   });
   el.addEventListener('pointermove', e => {
     if (!scrub) return;
-    const dy = scrub.y0 - e.clientY;   // up = positive, like the rail
+    // Down = positive = increment: the drum reading (the owner's ruling).
+    // The higher values hang above the window, so pulling the drum's
+    // surface downward rotates it toward you and rolls them down into the
+    // window — the drag turns the object the rail draws.
+    const dy = e.clientY - scrub.y0;
     if (!scrub.dragging) {
       if (Math.abs(dy) <= 6) return;   // inside the tap budget — not a scrub yet
       scrub.dragging = true;
@@ -2504,7 +2523,9 @@ function bindScrubDial(el, { get, set, min, max, format = v => String(v), unset 
       set(commit);
       if (navigator.vibrate) navigator.vibrate(3);
     }
-    updateRail(value, remainder, scrub.floor);
+    // The remainder, in steps, IS the drum's live rotation — the fraction
+    // of a turn under the finger between detents.
+    updateRail(value, remainder / SCRUB_PX_PER_STEP, scrub.floor);
   });
   const endScrub = () => {
     if (!scrub) return;
