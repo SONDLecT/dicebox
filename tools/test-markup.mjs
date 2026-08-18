@@ -99,6 +99,19 @@ if (msTheme) for (const block of msTheme.slice(1)) {
 }
 ok('Mothership small text meets WCAG AA contrast in both themes', contrastPass);
 
+// Draw Steel gets the same guard: an ember-orange accent is exactly the kind
+// of hue that reads fine on near-black and goes illegible on pale steel, so
+// both schemes are held to the same AA bar as Mothership.
+const dsTheme = /drawsteel:\s*\{\s*dark:\s*\{([^}]*)\},\s*light:\s*\{([^}]*)\}/.exec(themesJs);
+let dsContrastPass = !!dsTheme;
+if (dsTheme) for (const block of dsTheme.slice(1)) {
+  const paper = themeColor(block, 'paper'), face = themeColor(block, 'face');
+  const muted = themeColor(block, 'muted'), accent = themeColor(block, 'accent');
+  dsContrastPass &&= [paper, face].every(bg => contrast(muted, bg) >= 4.5);
+  dsContrastPass &&= [paper, face].every(bg => contrast(accent, mix(accent, bg)) >= 4.5);
+}
+ok('Draw Steel small text meets WCAG AA contrast in both themes', dsContrastPass);
+
 // Mothership follows the established tactile picker grammar: illustrated role
 // dice, compact number pills, and keep/drop dice around the primary roll action.
 const msMarkup = html.slice(html.indexOf('id="msPicker"'), html.indexOf('</section>', html.indexOf('id="msPicker"')));
@@ -174,7 +187,7 @@ ok('Mothership numeric rail is limited to rules dice plus d-question',
   const order = [...pop.matchAll(/data-system="([a-z0-9]+)"/g)].map(m => m[1]);
   ok('picker is a popover: Dicebox pinned first, then systems alphabetical by label',
      /class="mode-pop"/.test(pop) &&
-     order.join(',') === 'numeric,alien,bladerunner,callofcthulhu,cthulhutech,dcc,deltagreen,daggerheart,fate,genesys,ironsworn,mist,mothership,pbta,starforged,starwars,twilight,onering,v5,yearzero,cards,tarot,napoletane,hanafuda,utagaruta' &&
+     order.join(',') === 'numeric,alien,bladerunner,callofcthulhu,cthulhutech,dcc,drawsteel,deltagreen,daggerheart,fate,genesys,ironsworn,mist,mothership,pbta,starforged,starwars,twilight,onering,v5,yearzero,cards,tarot,napoletane,hanafuda,utagaruta' &&
      /class="mode-row mode-row-pinned" data-system="numeric"[^]*?>Dicebox</.test(pop));
   ok('picker rows carry the community shorthand',
      ['CTech 2e', 'DH', 'Fate', 'Genesys', 'Mist', 'MoSh 1e', 'PbtA', 'SWRPG', 'TOR 2e', 'VtM V5']

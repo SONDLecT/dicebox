@@ -150,6 +150,19 @@ export const SYSTEM_THEMES = {
       '--hair': '#E4D5C6', '--accent': '#B75A22', '--danger': '#9A3A2E',
     },
   },
+  // Draw Steel — forged steel and fire: cool near-black steel neutrals under an
+  // ember-orange accent, the metal fresh off the anvil. Light is pale steel with
+  // the ember deepened to hold WCAG AA on the tinted chrome.
+  drawsteel: {
+    dark: {
+      '--paper': '#0D0E10', '--face': '#16181B', '--line': '#E3E5E8', '--muted': '#8B939B',
+      '--hair': '#23272C', '--accent': '#E27B3F', '--danger': '#C0453F',
+    },
+    light: {
+      '--paper': '#E8EAEC', '--face': '#F4F5F7', '--line': '#15181B', '--muted': '#5A626A',
+      '--hair': '#CDD2D7', '--accent': '#9A400C', '--danger': '#9E3529',
+    },
+  },
   // Mist Engine — moody teal and dim gold, fog over deep water; a pale seafoam
   // for light.
   mist: {

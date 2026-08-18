@@ -15,6 +15,7 @@ import { parseTwilight, rollTwilight, pushTwilight, summarizeTwilight, describeT
 import { parseStarWars, rollStarWars, summarizeStarWars, describeStarWars, starWarsHeadline } from '../system-dice.js';
 import { parseOneRing, rollOneRing, summarizeOneRing, describeOneRing, oneRingHeadline } from '../system-dice.js';
 import { parsePbta, parseMist, rollPbta, rollMist, summarize2d6, describe2d6, twod6Headline } from '../system-dice.js';
+import { parseDrawSteel, rollDrawSteel, summarizeDrawSteel, describeDrawSteel, drawSteelHeadline } from '../system-dice.js';
 import { parseMothership, rollMothership, summarizeMothershipCheck, summarizeMothershipPanic, describeMothership, mothershipHeadline } from '../system-dice.js';
 import { parseCards, newDeckOrder, summarizeCards, cardsHeadline, describeCards } from '../system-dice.js';
 import { parseTarot, summarizeTarot, tarotHeadline, describeTarot } from '../system-dice.js';
@@ -871,6 +872,64 @@ ok('negative modifier drops the band', summarize2d6(4, 4, -3, 'pbta').band === '
   ok('2d6 headline is total', h.text === '11' && h.kind === 'number');
   ok('2d6 headline band variant', h.variant === 'band-hit');
   ok('2d6 describe shows the math', /5 \+ 5 \+ 1 · total 11/.test(describe2d6(p)));
+}
+
+// ---- Draw Steel (2d10 power roll) ----
+ok('detect ds', detectSystem('ds:+2') === 'drawsteel');
+ok('ds not numeric', detectSystem('2d10') === 'numeric');
+ok('parse ds bare', eq(parseDrawSteel('ds:'), { modifier: 0, edges: 0, banes: 0 }));
+ok('parse ds +2', eq(parseDrawSteel('ds:+2'), { modifier: 2, edges: 0, banes: 0 }));
+ok('parse ds -1', eq(parseDrawSteel('ds:-1'), { modifier: -1, edges: 0, banes: 0 }));
+ok('parse ds edges only', eq(parseDrawSteel('ds:e2'), { modifier: 0, edges: 2, banes: 0 }));
+ok('parse ds full', eq(parseDrawSteel('ds:+2e1b1'), { modifier: 2, edges: 1, banes: 1 }));
+for (const bad of ['ds', 'ds:x', 'ds:e3', 'ds:b3', 'ds:+10', 'ds:-6', 'ds:b1e1', 'pbta:']) {
+  ok(`reject ds ${bad}`, (() => { try { parseDrawSteel(bad); return false; } catch { return true; } })());
+}
+// tier boundaries: 11 or less / 12-16 / 17+
+ok('11 = tier 1', summarizeDrawSteel(5, 6, 0, 0, 0).tier === 1);
+ok('12 = tier 2', summarizeDrawSteel(6, 6, 0, 0, 0).tier === 2);
+ok('16 = tier 2', summarizeDrawSteel(8, 8, 0, 0, 0).tier === 2);
+ok('17 = tier 3', summarizeDrawSteel(9, 8, 0, 0, 0).tier === 3);
+ok('the characteristic moves the tier', summarizeDrawSteel(5, 5, 2, 0, 0).tier === 2); // 10 + 2 = 12
+// natural 19-20 is always tier 3, read off the bare dice
+ok('natural 19 crits', summarizeDrawSteel(9, 10, 0, 0, 0).crit === true);
+ok('natural 20 crits', summarizeDrawSteel(10, 10, -5, 0, 0).crit === true && summarizeDrawSteel(10, 10, -5, 0, 0).tier === 3);
+ok('natural 18 does not crit', summarizeDrawSteel(9, 9, 0, 0, 0).crit === false);
+ok('a modified 19 does not crit', summarizeDrawSteel(9, 8, 2, 0, 0).crit === false);
+ok('a crit outranks a double bane', summarizeDrawSteel(9, 10, 0, 0, 2).tier === 3);
+// edges and banes: cancel one for one, then one moves the number, two the tier
+ok('edge and bane cancel', summarizeDrawSteel(4, 4, 0, 1, 1).adjust === 0 && summarizeDrawSteel(4, 4, 0, 1, 1).total === 8);
+ok('double edge vs double bane cancels', summarizeDrawSteel(4, 4, 0, 2, 2).adjust === 0 && summarizeDrawSteel(4, 4, 0, 2, 2).shift === 0);
+ok('one edge = +2', summarizeDrawSteel(5, 5, 0, 1, 0).total === 12 && summarizeDrawSteel(5, 5, 0, 1, 0).tier === 2);
+ok('one bane = -2', summarizeDrawSteel(6, 6, 0, 0, 1).total === 10 && summarizeDrawSteel(6, 6, 0, 0, 1).tier === 1);
+ok('two edges vs one bane = +2', summarizeDrawSteel(5, 5, 0, 2, 1).adjust === 2 && summarizeDrawSteel(5, 5, 0, 2, 1).shift === 0);
+ok('double edge moves the tier, not the number', summarizeDrawSteel(6, 6, 0, 2, 0).total === 12 && summarizeDrawSteel(6, 6, 0, 2, 0).tier === 3);
+ok('double bane moves the tier, not the number', summarizeDrawSteel(6, 6, 0, 0, 2).total === 12 && summarizeDrawSteel(6, 6, 0, 0, 2).tier === 1);
+ok('double edge clamps at tier 3', summarizeDrawSteel(9, 9, 0, 2, 0).tier === 3);
+ok('double bane clamps at tier 1', summarizeDrawSteel(2, 3, 0, 0, 2).tier === 1);
+// roll shape and routing
+{
+  const r = rollDrawSteel('ds:+1');
+  ok('ds system tag', r.system === 'drawsteel');
+  ok('ds rolls two d10', r.groups[0].dice.length === 2 && r.groups[0].sides === 10);
+  ok('ds total = a+b+mod (no edges)', r.summary.total === r.groups[0].dice[0].value + r.groups[0].dice[1].value + 1);
+  ok('rollAny routes ds', rollAny('ds:').system === 'drawsteel');
+}
+// headline and detail
+{
+  const t3 = { summary: summarizeDrawSteel(9, 7, 2, 0, 0) }; // total 18
+  ok('ds headline reads the tier', drawSteelHeadline(t3).text === 'Tier 3 · 18');
+  ok('ds tier variant', drawSteelHeadline(t3).variant === 'ds-tier3');
+  ok('ds tier 1 variant', drawSteelHeadline({ summary: summarizeDrawSteel(3, 3, 0, 0, 0) }).variant === 'ds-tier1');
+  const crit = { summary: summarizeDrawSteel(9, 10, 0, 0, 0) };
+  ok('ds crit headline', drawSteelHeadline(crit).text === 'Critical · 19' && drawSteelHeadline(crit).variant === 'ds-crit');
+  ok('ds describe shows the math', /9 \+ 7 \+ 2 · total 18/.test(describeDrawSteel(t3)));
+  ok('ds describe shows the edge', /edge \+2/.test(describeDrawSteel({ summary: summarizeDrawSteel(5, 5, 0, 1, 0) })));
+  ok('ds describe shows the tier shift', /double edge — tier up/.test(describeDrawSteel({ summary: summarizeDrawSteel(6, 6, 0, 2, 0) })));
+  ok('ds describe shows the cancellation', /1 edge vs 1 bane — cancel out/.test(describeDrawSteel({ summary: summarizeDrawSteel(4, 4, 0, 1, 1) })));
+  ok('ds describe names the crit', /natural 19 — critical/.test(describeDrawSteel(crit)));
+  ok('ds describe says the crit beats the banes',
+     /natural 20 — critical, banes cannot drop it/.test(describeDrawSteel({ summary: summarizeDrawSteel(10, 10, 0, 0, 2) })));
 }
 
 // ---- Mothership 1e ----

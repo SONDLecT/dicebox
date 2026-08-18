@@ -746,6 +746,35 @@ body {
 /* PbtA / Mist: nothing to build (the 2d6 sit in the tray), so just the one chip. */
 .twod6-picker { display: flex; justify-content: center; }
 
+/* Draw Steel: the 2d10 stage themselves, so one row — the characteristic
+   spinner flanked by the Edge and Bane counters. The counters are conditions
+   on the roll, not dice, so they stay in the spin-chip family and badge their
+   count the way a loaded die button does. */
+.ds-picker { display: flex; gap: 10px; justify-content: center; }
+.ds-count { position: relative; }
+.ds-edge { --dc: #57B591; }
+.ds-bane { --dc: #C0453F; }
+.ds-count[data-count] { border-color: var(--dc); background: color-mix(in srgb, var(--dc) 12%, transparent); }
+.ds-count[data-count] .spin-chip-label { color: var(--line); }
+.ds-count[data-count]::after {
+  content: attr(data-count);
+  position: absolute;
+  top: -6px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--dc);
+  color: var(--paper);
+  font: 700 10px system-ui;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* ---- Daggerheart ---- */
 
 .dh-picker {
@@ -955,6 +984,14 @@ body {
 .total[data-variant="band-hit"] { color: #57B591; }
 .total[data-variant="band-partial"] { color: #C99A3C; }
 .total[data-variant="band-miss"] { color: var(--muted); }
+
+/* Draw Steel tiers: the weakest result in a muted ember-red, the middle in the
+   cautionary amber the 2d6 bands use, tier 3 in their green, and the natural
+   19-20 in the critical gold — one vocabulary of outcome colour across modes. */
+.total[data-variant="ds-tier1"] { color: #C4705C; }
+.total[data-variant="ds-tier2"] { color: #C99A3C; }
+.total[data-variant="ds-tier3"] { color: #57B591; }
+.total[data-variant="ds-crit"] { color: #E7C24C; }
 /* Oracle readings are prose, not a headline word — smaller, serif, wrapping. */
 .total[data-variant="oracle"] {
   color: var(--line);
@@ -1701,6 +1738,7 @@ body {
 .mode-onering { --sys: #B5893C; }
 .mode-pbta { --sys: #D97A3C; }
 .mode-mist { --sys: #3F9FA0; }
+.mode-drawsteel { --sys: #E27B3F; }
 .mode-mothership { --sys: #AEC93C; }
 
 /* How many dice each tap adds. Typing a number here and tapping d6 is how you

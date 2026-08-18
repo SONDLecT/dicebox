@@ -209,6 +209,13 @@
             <path d="M4 12.5c2-1.6 4-1.6 6 0s4 1.6 6 0"/>
             <path d="M6 16.5c2-1.6 4-1.6 6 0s3 1.2 4 0.4"/>
           </g>
+          <!-- Draw Steel: two crossed swords — the title made literal. -->
+          <g class="mode-ico" data-for="drawsteel" fill="none" stroke="currentColor"
+             stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 4 16 15M19 4 8 15"/>
+            <path d="M13.9 17.1 18.1 12.9M10.1 17.1 5.9 12.9"/>
+            <path d="M16 15 18.2 17.2M8 15 5.8 17.2"/>
+          </g>
           <!-- Cards: a single card face showing a spade. -->
           <g class="mode-ico" data-for="cards">
             <rect x="5.5" y="3" width="13" height="18" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.5"/>
@@ -568,6 +575,27 @@
       </p>
       </div>
 
+      <div id="helpDrawsteel" hidden>
+      <dl class="syntax">
+        <dt>ds:</dt>       <dd>2d10, no characteristic</dd>
+        <dt>ds:+2</dt>     <dd>2d10 plus a characteristic of +2</dd>
+        <dt>ds:+2e1</dt>   <dd>the same with one edge</dd>
+        <dt>ds:+2b2</dt>   <dd>the same with a double bane</dd>
+        <dt>ds:+2e1b1</dt> <dd>an edge and a bane — they cancel</dd>
+      </dl>
+      <p class="note">
+        The power roll: <b>2d10</b> plus a characteristic, read in tiers.
+        <b>11 or less</b> is <b>tier 1</b>, <b>12–16</b> <b>tier 2</b>,
+        <b>17+</b> <b>tier 3</b>. A natural <b>19 or 20</b> on the dice is
+        always tier 3 and reads as a <b>critical</b> — on an ability roll it
+        also buys another main action. <b>Edges</b> and <b>banes</b> cancel one
+        for one: one edge adds <b>+2</b>, one bane subtracts 2, a <b>double
+        edge</b> raises the tier by one instead (a double bane lowers it). A
+        skill that applies to a test adds +2 — fold it into the characteristic.
+        Tap Edge or Bane to raise it, hold to lower.
+      </p>
+      </div>
+
       <div id="helpMothership" hidden>
       <dl class="syntax">
         <dt>ms:c</dt>       <dd>Check/Save — no target, the table judges</dd>
@@ -887,6 +915,15 @@
         </svg>
         <span class="mode-row-name">DCC</span>
         <span class="mode-row-sub">the dice chain</span>
+      </button>
+      <button type="button" class="mode-row mode-drawsteel" data-system="drawsteel" aria-pressed="false">
+        <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 4 16 15M19 4 8 15"/>
+          <path d="M13.9 17.1 18.1 12.9M10.1 17.1 5.9 12.9"/>
+          <path d="M16 15 18.2 17.2M8 15 5.8 17.2"/>
+        </svg>
+        <span class="mode-row-name">Draw Steel</span>
+        <span class="mode-row-sub">2d10 &middot; tiers</span>
       </button>
       <button type="button" class="mode-row mode-deltagreen" data-system="deltagreen" aria-pressed="false">
         <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">
@@ -1629,6 +1666,23 @@
     <button type="button" class="spin-chip" id="twod6ModChip" aria-label="Modifier — tap to raise, hold to lower">
       <span class="spin-chip-label" id="twod6ModLabel">Modifier</span>
       <span class="spin-chip-val" id="twod6Mod">0</span>
+    </button>
+  </section>
+
+  <!-- Draw Steel: the 2d10 power roll stages itself, so one row of chips — the
+       characteristic spinner, then Edge and Bane tap-counters. Edges and banes
+       are conditions, not dice, so they wear count badges rather than
+       die silhouettes. -->
+  <section class="picker ds-picker" id="dsPicker" aria-label="Draw Steel roll" hidden>
+    <button type="button" class="spin-chip" id="dsCharChip" aria-label="Characteristic — tap to raise, hold to lower">
+      <span class="spin-chip-label">Characteristic</span>
+      <span class="spin-chip-val" id="dsChar">0</span>
+    </button>
+    <button type="button" class="spin-chip ds-count ds-edge" id="dsEdgeChip" aria-label="Edges — tap to raise, hold to lower, two at most">
+      <span class="spin-chip-label">Edge</span>
+    </button>
+    <button type="button" class="spin-chip ds-count ds-bane" id="dsBaneChip" aria-label="Banes — tap to raise, hold to lower, two at most">
+      <span class="spin-chip-label">Bane</span>
     </button>
   </section>
 

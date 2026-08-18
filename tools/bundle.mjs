@@ -51,6 +51,7 @@ const SYSTEM_EXPORTS = [
   'rollStarWars', 'describeStarWars', 'starWarsHeadline', 'parseStarWars',
   'rollOneRing', 'describeOneRing', 'oneRingHeadline', 'parseOneRing',
   'rollPbta', 'rollMist', 'twod6Headline', 'describe2d6', 'parsePbta', 'parseMist',
+  'rollDrawSteel', 'describeDrawSteel', 'drawSteelHeadline', 'parseDrawSteel',
   'rollMothership', 'describeMothership', 'mothershipHeadline', 'parseMothership', 'resolveMothershipStress',
   'rollCallOfCthulhu', 'describeCallOfCthulhu', 'callOfCthulhuHeadline', 'parseCallOfCthulhu',
   'rollDeltaGreen', 'describeDeltaGreen', 'deltaGreenHeadline', 'parseDeltaGreen',

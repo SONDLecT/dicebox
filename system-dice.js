@@ -43,6 +43,7 @@ export function detectSystem(src) {
   if (/^tor:/.test(s)) return 'onering';
   if (/^pbta:/.test(s)) return 'pbta';
   if (/^mist:/.test(s)) return 'mist';
+  if (/^ds:/.test(s)) return 'drawsteel';
   if (/^ms:/.test(s)) return 'mothership';
   if (/^coc:/.test(s)) return 'callofcthulhu';
   if (/^dg:/.test(s)) return 'deltagreen';
@@ -353,6 +354,7 @@ export function rollAny(src, uiSystem = 'numeric') {
   if (sys === 'onering') return rollOneRing(src);
   if (sys === 'pbta') return rollPbta(src);
   if (sys === 'mist') return rollMist(src);
+  if (sys === 'drawsteel') return rollDrawSteel(src);
   if (sys === 'mothership') return rollMothership(src);
   if (sys === 'callofcthulhu') return rollCallOfCthulhu(src);
   if (sys === 'deltagreen') return rollDeltaGreen(src);
@@ -422,6 +424,122 @@ export function describe2d6(result) {
   let math = `${s.a} + ${s.b}`;
   if (s.modifier) math += ` ${s.modifier > 0 ? '+' : '−'} ${Math.abs(s.modifier)}`;
   parts.push(math, `total ${s.total}`);
+  return parts.join(' · ');
+}
+
+// ---- Draw Steel (MCDM) — the power roll ----
+//
+// Every roll is the same throw: 2d10 plus a characteristic, read in three
+// tiers rather than pass/fail — 11 or less is tier 1, 12-16 tier 2, 17 or
+// more tier 3. There is no target number; the tiers ARE the resolution, so
+// unlike the roll-under modes there is no unset "table judges" state here.
+//
+// Edges and banes (0-2 of each) cancel one for one before anything applies.
+// A single net edge adds +2 to the total and a single net bane subtracts 2 —
+// but a DOUBLE edge adds nothing and instead raises the resolved tier by one
+// (a double bane lowers it), clamped to the 1-3 band. The book is explicit
+// that the double is a tier move, not a +4.
+//
+// A natural 19 or 20 — the two dice alone, before any modifier — is always a
+// tier 3 result "regardless of any modifiers", and on an ability roll it is a
+// critical (the hero gets another main action; that spend is the sheet's
+// business, not the dice's). The book's downgrade clause never lets a crit
+// lose its teeth, so the natural 19-20 outranks a double bane here too.
+//
+// The skill bonus on tests is a flat +2 folded into the characteristic chip —
+// it is just a number added to the roll, so it earns no control of its own.
+//
+// ds:[+CHAR][eEDGES][bBANES]   e.g. "ds:+2", "ds:-1e1", "ds:+2e1b1";
+// bare "ds:" rolls flat. Edges before banes, both optional.
+const DS_REGEX = /^ds:([+-]\d+)?(?:e(\d+))?(?:b(\d+))?$/;
+
+export function parseDrawSteel(src) {
+  const m = DS_REGEX.exec(String(src || '').trim().toLowerCase());
+  if (!m) throw new Error('Expected a Draw Steel roll like "ds:+2" or "ds:+2e1b1"');
+  const modifier = m[1] ? Number(m[1]) : 0;
+  const edges = m[2] === undefined ? 0 : Number(m[2]);
+  const banes = m[3] === undefined ? 0 : Number(m[3]);
+  // Characteristics run -5 to +5 in the book; the top stretches to +9 so a
+  // characteristic plus the +2 skill (and a situational bonus) still types.
+  if (modifier < -5 || modifier > 9) throw new Error('Characteristic must be -5 to +9');
+  // The rules count edges and banes to two, full stop — more of either has no
+  // effect at the table, so the notation refuses to claim it.
+  if (edges > 2 || banes > 2) throw new Error('Edges and banes cap at 2');
+  return { modifier, edges, banes };
+}
+
+export function rollDrawSteel(src) {
+  const { modifier, edges, banes } = parseDrawSteel(src);
+  const a = randInt(10), b = randInt(10);
+  const dice = [
+    { value: a, sides: 10, kept: true, rerolled: false, exploded: false },
+    { value: b, sides: 10, kept: true, rerolled: false, exploded: false },
+  ];
+  return {
+    schema: 2,
+    system: 'drawsteel',
+    notation: String(src),
+    groups: [{ kind: 'dice', dieType: 'drawsteel', sides: 10, count: 2, dice, subtotal: a + b }],
+    summary: summarizeDrawSteel(a, b, modifier, edges, banes),
+  };
+}
+
+// The tier a bare total lands in, before any double-edge/bane shift.
+const dsTierOf = total => (total <= 11 ? 1 : total <= 16 ? 2 : 3);
+
+export function summarizeDrawSteel(a, b, modifier, edges, banes) {
+  const natural = a + b;
+  // Cancellation first: only the net survivor does anything.
+  const net = edges - banes;
+  const adjust = net === 1 ? 2 : net === -1 ? -2 : 0;
+  const total = natural + modifier + adjust;
+  // A double moves the OUTCOME: resolve the tier from the total, then step it,
+  // clamped — the order the book gives, which is why a double edge on a total
+  // of 17+ buys nothing more.
+  const shift = net === 2 ? 1 : net === -2 ? -1 : 0;
+  let tier = Math.max(1, Math.min(3, dsTierOf(total) + shift));
+  // Natural 19-20 reads off the bare dice and wins over everything, the
+  // double bane included.
+  const crit = natural >= 19;
+  if (crit) tier = 3;
+  return { kind: 'drawsteel', a, b, natural, modifier, edges, banes, adjust, shift, total, tier, crit };
+}
+
+// The tier is the answer, so it leads; the total rides along the way the
+// table would say it ("tier 2, 14"). Crits read as the event they are.
+export function drawSteelHeadline(result) {
+  const s = result.summary;
+  return s.crit
+    ? { kind: 'text', text: `Critical · ${s.total}`, variant: 'ds-crit' }
+    : { kind: 'text', text: `Tier ${s.tier} · ${s.total}`, variant: `ds-tier${s.tier}` };
+}
+
+export function describeDrawSteel(result) {
+  const s = result.summary;
+  let math = `${s.a} + ${s.b}`;
+  if (s.modifier) math += ` ${s.modifier > 0 ? '+' : '−'} ${Math.abs(s.modifier)}`;
+  if (s.adjust) math += ` ${s.adjust > 0 ? '+' : '−'} 2`;
+  const parts = [math, `total ${s.total}`];
+  if (s.edges || s.banes) {
+    // Name what was held and what it came to after cancellation, so a
+    // "2 edges vs 1 bane" roll shows its arithmetic and not just the +2.
+    const net = s.edges - s.banes;
+    const effect = net === 2 ? (dsTierOf(s.total) === 3 ? 'double edge — already tier 3' : 'double edge — tier up')
+      : net === 1 ? 'edge +2'
+      : net === -1 ? 'bane −2'
+      : net === -2 ? (dsTierOf(s.total) === 1 ? 'double bane — already tier 1' : 'double bane — tier down')
+      : 'cancel out';
+    const held = [
+      s.edges ? `${s.edges} edge${s.edges > 1 ? 's' : ''}` : '',
+      s.banes ? `${s.banes} bane${s.banes > 1 ? 's' : ''}` : '',
+    ].filter(Boolean).join(' vs ');
+    parts.push(s.edges && s.banes ? `${held} — ${effect}` : effect);
+  }
+  if (s.crit) {
+    // The natural 19-20 stands whatever the banes said — say so when they
+    // tried, so the tier 3 never looks like a maths slip.
+    parts.push(s.shift < 0 ? `natural ${s.natural} — critical, banes cannot drop it` : `natural ${s.natural} — critical`);
+  }
   return parts.join(' · ');
 }
 

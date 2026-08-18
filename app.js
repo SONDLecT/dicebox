@@ -23,6 +23,7 @@ import { parseCards, newDeckOrder, summarizeCards, cardsHeadline, describeCards,
 import { rollStarWars, describeStarWars, starWarsHeadline, parseStarWars } from './system-dice.js';
 import { rollOneRing, describeOneRing, oneRingHeadline, parseOneRing } from './system-dice.js';
 import { rollPbta, rollMist, twod6Headline, describe2d6, parsePbta, parseMist } from './system-dice.js';
+import { rollDrawSteel, describeDrawSteel, drawSteelHeadline, parseDrawSteel } from './system-dice.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('tray');
@@ -465,6 +466,7 @@ function doRoll(notation, { viaOwlbear = true } = {}) {
       : sys === 'onering' ? rollOneRing(notation)
       : sys === 'pbta' ? rollPbta(notation)
       : sys === 'mist' ? rollMist(notation)
+      : sys === 'drawsteel' ? rollDrawSteel(notation)
       : sys === 'mothership' ? rollMothership(notation)
       : sys === 'callofcthulhu' ? rollCallOfCthulhu(notation)
       : sys === 'deltagreen' ? rollDeltaGreen(notation)
@@ -770,6 +772,7 @@ $('notation').addEventListener('input', () => {
   if (typedSystem === 'onering') { syncTorFromField(); return; }
   if (typedSystem === 'pbta') { pbtaCtl.fromField(); return; }
   if (typedSystem === 'mist') { mistCtl.fromField(); return; }
+  if (typedSystem === 'drawsteel') { syncDsFromField(); return; }
   if (typedSystem === 'mothership') { syncMsFromField(); return; }
   if (typedSystem === 'callofcthulhu') { syncCocFromField(); return; }
   if (typedSystem === 'deltagreen') { syncDgFromField(); return; }
@@ -858,6 +861,7 @@ const SYSTEMS = {
   onering: { badge: 'TOR 2e' },
   pbta: { badge: 'PbtA' },
   mist: { badge: 'Mist' },
+  drawsteel: { badge: 'Draw Steel' },
   mothership: { badge: 'MoSh 1e' },
   callofcthulhu: { badge: 'CoC 7e' },
   deltagreen: { badge: 'Delta Green' },
@@ -874,6 +878,7 @@ const DEFAULT_HINT = { idle: 'Pick dice or type a roll', placeholder: 'Tap dice 
 const SYSTEM_HINTS = {
   pbta: { idle: 'Set a modifier, then roll 2d6', placeholder: 'Set a modifier, or type pbta:+2' },
   mist: { idle: 'Set your Power, then roll 2d6', placeholder: 'Set your Power, or type mist:+1' },
+  drawsteel: { idle: 'Set a characteristic and any edges, then roll 2d10', placeholder: 'Set the chips, or type ds:+2e1' },
   mothership: { idle: 'Roll d100 — set a target to resolve it, or let the table judge', placeholder: 'Roll, or type ms:c@35' },
   callofcthulhu: { idle: 'Roll d100 under your skill — set the skill, or let the table judge', placeholder: 'Roll, or type coc:60' },
   deltagreen: { idle: 'Roll d100 under your target — set it, or let the table judge', placeholder: 'Roll, or type dg:50' },
@@ -901,6 +906,7 @@ function systemHint(system) { return SYSTEM_HINTS[system] || DEFAULT_HINT; }
 const SLUG_TO_SYSTEM = {
   cards: 'cards', tarot: 'tarot', italiane: 'napoletane', napoletane: 'napoletane', scopa: 'napoletane', hanafuda: 'hanafuda', koikoi: 'hanafuda', hana: 'hanafuda', utagaruta: 'utagaruta', karuta: 'utagaruta', hyakunin: 'utagaruta', vtmv5: 'v5', fate: 'fate', genesys: 'genesys', dh: 'daggerheart', ctech2e: 'cthulhutech',
   swrpg: 'starwars', tor2e: 'onering', pbta: 'pbta', mist: 'mist', mosh1e: 'mothership',
+  drawsteel: 'drawsteel', ds: 'drawsteel',
   v5: 'v5', vtm: 'v5', daggerheart: 'daggerheart', cthulhutech: 'cthulhutech', ctech: 'cthulhutech',
   yz: 'yearzero', yearzero: 'yearzero', forbiddenlands: 'yearzero', vaesen: 'yearzero', coriolis: 'yearzero', mutant: 'yearzero', tales: 'yearzero',
   alien: 'alien',
@@ -909,7 +915,7 @@ const SLUG_TO_SYSTEM = {
   force: 'starwars', feat: 'onering', tor: 'onering', mothership: 'mothership', mosh: 'mothership', coc: 'callofcthulhu', callofcthulhu: 'callofcthulhu', cthulhu: 'callofcthulhu', dg: 'deltagreen', deltagreen: 'deltagreen',
   ironsworn: 'ironsworn', iron: 'ironsworn', starforged: 'starforged', sf: 'starforged', dcc: 'dcc',
 };
-const SYSTEM_TO_SLUG = { cards: 'cards', tarot: 'tarot', napoletane: 'napoletane', hanafuda: 'hanafuda', utagaruta: 'utagaruta', v5: 'vtmv5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', yearzero: 'yz', alien: 'alien', bladerunner: 'brrpg', twilight: 't2k', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', mothership: 'mosh1e', callofcthulhu: 'coc', deltagreen: 'dg', ironsworn: 'ironsworn', starforged: 'starforged', dcc: 'dcc' };
+const SYSTEM_TO_SLUG = { cards: 'cards', tarot: 'tarot', napoletane: 'napoletane', hanafuda: 'hanafuda', utagaruta: 'utagaruta', v5: 'vtmv5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', yearzero: 'yz', alien: 'alien', bladerunner: 'brrpg', twilight: 't2k', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', drawsteel: 'drawsteel', mothership: 'mosh1e', callofcthulhu: 'coc', deltagreen: 'dg', ironsworn: 'ironsworn', starforged: 'starforged', dcc: 'dcc' };
 
 function systemFromPath() {
   const seg = (location.pathname || '/').replace(/^\/+|\/+$/g, '').toLowerCase();
@@ -932,6 +938,7 @@ const torPicker = $('torPicker');
 // PbtA and Mist Engine share one picker: their only control is a modifier
 // stepper, identical between the two modes.
 const twod6Picker = $('twod6Picker');
+const dsPicker = $('dsPicker');
 const msPicker = $('msPicker');
 const cocPicker = $('cocPicker');
 const dgPicker = $('dgPicker');
@@ -1002,6 +1009,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
   $('t2kPicker').hidden = system !== 'twilight';
   torPicker.hidden = system !== 'onering';
   twod6Picker.hidden = system !== 'pbta' && system !== 'mist';
+  dsPicker.hidden = system !== 'drawsteel';
   msPicker.hidden = system !== 'mothership';
   cocPicker.hidden = system !== 'callofcthulhu';
   dgPicker.hidden = system !== 'deltagreen';
@@ -1052,6 +1060,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
   $('helpOnering').hidden = system !== 'onering';
   $('helpPbta').hidden = system !== 'pbta';
   $('helpMist').hidden = system !== 'mist';
+  $('helpDrawsteel').hidden = system !== 'drawsteel';
   $('helpMothership').hidden = system !== 'mothership';
   $('helpCallofcthulhu').hidden = system !== 'callofcthulhu';
   $('helpDeltagreen').hidden = system !== 'deltagreen';
@@ -1083,6 +1092,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
     resetOneRing();
     pbtaCtl.reset();
     mistCtl.reset();
+    resetDs();
     // Mothership resets the roll config (mode, target, skill, advantage) but NOT
     // Stress — that is the character's ongoing state, not pool setup, so it must
     // survive a mode switch the way it survives a reload.
@@ -2421,6 +2431,47 @@ bindTapHold($('twod6ModChip'), dir => { twod6.modifier = Math.max(-100, Math.min
 // set in PbtA carries into Mist and vice versa — which is the intuitive result.
 const pbtaCtl = { notation: () => twod6Notation('pbta'), reset: resetTwod6, fromField: syncTwod6FromField };
 const mistCtl = { notation: () => twod6Notation('mist'), reset: resetTwod6, fromField: syncTwod6FromField };
+
+// ---- Draw Steel (2d10 power roll + characteristic, edges and banes) ----
+// The roll is fixed — the 2d10 stage on entry like PbtA's pair — so the picker
+// is three chips: the characteristic spinner, then Edge and Bane counters.
+// Edges and banes are conditions on the roll, not dice, so they wear the
+// spin-chip family with a count badge rather than a die silhouette.
+const ds = { char: 0, edges: 0, banes: 0 };
+const dsCharField = $('dsChar');
+const dsEdgeChip = $('dsEdgeChip');
+const dsBaneChip = $('dsBaneChip');
+
+function dsNotation() {
+  const m = ds.char;
+  let s = 'ds:' + (m ? (m > 0 ? `+${m}` : String(m)) : '');
+  if (ds.edges) s += `e${ds.edges}`;
+  if (ds.banes) s += `b${ds.banes}`;
+  return s;
+}
+function syncDs({ writeField = true } = {}) {
+  const m = ds.char;
+  if (dsCharField) dsCharField.textContent = m > 0 ? `+${m}` : String(m);
+  // A loaded counter badges its count and lights its colour; at zero the chip
+  // goes quiet rather than badging a meaningless 0.
+  if (ds.edges) dsEdgeChip.dataset.count = String(ds.edges); else delete dsEdgeChip.dataset.count;
+  if (ds.banes) dsBaneChip.dataset.count = String(ds.banes); else delete dsBaneChip.dataset.count;
+  if (writeField && uiSystem === 'drawsteel') $('notation').value = dsNotation();
+  if (uiSystem === 'drawsteel') stageSystemPool();
+}
+function resetDs() { ds.char = 0; ds.edges = 0; ds.banes = 0; syncDs({ writeField: false }); }
+function syncDsFromField() {
+  try {
+    const { modifier, edges, banes } = parseDrawSteel($('notation').value);
+    ds.char = modifier; ds.edges = edges; ds.banes = banes;
+    syncDs({ writeField: false });
+  } catch { /* mid-type, not yet valid */ }
+}
+bindTapHold($('dsCharChip'), dir => { ds.char = Math.max(-5, Math.min(9, ds.char + dir)); syncDs(); });
+// Tap raises 0 → 1 → 2, hold lowers — the counts clamp at the book's cap of
+// two, where a third edge or bane stops meaning anything.
+bindTapHold(dsEdgeChip, dir => { ds.edges = Math.max(0, Math.min(2, ds.edges + dir)); syncDs(); });
+bindTapHold(dsBaneChip, dir => { ds.banes = Math.max(0, Math.min(2, ds.banes + dir)); syncDs(); });
 
 // ---- Mothership 1e ----
 //
@@ -5504,6 +5555,11 @@ function systemStageDescriptors() {
     case 'mist':
       add(2, { sides: 6, kind: '2d6' });
       break;
+    case 'drawsteel':
+      // The power roll is always exactly two d10 in theme ink — Draw Steel's
+      // physical dice carry no per-die colour, so neither do ours.
+      add(2, { sides: 10, kind: 'ds' });
+      break;
     case 'mothership': {
       // Advantage/Disadvantage rolls the complete check twice. Stage both
       // percentile pairs (four physical d10s) or both Panic d20s so the tray
@@ -5634,7 +5690,8 @@ function removeSystemStageKind(kind) {
         if (yz[type] > 0) { yz[type] -= 1; syncYz(); return true; }
       }
       // Not removable, each on purpose: Hope/Fear and the plain Feat die and
-      // the fixed 2d6 are dice the rules fix; 'br'/'t2k' here are the
+      // the fixed 2d6 and the Draw Steel power roll's fixed 2d10 ('ds') are
+      // dice the rules fix; 'br'/'t2k' here are the
       // Attribute and Skill dice (always exactly one each — their SIZE steps
       // at the picker, not their count); 'dg-check' is the fixed percentile
       // pair; the iron-* kinds are whatever roll the shelf loaded, fixed by
@@ -5687,6 +5744,7 @@ function clearPool({ trackers = true } = {}) {
       case 'twilight': resetTwilight(); syncT2k(); break;
       case 'onering': resetOneRing(); syncTor(); break;
       case 'pbta': case 'mist': resetTwod6(); syncTwod6(); break;
+      case 'drawsteel': resetDs(); syncDs(); break;
       // The X sweeps Stress back to its floor of 2 — the tracked-stat rule:
       // trackers survive mode switches and fall only to the full table sweep.
       case 'mothership': if (trackers) setStress(2, { restage: false }); resetMothership(); syncMs(); break;
@@ -7021,6 +7079,7 @@ function emptyTrayRoll() {
   if (uiSystem === 'twilight') return t2kNotation();
   if (uiSystem === 'pbta') return pbtaCtl.notation();
   if (uiSystem === 'mist') return mistCtl.notation();
+  if (uiSystem === 'drawsteel') return dsNotation();
   if (uiSystem === 'mothership') return msNotation();
   if (uiSystem === 'callofcthulhu') return cocNotation();
   if (uiSystem === 'deltagreen') return dgNotation();
@@ -7049,6 +7108,7 @@ function restageActiveSystem() {
     case 'twilight': syncT2k(); break;
     case 'onering': syncTor(); break;
     case 'pbta': case 'mist': syncTwod6(); break;
+    case 'drawsteel': syncDs(); break;
     case 'mothership': syncMs(); break;
     case 'callofcthulhu': syncCoc(); break;
     case 'deltagreen': syncDg(); break;
