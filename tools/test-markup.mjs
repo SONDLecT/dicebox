@@ -197,16 +197,18 @@ ok('the popup number dial is fully retired',
    !/openNumberDial/.test(js) && !/openCountDial/.test(js) &&
    !/id="dial"/.test(html) && !/id="wheel"/.test(html) &&
    !css.includes('.wheel-item') && !css.includes('.dial-entry'));
-// The d? flow that cannot mint an accidental die OR ambush a scrub with
-// the keyboard: scrubbing only previews (the label says dN), a tap mints
-// the preview (or, with nothing pending, flashes the rail — a teaching
-// moment, never a keyboard), and typed entry hides behind a long-press.
-ok('the custom die previews on scrub, mints on tap, types on hold',
-   /set: setCustomPreview/.test(js) &&
-   /tap: \(\) => \{ if \(customPending !== null\) mintCustomDie\(customPending\); else customApi\.flashRail\(\); \}/.test(js) &&
-   /onEntry: mintCustomDie/.test(js) &&
+// The custom die is a persistent-value barrel, exactly the dice-per-tap
+// chip's shape (Emory's ruling): the chip always names a real remembered
+// size, EVERY tap spawns one of it, scrubbing turns the size live, and
+// typed entry hides behind the long-press (Enter sets and spawns). The
+// pending/preview model is dead and must stay dead.
+ok('the custom die holds a persistent size: tap spawns, hold types',
+   /tap: mintCustomDie/.test(js) &&
+   /onEntry: v => \{ setCustomSides\(v\); mintCustomDie\(\); \}/.test(js) &&
    /holdEntry: true/.test(js) &&
-   /function mintCustomDie\(sides\) \{[\s\S]{0,300}ensureDieButton\(sides\);[\s\S]{0,80}addToPool\(sides, perTap\(\)\);/.test(js));
+   /store\.set\(CUSTOM_SIDES_KEY, String\(customSides\)\)/.test(js) &&
+   !/customPending/.test(js) &&
+   /function mintCustomDie\(\) \{[\s\S]{0,300}ensureDieButton\(customSides\);[\s\S]{0,80}addToPool\(customSides, perTap\(\)\);/.test(js));
 // The touch-gesture regression Emory found on the phone: a boolean "was
 // scrubbing" latch goes stale on touch (no synthetic click after a drag),
 // eating the next genuine tap. The guard must be a time window, and the

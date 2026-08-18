@@ -7418,52 +7418,49 @@ $('historyClear').addEventListener('click', () => {
   openHistory();
 });
 
-// ---- the custom d? die ----
+// ---- the custom die ----
 //
-// The last number modal is gone: d? is a barrel+type hybrid honouring its
-// two jobs (choose a size, mint the die button). SCRUB it and the pending
-// size rolls live — the drum rail shows the neighbouring side counts
-// (d6 · d7 · d8) and the button's own label previews dN — but nothing
-// mints yet: the first TAP after a scrub mints the previewed die. That is
-// the flow that cannot mint an accidental d7 from a stray notch — the
-// button reads exactly what the tap will make, and only a deliberate tap
-// makes it. A tap with nothing pending floats the inline entry instead:
-// type 66, Enter mints d66, Escape cancels. Minting is the old dial's
-// commit verbatim — the dedicated dN button appears (or updates) and a
-// tap's worth of dice goes to the pool. Hold does nothing. Typed notation
-// beyond d1000 is untouched: MAX_SIDES is the picker's bound, not the
-// parser's.
+// Emory's ruling, verbatim shape: this chip works exactly like the
+// dice-per-tap chip beside it — a persistent value you scrub, typing
+// behind a long-press — except its TAP SPAWNS a die of the displayed
+// size. No pending state, no preview: the chip always names a real size
+// (seeded with the old dial's d20, remembered across sessions like any
+// picker pref), scrub or wheel turns it live on the drum, every tap mints
+// — the dedicated dN button appears (or updates) and a tap's worth of
+// dice goes to the pool, tap twice to add two, exactly like any die
+// button — and a long-press opens typed entry, where Enter or blur sets
+// the size AND spawns one, Escape cancels. Typed notation beyond d1000 is
+// untouched: MAX_SIDES bounds the picker, not the parser.
 const MAX_SIDES = 1000;
+const CUSTOM_SIDES_KEY = 'dicebox:customSides';
 let customSides = 20;
-let customPending = null;
+{
+  const saved = Number(store.get(CUSTOM_SIDES_KEY));
+  if (Number.isFinite(saved) && saved >= 1 && saved <= MAX_SIDES) customSides = Math.round(saved);
+}
 const customBtn = $('customDie');
 const customLabel = $('customDieLabel');
 
-function setCustomPreview(v) {
-  customPending = v;
-  customLabel.textContent = v === null ? 'd?' : `d${v}`;
+function setCustomSides(v) {
+  customSides = Math.max(1, Math.min(MAX_SIDES, Math.round(v)));
+  customLabel.textContent = `d${customSides}`;
+  store.set(CUSTOM_SIDES_KEY, String(customSides));
 }
+setCustomSides(customSides);   // paint the remembered size on load
 
-function mintCustomDie(sides) {
-  customSides = sides;
-  setCustomPreview(null);
-  const button = ensureDieButton(sides);
-  addToPool(sides, perTap());
+function mintCustomDie() {
+  const button = ensureDieButton(customSides);
+  addToPool(customSides, perTap());
   button.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
 }
 
-// Gesture map, tuned on a phone: the tap is spoken for by minting, so the
-// typed entry lives behind a LONG-PRESS here rather than the tap — with
-// tap-to-type, every scrub attempt that wobbled inside the slop threw the
-// keyboard at the player mid-gesture. A tap with nothing pending flashes
-// the rail instead: harmless, and it teaches that this button scrubs.
-const customApi = bindScrubDial(customBtn, {
-  get: () => customPending ?? customSides,
-  set: setCustomPreview,
+bindScrubDial(customBtn, {
+  get: () => customSides,
+  set: setCustomSides,
   min: 1, max: MAX_SIDES,
   format: v => `d${v}`,
-  tap: () => { if (customPending !== null) mintCustomDie(customPending); else customApi.flashRail(); },
-  onEntry: mintCustomDie,
+  tap: mintCustomDie,
+  onEntry: v => { setCustomSides(v); mintCustomDie(); },
   holdEntry: true,
 });
 
