@@ -279,9 +279,9 @@ ok('rollAny defers numeric', rollAny('4d6').deferred === true && rollAny('4d6').
      s.summary.surge.rouse.value === 4 && s.summary.surge.rouse.success === false);
   ok('the surge carries the difficulty through', s.summary.difficulty === 2);
   ok('a 7 on the ride-along Rouse holds', surgeV5(base, 2, 7).summary.surge.rouse.success === true);
-  // Blood Potency caps the surge at four dice; eligibility (one surge per
+  // Blood Potency 10 caps the surge at six dice; eligibility (one surge per
   // roll) is the UI's concern, but the reducer clamps the count itself.
-  ok('the surge caps at four dice', surgeV5(base, 9, 7).groups[0].dice.length === 8);
+  ok('the surge caps at six dice — Blood Potency 10', surgeV5(base, 9, 7).groups[0].dice.length === 10);
   // A spent Willpower reroll must not come back just because the pool grew.
   const spent = { ...base, summary: { ...base.summary, willpowerAvailable: false, willpowerUsed: true } };
   ok('surging never refreshes a spent Willpower reroll',

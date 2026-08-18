@@ -49,7 +49,7 @@ await OBR.broadcast.sendMessage('cc.dicebox.rolls', {
 | Type | Purpose | Correlated response |
 | --- | --- | --- |
 | `roll.request` | Numeric notation, all built-in systems, five deck modes, Rouse checks, and Ironsworn/Starforged oracles | `roll.result` or `roll.error` |
-| `action.request` | `push` by authoritative `rollId`, `surge` (V5 Blood Surge) by `rollId` plus `dice` (1-4 surge dice; the background rolls the ride-along Rouse and moves Hunger), deck `shuffle`/`reset`, or `state.set` for the Hunger/Stress trackers | `roll.result`, `action.result`, or `roll.error` |
+| `action.request` | `push` by authoritative `rollId`, `surge` (V5 Blood Surge) by `rollId` plus `dice` (1-6 surge dice; the background rolls the ride-along Rouse and moves Hunger), deck `shuffle`/`reset`, or `state.set` for the Hunger/Stress trackers | `roll.result`, `action.result`, or `roll.error` |
 | `history.request` | Ask the local background for retained room history | One or more paged `history.result` messages |
 
 `requestId` is 1–96 characters and is echoed only in local responses. Reusing

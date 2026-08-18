@@ -1358,11 +1358,15 @@ function rollRouseLocally(diceCount = 1) {
   result.summary.tracked = tracked;
   if (tracked) {
     const before = v5.hunger;
-    if (result.summary.hungerGain) setHunger(v5.hunger + result.summary.hungerGain, { restage: false });
-    result.summary.hungerAfter = v5.hunger;
+    const after = Math.min(5, before + (result.summary.hungerGain || 0));
+    result.summary.hungerAfter = after;
     // A failed Rouse at Hunger 5 cannot climb higher, so the readout must not
     // claim it did — that is the moment the Beast is closest, not a tick upward.
-    result.summary.hungerRose = v5.hunger > before;
+    result.summary.hungerRose = after > before;
+    // The tracker moves only once the die has landed: an instantly rising
+    // badge told the result before the tray did, which is the one spoiler
+    // this app never allows.
+    if (after !== before) setTimeout(() => setHunger(after, { restage: false }), 1_100);
   }
   throwResult(result, { writeField: false });
   // The mode is spent; revert the field to the pool it will build next.
@@ -1372,10 +1376,10 @@ function rollRouseLocally(diceCount = 1) {
 // Rouse pulls a Hunger die into hand — it stages a lone die to throw, the way
 // every other die button stages its dice, rather than rolling on the click.
 // A second tap adds the advantage die (Discipline level and Blood Potency can
-// grant a two-die Rouse, keeping the better); a third puts them back. Tapping
-// a staged die or building the pool also leaves the mode.
-v5RouseBtn.addEventListener('click', () => {
-  v5.rouse = (Number(v5.rouse) + 1) % 3;
+// grant a two-die Rouse, keeping the better); holding takes one back — the
+// same tap-up/hold-down every neighbouring die button speaks. No wrap.
+bindTapHold(v5RouseBtn, dir => {
+  v5.rouse = Math.max(0, Math.min(2, Number(v5.rouse) + dir));
   syncV5();
 });
 
@@ -1560,6 +1564,10 @@ function v5SurgeEligible() {
   const last = state.last;
   return uiSystem === 'v5' && last && last.system === 'v5'
     && last.summary && last.summary.kind === 'v5' && !last.summary.surged
+    // At Hunger 5 a vampire cannot CHOOSE an action that costs a Rouse — only
+    // the Storyteller compels one — so the Surge greys out while the plain
+    // Rouse button stays.
+    && v5.hunger < 5
     && !state.pendingPush && !state.pendingSurge && !state.willpowerArmed
     && $('total').dataset.idle !== '1' && $('total').dataset.rolling !== '1';
 }
@@ -1578,7 +1586,7 @@ function updateV5BloodSurge() {
 // asked for a Surge, not a setting) from a hold (just change the size).
 function openSurgeDial(perform) {
   openNumberDial({
-    title: 'Surge dice', value: v5.surgeDice || 2, min: 1, max: 4,
+    title: 'Surge dice', value: v5.surgeDice || 2, min: 1, max: 6,
     actionLabel: 'Set Surge', inputLabel: 'Surge dice',
     commit: value => {
       v5.surgeDice = value;
@@ -1677,6 +1685,9 @@ function rollPendingSurge() {
     // the NEXT roll, never recolouring the one that just resolved. restage
     // stays off or the sync would sweep the landed dice from the tray.
     if (!rouse.success) setHunger(v5.hunger + 1, { restage: false });
+    // The tracker moved after the roll was written, so the field re-syncs —
+    // or the next tray tap would stage the Hunger of a moment ago.
+    if (uiSystem === 'v5') $('notation').value = v5Notation();
     rouse.hungerAfter = v5.hunger;
     finish(surged);
   }, 760);
@@ -2461,12 +2472,28 @@ function dsNotation() {
 function syncDs({ writeField = true } = {}) {
   const m = ds.char;
   if (dsCharField) dsCharField.textContent = m > 0 ? `+${m}` : String(m);
-  // A loaded counter badges its count and lights its colour; at zero the chip
-  // goes quiet rather than badging a meaningless 0.
+  // The chips read their EFFECT, not a bare count — a control says exactly
+  // what it will do to the roll: nothing, ±2, or a tier shift.
+  const effect = (n, up) => n === 0 ? '—' : n === 1 ? (up ? '+2' : '−2') : (up ? 'Tier ↑' : 'Tier ↓');
   if (ds.edges) dsEdgeChip.dataset.count = String(ds.edges); else delete dsEdgeChip.dataset.count;
   if (ds.banes) dsBaneChip.dataset.count = String(ds.banes); else delete dsBaneChip.dataset.count;
+  const edgeVal = $('dsEdgeVal'), baneVal = $('dsBaneVal');
+  if (edgeVal) { edgeVal.textContent = effect(ds.edges, true); if (ds.edges) delete edgeVal.dataset.unset; else edgeVal.dataset.unset = '1'; }
+  if (baneVal) { baneVal.textContent = effect(ds.banes, false); if (ds.banes) delete baneVal.dataset.unset; else baneVal.dataset.unset = '1'; }
   if (writeField && uiSystem === 'drawsteel') $('notation').value = dsNotation();
-  if (uiSystem === 'drawsteel') stageSystemPool();
+  if (uiSystem === 'drawsteel') {
+    stageSystemPool();
+    // The idle line narrates the assembled roll — the honest surface for
+    // arithmetic that never changes the dice: the physical game throws the
+    // same 2d10 whatever your edges, and so does the tray.
+    if ($('total').dataset.idle === '1') {
+      const net = ds.edges - ds.banes;
+      const netText = net === 0 ? (ds.edges ? ' · edge and bane cancel' : '')
+        : net === 1 ? ' · edge +2' : net >= 2 ? ' · double edge — tier up'
+        : net === -1 ? ' · bane −2' : ' · double bane — tier down';
+      $('breakdown').textContent = `2d10 ${ds.char >= 0 ? '+' : '−'} ${Math.abs(ds.char)}${netText}`;
+    }
+  }
 }
 function resetDs() { ds.char = 0; ds.edges = 0; ds.banes = 0; syncDs({ writeField: false }); }
 function syncDsFromField() {

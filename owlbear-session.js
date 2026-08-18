@@ -950,7 +950,7 @@ export async function initializeOwlbearBackground(OBR, options = {}) {
         // pool roll, once. The panel says how many; the background rolls the
         // ride-along Rouse and owns the Hunger it moves — the state snapshot
         // on the result is what re-syncs every panel's tracker.
-        if (!Number.isInteger(data.dice) || data.dice < 1 || data.dice > 4) {
+        if (!Number.isInteger(data.dice) || data.dice < 1 || data.dice > 6) {
           await failRequest(data.requestId, signature, 'invalid_request', 'Surge dice must be 1 to 4');
           return;
         }

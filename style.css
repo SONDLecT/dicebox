@@ -750,6 +750,15 @@ body {
    spinner flanked by the Edge and Bane counters. The counters are conditions
    on the roll, not dice, so they stay in the spin-chip family and badge their
    count the way a loaded die button does. */
+/* Edge/Bane wear a chevron that doubles when the mechanic changes kind — one
+   chevron while the effect is ±2, both when a double shifts the tier — and an
+   effect readout (+2 / Tier ↑) instead of a bare count. */
+.ds-count-ico { width: 15px; height: 15px; flex: none; }
+.ds-count .ds-chev-one { opacity: 1; }
+.ds-ico-down { transform: none; }   /* the bane's chevrons point down in their own paths */
+.ds-count .ds-chev-two { opacity: 0.18; }
+.ds-count[data-count="2"] .ds-chev-two { opacity: 1; }
+.ds-effect { min-width: 34px; text-align: right; }
 .ds-picker { display: flex; gap: 10px; justify-content: center; }
 .ds-count { position: relative; }
 .ds-edge { --dc: #57B591; }

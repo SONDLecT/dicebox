@@ -216,7 +216,8 @@ export function surgeV5(result, count, rouseValue) {
   const src = result?.groups?.[0]?.dice || [];
   // Blood Potency bounds the surge at four dice. Out-of-range counts are
   // clamped rather than thrown, the way rerollV5 quietly ignores bad indices.
-  const surge = Math.max(1, Math.min(4, Math.floor(Number(count) || 1)));
+  // Blood Potency 10's surge bonus is six dice — the table's true ceiling.
+  const surge = Math.max(1, Math.min(6, Math.floor(Number(count) || 1)));
   // Reroll marks belong to the roll that earned them; a copy that kept them
   // would make a receiver replay a Willpower hop that already happened.
   const dice = src.map(d => ({ ...d, rerolled: false }));
