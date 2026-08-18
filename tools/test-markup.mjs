@@ -112,6 +112,19 @@ if (dsTheme) for (const block of dsTheme.slice(1)) {
 }
 ok('Draw Steel small text meets WCAG AA contrast in both themes', dsContrastPass);
 
+// Crows too: a pale bone accent is comfortable on carrion black and the deep
+// ink flips for parchment, but a tweak to either scheme could quietly sink the
+// other, so both are held to the same AA bar as Mothership and Draw Steel.
+const crowsTheme = /crows:\s*\{\s*dark:\s*\{([^}]*)\},\s*light:\s*\{([^}]*)\}/.exec(themesJs);
+let crowsContrastPass = !!crowsTheme;
+if (crowsTheme) for (const block of crowsTheme.slice(1)) {
+  const paper = themeColor(block, 'paper'), face = themeColor(block, 'face');
+  const muted = themeColor(block, 'muted'), accent = themeColor(block, 'accent');
+  crowsContrastPass &&= [paper, face].every(bg => contrast(muted, bg) >= 4.5);
+  crowsContrastPass &&= [paper, face].every(bg => contrast(accent, mix(accent, bg)) >= 4.5);
+}
+ok('Crows small text meets WCAG AA contrast in both themes', crowsContrastPass);
+
 // Mothership follows the established tactile picker grammar: illustrated role
 // dice, compact number pills, and keep/drop dice around the primary roll action.
 const msMarkup = html.slice(html.indexOf('id="msPicker"'), html.indexOf('</section>', html.indexOf('id="msPicker"')));
@@ -187,7 +200,7 @@ ok('Mothership numeric rail is limited to rules dice plus d-question',
   const order = [...pop.matchAll(/data-system="([a-z0-9]+)"/g)].map(m => m[1]);
   ok('picker is a popover: Dicebox pinned first, then systems alphabetical by label',
      /class="mode-pop"/.test(pop) &&
-     order.join(',') === 'numeric,alien,bladerunner,callofcthulhu,cthulhutech,dcc,drawsteel,deltagreen,daggerheart,fate,genesys,ironsworn,mist,mothership,pbta,starforged,starwars,twilight,onering,v5,yearzero,cards,tarot,napoletane,hanafuda,utagaruta' &&
+     order.join(',') === 'numeric,alien,bladerunner,callofcthulhu,crows,cthulhutech,dcc,drawsteel,deltagreen,daggerheart,fate,genesys,ironsworn,mist,mothership,pbta,starforged,starwars,twilight,onering,v5,yearzero,cards,tarot,napoletane,hanafuda,utagaruta' &&
      /class="mode-row mode-row-pinned" data-system="numeric"[^]*?>Dicebox</.test(pop));
   ok('picker rows carry the community shorthand',
      ['CTech 2e', 'DH', 'Fate', 'Genesys', 'Mist', 'MoSh 1e', 'PbtA', 'SWRPG', 'TOR 2e', 'VtM V5']

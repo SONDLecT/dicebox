@@ -44,6 +44,7 @@ export function detectSystem(src) {
   if (/^pbta:/.test(s)) return 'pbta';
   if (/^mist:/.test(s)) return 'mist';
   if (/^ds:/.test(s)) return 'drawsteel';
+  if (/^crows:/.test(s)) return 'crows';
   if (/^ms:/.test(s)) return 'mothership';
   if (/^coc:/.test(s)) return 'callofcthulhu';
   if (/^dg:/.test(s)) return 'deltagreen';
@@ -355,6 +356,7 @@ export function rollAny(src, uiSystem = 'numeric') {
   if (sys === 'pbta') return rollPbta(src);
   if (sys === 'mist') return rollMist(src);
   if (sys === 'drawsteel') return rollDrawSteel(src);
+  if (sys === 'crows') return rollCrows(src);
   if (sys === 'mothership') return rollMothership(src);
   if (sys === 'callofcthulhu') return rollCallOfCthulhu(src);
   if (sys === 'deltagreen') return rollDeltaGreen(src);
@@ -540,6 +542,155 @@ export function describeDrawSteel(result) {
     // tried, so the tier 3 never looks like a maths slip.
     parts.push(s.shift < 0 ? `natural ${s.natural} — critical, banes cannot drop it` : `natural ${s.natural} — critical`);
   }
+  return parts.join(' · ');
+}
+
+// ---- Crows (MCDM) — the power roll and usage dice, per the May 2026 alpha ----
+//
+// Crows is in open playtest, so this mode is deliberately version-locked: it
+// implements the May 2026 alpha packet, the newest public one, and says so on
+// the help panel. When the next packet lands the numbers here change WITH the
+// label — the edition is a promise, alpha or not.
+//
+// The power roll shares Draw Steel's 2d10 skeleton and thresholds (11 or less /
+// 12-16 / 17+) but not its reading: in Crows the bottom band is a real failure,
+// the middle a partial success, the top a success — and there are no edges or
+// banes. Circumstance bonuses are flat, unlimited by rule ("no limit to the
+// number of circumstantial bonuses"), so the whole of characteristic (-1..+3),
+// skill (0..2), and circumstance folds into one typed modifier. Sharing Draw
+// Steel's internals would smuggle its edge/bane and auto-tier-3 rules into a
+// game that has neither, so this block stands alone on purpose.
+//
+// The bare dice speak twice more: a natural 2-3 (the two d10 alone, before any
+// modifier) is a Doom! — something extra bad happens on top of the result — and
+// a natural 19-20 a Critical!. They read off opposite ends of the 2d10 curve,
+// so no precedence rule is needed: one sum can never be both. What a Doom costs
+// or a Critical buys is the packet's tables and the table's call; the dice just
+// name the event.
+//
+// Usage dice are the alpha's duration clock: an item or effect carries a pool
+// of d6s, the pool is rolled each dungeon turn, and every die showing 1-2 is
+// removed — the rest remain. The item's pool lives on the sheet (the count is
+// per-item input, not a tracked stat), so the player types or taps the pool
+// each time and the tray reports the survivors.
+//
+// crows:[+MOD]  the power roll — e.g. "crows:+2"; bare "crows:" rolls flat.
+// crows:uN      roll an item's pool of N usage dice — e.g. "crows:u4".
+const CROWS_POWER_REGEX = /^crows:([+-]\d+)?$/;
+const CROWS_USAGE_REGEX = /^crows:u(\d+)$/;
+
+export function parseCrows(src) {
+  const s = String(src || '').trim().toLowerCase();
+  const u = CROWS_USAGE_REGEX.exec(s);
+  if (u) {
+    const pool = Number(u[1]);
+    // The packet caps no pool; items carry a handful of dice, so 20 is an
+    // engine sanity bound far past table reality, not a rule.
+    if (pool < 1 || pool > 20) throw new Error('Usage pools run 1 to 20');
+    return { mode: 'usage', pool };
+  }
+  const m = CROWS_POWER_REGEX.exec(s);
+  if (!m) throw new Error('Expected a Crows roll like "crows:+2" or "crows:u4"');
+  const modifier = m[1] ? Number(m[1]) : 0;
+  // Characteristics run -1 to +3 and skills 0 to 2, but circumstance bonuses
+  // are unlimited by rule — so this too is a sanity bound, not a cap.
+  if (modifier < -20 || modifier > 20) throw new Error('Modifier must be -20 to +20');
+  return { mode: 'power', modifier };
+}
+
+export function rollCrows(src) {
+  const parsed = parseCrows(src);
+  if (parsed.mode === 'usage') return rollCrowsUsage(src);
+  const a = randInt(10), b = randInt(10);
+  const dice = [
+    { value: a, sides: 10, kept: true, rerolled: false, exploded: false },
+    { value: b, sides: 10, kept: true, rerolled: false, exploded: false },
+  ];
+  return {
+    schema: 2,
+    system: 'crows',
+    notation: String(src),
+    groups: [{ kind: 'dice', dieType: 'crows-power', sides: 10, count: 2, dice, subtotal: a + b }],
+    summary: summarizeCrows(a, b, parsed.modifier),
+  };
+}
+
+export function rollCrowsUsage(src) {
+  const { pool } = parseCrows(src);
+  const faces = Array.from({ length: pool }, () => randInt(6));
+  // A die showing 1-2 is removed from the item — kept:false so it fades on the
+  // tray exactly like every other dropped die.
+  const dice = faces.map(v => ({ value: v, sides: 6, kept: v > 2, rerolled: false, exploded: false }));
+  return {
+    schema: 2,
+    system: 'crows',
+    notation: String(src),
+    groups: [{ kind: 'dice', dieType: 'crows-usage', sides: 6, count: pool, dice, subtotal: faces.reduce((x, y) => x + y, 0) }],
+    summary: summarizeCrowsUsage(faces),
+  };
+}
+
+const CROWS_TIER_WORDS = { 1: 'Failure', 2: 'Partial success', 3: 'Success' };
+
+export function summarizeCrows(a, b, modifier) {
+  const natural = a + b;
+  const total = natural + modifier;
+  const tier = total <= 11 ? 1 : total <= 16 ? 2 : 3;
+  // Doom and Critical read off the bare dice; the tier reads off the total.
+  // The alpha ties neither to the other, so a heavily-modified roll keeps both
+  // facts and the readout reports them side by side.
+  const doom = natural <= 3;
+  const crit = natural >= 19;
+  return { kind: 'crows', mode: 'power', a, b, natural, modifier, total, tier, doom, crit };
+}
+
+export function summarizeCrowsUsage(faces) {
+  const spent = faces.filter(v => v <= 2);
+  return { kind: 'crows', mode: 'usage', pool: faces.length, faces: [...faces], spent, remain: faces.length - spent.length };
+}
+
+// The power headline is the outcome the way the packet words it; a Doom or a
+// Critical is the bigger event, so it takes the line. A usage roll's answer is
+// the survivor count — the item's new pool, ready to write on the sheet.
+export function crowsHeadline(result) {
+  const s = result.summary;
+  if (s.mode === 'usage') {
+    if (s.remain === 0) return { kind: 'text', text: 'The last die is spent', variant: 'crows-out' };
+    return { kind: 'text', text: `${s.remain} remain${s.remain === 1 ? 's' : ''}` };
+  }
+  if (s.doom) return { kind: 'text', text: `Doom! · ${s.total}`, variant: 'crows-doom' };
+  if (s.crit) return { kind: 'text', text: `Critical! · ${s.total}`, variant: 'crows-crit' };
+  return { kind: 'text', text: `${CROWS_TIER_WORDS[s.tier]} · ${s.total}`, variant: `crows-tier${s.tier}` };
+}
+
+const CROWS_COUNT_WORDS = ['no', 'a', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+const crowsCount = n => CROWS_COUNT_WORDS[n] || String(n);
+
+export function describeCrows(result) {
+  const s = result.summary;
+  if (s.mode === 'usage') {
+    const parts = [`${s.pool}d6`, s.faces.join(', ')];
+    if (s.spent.length === 0) parts.push('every die holds');
+    else {
+      // Name the faces that died — "two 1s and a 2" — so the sheet edit the
+      // roll demands is never in doubt.
+      const ones = s.spent.filter(v => v === 1).length;
+      const twos = s.spent.length - ones;
+      const died = [
+        ones ? `${crowsCount(ones)} 1${ones > 1 ? 's' : ''}` : '',
+        twos ? `${crowsCount(twos)} 2${twos > 1 ? 's' : ''}` : '',
+      ].filter(Boolean).join(' and ');
+      parts.push(`${died} spent`);
+    }
+    return parts.join(' · ');
+  }
+  let math = `${s.a} + ${s.b}`;
+  if (s.modifier) math += ` ${s.modifier > 0 ? '+' : '−'} ${Math.abs(s.modifier)}`;
+  const parts = [math, `total ${s.total}`];
+  // A Doom or Critical displaces the outcome word from the headline, so the
+  // detail restores it here — the band still resolved, the event rides on top.
+  if (s.doom) parts.push(CROWS_TIER_WORDS[s.tier].toLowerCase(), `natural ${s.natural} — Doom`);
+  else if (s.crit) parts.push(CROWS_TIER_WORDS[s.tier].toLowerCase(), `natural ${s.natural} — Critical`);
   return parts.join(' · ');
 }
 

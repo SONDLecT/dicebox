@@ -23,7 +23,8 @@ import {
 } from '../room-crypto.js';
 import {
   rollV5, rollFate, rollGenesys, rollDaggerheart, rollCthulhuTech, rollStarWars,
-  rollOneRing, rollPbta, rollMist, rollDrawSteel, rollMothership, rollCallOfCthulhu, rollDeltaGreen,
+  rollOneRing, rollPbta, rollMist, rollDrawSteel, rollCrows, rollCrowsUsage,
+  rollMothership, rollCallOfCthulhu, rollDeltaGreen,
   rollIronsworn, rollYearZero, rollBladeRunner, rollTwilight,
   pushYearZero, pushBladeRunner, pushTwilight,
 } from '../system-dice.js';
@@ -672,6 +673,8 @@ const sampleSystemRoll = {
     'PbtA': rollPbta('pbta:+1'),
     'Mist': rollMist('mist:+0'),
     'Draw Steel': rollDrawSteel('ds:+2e1'),
+    'Crows': rollCrows('crows:+2'),
+    'Crows usage': rollCrowsUsage('crows:u3'),
     'Mothership': rollMothership('ms:c@35'),
     'Call of Cthulhu': rollCallOfCthulhu('coc:50'),
     'Delta Green': rollDeltaGreen('dg:50'),

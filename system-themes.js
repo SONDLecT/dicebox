@@ -163,6 +163,19 @@ export const SYSTEM_THEMES = {
       '--hair': '#CDD2D7', '--accent': '#9A400C', '--danger': '#9E3529',
     },
   },
+  // Crows — corvid survival horror: carrion black under a pale bone accent,
+  // moonlight on feathers, cold where V5 runs hot and Mothership runs acid.
+  // Light is parchment under a deep cold ink, the same story by daylight.
+  crows: {
+    dark: {
+      '--paper': '#101012', '--face': '#17181B', '--line': '#E9EAE3', '--muted': '#979B90',
+      '--hair': '#23252A', '--accent': '#C9CEBE', '--danger': '#C0453F',
+    },
+    light: {
+      '--paper': '#EAE5D8', '--face': '#F4F0E6', '--line': '#191A16', '--muted': '#5C6053',
+      '--hair': '#D2CCBC', '--accent': '#46503F', '--danger': '#9E3529',
+    },
+  },
   // Mist Engine — moody teal and dim gold, fog over deep water; a pale seafoam
   // for light.
   mist: {

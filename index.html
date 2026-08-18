@@ -216,6 +216,14 @@
             <path d="M13.9 17.1 18.1 12.9M10.1 17.1 5.9 12.9"/>
             <path d="M16 15 18.2 17.2M8 15 5.8 17.2"/>
           </g>
+          <!-- Crows: a corvid head in profile — crown, open beak, throat, eye. -->
+          <g class="mode-ico" data-for="crows" fill="none" stroke="currentColor"
+             stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5.2 15.4C4.7 10.1 7.7 6.5 12.4 6.5c2.6 0 4.5 1.1 5.7 2.9"/>
+            <path d="M18.1 9.4 21.8 10.9 18.2 12.2"/>
+            <path d="M18.2 12.2c-.8 4.2-3.5 6.6-7.3 6.6-2.4 0-4.4-.9-5.7-2.6"/>
+            <path d="M15.2 9.7h.01" stroke-width="2.4"/>
+          </g>
           <!-- Cards: a single card face showing a spade. -->
           <g class="mode-ico" data-for="cards">
             <rect x="5.5" y="3" width="13" height="18" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.5"/>
@@ -596,6 +604,32 @@
       </p>
       </div>
 
+      <div id="helpCrows" hidden>
+      <dl class="syntax">
+        <dt>crows:</dt>   <dd>2d10, no modifier</dd>
+        <dt>crows:+2</dt> <dd>2d10 plus a modifier of +2</dd>
+        <dt>crows:-1</dt> <dd>the same, penalised</dd>
+        <dt>crows:u4</dt> <dd>roll an item's pool of 4 usage dice</dd>
+      </dl>
+      <p class="note">
+        The power roll: <b>2d10</b> plus a characteristic (Strength, Agility,
+        or Mind), a relevant skill, and any circumstance bonuses — fold them
+        all into the one modifier. <b>11 or less</b> is a <b>failure</b>,
+        <b>12–16</b> a <b>partial success</b>, <b>17+</b> a <b>success</b>.
+        A natural <b>2–3</b> on the bare dice is a <b>Doom!</b> and a natural
+        <b>19–20</b> a <b>Critical!</b> — what the Doom costs or the Critical
+        buys is the table's call, the dice just name the event. Tap the
+        <b>usage die</b> to build an item's pool instead (hold to remove one):
+        each dungeon turn the pool is rolled and every die showing <b>1–2</b>
+        is spent and comes off the item, the rest remain. Items live on your
+        sheet — type or tap the pool each time.
+      </p>
+      <p class="note">
+        <i>Implements the May 2026 alpha playtest packet. The rules will change
+        as Crows develops, and this mode tracks that packet until updated.</i>
+      </p>
+      </div>
+
       <div id="helpMothership" hidden>
       <dl class="syntax">
         <dt>ms:c</dt>       <dd>Check/Save — no target, the table judges</dd>
@@ -897,6 +931,16 @@
         </svg>
         <span class="mode-row-name">CoC 7e</span>
         <span class="mode-row-sub">d100 roll-under &middot; tiers</span>
+      </button>
+      <button type="button" class="mode-row mode-crows" data-system="crows" aria-pressed="false">
+        <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5.2 15.4C4.7 10.1 7.7 6.5 12.4 6.5c2.6 0 4.5 1.1 5.7 2.9"/>
+          <path d="M18.1 9.4 21.8 10.9 18.2 12.2"/>
+          <path d="M18.2 12.2c-.8 4.2-3.5 6.6-7.3 6.6-2.4 0-4.4-.9-5.7-2.6"/>
+          <path d="M15.2 9.7h.01" stroke-width="2.4"/>
+        </svg>
+        <span class="mode-row-name">Crows (Alpha)</span>
+        <span class="mode-row-sub">2d10 &middot; usage dice</span>
       </button>
             <button type="button" class="mode-row mode-cthulhutech" data-system="cthulhutech" aria-pressed="false">
         <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true">
@@ -1683,6 +1727,25 @@
     </button>
     <button type="button" class="spin-chip ds-count ds-bane" id="dsBaneChip" aria-label="Banes — tap to raise, hold to lower, two at most">
       <span class="spin-chip-label">Bane</span>
+    </button>
+  </section>
+
+  <!-- Crows: the 2d10 power roll stages itself, so the row is the usage d6 —
+       which builds an item's pool in the tray instead — and the one modifier
+       chip (characteristic + skill + circumstance, resolved by the player).
+       The d6 shows a die burning down: two pips solid, one already fading. -->
+  <section class="picker crows-picker" id="crowsPicker" aria-label="Crows roll" hidden>
+    <button type="button" class="die-btn" id="crowsUsage" aria-label="Usage — build an item's pool of d6, hold to remove one">
+      <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true">
+        <rect x="5" y="5" width="20" height="20" rx="4.5"/>
+        <path class="crows-pip" d="M20 10h.01M15 15h.01"/>
+        <path class="crows-pip crows-pip-fading" d="M10 20h.01"/>
+      </svg>
+      <span class="die-btn-label">Usage</span>
+    </button>
+    <button type="button" class="spin-chip" id="crowsModChip" aria-label="Modifier — characteristic plus skill plus circumstance, tap to raise, hold to lower">
+      <span class="spin-chip-label">Modifier</span>
+      <span class="spin-chip-val" id="crowsMod">0</span>
     </button>
   </section>
 

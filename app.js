@@ -24,6 +24,7 @@ import { rollStarWars, describeStarWars, starWarsHeadline, parseStarWars } from 
 import { rollOneRing, describeOneRing, oneRingHeadline, parseOneRing } from './system-dice.js';
 import { rollPbta, rollMist, twod6Headline, describe2d6, parsePbta, parseMist } from './system-dice.js';
 import { rollDrawSteel, describeDrawSteel, drawSteelHeadline, parseDrawSteel } from './system-dice.js';
+import { rollCrows, describeCrows, crowsHeadline, parseCrows } from './system-dice.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('tray');
@@ -467,6 +468,7 @@ function doRoll(notation, { viaOwlbear = true } = {}) {
       : sys === 'pbta' ? rollPbta(notation)
       : sys === 'mist' ? rollMist(notation)
       : sys === 'drawsteel' ? rollDrawSteel(notation)
+      : sys === 'crows' ? rollCrows(notation)
       : sys === 'mothership' ? rollMothership(notation)
       : sys === 'callofcthulhu' ? rollCallOfCthulhu(notation)
       : sys === 'deltagreen' ? rollDeltaGreen(notation)
@@ -773,6 +775,7 @@ $('notation').addEventListener('input', () => {
   if (typedSystem === 'pbta') { pbtaCtl.fromField(); return; }
   if (typedSystem === 'mist') { mistCtl.fromField(); return; }
   if (typedSystem === 'drawsteel') { syncDsFromField(); return; }
+  if (typedSystem === 'crows') { syncCrowsFromField(); return; }
   if (typedSystem === 'mothership') { syncMsFromField(); return; }
   if (typedSystem === 'callofcthulhu') { syncCocFromField(); return; }
   if (typedSystem === 'deltagreen') { syncDgFromField(); return; }
@@ -862,6 +865,7 @@ const SYSTEMS = {
   pbta: { badge: 'PbtA' },
   mist: { badge: 'Mist' },
   drawsteel: { badge: 'Draw Steel' },
+  crows: { badge: 'Crows (Alpha)' },
   mothership: { badge: 'MoSh 1e' },
   callofcthulhu: { badge: 'CoC 7e' },
   deltagreen: { badge: 'Delta Green' },
@@ -879,6 +883,7 @@ const SYSTEM_HINTS = {
   pbta: { idle: 'Set a modifier, then roll 2d6', placeholder: 'Set a modifier, or type pbta:+2' },
   mist: { idle: 'Set your Power, then roll 2d6', placeholder: 'Set your Power, or type mist:+1' },
   drawsteel: { idle: 'Set a characteristic and any edges, then roll 2d10', placeholder: 'Set the chips, or type ds:+2e1' },
+  crows: { idle: 'Set a modifier and roll 2d10 — or build a usage pool', placeholder: 'Set the chips, or type crows:+2 or crows:u4' },
   mothership: { idle: 'Roll d100 — set a target to resolve it, or let the table judge', placeholder: 'Roll, or type ms:c@35' },
   callofcthulhu: { idle: 'Roll d100 under your skill — set the skill, or let the table judge', placeholder: 'Roll, or type coc:60' },
   deltagreen: { idle: 'Roll d100 under your target — set it, or let the table judge', placeholder: 'Roll, or type dg:50' },
@@ -906,7 +911,7 @@ function systemHint(system) { return SYSTEM_HINTS[system] || DEFAULT_HINT; }
 const SLUG_TO_SYSTEM = {
   cards: 'cards', tarot: 'tarot', italiane: 'napoletane', napoletane: 'napoletane', scopa: 'napoletane', hanafuda: 'hanafuda', koikoi: 'hanafuda', hana: 'hanafuda', utagaruta: 'utagaruta', karuta: 'utagaruta', hyakunin: 'utagaruta', vtmv5: 'v5', fate: 'fate', genesys: 'genesys', dh: 'daggerheart', ctech2e: 'cthulhutech',
   swrpg: 'starwars', tor2e: 'onering', pbta: 'pbta', mist: 'mist', mosh1e: 'mothership',
-  drawsteel: 'drawsteel', ds: 'drawsteel',
+  drawsteel: 'drawsteel', ds: 'drawsteel', crows: 'crows',
   v5: 'v5', vtm: 'v5', daggerheart: 'daggerheart', cthulhutech: 'cthulhutech', ctech: 'cthulhutech',
   yz: 'yearzero', yearzero: 'yearzero', forbiddenlands: 'yearzero', vaesen: 'yearzero', coriolis: 'yearzero', mutant: 'yearzero', tales: 'yearzero',
   alien: 'alien',
@@ -915,7 +920,7 @@ const SLUG_TO_SYSTEM = {
   force: 'starwars', feat: 'onering', tor: 'onering', mothership: 'mothership', mosh: 'mothership', coc: 'callofcthulhu', callofcthulhu: 'callofcthulhu', cthulhu: 'callofcthulhu', dg: 'deltagreen', deltagreen: 'deltagreen',
   ironsworn: 'ironsworn', iron: 'ironsworn', starforged: 'starforged', sf: 'starforged', dcc: 'dcc',
 };
-const SYSTEM_TO_SLUG = { cards: 'cards', tarot: 'tarot', napoletane: 'napoletane', hanafuda: 'hanafuda', utagaruta: 'utagaruta', v5: 'vtmv5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', yearzero: 'yz', alien: 'alien', bladerunner: 'brrpg', twilight: 't2k', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', drawsteel: 'drawsteel', mothership: 'mosh1e', callofcthulhu: 'coc', deltagreen: 'dg', ironsworn: 'ironsworn', starforged: 'starforged', dcc: 'dcc' };
+const SYSTEM_TO_SLUG = { cards: 'cards', tarot: 'tarot', napoletane: 'napoletane', hanafuda: 'hanafuda', utagaruta: 'utagaruta', v5: 'vtmv5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', yearzero: 'yz', alien: 'alien', bladerunner: 'brrpg', twilight: 't2k', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', drawsteel: 'drawsteel', crows: 'crows', mothership: 'mosh1e', callofcthulhu: 'coc', deltagreen: 'dg', ironsworn: 'ironsworn', starforged: 'starforged', dcc: 'dcc' };
 
 function systemFromPath() {
   const seg = (location.pathname || '/').replace(/^\/+|\/+$/g, '').toLowerCase();
@@ -939,6 +944,7 @@ const torPicker = $('torPicker');
 // stepper, identical between the two modes.
 const twod6Picker = $('twod6Picker');
 const dsPicker = $('dsPicker');
+const crowsPicker = $('crowsPicker');
 const msPicker = $('msPicker');
 const cocPicker = $('cocPicker');
 const dgPicker = $('dgPicker');
@@ -1010,6 +1016,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
   torPicker.hidden = system !== 'onering';
   twod6Picker.hidden = system !== 'pbta' && system !== 'mist';
   dsPicker.hidden = system !== 'drawsteel';
+  crowsPicker.hidden = system !== 'crows';
   msPicker.hidden = system !== 'mothership';
   cocPicker.hidden = system !== 'callofcthulhu';
   dgPicker.hidden = system !== 'deltagreen';
@@ -1061,6 +1068,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
   $('helpPbta').hidden = system !== 'pbta';
   $('helpMist').hidden = system !== 'mist';
   $('helpDrawsteel').hidden = system !== 'drawsteel';
+  $('helpCrows').hidden = system !== 'crows';
   $('helpMothership').hidden = system !== 'mothership';
   $('helpCallofcthulhu').hidden = system !== 'callofcthulhu';
   $('helpDeltagreen').hidden = system !== 'deltagreen';
@@ -1093,6 +1101,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
     pbtaCtl.reset();
     mistCtl.reset();
     resetDs();
+    resetCrows();
     // Mothership resets the roll config (mode, target, skill, advantage) but NOT
     // Stress — that is the character's ongoing state, not pool setup, so it must
     // survive a mode switch the way it survives a reload.
@@ -2472,6 +2481,45 @@ bindTapHold($('dsCharChip'), dir => { ds.char = Math.max(-5, Math.min(9, ds.char
 // two, where a third edge or bane stops meaning anything.
 bindTapHold(dsEdgeChip, dir => { ds.edges = Math.max(0, Math.min(2, ds.edges + dir)); syncDs(); });
 bindTapHold(dsBaneChip, dir => { ds.banes = Math.max(0, Math.min(2, ds.banes + dir)); syncDs(); });
+
+// ---- Crows (May 2026 alpha: 2d10 power roll, d6 usage pools) ----
+// Two roll types share the tray the way a staged Rouse displaces the V5 pool:
+// the power roll's fixed 2d10 stage on entry, and tapping the usage d6 flips
+// the tray to an item's usage pool instead. Touching the modifier is power-roll
+// business, so it hands the tray back — the two modes never mix in one throw.
+// `usage` is per-item input read off the sheet, not a tracked stat: it does
+// not persist, and the X clears it with everything else.
+const crows = { mod: 0, usage: 0 };
+const crowsModVal = $('crowsMod');
+const crowsUsageBtn = $('crowsUsage');
+
+function crowsNotation() {
+  if (crows.usage) return `crows:u${crows.usage}`;
+  const m = crows.mod;
+  return 'crows:' + (m ? (m > 0 ? `+${m}` : String(m)) : '');
+}
+function syncCrows({ writeField = true } = {}) {
+  if (crowsModVal) crowsModVal.textContent = crows.mod > 0 ? `+${crows.mod}` : String(crows.mod);
+  if (crows.usage) crowsUsageBtn.dataset.count = String(crows.usage); else delete crowsUsageBtn.dataset.count;
+  if (writeField && uiSystem === 'crows') $('notation').value = crowsNotation();
+  if (uiSystem === 'crows') stageSystemPool();
+}
+function resetCrows() { crows.mod = 0; crows.usage = 0; syncCrows({ writeField: false }); }
+function syncCrowsFromField() {
+  try {
+    const p = parseCrows($('notation').value);
+    if (p.mode === 'usage') crows.usage = p.pool;
+    else { crows.usage = 0; crows.mod = p.modifier; }
+    syncCrows({ writeField: false });
+  } catch { /* mid-type, not yet valid */ }
+}
+// One modifier chip carries characteristic + skill + circumstance, resolved by
+// the player — circumstance bonuses are unlimited by rule, so ±20 is the
+// notation's sanity bound, not a cap from the book.
+bindTapHold($('crowsModChip'), dir => { crows.usage = 0; crows.mod = Math.max(-20, Math.min(20, crows.mod + dir)); syncCrows(); });
+// Tap adds a usage die, hold removes one — an item's pool stays within tapping
+// distance, so the small-pool gesture applies, not the rotary dial.
+bindTapHold(crowsUsageBtn, dir => { crows.usage = Math.max(0, Math.min(20, crows.usage + dir)); syncCrows(); });
 
 // ---- Mothership 1e ----
 //
@@ -5560,6 +5608,13 @@ function systemStageDescriptors() {
       // physical dice carry no per-die colour, so neither do ours.
       add(2, { sides: 10, kind: 'ds' });
       break;
+    case 'crows':
+      // A built usage pool displaces the power roll, exactly like a staged
+      // Rouse displaces the V5 pool; otherwise the fixed 2d10 sit ready.
+      // Both wear theme ink — the alpha colours no dice.
+      if (crows.usage) { add(crows.usage, { sides: 6, kind: 'crows-usage' }); break; }
+      add(2, { sides: 10, kind: 'crows-power' });
+      break;
     case 'mothership': {
       // Advantage/Disadvantage rolls the complete check twice. Stage both
       // percentile pairs (four physical d10s) or both Panic d20s so the tray
@@ -5680,6 +5735,9 @@ function removeSystemStageKind(kind) {
       dhState.advantage -= Math.sign(dhState.advantage);
       syncDh();
       return true;
+    // A usage die tapped goes back on the item — and taking the last one off
+    // returns the tray to the staged power roll, the flip-back gesture.
+    case 'crows-usage': crows.usage = Math.max(0, crows.usage - 1); syncCrows(); return true;
     default:
       if (kind && kind.startsWith('gen-')) {
         const type = kind.slice(4);
@@ -5690,8 +5748,8 @@ function removeSystemStageKind(kind) {
         if (yz[type] > 0) { yz[type] -= 1; syncYz(); return true; }
       }
       // Not removable, each on purpose: Hope/Fear and the plain Feat die and
-      // the fixed 2d6 and the Draw Steel power roll's fixed 2d10 ('ds') are
-      // dice the rules fix; 'br'/'t2k' here are the
+      // the fixed 2d6 and the Draw Steel and Crows power rolls' fixed 2d10
+      // ('ds', 'crows-power') are dice the rules fix; 'br'/'t2k' here are the
       // Attribute and Skill dice (always exactly one each — their SIZE steps
       // at the picker, not their count); 'dg-check' is the fixed percentile
       // pair; the iron-* kinds are whatever roll the shelf loaded, fixed by
@@ -5745,6 +5803,7 @@ function clearPool({ trackers = true } = {}) {
       case 'onering': resetOneRing(); syncTor(); break;
       case 'pbta': case 'mist': resetTwod6(); syncTwod6(); break;
       case 'drawsteel': resetDs(); syncDs(); break;
+      case 'crows': resetCrows(); syncCrows(); break;
       // The X sweeps Stress back to its floor of 2 — the tracked-stat rule:
       // trackers survive mode switches and fall only to the full table sweep.
       case 'mothership': if (trackers) setStress(2, { restage: false }); resetMothership(); syncMs(); break;
@@ -7080,6 +7139,7 @@ function emptyTrayRoll() {
   if (uiSystem === 'pbta') return pbtaCtl.notation();
   if (uiSystem === 'mist') return mistCtl.notation();
   if (uiSystem === 'drawsteel') return dsNotation();
+  if (uiSystem === 'crows') return crowsNotation();
   if (uiSystem === 'mothership') return msNotation();
   if (uiSystem === 'callofcthulhu') return cocNotation();
   if (uiSystem === 'deltagreen') return dgNotation();
@@ -7109,6 +7169,7 @@ function restageActiveSystem() {
     case 'onering': syncTor(); break;
     case 'pbta': case 'mist': syncTwod6(); break;
     case 'drawsteel': syncDs(); break;
+    case 'crows': syncCrows(); break;
     case 'mothership': syncMs(); break;
     case 'callofcthulhu': syncCoc(); break;
     case 'deltagreen': syncDg(); break;

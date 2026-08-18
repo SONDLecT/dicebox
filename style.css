@@ -775,6 +775,14 @@ body {
   justify-content: center;
 }
 
+/* Crows: the 2d10 stage themselves, so one row — the usage d6 (which builds an
+   item's pool instead) and the single resolved-modifier chip. The pips on the
+   usage die are stroke dots, one faded: a die already burning down. */
+.crows-picker { display: flex; gap: 14px; justify-content: center; align-items: center; }
+.crows-picker .die-btn { --dc: #98A08A; }
+.crows-pip { fill: none; stroke-width: 3; stroke-linecap: round; }
+.crows-pip-fading { opacity: 0.35; }
+
 /* ---- Daggerheart ---- */
 
 .dh-picker {
@@ -992,6 +1000,17 @@ body {
 .total[data-variant="ds-tier2"] { color: #C99A3C; }
 .total[data-variant="ds-tier3"] { color: #57B591; }
 .total[data-variant="ds-crit"] { color: #E7C24C; }
+
+/* Crows reuses the shared outcome vocabulary — failure ember, partial amber,
+   success green, Critical the crit gold — and gives Doom the danger red it is.
+   A usage roll's survivor count reads in the plain accent (bone/moonlight);
+   only the emptied pool goes danger red. */
+.total[data-variant="crows-tier1"] { color: #C4705C; }
+.total[data-variant="crows-tier2"] { color: #C99A3C; }
+.total[data-variant="crows-tier3"] { color: #57B591; }
+.total[data-variant="crows-crit"] { color: #E7C24C; }
+.total[data-variant="crows-doom"] { color: var(--danger); }
+.total[data-variant="crows-out"] { color: var(--danger); }
 /* Oracle readings are prose, not a headline word — smaller, serif, wrapping. */
 .total[data-variant="oracle"] {
   color: var(--line);
@@ -1739,6 +1758,7 @@ body {
 .mode-pbta { --sys: #D97A3C; }
 .mode-mist { --sys: #3F9FA0; }
 .mode-drawsteel { --sys: #E27B3F; }
+.mode-crows { --sys: #98A08A; }
 .mode-mothership { --sys: #AEC93C; }
 
 /* How many dice each tap adds. Typing a number here and tapping d6 is how you

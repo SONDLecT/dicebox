@@ -16,6 +16,7 @@ import { parseStarWars, rollStarWars, summarizeStarWars, describeStarWars, starW
 import { parseOneRing, rollOneRing, summarizeOneRing, describeOneRing, oneRingHeadline } from '../system-dice.js';
 import { parsePbta, parseMist, rollPbta, rollMist, summarize2d6, describe2d6, twod6Headline } from '../system-dice.js';
 import { parseDrawSteel, rollDrawSteel, summarizeDrawSteel, describeDrawSteel, drawSteelHeadline } from '../system-dice.js';
+import { parseCrows, rollCrows, rollCrowsUsage, summarizeCrows, summarizeCrowsUsage, describeCrows, crowsHeadline } from '../system-dice.js';
 import { parseMothership, rollMothership, summarizeMothershipCheck, summarizeMothershipPanic, describeMothership, mothershipHeadline } from '../system-dice.js';
 import { parseCards, newDeckOrder, summarizeCards, cardsHeadline, describeCards } from '../system-dice.js';
 import { parseTarot, summarizeTarot, tarotHeadline, describeTarot } from '../system-dice.js';
@@ -930,6 +931,86 @@ ok('double bane clamps at tier 1', summarizeDrawSteel(2, 3, 0, 0, 2).tier === 1)
   ok('ds describe names the crit', /natural 19 — critical/.test(describeDrawSteel(crit)));
   ok('ds describe says the crit beats the banes',
      /natural 20 — critical, banes cannot drop it/.test(describeDrawSteel({ summary: summarizeDrawSteel(10, 10, 0, 0, 2) })));
+}
+
+// ---- Crows (May 2026 alpha: 2d10 power roll + usage dice) ----
+ok('detect crows', detectSystem('crows:+2') === 'crows');
+ok('detect crows usage', detectSystem('crows:u4') === 'crows');
+ok('crows not numeric', detectSystem('2d10') === 'numeric');
+ok('parse crows bare', eq(parseCrows('crows:'), { mode: 'power', modifier: 0 }));
+ok('parse crows +2', eq(parseCrows('crows:+2'), { mode: 'power', modifier: 2 }));
+ok('parse crows -1', eq(parseCrows('crows:-1'), { mode: 'power', modifier: -1 }));
+ok('parse crows usage', eq(parseCrows('crows:u4'), { mode: 'usage', pool: 4 }));
+for (const bad of ['crows', 'crows:x', 'crows:2', 'crows:+21', 'crows:-21', 'crows:u0', 'crows:u21', 'crows:+2u3', 'ds:']) {
+  ok(`reject crows ${bad}`, (() => { try { parseCrows(bad); return false; } catch { return true; } })());
+}
+// tier boundaries: 11 or less / 12-16 / 17+, worded as the packet reads them
+ok('11 = failure', summarizeCrows(5, 6, 0).tier === 1);
+ok('12 = partial', summarizeCrows(6, 6, 0).tier === 2);
+ok('16 = partial', summarizeCrows(8, 8, 0).tier === 2);
+ok('17 = success', summarizeCrows(9, 8, 0).tier === 3);
+ok('the modifier moves the tier', summarizeCrows(5, 5, 2).tier === 2); // 10 + 2 = 12
+// Doom on a natural 2-3, Critical on 19-20 — the bare dice, before modifiers
+ok('natural 2 dooms', summarizeCrows(1, 1, 0).doom === true);
+ok('natural 3 dooms', summarizeCrows(1, 2, 5).doom === true);
+ok('natural 4 does not doom', summarizeCrows(2, 2, -5).doom === false);
+ok('natural 19 crits', summarizeCrows(9, 10, 0).crit === true);
+ok('natural 20 crits', summarizeCrows(10, 10, 0).crit === true);
+ok('natural 18 does not crit', summarizeCrows(9, 9, 0).crit === false);
+ok('a modified 19 does not crit', summarizeCrows(9, 8, 2).crit === false);
+// the alpha needs no precedence rule: 2-3 and 19-20 sit at opposite ends of
+// the curve, so no roll can be both — asserted across every possible pair
+ok('doom and critical are mutually exclusive by construction', (() => {
+  for (let a = 1; a <= 10; a++) for (let b = 1; b <= 10; b++) {
+    const s = summarizeCrows(a, b, 0);
+    if (s.doom && s.crit) return false;
+  }
+  return true;
+})());
+// the tier reads the total and the flags read the dice — both facts survive
+ok('a bought-up doom keeps its band', summarizeCrows(1, 2, 10).doom === true && summarizeCrows(1, 2, 10).tier === 2);
+ok('a dragged-down crit keeps its flag', summarizeCrows(9, 10, -10).crit === true && summarizeCrows(9, 10, -10).tier === 1);
+// usage pools: every die showing 1-2 is removed, the rest remain
+ok('usage spends 1s and 2s', eq(summarizeCrowsUsage([3, 1, 6, 2]).spent, [1, 2]) && summarizeCrowsUsage([3, 1, 6, 2]).remain === 2);
+ok('usage none dead', summarizeCrowsUsage([3, 4, 5, 6]).remain === 4 && summarizeCrowsUsage([3, 4, 5, 6]).spent.length === 0);
+ok('usage all dead', summarizeCrowsUsage([1, 2, 1]).remain === 0);
+ok('a 3 survives the cut', summarizeCrowsUsage([3]).remain === 1);
+ok('a 2 does not', summarizeCrowsUsage([2]).remain === 0);
+// roll shape and routing
+{
+  const r = rollCrows('crows:+1');
+  ok('crows system tag', r.system === 'crows');
+  ok('crows rolls two d10', r.groups[0].dice.length === 2 && r.groups[0].sides === 10);
+  ok('crows total = a+b+mod', r.summary.total === r.groups[0].dice[0].value + r.groups[0].dice[1].value + 1);
+  const u = rollCrows('crows:u4');
+  ok('crows:u routes to the usage roll', u.groups[0].dieType === 'crows-usage' && u.groups[0].sides === 6 && u.groups[0].dice.length === 4);
+  ok('spent usage dice are dropped on the tray', u.groups[0].dice.every(d => d.kept === (d.value > 2)));
+  ok('usage summary matches the dice', u.summary.remain === u.groups[0].dice.filter(d => d.kept).length);
+  ok('rollAny routes crows', rollAny('crows:').system === 'crows');
+  ok('rollAny routes crows usage', rollAny('crows:u2').summary.mode === 'usage');
+  ok('rollCrowsUsage stands alone', rollCrowsUsage('crows:u3').groups[0].dice.length === 3);
+}
+// headline and detail
+{
+  const t3 = { summary: summarizeCrows(9, 7, 2) }; // total 18
+  ok('crows headline reads the outcome', crowsHeadline(t3).text === 'Success · 18' && crowsHeadline(t3).variant === 'crows-tier3');
+  ok('crows partial headline', crowsHeadline({ summary: summarizeCrows(6, 6, 2) }).text === 'Partial success · 14');
+  ok('crows failure headline', crowsHeadline({ summary: summarizeCrows(4, 4, 0) }).text === 'Failure · 8' && crowsHeadline({ summary: summarizeCrows(4, 4, 0) }).variant === 'crows-tier1');
+  const doom = { summary: summarizeCrows(1, 2, 0) };
+  ok('Doom takes the headline', crowsHeadline(doom).text === 'Doom! · 3' && crowsHeadline(doom).variant === 'crows-doom');
+  const crit = { summary: summarizeCrows(9, 10, 0) };
+  ok('Critical takes the headline', crowsHeadline(crit).text === 'Critical! · 19' && crowsHeadline(crit).variant === 'crows-crit');
+  ok('crows describe shows the math', /9 \+ 7 \+ 2 · total 18/.test(describeCrows(t3)));
+  ok('crows describe restores the band under a Doom', /failure · natural 3 — Doom/.test(describeCrows(doom)));
+  ok('crows describe names the crit', /natural 19 — Critical/.test(describeCrows(crit)));
+  const u = { summary: summarizeCrowsUsage([3, 1, 6, 2]) };
+  ok('usage headline counts the survivors', crowsHeadline(u).text === '2 remain');
+  ok('a lone survivor reads singular', crowsHeadline({ summary: summarizeCrowsUsage([1, 2, 5]) }).text === '1 remains');
+  const out = { summary: summarizeCrowsUsage([1, 2, 1]) };
+  ok('an emptied pool says so', crowsHeadline(out).text === 'The last die is spent' && crowsHeadline(out).variant === 'crows-out');
+  ok('usage describe names the dead faces', /a 1 and a 2 spent/.test(describeCrows(u)));
+  ok('usage describe counts doubles', /two 1s and a 2 spent/.test(describeCrows(out)));
+  ok('usage describe on a clean roll', /every die holds/.test(describeCrows({ summary: summarizeCrowsUsage([4, 5]) })));
 }
 
 // ---- Mothership 1e ----
