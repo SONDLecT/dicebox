@@ -533,6 +533,17 @@ const sampleSystemRoll = {
   ok('empty groups are rejected', !bad({ groups: [] }));
   ok('a non-object is rejected', !validateSystemRoll(null) && !validateSystemRoll('x'));
 
+  // Two-beat transitions travel inside roll2, and a rejected kind drops the
+  // WHOLE roll at the receiver, not just its animation — every kind that
+  // exists must be on the list (the willpower reroll shipped off it once).
+  const withTransition = kind => validateSystemRoll({
+    ...sampleSystemRoll, parentId: 'roll-1',
+    transition: { kind, held: [0, 1, 2], rerolled: [3], added: [4] },
+  });
+  ok('push, willpower, and surge transitions validate',
+     withTransition('push') && withTransition('willpower') && withTransition('surge'));
+  ok('an unknown transition kind is rejected', !withTransition('teleport'));
+
   // Fate dice are -1/0/+1 with no per-die sides — the numeric validator would
   // reject them, this one must not.
   ok('a Fate roll validates', validateSystemRoll({

@@ -4,7 +4,7 @@
 import { webcrypto } from 'node:crypto';
 if (!globalThis.crypto) globalThis.crypto = webcrypto;
 
-import { parseV5, rollV5, rollRouse, rerollV5, summarizeV5, detectSystem, describeV5, rollAny, v5Face, v5Headline } from '../system-dice.js';
+import { parseV5, rollV5, rollRouse, rerollV5, surgeV5, summarizeV5, detectSystem, describeV5, rollAny, v5Face, v5Headline } from '../system-dice.js';
 import { parseFate, rollFate, summarizeFate, describeFate, fateHeadline, fateFace, fateLadder } from '../system-dice.js';
 import { parseGenesys, rollGenesys, summarizeGenesys, describeGenesys, genesysHeadline, genesysFace, GENESYS_DICE } from '../system-dice.js';
 import { parseDaggerheart, rollDaggerheart, summarizeDaggerheart, describeDaggerheart, daggerheartHeadline } from '../system-dice.js';
@@ -246,6 +246,49 @@ ok('rollAny defers numeric', rollAny('4d6').deferred === true && rollAny('4d6').
   ok('the reroll carries the difficulty through', rr.summary.difficulty === 2);
   ok('out-of-range and phantom indices are ignored safely',
      rerollV5(base, [-1, 100, 'x']).groups[0].dice.every(d => d.rerolled === false));
+}
+
+// ---- Blood Surge: 1-4 regular dice ADDED after the roll, a Rouse riding along ----
+{
+  // A fixed four-die result (the two Hunger dice first) so the surge's effect
+  // is checkable die by die.
+  const base = {
+    schema: 2, system: 'v5', notation: 'v5:4h2',
+    groups: [{ kind: 'dice', dieType: 'v5', count: 4, dice: [
+      { value: 1, hunger: true, kept: true, rerolled: false, exploded: false, crit: null },
+      { value: 10, hunger: true, kept: true, rerolled: false, exploded: false, crit: null },
+      { value: 7, hunger: false, kept: true, rerolled: false, exploded: false, crit: null },
+      { value: 4, hunger: false, kept: true, rerolled: false, exploded: false, crit: null },
+    ] }],
+    summary: { kind: 'v5', pool: 4, hunger: 2, difficulty: 2 },
+  };
+
+  const s = surgeV5(base, 3, 4);
+  ok('a surge adds its dice to the pool', s.groups[0].dice.length === 7);
+  ok('the added dice are regular, never Hunger', s.groups[0].dice.slice(4).every(d => d.hunger === false));
+  ok('the original dice keep their faces',
+     s.groups[0].dice.slice(0, 4).map(d => d.value).join(',') === '1,10,7,4');
+  ok('the surge marks the summary', s.summary.surged === true && s.summary.surge.dice === 3);
+  ok('the notation total grows with the surge', s.notation === 'v5:7h2');
+  ok('the summary pool grows and the hunger count rides through',
+     s.summary.pool === 7 && s.summary.hunger === 2);
+  ok('the surge re-resolves the pool', s.summary.kind === 'v5' && Number.isInteger(s.summary.successes));
+  ok('a 4 on the ride-along Rouse fails it',
+     s.summary.surge.rouse.value === 4 && s.summary.surge.rouse.success === false);
+  ok('the surge carries the difficulty through', s.summary.difficulty === 2);
+  ok('a 7 on the ride-along Rouse holds', surgeV5(base, 2, 7).summary.surge.rouse.success === true);
+  // Blood Potency caps the surge at four dice; eligibility (one surge per
+  // roll) is the UI's concern, but the reducer clamps the count itself.
+  ok('the surge caps at four dice', surgeV5(base, 9, 7).groups[0].dice.length === 8);
+  // A spent Willpower reroll must not come back just because the pool grew.
+  const spent = { ...base, summary: { ...base.summary, willpowerAvailable: false, willpowerUsed: true } };
+  ok('surging never refreshes a spent Willpower reroll',
+     surgeV5(spent, 2, 8).summary.willpowerAvailable === false);
+  // The detail names the surge and the Rouse's fate after the arithmetic.
+  ok('the detail names the surge and a failed Rouse',
+     /Blood Surge \+3 · Hunger rises$/.test(describeV5(s)));
+  ok('the detail names a held Rouse',
+     /Blood Surge \+2 · the Blood holds$/.test(describeV5(surgeV5(base, 2, 9))));
 }
 
 // ---- Fate / Fudge ----

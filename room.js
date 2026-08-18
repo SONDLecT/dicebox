@@ -207,7 +207,11 @@ export function validateSystemRoll(msg) {
   if (msg.parentId != null && (typeof msg.parentId !== 'string' || msg.parentId.length > 96)) return false;
   if (msg.transition != null) {
     const t = msg.transition;
-    if (!t || typeof t !== 'object' || t.kind !== 'push') return false;
+    // Every two-beat mechanic that travels: the Year Zero-family push, the V5
+    // Willpower reroll, the V5 Blood Surge. Rejecting the kind here drops the
+    // WHOLE roll at the receiver, not just its animation — which is exactly
+    // what happened to willpower rerolls before the list grew past 'push'.
+    if (!t || typeof t !== 'object' || !['push', 'willpower', 'surge'].includes(t.kind)) return false;
     for (const key of ['held', 'rerolled', 'added']) {
       if (!Array.isArray(t[key]) || t[key].length > 100
           || t[key].some(index => !Number.isInteger(index) || index < 0 || index >= 100)) return false;

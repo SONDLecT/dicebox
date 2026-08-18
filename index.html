@@ -327,6 +327,10 @@
         reload. A <b>Rouse check</b> spends one die on its own to power a
         Discipline or wake for the night. It holds on a 6 or more and raises
         your Hunger on a 1 to 5. With Hunger at 0 it is just pass or fail.
+        After a pool roll, <b>Blood Surge</b> adds your surge dice — 1 to 4,
+        from Blood Potency, asked once and remembered (hold the button to
+        change it) — as ordinary dice, with a Rouse check riding along: fail
+        it and your Hunger rises for the next roll, never this one.
       </p>
       <p class="note">
         Each die wears a mark instead of a number. A success from 6 to 9 shows a
@@ -1345,6 +1349,10 @@
        row after a roll, the way the push button does. -->
   <section class="picker v5-picker" id="v5Picker" aria-label="Vampire dice" hidden>
     <button type="button" class="yz-push v5-willpower" id="v5Willpower" hidden>Willpower reroll</button>
+    <!-- Blood Surge pops in beside it: tap adds your surge dice (asked once,
+         from Blood Potency) with a Rouse check riding along; hold to change
+         the size. It ADDS dice after the roll, where Willpower rethrows. -->
+    <button type="button" class="yz-push" id="v5BloodSurge" hidden aria-label="Blood Surge — add your surge dice with a Rouse check; hold to set the size">Blood Surge</button>
     <div class="v5-row">
       <!-- The pool die: an ankh set in a d10, the same mark the tray draws on a
            V5 success — ink for the ordinary dice, blood for Hunger. -->

@@ -49,7 +49,7 @@ await OBR.broadcast.sendMessage('cc.dicebox.rolls', {
 | Type | Purpose | Correlated response |
 | --- | --- | --- |
 | `roll.request` | Numeric notation, all built-in systems, five deck modes, Rouse checks, and Ironsworn/Starforged oracles | `roll.result` or `roll.error` |
-| `action.request` | `push` by authoritative `rollId`, deck `shuffle`/`reset`, or `state.set` for the Hunger/Stress trackers | `roll.result`, `action.result`, or `roll.error` |
+| `action.request` | `push` by authoritative `rollId`, `surge` (V5 Blood Surge) by `rollId` plus `dice` (1-4 surge dice; the background rolls the ride-along Rouse and moves Hunger), deck `shuffle`/`reset`, or `state.set` for the Hunger/Stress trackers | `roll.result`, `action.result`, or `roll.error` |
 | `history.request` | Ask the local background for retained room history | One or more paged `history.result` messages |
 
 `requestId` is 1–96 characters and is echoed only in local responses. Reusing
@@ -60,7 +60,7 @@ and time out explicitly.
 ## Who owns what
 
 Dicebox owns RNG, notation interpretation, Hunger, Stress, decks, oracle
-lookup, push eligibility, history, timestamps, roll ids, and player
+lookup, push and surge eligibility, history, timestamps, roll ids, and player
 attribution. Callers provide intent, not precomputed outcomes. Deck state is
 shared across the whole Owlbear room (it lives in room metadata), so a draw
 requested through the bridge comes off the same deck every player at the table

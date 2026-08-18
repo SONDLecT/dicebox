@@ -203,6 +203,51 @@ export function rerollV5(result, indices) {
   };
 }
 
+// A Blood Surge: after seeing a pool roll, the vampire calls on the Blood —
+// a Rouse check, and 1-4 surge dice (from Blood Potency) ADDED to the roll as
+// ordinary dice, never Hunger. The pool re-resolves from all the faces; the
+// ride-along Rouse can raise the tracked Hunger going forward but never
+// recolours the roll it powered. The Rouse die itself is rolled by the CALLER
+// — each surface owns its own crypto draw and its own Hunger tracker — so
+// `rouseValue` arrives as a plain 1-10 and this stays a pure pool transform.
+export function surgeV5(result, count, rouseValue) {
+  const src = result?.groups?.[0]?.dice || [];
+  // Blood Potency bounds the surge at four dice. Out-of-range counts are
+  // clamped rather than thrown, the way rerollV5 quietly ignores bad indices.
+  const surge = Math.max(1, Math.min(4, Math.floor(Number(count) || 1)));
+  // Reroll marks belong to the roll that earned them; a copy that kept them
+  // would make a receiver replay a Willpower hop that already happened.
+  const dice = src.map(d => ({ ...d, rerolled: false }));
+  for (let i = 0; i < surge; i++) {
+    dice.push({ value: randInt(10), hunger: false, kept: true, rerolled: false, exploded: false, crit: null });
+  }
+  const pool = (Number.isInteger(result?.summary?.pool) ? result.summary.pool : src.length) + surge;
+  const hunger = Number.isInteger(result?.summary?.hunger)
+    ? result.summary.hunger : dice.filter(d => d.hunger).length;
+  const difficulty = result?.summary?.difficulty ?? null;
+  const summary = summarizeV5(dice, difficulty, pool, hunger);
+  // Surging never refreshes a spent Willpower reroll — once per roll is once,
+  // and the re-summarize alone would quietly offer it again.
+  if (result?.summary?.willpowerUsed) {
+    summary.willpowerAvailable = false;
+    summary.willpowerUsed = true;
+  }
+  summary.surged = true;
+  summary.surge = { dice: surge, rouse: { value: rouseValue, success: rouseValue >= 6 } };
+  // The notation stays the throw's truth: only the total grows, the Hunger
+  // count and difficulty ride through untouched (v5:5h2@3 becomes v5:7h2@3).
+  const m = /^v5:(\d+)((?:h\d+)?(?:@\d+)?)$/i.exec(String(result?.notation || '').trim());
+  const notation = m ? `v5:${Number(m[1]) + surge}${m[2]}`
+    : `v5:${pool}${hunger > 0 ? `h${hunger}` : ''}${difficulty !== null ? `@${difficulty}` : ''}`;
+  return {
+    schema: 2,
+    system: 'v5',
+    notation,
+    groups: [{ kind: 'dice', dieType: 'v5', count: dice.length, dice, subtotal: 0 }],
+    summary,
+  };
+}
+
 const OUTCOME_LABEL = {
   'messy-critical': 'Messy Critical',
   critical: 'Critical',
@@ -254,6 +299,12 @@ export function describeV5(result) {
   else if (s.critTwo) parts.push(s.critPairs > 1 ? `${s.critPairs} pairs of 10s` : 'a pair of 10s');
   const dice = v5Dice(result);
   if (dice) parts.push(dice);
+  // A Blood Surge rode on this roll: name the dice it added and how its Rouse
+  // went. The outcome above already speaks with the surge dice counted in.
+  if (s.surge) {
+    parts.push(`Blood Surge +${s.surge.dice}`);
+    parts.push(s.surge.rouse?.success ? 'the Blood holds' : 'Hunger rises');
+  }
   return parts.join(' · ');
 }
 

@@ -43,7 +43,7 @@ function moduleScope(name, exportsFrom = []) {
 
 const DICE_EXPORTS = ['roll', 'describe'];
 const SYSTEM_EXPORTS = [
-  'rollV5', 'rerollV5', 'describeV5', 'v5Headline', 'detectSystem', 'v5Face', 'parseV5',
+  'rollV5', 'rerollV5', 'surgeV5', 'describeV5', 'v5Headline', 'detectSystem', 'v5Face', 'parseV5',
   'rollFate', 'describeFate', 'fateHeadline', 'fateFace', 'parseFate',
   'rollGenesys', 'describeGenesys', 'genesysHeadline', 'parseGenesys',
   'rollDaggerheart', 'describeDaggerheart', 'daggerheartHeadline', 'parseDaggerheart',

@@ -2,7 +2,7 @@ import { roll, describe } from './dice.js';
 import { Die, Surface, separate, beginFrame } from './render.js';
 import { createRoom, parsePassphraseFromHash, validateRoll, validateSystemRoll } from './room.js';
 import { generatePassphrase, normalizePassphrase } from './room-crypto.js';
-import { rollV5, rollRouse, rerollV5, describeV5, v5Headline, detectSystem, v5Face, parseV5 } from './system-dice.js';
+import { rollV5, rollRouse, rerollV5, surgeV5, describeV5, v5Headline, detectSystem, v5Face, parseV5 } from './system-dice.js';
 import { formatHeadline, formatDetail } from './result-text.js';
 import { SYSTEM_THEMES } from './system-themes.js';
 import { createSharedDecks } from './shared-decks.js';
@@ -121,6 +121,11 @@ const state = {
   // the locked 6s/1s so they can be unlocked when the throw lands.
   pendingPush: null,
   pushKept: null,
+  // A Blood Surge held between its two beats, same shape of moment: the surge
+  // dice (and the Rouse die riding along) are picked up on the tray, and the
+  // next tap throws them to this pre-decided result. Every rolled die is
+  // locked — a surge adds, it never rethrows — so no kept-list is needed.
+  pendingSurge: null,
   // Last completed result currently represented on a remote/shared tray. Used
   // only to decide whether a following push transition can reuse those exact dice.
   remoteRollId: null,
@@ -495,6 +500,7 @@ function doRoll(notation, { viaOwlbear = true } = {}) {
 function throwResult(result, { writeField = true } = {}) {
   state.last = result;
   state.pendingPush = null; state.pushKept = null;   // a fresh throw cancels any half-done push
+  state.pendingSurge = null;   // and any half-done Blood Surge
   state.willpowerArmed = false; state.willpowerPicks = null;   // and any arming Willpower reroll
   state.remoteRollId = null;
   // Quick one-off rolls (an oracle draw, a progress roll) leave the field on the
@@ -617,6 +623,7 @@ function finish(result) {
   updateYzPush();
   updateBrPush();
   updateV5Willpower();
+  updateV5BloodSurge();
   updateT2kPush();
 }
 
@@ -1192,15 +1199,23 @@ for (const row of modeRows) {
 // Stress does — and 0 means it is not being tracked, where a Rouse check is only
 // pass/fail.
 const V5_HUNGER_KEY = 'dicebox:v5:hunger';
+// Surge dice come from Blood Potency — a character property like Hunger, so
+// the size (1-4) persists across reloads. 0 means never set: the first Blood
+// Surge asks for it, later ones spend it in a single tap (hold the button to
+// change it). Unlike Hunger it survives the X: Blood Potency does not move in
+// play, so sweeping the table has no reason to forget it.
+const V5_SURGE_KEY = 'dicebox:v5:surge';
 // `rouse` is a transient staging mode: a single Hunger die pulled into hand,
 // thrown on its own as a Rouse check rather than added to the action pool.
 // `flipped` is the per-roll clean-pool override: how many of this roll's
 // Hunger dice were swapped back for regular ones (a Willpower or Humanity
 // test takes no Hunger dice). It lasts one roll and never moves the tracker.
-const v5 = { pool: 0, hunger: 0, difficulty: null, rouse: false, flipped: 0 };
+const v5 = { pool: 0, hunger: 0, difficulty: null, rouse: false, flipped: 0, surgeDice: 0 };
 {
   const saved = Number(store.get(V5_HUNGER_KEY));
   if (Number.isFinite(saved) && saved >= 0 && saved <= 5) v5.hunger = Math.round(saved);
+  const surge = Number(store.get(V5_SURGE_KEY));
+  if (Number.isFinite(surge) && surge >= 1 && surge <= 4) v5.surgeDice = Math.round(surge);
 }
 const v5PoolFace = $('v5NormalFace');
 const v5HungerChip = $('v5HungerChip');
@@ -1382,6 +1397,7 @@ function armWillpower() {
   state.willpowerPicks = new Set();
   updateWillpowerReadout();
   updateV5Willpower();
+  updateV5BloodSurge();
   dropIdleCache();
   if (navigator.vibrate) navigator.vibrate(8);
 }
@@ -1394,6 +1410,7 @@ function cancelWillpower({ restore = true } = {}) {
   state.willpowerArmed = false;
   state.willpowerPicks = null;
   updateV5Willpower();
+  updateV5BloodSurge();
   dropIdleCache();
   if (restore && state.last) {
     try { setTotal(resultHeadline(state.last)); $('breakdown').textContent = resultDetail(state.last); }
@@ -1478,6 +1495,7 @@ function performWillpowerReroll() {
   state.last = rerolled;
   $('total').dataset.rolling = '1';
   updateV5Willpower();
+  updateV5BloodSurge();
   dropIdleCache();
   setTimeout(() => {
     for (const d of state.dice) d.locked = false;
@@ -1509,6 +1527,147 @@ function drawWillpowerMarks(ctx, t) {
     ctx.restore();
   });
 }
+
+// ---- V5 Blood Surge ----
+//
+// After seeing a pool roll, the vampire may call on the Blood: a Rouse check,
+// and 1-4 surge dice (Blood Potency) ADDED to the roll as ordinary dice,
+// never Hunger. The design doc's composition rule would leave this to the
+// pool buttons, but the owner ruled the after-the-roll timing earns the same
+// pop-in button the Willpower reroll has — a surge is a decision made looking
+// at a result, not one made building the pool. The ride-along Rouse moves the
+// tracker going forward only; the roll it powered keeps its colours.
+function v5SurgeEligible() {
+  const last = state.last;
+  return uiSystem === 'v5' && last && last.system === 'v5'
+    && last.summary && last.summary.kind === 'v5' && !last.summary.surged
+    && !state.pendingPush && !state.pendingSurge && !state.willpowerArmed
+    && $('total').dataset.idle !== '1' && $('total').dataset.rolling !== '1';
+}
+
+function updateV5BloodSurge() {
+  const btn = $('v5BloodSurge');
+  if (btn) btn.hidden = !v5SurgeEligible();
+}
+
+// The surge-size dial: Blood Potency's surge dice, asked once and remembered.
+// `perform` separates the first tap (set it, then surge at once — the player
+// asked for a Surge, not a setting) from a hold (just change the size).
+function openSurgeDial(perform) {
+  openNumberDial({
+    title: 'Surge dice', value: v5.surgeDice || 2, min: 1, max: 4,
+    actionLabel: 'Set Surge', inputLabel: 'Surge dice',
+    commit: value => {
+      v5.surgeDice = value;
+      store.set(V5_SURGE_KEY, String(value));
+      if (perform) performBloodSurge();
+    },
+  });
+}
+
+// Beat one, mirroring preparePush: every rolled die locks in place holding its
+// face — a surge rethrows nothing — while the added dice gather blank on the
+// right, plus ONE red Rouse die that rides the same throw. The Rouse die is
+// tray-local: it is not part of the shared result, so a peer sees the surge
+// dice added and reads the Rouse's fate in the detail line.
+function performBloodSurge() {
+  const last = state.last;
+  // A roll the background produced surges there too, so the whole table sees
+  // the transition; a roll that landed through the local fallback is unknown
+  // to the background and surges locally, exactly as a push routes.
+  if (owlbearPanel && last?.fromOwlbear && last?.rollId) {
+    requestOwlbearAction('surge', { rollId: last.rollId, dice: v5.surgeDice });
+    return;
+  }
+  if (!v5SurgeEligible() || v5.surgeDice < 1) return;
+  const parentId = last.rollId;
+  // The ride-along Rouse draws through the same crypto machinery as a lone
+  // Rouse check, then hands the pure reducer a plain value.
+  const rouseValue = rollRouse().summary.value;
+  const surged = surgeV5(last, v5.surgeDice, rouseValue);
+  const before = last.groups[0].dice.length;
+  const all = surged.groups[0].dice.map((_, i) => i);
+  surged.parentId = parentId;
+  surged.transition = { kind: 'surge', held: all.slice(0, before), rerolled: [], added: all.slice(before) };
+
+  const prev = state.dice;
+  const size = prev.length ? prev[0].size : 40;
+  for (const d of prev) { d.locked = true; d.picked = false; }
+  const picked = [];
+  const count = all.length - before;
+  for (let i = 0; i < count + 1; i++) {
+    const die = new Die(10, null, 0, 0, size);
+    // The last die in hand is the Rouse itself, red among the white.
+    if (i === count) die.hunger = true;
+    die.settled = true; die.settling = true; die.settleT = 1;
+    die.rot = [0.5, 0.6, 0.1];
+    die.picked = true;
+    prev.push(die); picked.push(die);
+  }
+  const { left, right, top, floor } = state.bounds;
+  const span = right - left, gap = span * 0.05;
+  packInto(picked, left + span * 0.56, right - gap, top + gap, floor - gap);
+  // Fresh dice snap into the cluster rather than easing from the tray corner.
+  for (const d of picked) { d.x = d.homeX; d.y = d.homeY; }
+
+  state.pendingSurge = surged;
+  $('total').dataset.idle = '1';
+  $('total').textContent = '—';
+  $('breakdown').textContent = 'Tap the tray to throw the Surge';
+  updateYzPush();
+  updateBrPush();
+  updateV5Willpower();
+  updateV5BloodSurge();
+  updateT2kPush();
+  dropIdleCache();
+  if (navigator.vibrate) navigator.vibrate(10);
+}
+
+// The second beat: throw the added handful across the felt to the values the
+// surge decided; the completed pool never moves. Mirrors rollPendingPush,
+// except the last tray die has no entry in the result's flat list — it is the
+// Rouse display die, stamped by hand.
+function rollPendingSurge() {
+  const surged = state.pendingSurge;
+  state.pendingSurge = null;
+  state.last = surged;
+  const flat = flattenRollDice(surged);
+  const rouse = surged.summary.surge.rouse;
+  rehomeUnlockedGrid(state.dice);
+  state.dice.forEach((d, i) => {
+    if (!d.picked) return;
+    d.picked = false;
+    if (i < flat.length) {
+      d.value = flat[i].value;
+      stampTrayDie(d, flat[i], surged);
+    } else {
+      d.value = rouse.value;
+      d.v5Face = v5Face(rouse.value, true);
+    }
+    d.throwWith((d.homeX - d.x) * 2.4, (d.homeY - d.y) * 2.4);
+  });
+  $('total').dataset.rolling = '1';
+  dropIdleCache();
+  setTimeout(() => {
+    for (const d of state.dice) d.locked = false;
+    // The Rouse rides along going forward only: a 1-5 raises the tracker for
+    // the NEXT roll, never recolouring the one that just resolved. restage
+    // stays off or the sync would sweep the landed dice from the tray.
+    if (!rouse.success) setHunger(v5.hunger + 1, { restage: false });
+    rouse.hungerAfter = v5.hunger;
+    finish(surged);
+  }, 760);
+  if (navigator.vibrate) navigator.vibrate([8, 40, 12]);
+}
+
+// Tap performs the Surge, asking for your surge dice the first time; hold
+// re-opens the dial to change the size without surging. bindTapHold's click
+// path gates on the hold having fired, so tap and hold can never both act.
+bindTapHold($('v5BloodSurge'), dir => {
+  if (dir !== 1) return;   // stepping down a one-way action means nothing
+  if (v5.surgeDice < 1) openSurgeDial(true);
+  else performBloodSurge();
+}, { onHold: () => openSurgeDial(false) });
 
 // A `v5:` pool typed into the field drives the controls, so the two never
 // disagree about what will roll. Invalid part-typed strings are left alone.
@@ -1754,6 +1913,7 @@ function preparePush() {
   updateYzPush();
   updateBrPush();
   updateV5Willpower();
+  updateV5BloodSurge();
   updateT2kPush();
   dropIdleCache();
   if (navigator.vibrate) navigator.vibrate(10);
@@ -5391,6 +5551,7 @@ function systemStageDescriptors() {
 // writes it).
 function stageSystemPool() {
   state.pendingPush = null; state.pushKept = null;   // building/restaging a pool abandons a pending push
+  state.pendingSurge = null;   // and a pending Blood Surge
   state.willpowerArmed = false; state.willpowerPicks = null;
   const staged = systemStageDescriptors().slice(0, ANIMATE_LIMIT).map(d => {
     const die = new Die(d.sides, null, 0, 0, 40);
@@ -5420,6 +5581,7 @@ function stageSystemPool() {
   updateYzPush();
   updateBrPush();
   updateV5Willpower();
+  updateV5BloodSurge();
   updateT2kPush();
 }
 
@@ -6796,6 +6958,10 @@ canvas.addEventListener('pointerup', e => {
   // or flick throws just that handful, leaving the kept 6s and 1s in place.
   if (state.pendingPush) { rollPendingPush(); return; }
 
+  // A pending Blood Surge works the same way: the added dice (and the Rouse
+  // die riding along) sit picked up, and any tap or flick throws that handful.
+  if (state.pendingSurge) { rollPendingSurge(); return; }
+
   // While a Willpower reroll is arming, taps select dice or throw the reroll —
   // they never roll fresh dice or edit the staged pool.
   if (state.willpowerArmed) { handleWillpowerTap(downX, downY); return; }
@@ -7290,7 +7456,7 @@ function alreadyShown(id) {
 
 function showRemotePushTransition(roll, result) {
   const transition = roll.transition;
-  if (!transition || !['push', 'willpower'].includes(transition.kind) || state.remoteRollId !== roll.parentId) return false;
+  if (!transition || !['push', 'willpower', 'surge'].includes(transition.kind) || state.remoteRollId !== roll.parentId) return false;
   if ($('total').dataset.rolling) return false;
   const flat = flattenRollDice(result);
   if (!flat.length || flat.length > ANIMATE_LIMIT) return false;
@@ -8005,6 +8171,7 @@ function presentOwlbearResult(data, pending) {
   state.last = result;
   state.pendingPush = null;
   state.pushKept = null;
+  state.pendingSurge = null;
   if (pending.writeField !== false) $('notation').value = result.notation;
   // The background already archived and published this outcome to Owlbear. The
   // panel may still mirror its own correlated intent into an explicitly joined
@@ -8014,6 +8181,7 @@ function presentOwlbearResult(data, pending) {
   updateYzPush();
   updateBrPush();
   updateV5Willpower();
+  updateV5BloodSurge();
   updateT2kPush();
 }
 

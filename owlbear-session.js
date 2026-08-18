@@ -3,7 +3,7 @@
 import { roll, parseNotation } from './dice.js';
 import {
   rollAny, detectSystem, rollRouse, resolveMothershipStress,
-  parseV5, parseMothership,
+  parseV5, parseMothership, surgeV5,
   pushYearZero, pushBladeRunner, pushTwilight,
   parseCards, parseTarot, parseNapoletane, parseHanafuda, parseUtagaruta,
   newDeckOrder, summarizeCards, summarizeTarot, randInt,
@@ -631,6 +631,9 @@ export async function initializeOwlbearBackground(OBR, options = {}) {
 
   const requested = new Map();
   const consumedPushes = new Set();
+  // A Blood Surge is one-shot per roll too, tracked apart from pushes so the
+  // two follow-ups can never spend each other.
+  const consumedSurges = new Set();
   // Only outcomes produced by this coordinator can authorize follow-up actions.
   // Remote table events are display/history data, never an authority source.
   const actionSources = new Map();
@@ -920,7 +923,7 @@ export async function initializeOwlbearBackground(OBR, options = {}) {
         await sendMessage(completed, { destination: 'LOCAL' });
         return;
       }
-      if (data.action !== 'push' || typeof data.rollId !== 'string' || data.rollId.length > 128) {
+      if (!['push', 'surge'].includes(data.action) || typeof data.rollId !== 'string' || data.rollId.length > 128) {
         await failRequest(data.requestId, signature, 'invalid_request', 'Unsupported or invalid action');
         return;
       }
@@ -929,17 +932,43 @@ export async function initializeOwlbearBackground(OBR, options = {}) {
         await failRequest(data.requestId, signature, 'not_found', 'The originating Dicebox roll is unavailable');
         return;
       }
-      const push = source.system === 'bladerunner' ? pushBladeRunner
-        : source.system === 'twilight' ? pushTwilight
-        : source.system === 'yearzero' ? pushYearZero
-        : null;
-      if (!push || !source.summary?.canPush || consumedPushes.has(source.id)) {
-        await failRequest(data.requestId, signature, 'action_unavailable', 'This roll cannot be pushed');
-        return;
-      }
       let result;
-      try { result = push(source); }
-      catch (error) { await failRequest(data.requestId, signature, 'action_failed', error); return; }
+      if (data.action === 'surge') {
+        // Blood Surge: 1-4 ordinary dice from Blood Potency, added to a V5
+        // pool roll, once. The panel says how many; the background rolls the
+        // ride-along Rouse and owns the Hunger it moves — the state snapshot
+        // on the result is what re-syncs every panel's tracker.
+        if (!Number.isInteger(data.dice) || data.dice < 1 || data.dice > 4) {
+          await failRequest(data.requestId, signature, 'invalid_request', 'Surge dice must be 1 to 4');
+          return;
+        }
+        if (source.system !== 'v5' || source.summary?.kind !== 'v5'
+            || source.summary?.surged || consumedSurges.has(source.id)) {
+          await failRequest(data.requestId, signature, 'action_unavailable', 'This roll cannot Blood Surge');
+          return;
+        }
+        try { result = surgeV5(source, data.dice, randInt(10)); }
+        catch (error) { await failRequest(data.requestId, signature, 'action_failed', error); return; }
+        // Unlike a lone Rouse (pass/fail while Hunger sits untracked at 0),
+        // the surge's failure always climbs — the app's local surge does the
+        // same, and the two surfaces must never disagree about a tracker.
+        if (!result.summary.surge.rouse.success) {
+          trackedState.hunger = Math.min(5, trackedState.hunger + 1);
+          safeSet(storage, 'dicebox:v5:hunger', String(trackedState.hunger));
+        }
+        result.summary.surge.rouse.hungerAfter = trackedState.hunger;
+      } else {
+        const push = source.system === 'bladerunner' ? pushBladeRunner
+          : source.system === 'twilight' ? pushTwilight
+          : source.system === 'yearzero' ? pushYearZero
+          : null;
+        if (!push || !source.summary?.canPush || consumedPushes.has(source.id)) {
+          await failRequest(data.requestId, signature, 'action_unavailable', 'This roll cannot be pushed');
+          return;
+        }
+        try { result = push(source); }
+        catch (error) { await failRequest(data.requestId, signature, 'action_failed', error); return; }
+      }
       const before = source.groups?.[0]?.dice || [];
       const after = result.groups?.[0]?.dice || [];
       const held = [], rerolled = [], added = [];
@@ -959,7 +988,7 @@ export async function initializeOwlbearBackground(OBR, options = {}) {
         groups: result.groups,
         summary: result.summary,
         total: result.total ?? null,
-        transition: { kind: 'push', held, rerolled, added },
+        transition: { kind: data.action, held, rerolled, added },
         who: String(playerName || 'Someone').slice(0, 40),
         at: now(),
         state: stateSnapshot(),
@@ -968,7 +997,7 @@ export async function initializeOwlbearBackground(OBR, options = {}) {
         await failRequest(data.requestId, signature, 'result_too_large', 'Dicebox result exceeds Owlbear’s message limit');
         return;
       }
-      consumedPushes.add(source.id);
+      (data.action === 'surge' ? consumedSurges : consumedPushes).add(source.id);
       requested.set(data.requestId, { signature, response: completed });
       if (requested.size > 400) requested.delete(requested.keys().next().value);
       await remember(completed);
@@ -979,7 +1008,7 @@ export async function initializeOwlbearBackground(OBR, options = {}) {
       await sendMessage({
         ...published,
         type: 'roll.transition',
-        transition: { kind: 'push', held, rerolled, added },
+        transition: { kind: data.action, held, rerolled, added },
       }, { destination: 'REMOTE' });
       showToast(completed);
       return;
