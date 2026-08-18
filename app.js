@@ -418,6 +418,7 @@ function doRoll(notation, { viaOwlbear = true } = {}) {
   // A staged Rouse is consumed the instant it is thrown, whichever route it
   // takes — the panel sends it to the background and never returns through the
   // local resolver, so the staging flag and field are cleared here for both.
+  if (typeof notation === 'string' && /^v5:\d/i.test(notation.trim())) v5.flipped = 0;
   if (typeof notation === 'string' && /^v5:rouse2?$/i.test(notation.trim())) {
     v5.rouse = 0;
     v5RouseBtn.classList.remove('is-staged');
@@ -1193,7 +1194,10 @@ for (const row of modeRows) {
 const V5_HUNGER_KEY = 'dicebox:v5:hunger';
 // `rouse` is a transient staging mode: a single Hunger die pulled into hand,
 // thrown on its own as a Rouse check rather than added to the action pool.
-const v5 = { pool: 0, hunger: 0, difficulty: null, rouse: false };
+// `flipped` is the per-roll clean-pool override: how many of this roll's
+// Hunger dice were swapped back for regular ones (a Willpower or Humanity
+// test takes no Hunger dice). It lasts one roll and never moves the tracker.
+const v5 = { pool: 0, hunger: 0, difficulty: null, rouse: false, flipped: 0 };
 {
   const saved = Number(store.get(V5_HUNGER_KEY));
   if (Number.isFinite(saved) && saved >= 0 && saved <= 5) v5.hunger = Math.round(saved);
@@ -1210,12 +1214,14 @@ function resetV5() {
   v5.pool = 0;
   v5.difficulty = null;
   v5.rouse = 0;
+  v5.flipped = 0;
   syncV5({ writeField: false });
 }
 
 // Move the tracked Hunger and persist it. `restage` is skipped mid-roll, when a
 // Rouse check is already throwing its own die and the pool must not re-stage.
 function setHunger(n, { restage = true, fromOwlbear = false } = {}) {
+  v5.flipped = 0;   // a moved tracker re-arms the default recolouring
   v5.hunger = Math.max(0, Math.min(5, Math.round(n)));
   if (owlbearPanel && !fromOwlbear && obrBackgroundUp) requestOwlbearAction('state.set', { state: { hunger: v5.hunger } });
   else store.set(V5_HUNGER_KEY, String(v5.hunger));
@@ -1234,12 +1240,15 @@ function syncV5Hunger() {
 // otherwise it is the pool + Hunger dice, with the Hunger count noted so the
 // receiver can colour them back. An empty throw writes nothing, so the readout
 // stays idle rather than showing a "v5:0".
+function v5Red() { return Math.max(0, Math.min(v5.hunger, v5.pool) - v5.flipped); }
+
 function v5Notation() {
   if (v5.rouse) return v5.rouse === 2 ? 'v5:rouse2' : 'v5:rouse';
   if (v5.pool < 1) return '';
   // The pool IS the total; the h-count is how many of it Hunger turns red —
-  // never more than the pool holds, however high the tracker sits.
-  const red = Math.min(v5.hunger, v5.pool);
+  // never more than the pool holds, and less when dice were flipped clean for
+  // a Willpower or Humanity test.
+  const red = v5Red();
   let s = `v5:${v5.pool}`;
   if (red > 0) s += `h${red}`;
   if (v5.difficulty !== null) s += `@${v5.difficulty}`;
@@ -1506,10 +1515,14 @@ function drawWillpowerMarks(ctx, t) {
 function syncV5FromField() {
   try {
     const { pool, hunger, difficulty } = parseV5($('notation').value);
-    // The notation total is the pool, exactly as the button counts it.
+    // The notation total is the pool, exactly as the button counts it. A typed
+    // h above the tracker raises it; a typed h below reads as this roll's
+    // clean-pool override (a Willpower test at Hunger 3 is v5:5 or v5:5h0),
+    // so typing a roll never silently drops the standing tracker.
     v5.pool = pool;
     v5.difficulty = difficulty;
-    setHunger(hunger, { restage: false });
+    if (hunger > v5.hunger) { v5.flipped = 0; setHunger(hunger, { restage: false }); }
+    else v5.flipped = Math.max(0, Math.min(v5.hunger, pool) - hunger);
     syncV5({ writeField: false });
   } catch { /* mid-type, not yet valid */ }
 }
@@ -5269,9 +5282,9 @@ function systemStageDescriptors() {
     case 'v5':
       // A staged Rouse is one Hunger die in hand — or two, keeping the better.
       if (v5.rouse) { add(v5.rouse, { sides: 10, hunger: true, kind: 'v5-rouse' }); break; }
-      // The pool is the total; the tracker recolours its tail red. It can never
-      // turn more dice red than the pool holds.
-      { const red = Math.min(v5.hunger, v5.pool);
+      // The pool is the total; the tracker recolours its tail red (minus any
+      // dice flipped clean for this roll).
+      { const red = v5Red();
         add(v5.pool - red, { sides: 10, kind: 'v5-normal' });
         add(red, { sides: 10, hunger: true, kind: 'v5-hunger' }); }
       break;
@@ -5415,10 +5428,12 @@ function stageSystemPool() {
 // tap on them is a gentle no-op rather than an error.
 function removeSystemStageKind(kind) {
   switch (kind) {
-    // Every V5 staged die is a pool die — the red ones are just the tail the
-    // Hunger tracker recoloured — so tapping any of them puts one die back.
-    // The tracker itself moves only at its own button and by a Rouse.
-    case 'v5-normal': case 'v5-hunger': v5.pool = Math.max(0, v5.pool - 1); syncV5(); return true;
+    // A white die tapped goes back in the box (pool − 1). A red die tapped is
+    // swapped for a clean one — same total, one fewer Hunger die, THIS roll
+    // only — because Willpower and Humanity tests take no Hunger dice. The
+    // tracker itself moves only at its own button and by a Rouse.
+    case 'v5-normal': v5.pool = Math.max(0, v5.pool - 1); syncV5(); return true;
+    case 'v5-hunger': v5.flipped = Math.min(v5.flipped + 1, Math.min(v5.hunger, v5.pool)); syncV5(); return true;
     case 'v5-rouse': v5.rouse = Math.max(0, Number(v5.rouse) - 1); syncV5(); return true;
     // Optional extras come back off the tray the way they went on: the Blade
     // Runner advantage die clears the Odds, a Twilight ammo die drops the pool
