@@ -85,6 +85,16 @@ gestures — so what is in and out of scope is never a surprise at the table.
   rerolled dice carry marks; percentile tens dice read 00–90. The tray after
   a roll is the record of what happened, not a cleaned-up summary.
 
+## The constant chrome
+
+The notation field, the **X**, the **Roll** button, and the history below
+them are the same four things in every system, and they behave identically
+everywhere. **Roll rolls whatever is in the current pool** — staged dice, an
+armed reroll's picked dice, a staged Rouse — never something else. **X
+resets the current pool** to empty, or to the system's default pool where
+the rules fix one, and as the full table sweep it also clears trackers.
+A system may add controls; it may never change what these four do.
+
 ## Pickers
 
 - **One row.** A system's picker is a single row of controls wherever
