@@ -2418,7 +2418,7 @@ function bindTapHold(el, step, { onHold = null } = {}) {
 // up from it enters at `enter` (Shadowdark's Normal 12), never at min — a
 // table that says "roll it" means the book's default difficulty, not DC 1.
 // `railLabel` may name specific values on the rail (the DC ladder's words).
-function bindScrubDial(el, { get, set, min, max, format = v => String(v), unset = null, railLabel = null, tapEntry = false, tap = null, onEntry = null } = {}) {
+function bindScrubDial(el, { get, set, min, max, format = v => String(v), unset = null, railLabel = null, tapEntry = false, tap = null, onEntry = null, holdEntry = false } = {}) {
   if (!el) return null;
   const clamp = v => Math.max(min, Math.min(max, v));
 
@@ -2606,7 +2606,14 @@ function bindScrubDial(el, { get, set, min, max, format = v => String(v), unset 
   };
   el.addEventListener('wheel', onWheelNotch, { passive: false });
 
-  let scrub = null, scrubbed = false;
+  // Tap-vs-scrub discrimination, tuned on a real phone: within TAP_SLOP px
+  // of travel the press can still be a tap; ONE pixel beyond it the gesture
+  // is a scrub — even if it never reaches a full 28px notch, the way a real
+  // wheel turns partway and settles back. 9px absorbs the wobble of a
+  // fingertip pressing down (6px classified honest scrub attempts as taps,
+  // which on the d? button threw the typing keyboard at every miss).
+  const TAP_SLOP = 9;
+  let scrub = null, scrubEndedAt = -Infinity, holdTimer = null;
   el.addEventListener('pointerdown', e => {
     if (e.button !== undefined && e.button !== 0) return;
     const v0 = get();
@@ -2622,6 +2629,18 @@ function bindScrubDial(el, { get, set, min, max, format = v => String(v), unset 
       floor: unset ? (fromUnset ? unset.enter - 1 : min - 1) : min,
       dragging: false,
     };
+    // `holdEntry`: typed entry lives behind a long-press instead of the tap
+    // (the d? button — its tap is spoken for by minting). A press that is
+    // still inside the slop when the hold matures opens the editor and
+    // disarms the gesture, so the later release neither taps nor scrubs.
+    if (holdEntry) {
+      holdTimer = setTimeout(() => {
+        holdTimer = null;
+        scrub = null;
+        if (navigator.vibrate) navigator.vibrate(8);
+        openEntry();
+      }, 450);
+    }
     // Capture so the scrub survives the finger wandering off the pill — the
     // whole point of a drag is that you stop looking at the control.
     try { el.setPointerCapture(e.pointerId); } catch { /* synthetic pointer */ }
@@ -2634,8 +2653,11 @@ function bindScrubDial(el, { get, set, min, max, format = v => String(v), unset 
     // window — the drag turns the object the rail draws.
     const dy = e.clientY - scrub.y0;
     if (!scrub.dragging) {
-      if (Math.abs(dy) <= 6) return;   // inside the tap budget — not a scrub yet
+      if (Math.abs(dy) <= TAP_SLOP) return;   // inside the tap budget
       scrub.dragging = true;
+      // Moving past the slop is a scrub, so the press can no longer become
+      // a long-press either.
+      if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
       showRail();
     }
     const { value, remainder } = scrubValue(scrub.v0, dy, scrub.floor, max);
@@ -2649,20 +2671,30 @@ function bindScrubDial(el, { get, set, min, max, format = v => String(v), unset 
     updateRail(value, remainder / SCRUB_PX_PER_STEP, scrub.floor);
   });
   const endScrub = () => {
+    if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
     if (!scrub) return;
-    // The browser synthesises a click after pointerup; a finished scrub must
-    // not let it add a bonus step on the way out.
-    scrubbed = scrub.dragging;
+    // Mark WHEN a real scrub ended rather than latching a boolean. Desktop
+    // browsers synthesise a click right after the drag's pointerup and the
+    // timestamp window below swallows it; touch browsers synthesise no
+    // click after a drag AT ALL, which is exactly why a boolean latch went
+    // stale there and silently ate the next genuine tap — the "scrub then
+    // tap won't lock in" bug from the phone.
+    scrubEndedAt = scrub.dragging ? performance.now() : -Infinity;
     scrub = null;
     hideRail();
   };
   el.addEventListener('pointerup', endScrub);
   el.addEventListener('pointercancel', endScrub);
   el.addEventListener('click', () => {
-    if (scrubbed) { scrubbed = false; return; }
+    // The synthetic post-drag click lands within a frame or two of
+    // pointerup; a deliberate follow-up tap takes a human moment. 120ms
+    // cleanly separates them.
+    if (performance.now() - scrubEndedAt < 120) return;
+    // While the inline editor is up, every pointer belongs to it.
+    if (entry) return;
     // A control may bring its own tap (the Blood Surge button performs an
     // ACTION on tap; scrubbing only sets its size) — still behind the
-    // scrubbed gate, so a drag can never fall through to it.
+    // post-drag gate, so a drag can never fall through to it.
     if (tap) { tap(); return; }
     // On a huge-range chip the tap types instead of stepping — +1 across
     // a d100 line is a gesture nobody meant.
@@ -7326,13 +7358,19 @@ function mintCustomDie(sides) {
   button.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
 }
 
+// Gesture map, tuned on a phone: the tap is spoken for by minting, so the
+// typed entry lives behind a LONG-PRESS here rather than the tap — with
+// tap-to-type, every scrub attempt that wobbled inside the slop threw the
+// keyboard at the player mid-gesture. A tap with nothing pending flashes
+// the rail instead: harmless, and it teaches that this button scrubs.
 const customApi = bindScrubDial(customBtn, {
   get: () => customPending ?? customSides,
   set: setCustomPreview,
   min: 1, max: MAX_SIDES,
   format: v => `d${v}`,
-  tap: () => { if (customPending !== null) mintCustomDie(customPending); else customApi.openEntry(); },
+  tap: () => { if (customPending !== null) mintCustomDie(customPending); else customApi.flashRail(); },
   onEntry: mintCustomDie,
+  holdEntry: true,
 });
 
 // ---- modifier sheet ----

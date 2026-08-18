@@ -197,14 +197,25 @@ ok('the popup number dial is fully retired',
    !/openNumberDial/.test(js) && !/openCountDial/.test(js) &&
    !/id="dial"/.test(html) && !/id="wheel"/.test(html) &&
    !css.includes('.wheel-item') && !css.includes('.dial-entry'));
-// The d? flow that cannot mint an accidental die: scrubbing only previews
-// (the label says dN), and only a tap mints — the previewed size after a
-// scrub, or the typed size through the entry door.
-ok('the custom die previews on scrub and mints only on a tap',
+// The d? flow that cannot mint an accidental die OR ambush a scrub with
+// the keyboard: scrubbing only previews (the label says dN), a tap mints
+// the preview (or, with nothing pending, flashes the rail — a teaching
+// moment, never a keyboard), and typed entry hides behind a long-press.
+ok('the custom die previews on scrub, mints on tap, types on hold',
    /set: setCustomPreview/.test(js) &&
-   /tap: \(\) => \{ if \(customPending !== null\) mintCustomDie\(customPending\); else customApi\.openEntry\(\); \}/.test(js) &&
+   /tap: \(\) => \{ if \(customPending !== null\) mintCustomDie\(customPending\); else customApi\.flashRail\(\); \}/.test(js) &&
    /onEntry: mintCustomDie/.test(js) &&
+   /holdEntry: true/.test(js) &&
    /function mintCustomDie\(sides\) \{[\s\S]{0,300}ensureDieButton\(sides\);[\s\S]{0,80}addToPool\(sides, perTap\(\)\);/.test(js));
+// The touch-gesture regression Emory found on the phone: a boolean "was
+// scrubbing" latch goes stale on touch (no synthetic click after a drag),
+// eating the next genuine tap. The guard must be a time window, and the
+// slop must be wide enough that a fingertip's wobble is not a tap.
+ok('tap-vs-scrub is a slop plus a time window, not a latch',
+   /const TAP_SLOP = 9;/.test(js) &&
+   /Math\.abs\(dy\) <= TAP_SLOP/.test(js) &&
+   /performance\.now\(\) - scrubEndedAt < 120/.test(js) &&
+   !/let scrub = null, scrubbed = false/.test(js));
 // The two hold count-dials became button barrels on the Blood Surge
 // precedent: tap still adds one (the dice grammar), scrub sets the count.
 ok('the CT pool and the Twilight magazine scrub their counts in place',
