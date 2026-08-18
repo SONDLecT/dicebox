@@ -94,14 +94,20 @@ gestures — so what is in and out of scope is never a surprise at the table.
   silhouette of its die (d6 rounded square, d8 diamond, d10 kite, d12
   pentagon) or the system's own mark (the V5 ankh-in-a-d10, the Rouse maw).
   Never a generic rectangle for a die.
-- **Tap adds; hold scales with the pool.** Where a pool plausibly stays small
-  (a handful of a kind), holding a die button removes one — the quick
-  gesture. Where counts run high (a V5 pool, the narrative and Year Zero
-  chips, a CthulhuTech pool), hold opens the shared rotary count dial on that
-  die instead — scroll a big handful on in one gesture, or scroll the lot
-  back to nothing. A menu appears only where a die has real per-die options
-  (the numeric picker's modifier sheet). Tapping staged dice on the tray
-  removes regardless.
+- **Tap adds; hold scales with the button's count.** The measure is one
+  button's realistic count, not the whole roll's. Where that count stays
+  within tapping distance (a rating of 1-5 per chip, a V5 pool in the low
+  teens), holding the button removes one — the quick gesture. Where a single
+  button's count genuinely runs large (a CthulhuTech pool of 8-16, a magazine
+  of Twilight ammo), hold opens the shared rotary count dial instead —
+  scroll a big handful on in one gesture, or scroll the lot back to nothing.
+  A menu appears only where a die has real per-die options (the numeric
+  picker's modifier sheet). Tapping staged dice on the tray removes
+  regardless.
+- **Caps come from the book or nowhere.** A tracked stat wears its printed
+  cap (Hunger 0-5, Stress's floor of 2). A pool the rules leave uncapped gets
+  only an engine sanity bound, far past table reality — and counts always
+  clamp at their bounds, never roll over.
 - **Numbers are chips or the dial, and unset is the default.** A non-dice
   number (Difficulty, Target, a modifier) is never a bare input: small ranges
   are spin-chips (tap up, hold down), wide ranges open the shared number

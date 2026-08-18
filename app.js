@@ -1254,8 +1254,11 @@ function v5StepPool(by) { v5.rouse = false; v5.pool = Math.max(0, Math.min(v5.po
 
 // Tap the Pool die to add one, hold (or right-click) to remove; a die tapped in
 // the tray comes off too.
-// The count dial a large pool's die button opens on hold: scroll straight to
-// any count, including zero. Tap still adds one; the tray still removes one.
+// The count dial a die button opens on hold — only where a SINGLE button's
+// count realistically runs large (a CthulhuTech pool of 8-16, a magazine of
+// ammo dice): scroll straight to any count, including zero. Buttons whose
+// per-type counts stay small keep the quick hold-removes-one instead. Tap
+// still adds one; the tray still removes one.
 function openCountDial(title, value, max, commit) {
   openNumberDial({
     title, value, min: 0, max,
@@ -1264,9 +1267,7 @@ function openCountDial(title, value, max, commit) {
   });
 }
 
-bindTapHold(v5PoolFace, dir => v5StepPool(dir), {
-  onHold: () => openCountDial('Pool dice', v5.pool, 100, n => { v5.rouse = false; v5.pool = n; syncV5(); }),
-});
+bindTapHold(v5PoolFace, dir => v5StepPool(dir));
 
 // Hunger is the one deliberate hunger control: tap to raise your level (a red die
 // joins the pool), hold to lower. It is standing state, so nothing about building
@@ -1591,17 +1592,10 @@ function syncGenFromField() {
   } catch { /* mid-type, not yet valid */ }
 }
 
-// Tap a chip to add that die; hold it (or right-click) for the count dial —
-// narrative pools run large, so the dial sets any count in one gesture.
-function genSetCount(type, n) {
-  const others = GEN_TYPES.reduce((s, t) => s + (t.type === type ? 0 : gen[t.type]), 0);
-  gen[type] = Math.max(0, Math.min(n, 100 - others));
-  syncGen();
-}
+// Tap a chip to add that die; hold it (or right-click) to remove one — per-type
+// counts stay small (a rating of 1-5 each), so the quick gesture is the right one.
 for (const t of GEN_TYPES) {
-  bindTapHold($(`gen-${t.type}`), dir => genStep(t.type, dir), {
-    onHold: () => openCountDial(`${t.label} dice`, gen[t.type], 20, n => genSetCount(t.type, n)),
-  });
+  bindTapHold($(`gen-${t.type}`), dir => genStep(t.type, dir));
 }
 
 // ---- Year Zero pool ----
@@ -1654,15 +1648,8 @@ function syncYzFromField() {
   } catch { /* mid-type, not yet valid */ }
 }
 
-function yzSetCount(type, n) {
-  const others = YZ_TYPES.reduce((s, t) => s + (t.type === type ? 0 : yz[t.type]), 0);
-  yz[type] = Math.max(0, Math.min(n, 100 - others));
-  syncYz();
-}
 for (const t of YZ_TYPES) {
-  bindTapHold($(`yz-${t.type}`), dir => yzStep(t.type, dir), {
-    onHold: () => openCountDial(`${t.label} dice`, yz[t.type], 20, n => yzSetCount(t.type, n)),
-  });
+  bindTapHold($(`yz-${t.type}`), dir => yzStep(t.type, dir));
 }
 
 // A push is two beats, the way it feels at the table: pressing Push leaves your
@@ -2182,9 +2169,7 @@ for (const btn of torFlagButtons) {
   });
 }
 // Tap the d6 to add a Success die, hold to remove one.
-bindTapHold(torAddSuccess, dir => { tor.success = Math.max(0, Math.min(20, tor.success + dir)); syncTor(); }, {
-  onHold: () => openCountDial('Success dice', tor.success, 20, n => { tor.success = Math.max(0, Math.min(20, n)); syncTor(); }),
-});
+bindTapHold(torAddSuccess, dir => { tor.success = Math.max(0, Math.min(20, tor.success + dir)); syncTor(); });
 // The Target Number opens the shared number dial (1-30), with "Table sets it"
 // as the unset state.
 torTnChip.addEventListener('click', () => {
