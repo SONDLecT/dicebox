@@ -24,6 +24,7 @@ import { parseTarot, summarizeTarot, tarotHeadline, describeTarot } from '../sys
 import { parseNapoletane } from '../system-dice.js';
 import { parseIronsworn, rollIronsworn, summarizeIronsworn, describeIronsworn, ironswornHeadline } from '../system-dice.js';
 import * as systemModule from '../system-dice.js';
+import { scrubValue, wheelStep, SCRUB_PX_PER_STEP } from '../scrub-math.js';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, extra = '') => {
@@ -1332,6 +1333,29 @@ for (const bad of ['iron:p11', 'iron:21', 'iron:-10', 'iron:xyz', 'ironx', 'dg:6
   }
   const p = rollIronsworn('iron:p0');
   ok('progress roll has no action die', !p.groups[0].dice.some(d => d.role === 'action'));
+}
+
+// ---- the scrub dial's step math (UI prototype; the math is kept pure) ----
+// The pointer work lives in app.js, but every pixels-to-steps decision runs
+// through scrub-math.js so a regression here fails a suite instead of
+// feeling like a sticky dial at a table.
+{
+  ok('a scrub inside the dead zone holds the value',
+     eq(scrubValue(0, 10, -20, 20), { value: 0, remainder: 10 }));
+  ok('28px up is one step up', scrubValue(0, 28, -20, 20).value === 1);
+  ok('56px down is two steps down', eq(scrubValue(0, -56, -20, 20), { value: -2, remainder: 0 }));
+  ok('the remainder carries the fraction toward the next step',
+     eq(scrubValue(0, 34, -20, 20), { value: 1, remainder: 6 }));
+  ok('a negative remainder mirrors it', eq(scrubValue(0, -34, -20, 20), { value: -1, remainder: -6 }));
+  ok('the clamp holds at max and zeroes the remainder',
+     eq(scrubValue(19, 90, -20, 20), { value: 20, remainder: 0 }));
+  ok('the clamp holds at min', eq(scrubValue(-19, -300, -20, 20), { value: -20, remainder: 0 }));
+  ok('a custom step size scales the travel', scrubValue(0, 84, 0, 99, 42).value === 2);
+  ok('wheel up is +1 whatever the delta', wheelStep(0, -1, -20, 20) === 1 && wheelStep(0, -240, -20, 20) === 1);
+  ok('wheel down is -1 whatever the delta', wheelStep(0, 1, -20, 20) === -1 && wheelStep(0, 180, -20, 20) === -1);
+  ok('a zero delta is no step', wheelStep(5, 0, -20, 20) === 5);
+  ok('the wheel clamps, never wraps', wheelStep(20, -1, -20, 20) === 20 && wheelStep(-20, 1, -20, 20) === -20);
+  ok('one default step is 28px', SCRUB_PX_PER_STEP === 28);
 }
 
 console.log(`\nsystem-dice: ${pass} passed, ${fail} failed`);

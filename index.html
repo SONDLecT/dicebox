@@ -608,7 +608,10 @@
         for one: one edge adds <b>+2</b>, one bane subtracts 2, a <b>double
         edge</b> raises the tier by one instead (a double bane lowers it). A
         skill that applies to a test adds +2 — fold it into the characteristic.
-        Tap Edge or Bane to raise it, hold to lower.
+        Tap Edge or Bane to raise it, hold to lower. The <b>Power Roll</b>
+        button stages the 2d10 with the current chips — it never rolls, so
+        after a numeric damage roll one tap puts the power roll back in hand
+        and <b>Roll</b> (or the tray) throws it.
       </p>
       </div>
 
@@ -630,7 +633,10 @@
         <b>usage die</b> to build an item's pool instead (hold to remove one):
         each dungeon turn the pool is rolled and every die showing <b>1–2</b>
         is spent and comes off the item, the rest remain. Items live on your
-        sheet — type or tap the pool each time.
+        sheet — type or tap the pool each time. The <b>Power Roll</b> button
+        stages the 2d10 back — the way home from a usage pool — and never
+        rolls: <b>Roll</b> and the tray do the throwing. The <b>Modifier</b>
+        is a scrub dial: tap for +1, or drag or scroll it up and down.
       </p>
       <p class="note">
         <i>Implements the May 2026 alpha playtest packet. The rules will change
@@ -648,10 +654,13 @@
       </dl>
       <p class="note">
         The check: <b>d20</b> plus a stat modifier against a DC — <b>equal or
-        over succeeds</b>. The book's ladder is Easy <b>9</b>, Normal
-        <b>12</b>, Hard <b>15</b>, Extreme <b>18</b>: tap the DC chip to step
-        up it, hold to step back, or leave it unset and the table judges the
-        number. A natural <b>20</b> is a <b>critical</b> and always succeeds
+        over succeeds</b>. The Modifier and DC chips are <b>scrub dials</b>:
+        tap for one step up, or drag or scroll them. The DC runs the whole
+        <b>1–30</b> line with the book's ladder named on the way (Easy
+        <b>9</b>, Normal <b>12</b>, Hard <b>15</b>, Extreme <b>18</b>); scrub
+        below 1 and it is unset — the table judges. From unset, a tap or an
+        upward step enters at Normal 12. A natural <b>20</b> is a
+        <b>critical</b> and always succeeds
         (an attack deals double damage dice); a natural <b>1</b> is a
         <b>fumble</b> and always fails. With advantage or disadvantage the
         crit reads from the <b>kept</b> die. Attacks (vs AC) and spellcasting
@@ -661,11 +670,13 @@
       <p class="note">
         <b>The torch</b> burns for <b>one hour of real time</b>. Tap it and
         the hour starts — it keeps burning across reloads and mode switches,
-        because the clock is the rule. Tap a burning torch to snuff it, a dead
-        one to light fresh; the <b>X</b> snuffs it with the rest of the table.
-        Under ten minutes it gutters; at zero, darkness. The torch is a clock,
-        not a roll, so it has no notation — and it never shares to a room:
-        your torch, your clock.
+        because the clock is the rule. While it has a state it also stands
+        <b>on the tray</b>, casting its light across the felt — the tray
+        torch and the picker button are the same control: tap either burning
+        one to snuff it, a dead one to light fresh; the <b>X</b> snuffs it
+        with the rest of the table. Under ten minutes it gutters; at zero,
+        darkness. The torch is a clock, not a roll, so it has no notation —
+        and it never shares to a room: your torch, your clock.
       </p>
       </div>
 
@@ -1761,11 +1772,19 @@
     </button>
   </section>
 
-  <!-- Draw Steel: the 2d10 power roll stages itself, so one row of chips — the
-       characteristic spinner, then Edge and Bane tap-counters. Edges and banes
-       are conditions, not dice, so they wear count badges rather than
-       die silhouettes. -->
+  <!-- Draw Steel: the 2d10 power roll stages itself, so the row is the Power
+       Roll tile — the paired d10s, select-and-stage, the way back after a
+       numeric damage pool took the tray — then the characteristic spinner and
+       the Edge and Bane tap-counters. Edges and banes are conditions, not
+       dice, so they wear count badges rather than die silhouettes. -->
   <section class="picker ds-picker" id="dsPicker" aria-label="Draw Steel roll" hidden>
+    <button type="button" class="die-btn power-roll" id="dsPowerRoll" aria-label="Power Roll — stages the 2d10 power roll. It never rolls: Roll or a tap on the tray throws it">
+      <svg class="die-ico power-ico" viewBox="0 0 40 30" aria-hidden="true">
+        <path class="power-die-rear" d="M29 2 37.5 10.2 29 22.4 20.5 10.2Z"/>
+        <path d="M13 4 23 13.7 13 28 3 13.7Z"/>
+      </svg>
+      <span class="die-btn-label">Power Roll</span>
+    </button>
     <button type="button" class="spin-chip" id="dsCharChip" aria-label="Characteristic — tap to raise, hold to lower">
       <span class="spin-chip-label">Characteristic</span>
       <span class="spin-chip-val" id="dsChar">0</span>
@@ -1788,11 +1807,21 @@
     </button>
   </section>
 
-  <!-- Crows: the 2d10 power roll stages itself, so the row is the usage d6 —
-       which builds an item's pool in the tray instead — and the one modifier
-       chip (characteristic + skill + circumstance, resolved by the player).
-       The d6 shows a die burning down: two pips solid, one already fading. -->
+  <!-- Crows: the 2d10 power roll stages itself, so the row is the Power Roll
+       tile — the paired d10s, select-and-stage, and the way BACK from a usage
+       pool: it wears aria-pressed so a glance says which of the two rolls the
+       tray holds — then the usage d6, which builds an item's pool instead,
+       and the one modifier chip (characteristic + skill + circumstance,
+       resolved by the player; the scrub-dial prototype). The d6 shows a die
+       burning down: two pips solid, one already fading. -->
   <section class="picker crows-picker" id="crowsPicker" aria-label="Crows roll" hidden>
+    <button type="button" class="die-btn power-roll" id="crowsPowerRoll" aria-pressed="true" aria-label="Power Roll — stages the 2d10 power roll, setting any usage pool aside. It never rolls: Roll or a tap on the tray throws it">
+      <svg class="die-ico power-ico" viewBox="0 0 40 30" aria-hidden="true">
+        <path class="power-die-rear" d="M29 2 37.5 10.2 29 22.4 20.5 10.2Z"/>
+        <path d="M13 4 23 13.7 13 28 3 13.7Z"/>
+      </svg>
+      <span class="die-btn-label">Power Roll</span>
+    </button>
     <button type="button" class="die-btn" id="crowsUsage" aria-label="Usage — build an item's pool of d6, hold to remove one">
       <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true">
         <rect x="5" y="5" width="20" height="20" rx="4.5"/>
@@ -1801,7 +1830,7 @@
       </svg>
       <span class="die-btn-label">Usage</span>
     </button>
-    <button type="button" class="spin-chip" id="crowsModChip" aria-label="Modifier — characteristic plus skill plus circumstance, tap to raise, hold to lower">
+    <button type="button" class="spin-chip scrub-dial" id="crowsModChip" aria-label="Modifier — characteristic plus skill plus circumstance. Tap to raise, drag or scroll to scrub up and down">
       <span class="spin-chip-label">Modifier</span>
       <span class="spin-chip-val" id="crowsMod">0</span>
     </button>
@@ -1809,9 +1838,10 @@
 
   <!-- Shadowdark: the check d20 stages itself, so the row is the two keep-pair
        flags (kept die + chevrons pointing where the kept NUMBER goes — up for
-       advantage, down for disadvantage) around the torch and the DC ladder
-       chip. The torch is the centerpiece: a real-time rules clock, not a die,
-       whose label is the time it has left. -->
+       advantage, down for disadvantage) around the torch and the scrub-dial
+       Modifier and DC chips. The torch button is the clock's readout; while
+       the torch has a state it also stands on the tray itself, lit and
+       casting light, and both are the same control. -->
   <section class="picker sd-picker" id="sdPicker" aria-label="Shadowdark roll" hidden>
     <button type="button" class="sd-adv" data-adv="a" aria-pressed="false" aria-label="Advantage — roll 2d20, keep the higher">
       <svg class="sd-keep-dice" viewBox="0 0 40 40" aria-hidden="true">
@@ -1829,11 +1859,11 @@
       </svg>
       <span class="die-btn-label" id="sdTorchTime">Torch</span>
     </button>
-    <button type="button" class="spin-chip" id="sdModChip" aria-label="Stat modifier — tap to raise, hold to lower">
+    <button type="button" class="spin-chip scrub-dial" id="sdModChip" aria-label="Stat modifier — tap to raise, drag or scroll to scrub up and down">
       <span class="spin-chip-label">Modifier</span>
       <span class="spin-chip-val" id="sdMod">0</span>
     </button>
-    <button type="button" class="spin-chip" id="sdDcChip" aria-label="DC — tap to step up the book's ladder, hold to step down; unset and the table judges">
+    <button type="button" class="spin-chip scrub-dial" id="sdDcChip" aria-label="DC — drag or scroll through 1 to 30, down past 1 the table judges. From unset a tap or step up enters at Normal 12">
       <span class="spin-chip-label">DC</span>
       <span class="spin-chip-val" id="sdDcVal" data-unset="1">—</span>
     </button>

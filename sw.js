@@ -30,6 +30,7 @@ const ASSETS = [
   './system-themes.js',
   './result-text.js',
   './system-dice.js',
+  './scrub-math.js',
   './oracle-dice.js',
   // The deck art modules — big (cards ~1.1MB, tarot ~4.5MB), so the app pulls
   // each with a dynamic import only when its mode is opened; precaching them

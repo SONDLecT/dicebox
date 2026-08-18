@@ -78,6 +78,7 @@ const ROOM_CRYPTO_EXPORTS = [
   'normalizePassphrase', 'generatePassphrase', 'PROTOCOL_VERSION',
 ];
 const ROOM_EXPORTS = ['createRoom', 'parsePassphraseFromHash', 'validateRoll', 'validateSystemRoll'];
+const SCRUB_EXPORTS = ['scrubValue', 'wheelStep'];
 const RESULT_TEXT_EXPORTS = ['formatHeadline', 'formatDetail'];
 const SYSTEM_THEME_EXPORTS = ['SYSTEM_THEMES'];
 const SHARED_DECK_EXPORTS = ['createSharedDecks'];
@@ -97,6 +98,7 @@ const script = [
   moduleScope('dice.js'),
   moduleScope('under30-gap.js'),
   moduleScope('system-dice.js'),
+  moduleScope('scrub-math.js'),
   moduleScope('tray-faces.js', ['v5Face', 'fateFace']),
   moduleScope('system-themes.js'),
   moduleScope('shared-decks.js'),
@@ -113,7 +115,7 @@ const script = [
   moduleScope('room-crypto.js'),
   moduleScope('room.js', ROOM_CRYPTO_EXPORTS),
   moduleScope('app.js', [
-    ...DICE_EXPORTS, ...SYSTEM_EXPORTS, ...RESULT_TEXT_EXPORTS, ...SYSTEM_THEME_EXPORTS, ...SHARED_DECK_EXPORTS, ...TRAY_FACES_EXPORTS, ...ORACLE_EXPORTS, ...IRON_ORACLE_EXPORTS, ...CARDS_ART_EXPORTS, ...TAROT_ART_EXPORTS, ...NAP_ART_EXPORTS, ...HANA_ART_EXPORTS, ...UTA_ART_EXPORTS, ...RENDER_EXPORTS, ...ROOM_CRYPTO_EXPORTS, ...ROOM_EXPORTS,
+    ...DICE_EXPORTS, ...SYSTEM_EXPORTS, ...RESULT_TEXT_EXPORTS, ...SYSTEM_THEME_EXPORTS, ...SHARED_DECK_EXPORTS, ...TRAY_FACES_EXPORTS, ...ORACLE_EXPORTS, ...IRON_ORACLE_EXPORTS, ...CARDS_ART_EXPORTS, ...TAROT_ART_EXPORTS, ...NAP_ART_EXPORTS, ...HANA_ART_EXPORTS, ...UTA_ART_EXPORTS, ...RENDER_EXPORTS, ...ROOM_CRYPTO_EXPORTS, ...ROOM_EXPORTS, ...SCRUB_EXPORTS,
   ]),
 ].join('\n\n');
 

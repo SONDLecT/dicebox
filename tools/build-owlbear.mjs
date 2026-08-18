@@ -103,7 +103,7 @@ try {
 // published on the extension origin.
 const APP_FILES = [
   // The static graph app.js needs to start.
-  'app.js', 'dice.js', 'render.js', 'under30-gap.js', 'tray-faces.js', 'result-text.js', 'system-themes.js', 'shared-decks.js', 'system-dice.js', 'room.js', 'room-crypto.js', 'style.css',
+  'app.js', 'dice.js', 'render.js', 'under30-gap.js', 'tray-faces.js', 'result-text.js', 'system-themes.js', 'shared-decks.js', 'system-dice.js', 'scrub-math.js', 'room.js', 'room-crypto.js', 'style.css',
   // Lazily imported on demand, so they cost nothing until used, but must be here
   // or that system is dead in the panel: the oracle tables and the card-deck art
   // (all vector SVG — the weight is trace detail, not resolution).

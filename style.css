@@ -759,8 +759,23 @@ body {
 .ds-count .ds-chev-two { opacity: 0.18; }
 .ds-count[data-count="2"] .ds-chev-two { opacity: 1; }
 .ds-effect { min-width: 34px; text-align: right; }
-.ds-picker { display: flex; gap: 10px; justify-content: center; }
+.ds-picker { display: flex; gap: 10px; justify-content: center; align-items: center; }
 .ds-count { position: relative; }
+
+/* The Power Roll tile, shared by Draw Steel and Crows: buttons that add dice
+   are shaped like the dice, and this one selects a PAIR, so it wears both
+   d10 kites — the Mothership percentile tile's two-dice grammar in the
+   wireframe family's stroke. The rear die sits back a step in opacity, the
+   way the far die of a thrown pair reads. In Crows it carries aria-pressed:
+   lit while the power roll holds the tray, dark while a usage pool does —
+   which of the two rolls Roll will throw was a real point of confusion. */
+.die-btn .die-ico.power-ico { width: 40px; height: 30px; }
+.power-die-rear { opacity: 0.55; }
+.power-roll[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.power-roll[aria-pressed="true"] .die-btn-label { color: var(--line); }
 .ds-edge { --dc: #57B591; }
 .ds-bane { --dc: #C0453F; }
 .ds-count[data-count] { border-color: var(--dc); background: color-mix(in srgb, var(--dc) 12%, transparent); }
@@ -791,6 +806,66 @@ body {
 .crows-picker .die-btn { --dc: #98A08A; }
 .crows-pip { fill: none; stroke-width: 3; stroke-linecap: round; }
 .crows-pip-fading { opacity: 0.35; }
+
+/* ---- the scrub dial (prototype: Crows Modifier, Shadowdark Modifier/DC) ----
+
+   A spin-chip that scrubs: wheel or press-drag moves the value, and during a
+   drag a ghost rail of neighbouring values materialises around the pill,
+   fading with distance. touch-action: none is what lets the drag own the
+   gesture — without it the browser scrolls the page out from under a scrub. */
+.scrub-dial { touch-action: none; }
+
+/* The rail is a fixed-position overlay anchored to the chip from JS — never
+   in the picker's layout, so nothing shifts when it appears. The values are
+   dice data, so they speak mono; each row wears a faint paper pill so the
+   numbers stay legible over whatever the tray has behind them. */
+.scrub-rail {
+  position: fixed;
+  z-index: 40;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+.scrub-rail[data-show="1"] { opacity: 1; }
+.scrub-rail-val {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 44px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--paper) 84%, transparent);
+  font-family: "Iosevka Etoile", ui-monospace, "SF Mono", monospace;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  color: var(--line);
+}
+/* The book's rung names ride beside their numbers in the interface voice —
+   a label, not dice data. */
+.scrub-rail-tag {
+  font-family: "Inter Tight", system-ui, -apple-system, sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.01em;
+  color: var(--muted);
+}
+/* Fading with distance: the rail suggests a wheel, not a menu. */
+.scrub-d1 { opacity: 0.6; }
+.scrub-d2 { opacity: 0.35; }
+.scrub-d3 { opacity: 0.15; }
+/* The hole the pill shows through; JS sizes it to the chip at show time. */
+.scrub-rail-gap { flex: none; }
+@media (prefers-reduced-motion: reduce) {
+  /* The rail still appears — it is information — but nothing fades or
+     slides: JS also zeroes its translate under this query. */
+  .scrub-rail { transition: none; }
+}
 
 /* ---- Shadowdark ---- */
 

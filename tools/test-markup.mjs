@@ -138,6 +138,39 @@ if (sdTheme) for (const block of sdTheme.slice(1)) {
 }
 ok('Shadowdark small text meets WCAG AA contrast in both themes', sdContrastPass);
 
+// The torch on the tray is wiring that crosses the draw loop, the hit test
+// and the idle cache, and a miss in any one of the three has no error — the
+// torch just quietly stops burning, stops answering taps, or freezes. So
+// the seams are asserted: the glow under the dice, the sprite over the felt,
+// the cache gated while the flame animates, and the tap checked before the
+// die hit-test.
+ok('the torchlight pool draws under the dice',
+   /drawTorchGlow\(ctx, t, r\);\s*\n\s*for \(const d of state\.dice\) d\.draw\(ctx, t\);/.test(js));
+ok('the torch sprite draws in the frame loop',
+   /drawWillpowerMarks\(ctx, t\);[\s\S]{0,200}drawTorchOnTray\(ctx, t, r\);/.test(js));
+ok('an animating flame gates the idle cache, both directions',
+   (js.match(/!torchAnimating\(\)/g) || []).length >= 2);
+ok('a tray tap reaches the torch before the dice',
+   js.indexOf('torchTrayHitAt(downX, downY)') !== -1 &&
+   js.indexOf('torchTrayHitAt(downX, downY)') < js.indexOf('removeDieAt(downX, downY)'));
+
+// The scrub dial is a prototype on exactly three chips — the Crows Modifier
+// and Shadowdark's Modifier and DC — while every other spin-chip keeps
+// bindTapHold. The wheel must be a non-passive listener or preventDefault is
+// a no-op and the page scrolls out from under a scrub.
+ok('the scrub dial is wired to its three prototype chips',
+   /bindScrubDial\(\$\('crowsModChip'\)/.test(js) &&
+   /bindScrubDial\(\$\('sdModChip'\)/.test(js) &&
+   /bindScrubDial\(\$\('sdDcChip'\)/.test(js) &&
+   (js.match(/bindScrubDial\(\$\(/g) || []).length === 3);
+ok('the scrub wheel listener is non-passive',
+   /addEventListener\('wheel', [\s\S]{0,600}?\{ passive: false \}\)/.test(js));
+ok('the prototype chips are marked touch-action none',
+   /id="crowsModChip"/.test(html) && /class="spin-chip scrub-dial" id="crowsModChip"/.test(html) &&
+   /class="spin-chip scrub-dial" id="sdModChip"/.test(html) &&
+   /class="spin-chip scrub-dial" id="sdDcChip"/.test(html) &&
+   /\.scrub-dial\s*\{[^}]*touch-action\s*:\s*none/.test(css));
+
 // Mothership follows the established tactile picker grammar: illustrated role
 // dice, compact number pills, and keep/drop dice around the primary roll action.
 const msMarkup = html.slice(html.indexOf('id="msPicker"'), html.indexOf('</section>', html.indexOf('id="msPicker"')));
