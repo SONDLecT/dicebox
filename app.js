@@ -1294,10 +1294,10 @@ for (const row of modeRows) {
 // pass/fail.
 const V5_HUNGER_KEY = 'dicebox:v5:hunger';
 // Surge dice come from Blood Potency — a character property like Hunger, so
-// the size (1-6) persists across reloads. 0 means never set: the Surge pill
-// in the picker reads "—", and the first Blood Surge asks. Unlike Hunger it
-// survives the X: Blood Potency does not move in play, so sweeping the
-// table has no reason to forget it.
+// the size (1-6) persists across reloads. 0 means never set: the first tap
+// on Blood Surge arms it at 2 without surging (see the button's binding).
+// Unlike Hunger it survives the X: Blood Potency does not move in play, so
+// sweeping the table has no reason to forget it.
 const V5_SURGE_KEY = 'dicebox:v5:surge';
 // `rouse` is a transient staging mode: a single Hunger die pulled into hand,
 // thrown on its own as a Rouse check rather than added to the action pool.
@@ -1657,51 +1657,24 @@ function updateV5BloodSurge() {
   // stat shows itself.
   if (v5.surgeDice > 0) btn.dataset.count = String(v5.surgeDice); else delete btn.dataset.count;
   btn.hidden = !v5SurgeEligible();
-  // The picker's Surge pill mirrors the same number — one stat, two views,
-  // and this funnel already runs on every path that can move it.
-  const pill = $('v5SurgeVal');
-  if (pill) {
-    pill.textContent = v5.surgeDice > 0 ? String(v5.surgeDice) : '—';
-    if (v5.surgeDice > 0) delete pill.dataset.unset; else pill.dataset.unset = '1';
-    $('v5SurgeChip').classList.toggle('is-set', v5.surgeDice > 0);
-  }
+  // The label says what THIS tap will do — arm on first use, surge after.
+  btn.setAttribute('aria-label', v5.surgeDice > 0
+    ? `Blood Surge — tap to add ${v5.surgeDice} surge ${v5.surgeDice === 1 ? 'die' : 'dice'} with a Rouse check riding along; drag or scroll to change the size`
+    : 'Blood Surge — tap to set your surge dice first (enters at 2, then scrub 1 to 6); tap again to surge');
 }
 
 // The surge-size dial: Blood Potency's surge dice, asked once and remembered.
 // `perform` separates the first tap (set it, then surge at once — the player
 // asked for a Surge, not a setting) from a hold (just change the size).
-function openSurgeDial(perform) {
-  openNumberDial({
-    title: 'Surge dice', value: v5.surgeDice || 2, min: 1, max: 6,
-    actionLabel: 'Set Surge', inputLabel: 'Surge dice',
-    commit: value => {
-      v5.surgeDice = value;
-      store.set(V5_SURGE_KEY, String(value));
-      // Light the pill (and the button badge) even on a hold's plain
-      // resize, where no surge follows to redraw them.
-      updateV5BloodSurge();
-      if (perform) performBloodSurge();
-    },
-  });
-}
-
-// The Surge pill: the same standing stat, adjustable before anything is
-// rolled — barrel like every stat, "—" until first set, entering at 2 (the
-// dial's long-standing default). A first-use Blood Surge with the pill
-// still unset keeps the dial ask as the fallback, on purpose: mid-surge is
-// an action, and bouncing the player's focus into the picker to hunt a
-// pill would trade one tap for a treasure hunt — the dial asks, commits,
-// and surges in one motion, and the pill lights up from the same funnel.
-bindScrubDial($('v5SurgeChip'), {
-  get: () => v5.surgeDice || null,
-  set: v => {
-    v5.surgeDice = v ?? 0;
-    if (v) store.set(V5_SURGE_KEY, String(v)); else store.remove(V5_SURGE_KEY);
-    updateV5BloodSurge();
-  },
-  min: 1, max: 6,
-  unset: { enter: 2 },
-});
+// The Blood Surge button IS the surge-size control (the owner's reversal:
+// the always-present picker pill was a vertical regression, and the
+// first-use popup retires with it). Scrub or wheel the button to set the
+// size — the drum rail shows the 1-6 rungs, the corner badge follows live,
+// the same store persists — and TAP to surge with it. First use, unset: a
+// tap must not silently spend blood on a guessed size, so it sets 2,
+// lights the badge, flashes the rail so the scrub is there to be
+// discovered, and does not surge; the next tap surges. Once a size exists
+// it is one tap forever. Hold does nothing any more.
 
 // Beat one, mirroring preparePush: every rolled die locks in place holding its
 // face — a surge rethrows nothing — while the added dice gather blank on the
@@ -1801,14 +1774,31 @@ function rollPendingSurge() {
   if (navigator.vibrate) navigator.vibrate([8, 40, 12]);
 }
 
-// Tap performs the Surge, asking for your surge dice the first time; hold
-// re-opens the dial to change the size without surging. bindTapHold's click
-// path gates on the hold having fired, so tap and hold can never both act.
-bindTapHold($('v5BloodSurge'), dir => {
-  if (dir !== 1) return;   // stepping down a one-way action means nothing
-  if (v5.surgeDice < 1) openSurgeDial(true);
-  else performBloodSurge();
-}, { onHold: () => openSurgeDial(false) });
+// The button as the barrel (see the surge-size comment above): scrub sets,
+// tap acts. bindScrubDial's 6px tap budget is the guard that a scrub can
+// never fall through to the tap — the same gate every chip relies on — and
+// `tap` replaces the default +1 with the surge itself.
+const surgeDial = bindScrubDial($('v5BloodSurge'), {
+  get: () => v5.surgeDice || null,
+  set: v => {
+    v5.surgeDice = v ?? 0;
+    if (v) store.set(V5_SURGE_KEY, String(v)); else store.remove(V5_SURGE_KEY);
+    updateV5BloodSurge();
+  },
+  min: 1, max: 6,
+  unset: { enter: 2 },
+  tap: () => {
+    if (v5.surgeDice < 1) {
+      // First use: arm, don't act. 2 is the long-standing default entry.
+      v5.surgeDice = 2;
+      store.set(V5_SURGE_KEY, '2');
+      updateV5BloodSurge();
+      surgeDial.flashRail();
+      return;
+    }
+    performBloodSurge();
+  },
+});
 
 // A `v5:` pool typed into the field drives the controls, so the two never
 // disagree about what will roll. Invalid part-typed strings are left alone.
@@ -2410,9 +2400,8 @@ function bindTapHold(el, step, { onHold = null } = {}) {
 // grammar); wrapping cycles keep tap/hold (Mothership Skill's four named
 // tiers, Blade Runner's even/adv/dis, the CoC bonus/penalty axis — a wrap
 // is the point, and a barrel does not wrap); and the popup number dial
-// survives only for the custom d? die, the dice-count dial a die button
-// opens on hold, and the V5 surge first-use ask — all dice business, not
-// number chips.
+// survives only for the custom d? die and the dice-count dial a die
+// button opens on hold — dice business, not number chips.
 //
 // Three ways in, ordered by how much they ask a player to learn: a plain tap
 // still bumps +1 (the zero-learning fallback); hovering plus a wheel notch
@@ -2434,8 +2423,8 @@ function bindTapHold(el, step, { onHold = null } = {}) {
 // up from it enters at `enter` (Shadowdark's Normal 12), never at min — a
 // table that says "roll it" means the book's default difficulty, not DC 1.
 // `railLabel` may name specific values on the rail (the DC ladder's words).
-function bindScrubDial(el, { get, set, min, max, format = v => String(v), unset = null, railLabel = null, tapEntry = false } = {}) {
-  if (!el) return;
+function bindScrubDial(el, { get, set, min, max, format = v => String(v), unset = null, railLabel = null, tapEntry = false, tap = null } = {}) {
+  if (!el) return null;
   const clamp = v => Math.max(min, Math.min(max, v));
 
   // Huge ranges get a second door: `tapEntry` swaps the tap's +1 for
@@ -2674,6 +2663,10 @@ function bindScrubDial(el, { get, set, min, max, format = v => String(v), unset 
   el.addEventListener('pointercancel', endScrub);
   el.addEventListener('click', () => {
     if (scrubbed) { scrubbed = false; return; }
+    // A control may bring its own tap (the Blood Surge button performs an
+    // ACTION on tap; scrubbing only sets its size) — still behind the
+    // scrubbed gate, so a drag can never fall through to it.
+    if (tap) { tap(); return; }
     // On a huge-range chip the tap types instead of stepping — +1 across
     // a d100 line is a gesture nobody meant.
     if (tapEntry) { openEntry(); return; }
@@ -2696,6 +2689,20 @@ function bindScrubDial(el, { get, set, min, max, format = v => String(v), unset 
       set(unset && cur - 1 < min ? null : clamp(cur - 1));
     }
   });
+
+  // The one hook a control can ask back for: raise the drum for a moment
+  // without a gesture — how a first-use tap teaches that the value under
+  // the badge scrubs (the Blood Surge arm). Rides the wheel's own quiet
+  // timer, so a real gesture landing mid-flash simply adopts the rail.
+  const flashRail = () => {
+    const cur = get();
+    const floor = unset ? (cur === null ? unset.enter - 1 : min - 1) : min;
+    showRail();
+    updateRail(cur === null ? floor : cur, 0, floor);
+    if (wheelIdleTimer) clearTimeout(wheelIdleTimer);
+    wheelIdleTimer = setTimeout(() => { wheelIdleTimer = null; hideRail(); }, 900);
+  };
+  return { flashRail };
 }
 
 const ct = { dice: 6, difficulty: null };

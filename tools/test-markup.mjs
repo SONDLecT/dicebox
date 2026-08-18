@@ -195,10 +195,16 @@ ok('the huge-range chips scrub and type, never popup',
    !/TargetDial\.addEventListener\('click'[\s\S]{0,200}openNumberDial/.test(js) &&
    !/cocSkillDial\.addEventListener\('click'[\s\S]{0,200}openNumberDial/.test(js));
 ok('the popup dial survives only for dice business',
-   (js.match(/openNumberDial\(\{/g) || []).length === 3 &&
+   (js.match(/openNumberDial\(\{/g) || []).length === 2 &&
    /function openCountDial[\s\S]{0,200}openNumberDial\(\{/.test(js) &&
-   /function openSurgeDial[\s\S]{0,300}openNumberDial\(\{/.test(js) &&
    /function openDial\(\)[\s\S]{0,200}openNumberDial\(\{/.test(js));
+// The Blood Surge button is its own barrel: scrubbing sets the size, only
+// a clean tap surges (the shared 6px tap budget is the gate), and a tap
+// with no size set arms the default instead of spending blood on a guess.
+ok('Blood Surge scrubs its size and never surges on a scrub',
+   /bindScrubDial\(\$\('v5BloodSurge'\), \{[\s\S]{0,900}tap: \(\) => \{[\s\S]{0,400}performBloodSurge\(\);/.test(js) &&
+   /if \(v5\.surgeDice < 1\) \{[\s\S]{0,300}surgeDial\.flashRail\(\);[\s\S]{0,60}return;/.test(js) &&
+   !/openSurgeDial/.test(js));
 // The typing door itself: numeric keyboard, commit/cancel keys, and the
 // floating field styled so the guard sees the class.
 ok('inline entry raises the numeric keyboard and answers the keys',

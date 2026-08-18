@@ -131,9 +131,12 @@ A system may add controls; it may never change what these four do.
   because +1 across a hundred-step line is a gesture nobody meant. One
   exception by kind: a wrapping cycle of named states (a four-tier skill,
   even/advantage/disadvantage) keeps tap/hold — a barrel does not wrap,
-  and the wrap is the point. The popup number dial survives only for dice
-  business: the custom d? die and the count dial a die button opens on
-  hold. Dice buttons are not numbers and keep their own grammar (tap
+  and the wrap is the point. A button whose tap is an ACTION may still be
+  a barrel for its own number (Blood Surge: scrub sets the size, tap
+  spends it — and a first tap with no size set arms the default without
+  acting, never spending on a guess). The popup number dial survives only
+  for dice business: the custom d? die and the count dial a die button
+  opens on hold. Dice buttons are not numbers and keep their own grammar (tap
   adds, hold removes or opens the count dial). Where the number is a
   resolution target the table may judge, the control defaults to unset —
   it reads "—", the roll reports raw facts, scrubbing below minimum falls
