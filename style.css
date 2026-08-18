@@ -606,6 +606,15 @@ body {
 .yz-push:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); }
 .yz-push:active { transform: scale(0.96); }
 
+/* The V5 post-roll actions share one row and each wears its mark — a hidden
+   pair collapses to nothing, so the row never reserves space. */
+.v5-actions { display: flex; gap: 8px; justify-content: center; }
+.v5-actions .yz-push { display: inline-flex; align-items: center; gap: 7px; }
+/* The display override above would beat the UA's [hidden] rule — restate it,
+   or the pair would show before any roll. */
+.v5-actions .yz-push[hidden] { display: none; }
+.v5-act-ico { width: 17px; height: 17px; display: block; flex: none; }
+
 /* While a Willpower reroll is arming, the button is the way out: read it as a
    cancel, filled and quiet rather than inviting. */
 .v5-willpower.is-arming {

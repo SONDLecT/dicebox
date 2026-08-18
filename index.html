@@ -1348,11 +1348,26 @@
        Hunger die to throw on its own. The Willpower reroll pops in above the
        row after a roll, the way the push button does. -->
   <section class="picker v5-picker" id="v5Picker" aria-label="Vampire dice" hidden>
-    <button type="button" class="yz-push v5-willpower" id="v5Willpower" hidden>Willpower reroll</button>
-    <!-- Blood Surge pops in beside it: tap adds your surge dice (asked once,
-         from Blood Potency) with a Rouse check riding along; hold to change
-         the size. It ADDS dice after the roll, where Willpower rethrows. -->
-    <button type="button" class="yz-push" id="v5BloodSurge" hidden aria-label="Blood Surge — add your surge dice with a Rouse check; hold to set the size">Blood Surge</button>
+    <!-- The two post-roll actions share one row — vertical space is the
+         scarcest thing on the table — each wearing its mark: the mind for the
+         Willpower rethrow, the drop for the Blood's surge. -->
+    <div class="v5-actions">
+      <button type="button" class="yz-push v5-willpower" id="v5Willpower" hidden>
+        <svg class="v5-act-ico" viewBox="0 0 20 20" aria-hidden="true">
+          <path d="M7 16.5V14C5 13 3.6 11 3.6 8.7 3.6 5.5 6.2 3 9.4 3c3.1 0 5.7 2.3 6 5.3l1.2 2.4-1.4.6v2.2c0 .9-.7 1.5-1.6 1.5H12v1.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round"/>
+          <path d="M8 7.5c.8-1 2.4-1 3.1 0M7.4 10.3c1.2 1 3.2 1 4.4-.1" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+        </svg>
+        Willpower reroll</button>
+      <!-- Blood Surge: tap adds your surge dice (asked once, from Blood
+           Potency) with a Rouse check riding along; hold to change the size.
+           It ADDS dice after the roll, where Willpower rethrows. -->
+      <button type="button" class="yz-push" id="v5BloodSurge" hidden aria-label="Blood Surge — add your surge dice with a Rouse check; hold to set the size">
+        <svg class="v5-act-ico" viewBox="0 0 20 20" aria-hidden="true">
+          <path d="M10 2.5C7.4 6.2 5.2 9 5.2 11.9a4.8 4.8 0 0 0 9.6 0C14.8 9 12.6 6.2 10 2.5Z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+          <path d="M7.6 12.2a2.5 2.5 0 0 0 1.8 2.3" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+        </svg>
+        Blood Surge</button>
+    </div>
     <div class="v5-row">
       <!-- The pool die: an ankh set in a d10, the same mark the tray draws on a
            V5 success — ink for the ordinary dice, blood for Hunger. -->
