@@ -6998,7 +6998,14 @@ canvas.addEventListener('pointerup', e => {
 // starter pool of one ordinary die and one Hunger die. Numeric keeps re-rolling
 // your last roll, or the selected die if there is none yet.
 function emptyTrayRoll() {
-  if (uiSystem === 'v5') return v5Notation() || 'v5:2h1';
+  // The V5 default follows the standing tracker: a fresh sheet rolls two
+  // clean dice, a hungry one sees its state — the default must never SEED
+  // Hunger a player does not have.
+  if (uiSystem === 'v5') {
+    if (v5Notation()) return v5Notation();
+    const red = Math.min(v5.hunger, 2);
+    return red > 0 ? `v5:2h${red}` : 'v5:2';
+  }
   if (uiSystem === 'fate') return fateNotation();
   if (uiSystem === 'genesys') return genNotation() || 'gen:1P+1A+2D';
   if (uiSystem === 'starwars') return genNotation() || 'sw:1A+2D+1F';
