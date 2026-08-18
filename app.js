@@ -2,7 +2,7 @@ import { roll, describe } from './dice.js';
 import { Die, Surface, separate, beginFrame } from './render.js';
 import { createRoom, parsePassphraseFromHash, validateRoll, validateSystemRoll } from './room.js';
 import { generatePassphrase, normalizePassphrase } from './room-crypto.js';
-import { rollV5, rollRouse, describeV5, v5Headline, detectSystem, v5Face, parseV5 } from './system-dice.js';
+import { rollV5, rollRouse, rerollV5, describeV5, v5Headline, detectSystem, v5Face, parseV5 } from './system-dice.js';
 import { formatHeadline, formatDetail } from './result-text.js';
 import { SYSTEM_THEMES } from './system-themes.js';
 import { createSharedDecks } from './shared-decks.js';
@@ -479,6 +479,7 @@ function doRoll(notation, { viaOwlbear = true } = {}) {
 function throwResult(result, { writeField = true } = {}) {
   state.last = result;
   state.pendingPush = null; state.pushKept = null;   // a fresh throw cancels any half-done push
+  state.willpowerArmed = false; state.willpowerPicks = null;   // and any arming Willpower reroll
   state.remoteRollId = null;
   // Quick one-off rolls (an oracle draw, a progress roll) leave the field on the
   // mode's primary expression so the Roll button keeps doing the action roll;
@@ -599,6 +600,7 @@ function finish(result) {
   $('wordmark').dataset.faded = '1';
   updateYzPush();
   updateBrPush();
+  updateV5Willpower();
   updateT2kPush();
 }
 
@@ -913,6 +915,9 @@ msPicker.after?.(numPicker);
 
 function setSystem(system, { roll = false, url = true } = {}) {
   if (!SYSTEMS[system]) system = 'numeric';
+  // Leaving V5 abandons any half-armed Willpower reroll rather than leaving its
+  // overlay live over another system's tray.
+  cancelWillpower({ restore: false });
   const changed = system !== uiSystem;
   uiSystem = system;
   // A card held up for a look — and a discard fanned open — belong to the
@@ -1278,6 +1283,171 @@ $('v5Rouse').addEventListener('click', () => {
   rollRouseLocally();
 });
 
+// ---- V5 Willpower reroll ----
+//
+// A completed pool roll may spend a point of Willpower to reroll up to three of
+// its own non-Hunger dice, once. The button arms a selection: tap eligible dice
+// on the tray to pick them up (Hunger dice refuse), then tap the felt to throw.
+// The unpicked dice lock and hold their faces; only the chosen handful is thrown
+// again, reusing the push animation and its held/rerolled transition so the
+// table sees the same partial reroll. Willpower itself is not tracked — the
+// reroll is the mechanic, the point is spent on the player's own sheet.
+function v5WillpowerEligible() {
+  const last = state.last;
+  return uiSystem === 'v5' && last && last.system === 'v5'
+    && last.summary && last.summary.kind === 'v5' && last.summary.willpowerAvailable
+    && !state.willpowerArmed && !state.pendingPush
+    && $('total').dataset.idle !== '1' && $('total').dataset.rolling !== '1';
+}
+
+function updateV5Willpower() {
+  const btn = $('v5Willpower');
+  if (!btn) return;
+  if (state.willpowerArmed) {
+    btn.hidden = false;
+    btn.textContent = 'Cancel reroll';
+    btn.classList.add('is-arming');
+  } else {
+    btn.classList.remove('is-arming');
+    btn.textContent = 'Willpower reroll';
+    btn.hidden = !v5WillpowerEligible();
+  }
+}
+
+function armWillpower() {
+  if (!v5WillpowerEligible()) return;
+  state.willpowerArmed = true;
+  state.willpowerPicks = new Set();
+  updateWillpowerReadout();
+  updateV5Willpower();
+  dropIdleCache();
+  if (navigator.vibrate) navigator.vibrate(8);
+}
+
+function cancelWillpower({ restore = true } = {}) {
+  if (!state.willpowerArmed) return;
+  if (state.willpowerPicks) {
+    for (const i of state.willpowerPicks) if (state.dice[i]) state.dice[i].willpowerPick = false;
+  }
+  state.willpowerArmed = false;
+  state.willpowerPicks = null;
+  updateV5Willpower();
+  dropIdleCache();
+  if (restore && state.last) {
+    try { setTotal(resultHeadline(state.last)); $('breakdown').textContent = resultDetail(state.last); }
+    catch { /* the readout was already moving on */ }
+  }
+}
+
+function updateWillpowerReadout() {
+  const n = state.willpowerPicks ? state.willpowerPicks.size : 0;
+  $('breakdown').textContent = n === 0
+    ? 'Tap up to 3 dice to reroll — not Hunger dice'
+    : `${n} of 3 picked — tap the tray to reroll`;
+}
+
+// Index of the settled result die under a tap, or null. Skips cards, the deck
+// stack, the discard pile, and any die still tumbling.
+function resultDieIndexAt(clientX, clientY) {
+  const rect = canvas.getBoundingClientRect();
+  const x = clientX - rect.left, y = clientY - rect.top;
+  let hit = null, best = Infinity;
+  state.dice.forEach((d, i) => {
+    if (d.value === null || d.isCard || d.isStack || d.isDiscard || d.gone) return;
+    const dist = Math.hypot(d.x - x, d.y - y);
+    if (dist < d.size * 0.62 && dist < best) { best = dist; hit = i; }
+  });
+  return hit;
+}
+
+// A tap while armed: an eligible die toggles, a Hunger die refuses, and a tap on
+// empty felt throws the reroll once at least one die is picked.
+function handleWillpowerTap(clientX, clientY) {
+  const idx = resultDieIndexAt(clientX, clientY);
+  if (idx === null) {
+    if (state.willpowerPicks && state.willpowerPicks.size > 0) performWillpowerReroll();
+    return;
+  }
+  if (state.dice[idx].hunger) { if (navigator.vibrate) navigator.vibrate(20); return; }
+  const picks = state.willpowerPicks;
+  const die = state.dice[idx];
+  if (picks.has(idx)) { picks.delete(idx); die.willpowerPick = false; }
+  else {
+    if (picks.size >= 3) { if (navigator.vibrate) navigator.vibrate(20); return; }
+    picks.add(idx); die.willpowerPick = true;
+  }
+  if (navigator.vibrate) navigator.vibrate(8);
+  updateWillpowerReadout();
+  dropIdleCache();
+}
+
+function performWillpowerReroll() {
+  const picks = state.willpowerPicks;
+  if (!picks || !picks.size || !state.last) { cancelWillpower(); return; }
+  const parentId = state.last.rollId;
+  const rerolled = rerollV5(state.last, [...picks]);
+  const rerolledFlat = flattenRollDice(rerolled);
+  const held = [];
+  rerolled.groups[0].dice.forEach((_, i) => { if (!picks.has(i)) held.push(i); });
+  rerolled.parentId = parentId;
+  rerolled.transition = { kind: 'willpower', held, rerolled: [...picks], added: [] };
+
+  // Split the tray like a push: the unpicked dice lock and hold their faces, the
+  // chosen dice blank ("picked up") ready to be thrown again.
+  state.dice.forEach((d, i) => {
+    d.willpowerPick = false;
+    if (picks.has(i)) { d.value = null; d.picked = true; d.locked = false; }
+    else { d.locked = true; d.picked = false; }
+  });
+  state.willpowerArmed = false;
+  state.willpowerPicks = null;
+
+  rehomeUnlockedGrid(state.dice);
+  state.dice.forEach((d, i) => {
+    if (!d.picked) return;
+    d.picked = false;
+    d.value = rerolledFlat[i].value;
+    stampTrayDie(d, rerolledFlat[i], rerolled);
+    d.rerolled = true;
+    d.rerollShown = true;
+    d.throwWith((d.homeX - d.x) * 2.4, (d.homeY - d.y) * 2.4);
+  });
+
+  state.last = rerolled;
+  $('total').dataset.rolling = '1';
+  updateV5Willpower();
+  dropIdleCache();
+  setTimeout(() => {
+    for (const d of state.dice) d.locked = false;
+    finish(rerolled);
+  }, 760);
+  if (navigator.vibrate) navigator.vibrate([8, 40, 12]);
+}
+
+$('v5Willpower').addEventListener('click', () => {
+  if (state.willpowerArmed) cancelWillpower();
+  else armWillpower();
+});
+
+// The arming overlay: a solid ring on the dice picked to reroll, a faint one on
+// the eligible dice still available. Drawn over the tray each frame while armed.
+function drawWillpowerMarks(ctx, t) {
+  if (!state.willpowerArmed) return;
+  const picks = state.willpowerPicks || new Set();
+  state.dice.forEach((d, i) => {
+    if (d.value === null || d.isCard || d.isStack || d.isDiscard || d.gone || d.hunger) return;
+    const picked = picks.has(i);
+    ctx.save();
+    ctx.lineWidth = picked ? 2.4 : 1.2;
+    ctx.strokeStyle = t.accent;
+    ctx.globalAlpha = picked ? 1 : 0.3;
+    ctx.beginPath();
+    ctx.arc(d.x, d.y, d.size * 0.62, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  });
+}
+
 // A `v5:` pool typed into the field drives the controls, so the two never
 // disagree about what will roll. Invalid part-typed strings are left alone.
 function syncV5FromField() {
@@ -1517,6 +1687,7 @@ function preparePush() {
   $('breakdown').textContent = 'Tap the tray to throw the pushed dice';
   updateYzPush();
   updateBrPush();
+  updateV5Willpower();
   updateT2kPush();
   dropIdleCache();
   if (navigator.vibrate) navigator.vibrate(10);
@@ -5152,6 +5323,7 @@ function systemStageDescriptors() {
 // writes it).
 function stageSystemPool() {
   state.pendingPush = null; state.pushKept = null;   // building/restaging a pool abandons a pending push
+  state.willpowerArmed = false; state.willpowerPicks = null;
   const staged = systemStageDescriptors().slice(0, ANIMATE_LIMIT).map(d => {
     const die = new Die(d.sides, null, 0, 0, 40);
     if (d.hunger) die.hunger = true;
@@ -5179,6 +5351,7 @@ function stageSystemPool() {
   hideHint();
   updateYzPush();
   updateBrPush();
+  updateV5Willpower();
   updateT2kPush();
 }
 
@@ -6527,6 +6700,10 @@ canvas.addEventListener('pointerup', e => {
   // or flick throws just that handful, leaving the kept 6s and 1s in place.
   if (state.pendingPush) { rollPendingPush(); return; }
 
+  // While a Willpower reroll is arming, taps select dice or throw the reroll —
+  // they never roll fresh dice or edit the staged pool.
+  if (state.willpowerArmed) { handleWillpowerTap(downX, downY); return; }
+
   // Tapping the discard pile fans it open instead of drawing. Hit-tested where
   // the finger LANDED (the aim point), not where it lifted, with a little pad.
   if (isTap) {
@@ -6720,7 +6897,7 @@ function drawFrame(dt) {
   // Fully-settled tray: blit the cached frame instead of re-stepping and
   // re-drawing every die. Skipping the mesh redraw is what keeps an exact d1000
   // idle cost ~0 instead of a 3k-edge frame.
-  if (idleCanvas && idleSize && trayIdle() && idleSize[0] === Math.round(r.width) && idleSize[1] === Math.round(r.height)) {
+  if (!state.willpowerArmed && idleCanvas && idleSize && trayIdle() && idleSize[0] === Math.round(r.width) && idleSize[1] === Math.round(r.height)) {
     ctx.clearRect(0, 0, r.width, r.height);
     ctx.drawImage(idleCanvas, 0, 0, r.width, r.height);
     return;
@@ -6776,10 +6953,12 @@ function drawFrame(dt) {
   // Bursts go over the dice: an explosion happens in front of the thing that
   // exploded, not behind it.
   state.surface.drawBursts(ctx, t);
+  // The Willpower selection rings sit on top of everything.
+  drawWillpowerMarks(ctx, t);
 
   // Maintain the settled-tray cache. Only snap once the reveal has played, so a
   // die mid-fade is never frozen half-drawn.
-  if (trayIdle()) {
+  if (trayIdle() && !state.willpowerArmed) {
     const w = Math.max(1, Math.round(r.width)), h = Math.max(1, Math.round(r.height));
     if (idleSince === null) idleSince = performance.now();
     if (performance.now() - idleSince >= REVEAL_MS && (!idleCanvas || !idleSize || idleSize[0] !== w || idleSize[1] !== h)) {
@@ -7015,7 +7194,7 @@ function alreadyShown(id) {
 
 function showRemotePushTransition(roll, result) {
   const transition = roll.transition;
-  if (!transition || transition.kind !== 'push' || state.remoteRollId !== roll.parentId) return false;
+  if (!transition || !['push', 'willpower'].includes(transition.kind) || state.remoteRollId !== roll.parentId) return false;
   if ($('total').dataset.rolling) return false;
   const flat = flattenRollDice(result);
   if (!flat.length || flat.length > ANIMATE_LIMIT) return false;
@@ -7081,6 +7260,9 @@ function showRemotePushTransition(roll, result) {
       if (!d.picked) return;
       d.picked = false;
       d.value = flat[index].value;
+      // Re-stamp the face, or a symbol die (a V5 Willpower reroll) would land
+      // showing its old glyph. Number dice are unaffected.
+      stampTrayDie(d, flat[index], result);
       d.rerolled = true;
       d.rerollShown = true;
       d.throwWith((d.homeX - d.x) * 2.4, (d.homeY - d.y) * 2.4);
@@ -7726,6 +7908,7 @@ function presentOwlbearResult(data, pending) {
   acceptOwlbearRoll({ ...data, who: obrPlayerName || data.who || 'You', type: data.transition ? 'roll.transition' : 'roll.event' });
   updateYzPush();
   updateBrPush();
+  updateV5Willpower();
   updateT2kPush();
 }
 

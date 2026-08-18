@@ -161,6 +161,41 @@ export function summarizeV5(dice, difficulty, pool = dice.length, hunger = dice.
     // and it is worth saying out loud whether or not a difficulty was set.
     totalFailure: successes === 0,
     critTwo, critPairs, hungerTen, hungerOne, tenCount,
+    // A Willpower reroll is offered while there is at least one non-Hunger die
+    // to spend it on. rerollV5 clears this so it can only be taken once.
+    willpowerAvailable: dice.some(d => !d.hunger),
+  };
+}
+
+// A Willpower reroll: the player spends one point of Willpower to reroll up to
+// three of their own non-Hunger dice, once per roll. The chosen dice take fresh
+// d10 faces, Hunger dice are never eligible, and the pool resolves again from
+// the new values. `indices` are positions into the roll's own dice array; any
+// that are out of range or land on a Hunger die are quietly ignored, and no
+// more than three are honoured.
+export function rerollV5(result, indices) {
+  const src = result?.groups?.[0]?.dice || [];
+  const chosen = new Set(
+    (Array.isArray(indices) ? indices : [])
+      .filter(i => Number.isInteger(i) && i >= 0 && i < src.length && !src[i].hunger)
+      .slice(0, 3),
+  );
+  const dice = src.map((d, i) => chosen.has(i)
+    ? { ...d, value: randInt(10), rerolled: true }
+    : { ...d, rerolled: false });
+  const pool = Number.isInteger(result?.summary?.pool) ? result.summary.pool : dice.length;
+  const hunger = Number.isInteger(result?.summary?.hunger)
+    ? result.summary.hunger : dice.filter(d => d.hunger).length;
+  const difficulty = result?.summary?.difficulty ?? null;
+  const summary = summarizeV5(dice, difficulty, pool, hunger);
+  summary.willpowerAvailable = false;
+  summary.willpowerUsed = true;
+  return {
+    schema: 2,
+    system: 'v5',
+    notation: result?.notation || `v5:${pool}h${hunger}`,
+    groups: [{ kind: 'dice', dieType: 'v5', count: dice.length, dice, subtotal: 0 }],
+    summary,
   };
 }
 

@@ -666,6 +666,14 @@ body {
 .yz-push:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); }
 .yz-push:active { transform: scale(0.96); }
 
+/* While a Willpower reroll is arming, the button is the way out: read it as a
+   cancel, filled and quiet rather than inviting. */
+.v5-willpower.is-arming {
+  background: color-mix(in srgb, var(--line) 14%, transparent);
+  border-color: color-mix(in srgb, var(--line) 34%, transparent);
+  color: var(--muted);
+}
+
 /* Blade Runner: two step-die selectors (Attribute teal, Skill amber) and an odds
    stepper that greens for advantage, reddens for disadvantage. */
 .br-picker { display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding: 0; }

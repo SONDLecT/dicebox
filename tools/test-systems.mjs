@@ -4,7 +4,7 @@
 import { webcrypto } from 'node:crypto';
 if (!globalThis.crypto) globalThis.crypto = webcrypto;
 
-import { parseV5, rollV5, rollRouse, summarizeV5, detectSystem, describeV5, rollAny, v5Face, v5Headline } from '../system-dice.js';
+import { parseV5, rollV5, rollRouse, rerollV5, summarizeV5, detectSystem, describeV5, rollAny, v5Face, v5Headline } from '../system-dice.js';
 import { parseFate, rollFate, summarizeFate, describeFate, fateHeadline, fateFace, fateLadder } from '../system-dice.js';
 import { parseGenesys, rollGenesys, summarizeGenesys, describeGenesys, genesysHeadline, genesysFace, GENESYS_DICE } from '../system-dice.js';
 import { parseDaggerheart, rollDaggerheart, summarizeDaggerheart, describeDaggerheart, daggerheartHeadline } from '../system-dice.js';
@@ -211,6 +211,41 @@ ok('rollAny defers numeric', rollAny('4d6').deferred === true && rollAny('4d6').
   // At Hunger 5 a tracked failure cannot climb: it names the Beast, not a rise.
   const cappedTxt = describeV5({ summary: { kind: 'rouse', value: 3, success: false, hungerGain: 1, hungerAfter: 5, hungerRose: false, tracked: true } });
   ok('capped rouse detail names the Beast', /the Beast stirs/.test(cappedTxt) && !/rises/.test(cappedTxt));
+}
+
+// ---- Willpower reroll: up to three non-Hunger dice, once, never Hunger ----
+{
+  ok('a fresh pool offers a Willpower reroll', rollV5('v5:5h2').summary.willpowerAvailable === true);
+  ok('an all-Hunger pool offers none', rollV5('v5:2h2').summary.willpowerAvailable === false);
+
+  // A fixed pool so the reroll's effect is checkable: dice [H,H,n,n,n], the two
+  // Hunger dice first.
+  const base = {
+    schema: 2, system: 'v5', notation: 'v5:5h2',
+    groups: [{ kind: 'dice', dieType: 'v5', count: 5, dice: [
+      { value: 1, hunger: true, kept: true, rerolled: false, exploded: false, crit: null },
+      { value: 2, hunger: true, kept: true, rerolled: false, exploded: false, crit: null },
+      { value: 3, hunger: false, kept: true, rerolled: false, exploded: false, crit: null },
+      { value: 4, hunger: false, kept: true, rerolled: false, exploded: false, crit: null },
+      { value: 5, hunger: false, kept: true, rerolled: false, exploded: false, crit: null },
+    ] }],
+    summary: summarizeV5([], null, 5, 2),
+  };
+  base.summary = { kind: 'v5', pool: 5, hunger: 2, difficulty: 2 };
+
+  // Ask to reroll a Hunger die (0), two normals (2,3), and overflow the cap
+  // (4,+phantom): Hunger is refused, the cap holds at three.
+  const rr = rerollV5(base, [0, 2, 3, 4, 99]);
+  const flags = rr.groups[0].dice.map(d => d.rerolled);
+  ok('Hunger dice are never rerolled', flags[0] === false && flags[1] === false);
+  ok('at most three dice reroll', flags.filter(Boolean).length === 3);
+  ok('the rerolled dice are the chosen non-Hunger ones', flags[2] && flags[3] && flags[4]);
+  ok('Hunger dice keep their faces', rr.groups[0].dice[0].value === 1 && rr.groups[0].dice[1].value === 2);
+  ok('the reroll re-resolves the pool', rr.summary.kind === 'v5' && Number.isInteger(rr.summary.successes));
+  ok('a reroll is one-shot', rr.summary.willpowerAvailable === false && rr.summary.willpowerUsed === true);
+  ok('the reroll carries the difficulty through', rr.summary.difficulty === 2);
+  ok('out-of-range and phantom indices are ignored safely',
+     rerollV5(base, [-1, 100, 'x']).groups[0].dice.every(d => d.rerolled === false));
 }
 
 // ---- Fate / Fudge ----
