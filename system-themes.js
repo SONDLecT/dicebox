@@ -176,6 +176,20 @@ export const SYSTEM_THEMES = {
       '--hair': '#D2CCBC', '--accent': '#46503F', '--danger': '#9E3529',
     },
   },
+  // Shadowdark — darkness is the antagonist, so the dark scheme runs deeper
+  // than anything else in the app (a warm true near-black, past even V5's)
+  // under a torchlight amber accent: the one light in the crawl. Light is
+  // aged stone and parchment under a deep ember — the torch by day.
+  shadowdark: {
+    dark: {
+      '--paper': '#080605', '--face': '#0F0C09', '--line': '#EFE5D2', '--muted': '#95896F',
+      '--hair': '#241E14', '--accent': '#E39A2E', '--danger': '#E0685F',
+    },
+    light: {
+      '--paper': '#E9E1CF', '--face': '#F3EDDF', '--line': '#231C10', '--muted': '#6A6350',
+      '--hair': '#D2C7AE', '--accent': '#85430C', '--danger': '#9E3529',
+    },
+  },
   // Mist Engine — moody teal and dim gold, fog over deep water; a pale seafoam
   // for light.
   mist: {

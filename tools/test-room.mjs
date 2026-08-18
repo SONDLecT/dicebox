@@ -24,7 +24,7 @@ import {
 import {
   rollV5, rollFate, rollGenesys, rollDaggerheart, rollCthulhuTech, rollStarWars,
   rollOneRing, rollPbta, rollMist, rollDrawSteel, rollCrows, rollCrowsUsage,
-  rollMothership, rollCallOfCthulhu, rollDeltaGreen,
+  rollShadowdark, rollMothership, rollCallOfCthulhu, rollDeltaGreen,
   rollIronsworn, rollYearZero, rollBladeRunner, rollTwilight,
   pushYearZero, pushBladeRunner, pushTwilight,
 } from '../system-dice.js';
@@ -675,6 +675,7 @@ const sampleSystemRoll = {
     'Draw Steel': rollDrawSteel('ds:+2e1'),
     'Crows': rollCrows('crows:+2'),
     'Crows usage': rollCrowsUsage('crows:u3'),
+    'Shadowdark': rollShadowdark('sd:+3a@12'),
     'Mothership': rollMothership('ms:c@35'),
     'Call of Cthulhu': rollCallOfCthulhu('coc:50'),
     'Delta Green': rollDeltaGreen('dg:50'),

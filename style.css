@@ -792,6 +792,84 @@ body {
 .crows-pip { fill: none; stroke-width: 3; stroke-linecap: round; }
 .crows-pip-fading { opacity: 0.35; }
 
+/* ---- Shadowdark ---- */
+
+/* One row, five controls, so everything goes compact and columnar: the two
+   keep-pair flags (Mothership's icon language on d20 hexagons — chevrons
+   point where the kept NUMBER goes), the torch, and the Modifier/DC chips
+   restacked vertically to match. */
+.sd-picker { display: flex; gap: 8px; justify-content: center; align-items: stretch; }
+.sd-picker .spin-chip {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 5px 12px 4px;
+  border-radius: 12px;
+}
+.sd-adv {
+  /* Flexible like Mothership's tiles, so five controls always share the row
+     width instead of overflowing a narrow phone. */
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 5px 8px 4px;
+  border: 1px solid var(--hair);
+  border-radius: 12px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: border-color 140ms ease, color 140ms ease, background 140ms ease, transform 120ms ease;
+}
+.sd-keep-dice { width: 34px; height: 34px; display: block; }
+.sd-keep-dice .drop { fill: none; stroke: var(--muted); stroke-width: 1.8; stroke-linejoin: round; }
+.sd-keep-dice .keep { fill: color-mix(in srgb, var(--accent) 18%, var(--paper)); stroke: var(--accent); stroke-width: 2.1; stroke-linejoin: round; }
+.sd-keep-dice .chev { fill: none; stroke: var(--accent); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.sd-adv-label { font-size: 10px; letter-spacing: 0.01em; white-space: nowrap; }
+.sd-adv[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.sd-adv[aria-pressed="true"] .sd-adv-label { color: var(--line); }
+.sd-adv:active { transform: scale(0.96); }
+
+/* The torch. Unlit it sits quiet in outline; lit it burns — accent border,
+   a warm tinted well, the flame filled — and its label is the time it has
+   left, in the tabular figures all dice data wear. Under ten minutes it
+   gutters: dimmer, and flickering by a slow irregular pulse. At zero the
+   flame is out and the label says what the crawl now knows. */
+.sd-torch { padding: 5px 12px 4px; }
+.sd-torch .die-ico path { fill: none; }
+.sd-torch .die-btn-label { font-variant-numeric: tabular-nums; }
+.sd-torch[data-torch="lit"], .sd-torch[data-torch="guttering"] {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+}
+.sd-torch[data-torch="lit"] .sd-flame, .sd-torch[data-torch="guttering"] .sd-flame {
+  fill: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.sd-torch[data-torch="lit"] .die-btn-label, .sd-torch[data-torch="guttering"] .die-btn-label { color: var(--line); }
+.sd-torch[data-torch="guttering"] { animation: sd-gutter 2.8s ease-in-out infinite; }
+@keyframes sd-gutter {
+  0%, 100% { opacity: 1; }
+  34% { opacity: 0.55; }
+  52% { opacity: 0.85; }
+  71% { opacity: 0.5; }
+  84% { opacity: 0.75; }
+}
+/* The flicker is testimony (a dying light), but a vestibular-safe machine
+   gets the same fact as a steady dimming. */
+@media (prefers-reduced-motion: reduce) {
+  .sd-torch[data-torch="guttering"] { animation: none; opacity: 0.7; }
+}
+.sd-torch[data-torch="dead"] { color: var(--muted); }
+.sd-torch[data-torch="dead"] .die-btn-label { color: var(--danger); }
+
 /* ---- Daggerheart ---- */
 
 .dh-picker {
@@ -864,6 +942,10 @@ body {
 /* The owned PSG/WOM use only d5, d10, d20 and d100. Keep d? and a custom die
    created through it, but hide Dicebox's broader DCC/novelty catalog here. */
 .dice-buttons.mothership-only .dbtn:not(.custom):not([data-sides="5"]):not([data-sides="10"]):not([data-sides="20"]):not([data-sides="100"]):not([data-custom]) { display: none; }
+/* Shadowdark's damage runs on the classic polyhedrals, d4 through d12, with
+   the d20 for checks; no d100 in play, so the strip trims to the game's own
+   dice. d? and player-made dice stay for table-specific rolls. */
+.dice-buttons.shadowdark-only .dbtn:not(.custom):not([data-sides="4"]):not([data-sides="6"]):not([data-sides="8"]):not([data-sides="10"]):not([data-sides="12"]):not([data-sides="20"]):not([data-custom]) { display: none; }
 /* DCC: the dice chain as a horizontal scroll-snap selector. Each die is its own
    2D shape in its own colour; the token centred in the row is the action die —
    enlarged and full colour — and what Roll throws. The side padding lets the
@@ -1020,6 +1102,14 @@ body {
 .total[data-variant="crows-crit"] { color: #E7C24C; }
 .total[data-variant="crows-doom"] { color: var(--danger); }
 .total[data-variant="crows-out"] { color: var(--danger); }
+
+/* Shadowdark reads in the shared outcome vocabulary — success green, failure
+   ember — with the natural 20 in crit gold and the natural 1 in danger red,
+   the two results the whole table turns for. */
+.total[data-variant="sd-success"] { color: #57B591; }
+.total[data-variant="sd-failure"] { color: #C4705C; }
+.total[data-variant="sd-crit"] { color: #E7C24C; }
+.total[data-variant="sd-fumble"] { color: var(--danger); }
 /* Oracle readings are prose, not a headline word — smaller, serif, wrapping. */
 .total[data-variant="oracle"] {
   color: var(--line);
@@ -1768,6 +1858,7 @@ body {
 .mode-mist { --sys: #3F9FA0; }
 .mode-drawsteel { --sys: #E27B3F; }
 .mode-crows { --sys: #98A08A; }
+.mode-shadowdark { --sys: #E39A2E; }
 .mode-mothership { --sys: #AEC93C; }
 
 /* How many dice each tap adds. Typing a number here and tapping d6 is how you

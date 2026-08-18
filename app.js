@@ -25,6 +25,7 @@ import { rollOneRing, describeOneRing, oneRingHeadline, parseOneRing } from './s
 import { rollPbta, rollMist, twod6Headline, describe2d6, parsePbta, parseMist } from './system-dice.js';
 import { rollDrawSteel, describeDrawSteel, drawSteelHeadline, parseDrawSteel } from './system-dice.js';
 import { rollCrows, describeCrows, crowsHeadline, parseCrows } from './system-dice.js';
+import { rollShadowdark, parseShadowdark, torchRemaining, torchLabel } from './system-dice.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('tray');
@@ -160,6 +161,9 @@ const store = {
   },
   set(key, value) {
     try { localStorage.setItem(key, value); } catch { /* see above */ }
+  },
+  remove(key) {
+    try { localStorage.removeItem(key); } catch { /* see above */ }
   },
 };
 
@@ -469,6 +473,7 @@ function doRoll(notation, { viaOwlbear = true } = {}) {
       : sys === 'mist' ? rollMist(notation)
       : sys === 'drawsteel' ? rollDrawSteel(notation)
       : sys === 'crows' ? rollCrows(notation)
+      : sys === 'shadowdark' ? rollShadowdark(notation)
       : sys === 'mothership' ? rollMothership(notation)
       : sys === 'callofcthulhu' ? rollCallOfCthulhu(notation)
       : sys === 'deltagreen' ? rollDeltaGreen(notation)
@@ -776,6 +781,7 @@ $('notation').addEventListener('input', () => {
   if (typedSystem === 'mist') { mistCtl.fromField(); return; }
   if (typedSystem === 'drawsteel') { syncDsFromField(); return; }
   if (typedSystem === 'crows') { syncCrowsFromField(); return; }
+  if (typedSystem === 'shadowdark') { syncSdFromField(); return; }
   if (typedSystem === 'mothership') { syncMsFromField(); return; }
   if (typedSystem === 'callofcthulhu') { syncCocFromField(); return; }
   if (typedSystem === 'deltagreen') { syncDgFromField(); return; }
@@ -866,6 +872,7 @@ const SYSTEMS = {
   mist: { badge: 'Mist' },
   drawsteel: { badge: 'Draw Steel' },
   crows: { badge: 'Crows (Alpha)' },
+  shadowdark: { badge: 'Shadowdark' },
   mothership: { badge: 'MoSh 1e' },
   callofcthulhu: { badge: 'CoC 7e' },
   deltagreen: { badge: 'Delta Green' },
@@ -884,6 +891,7 @@ const SYSTEM_HINTS = {
   mist: { idle: 'Set your Power, then roll 2d6', placeholder: 'Set your Power, or type mist:+1' },
   drawsteel: { idle: 'Set a characteristic and any edges, then roll 2d10', placeholder: 'Set the chips, or type ds:+2e1' },
   crows: { idle: 'Set a modifier and roll 2d10 — or build a usage pool', placeholder: 'Set the chips, or type crows:+2 or crows:u4' },
+  shadowdark: { idle: 'Roll d20 — set a DC to resolve it, or let the table judge', placeholder: 'Roll, or type sd:+3a@12' },
   mothership: { idle: 'Roll d100 — set a target to resolve it, or let the table judge', placeholder: 'Roll, or type ms:c@35' },
   callofcthulhu: { idle: 'Roll d100 under your skill — set the skill, or let the table judge', placeholder: 'Roll, or type coc:60' },
   deltagreen: { idle: 'Roll d100 under your target — set it, or let the table judge', placeholder: 'Roll, or type dg:50' },
@@ -911,7 +919,7 @@ function systemHint(system) { return SYSTEM_HINTS[system] || DEFAULT_HINT; }
 const SLUG_TO_SYSTEM = {
   cards: 'cards', tarot: 'tarot', italiane: 'napoletane', napoletane: 'napoletane', scopa: 'napoletane', hanafuda: 'hanafuda', koikoi: 'hanafuda', hana: 'hanafuda', utagaruta: 'utagaruta', karuta: 'utagaruta', hyakunin: 'utagaruta', vtmv5: 'v5', fate: 'fate', genesys: 'genesys', dh: 'daggerheart', ctech2e: 'cthulhutech',
   swrpg: 'starwars', tor2e: 'onering', pbta: 'pbta', mist: 'mist', mosh1e: 'mothership',
-  drawsteel: 'drawsteel', ds: 'drawsteel', crows: 'crows',
+  drawsteel: 'drawsteel', ds: 'drawsteel', crows: 'crows', shadowdark: 'shadowdark', sd: 'shadowdark',
   v5: 'v5', vtm: 'v5', daggerheart: 'daggerheart', cthulhutech: 'cthulhutech', ctech: 'cthulhutech',
   yz: 'yearzero', yearzero: 'yearzero', forbiddenlands: 'yearzero', vaesen: 'yearzero', coriolis: 'yearzero', mutant: 'yearzero', tales: 'yearzero',
   alien: 'alien',
@@ -920,7 +928,7 @@ const SLUG_TO_SYSTEM = {
   force: 'starwars', feat: 'onering', tor: 'onering', mothership: 'mothership', mosh: 'mothership', coc: 'callofcthulhu', callofcthulhu: 'callofcthulhu', cthulhu: 'callofcthulhu', dg: 'deltagreen', deltagreen: 'deltagreen',
   ironsworn: 'ironsworn', iron: 'ironsworn', starforged: 'starforged', sf: 'starforged', dcc: 'dcc',
 };
-const SYSTEM_TO_SLUG = { cards: 'cards', tarot: 'tarot', napoletane: 'napoletane', hanafuda: 'hanafuda', utagaruta: 'utagaruta', v5: 'vtmv5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', yearzero: 'yz', alien: 'alien', bladerunner: 'brrpg', twilight: 't2k', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', drawsteel: 'drawsteel', crows: 'crows', mothership: 'mosh1e', callofcthulhu: 'coc', deltagreen: 'dg', ironsworn: 'ironsworn', starforged: 'starforged', dcc: 'dcc' };
+const SYSTEM_TO_SLUG = { cards: 'cards', tarot: 'tarot', napoletane: 'napoletane', hanafuda: 'hanafuda', utagaruta: 'utagaruta', v5: 'vtmv5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', yearzero: 'yz', alien: 'alien', bladerunner: 'brrpg', twilight: 't2k', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', drawsteel: 'drawsteel', crows: 'crows', shadowdark: 'shadowdark', mothership: 'mosh1e', callofcthulhu: 'coc', deltagreen: 'dg', ironsworn: 'ironsworn', starforged: 'starforged', dcc: 'dcc' };
 
 function systemFromPath() {
   const seg = (location.pathname || '/').replace(/^\/+|\/+$/g, '').toLowerCase();
@@ -945,6 +953,7 @@ const torPicker = $('torPicker');
 const twod6Picker = $('twod6Picker');
 const dsPicker = $('dsPicker');
 const crowsPicker = $('crowsPicker');
+const sdPicker = $('sdPicker');
 const msPicker = $('msPicker');
 const cocPicker = $('cocPicker');
 const dgPicker = $('dgPicker');
@@ -990,13 +999,15 @@ function setSystem(system, { roll = false, url = true } = {}) {
   // The mode button wears the active system's mark (d20 / ankh / …).
   modeToggle.dataset.system = system;
 
-  // Swap the dice row for the active system's controls. Daggerheart and
-  // Mothership keep the numeric strip too — their signature roll is separate,
-  // but weapons/damage/wounds are ordinary dice. Mothership's own books use d5,
-  // d10, d20 and d100; d? remains available for table-specific dice.
-  numPicker.hidden = system !== 'numeric' && system !== 'daggerheart' && system !== 'mothership';
+  // Swap the dice row for the active system's controls. Daggerheart,
+  // Mothership and Shadowdark keep the numeric strip too — their signature
+  // roll is separate, but weapons/damage/wounds are ordinary dice.
+  // Mothership's own books use d5, d10, d20 and d100; Shadowdark's damage
+  // runs d4-d12 with the d20 for checks; d? remains for table-specific dice.
+  numPicker.hidden = system !== 'numeric' && system !== 'daggerheart' && system !== 'mothership' && system !== 'shadowdark';
   diceButtons.classList.toggle('standard-only', system === 'daggerheart');
   diceButtons.classList.toggle('mothership-only', system === 'mothership');
+  diceButtons.classList.toggle('shadowdark-only', system === 'shadowdark');
   if (system === 'dcc') enterDcc();
   numPicker.classList.toggle('mothership-rail', system === 'mothership');
   msFieldsRow.hidden = system !== 'mothership';
@@ -1017,6 +1028,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
   twod6Picker.hidden = system !== 'pbta' && system !== 'mist';
   dsPicker.hidden = system !== 'drawsteel';
   crowsPicker.hidden = system !== 'crows';
+  sdPicker.hidden = system !== 'shadowdark';
   msPicker.hidden = system !== 'mothership';
   cocPicker.hidden = system !== 'callofcthulhu';
   dgPicker.hidden = system !== 'deltagreen';
@@ -1069,6 +1081,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
   $('helpMist').hidden = system !== 'mist';
   $('helpDrawsteel').hidden = system !== 'drawsteel';
   $('helpCrows').hidden = system !== 'crows';
+  $('helpShadowdark').hidden = system !== 'shadowdark';
   $('helpMothership').hidden = system !== 'mothership';
   $('helpCallofcthulhu').hidden = system !== 'callofcthulhu';
   $('helpDeltagreen').hidden = system !== 'deltagreen';
@@ -1102,6 +1115,10 @@ function setSystem(system, { roll = false, url = true } = {}) {
     mistCtl.reset();
     resetDs();
     resetCrows();
+    // Shadowdark resets the roll config (modifier, advantage, DC) but NOT the
+    // torch — a lit torch is the crawl's ongoing state, and the hour keeps
+    // burning whatever mode the phone is showing.
+    resetSd();
     // Mothership resets the roll config (mode, target, skill, advantage) but NOT
     // Stress — that is the character's ongoing state, not pool setup, so it must
     // survive a mode switch the way it survives a reload.
@@ -1125,6 +1142,14 @@ function setSystem(system, { roll = false, url = true } = {}) {
     if (system === 'hanafuda') $('notation').value = hanaNotation();
     if (system === 'utagaruta') $('notation').value = utaNotation();
   }
+
+  // The torch ticks only while Shadowdark is on screen: the stored value is an
+  // absolute end-timestamp, so the interval is display-only and pausing it in
+  // other modes costs nothing — a relit page shows the true remaining time.
+  // Started last on purpose: a torch that died while the app was away
+  // announces on the first tick, and everything above repaints the readout —
+  // the one-time sentence must land after the staging line, not under it.
+  if (system === 'shadowdark') startTorchTick(); else stopTorchTick();
 }
 
 // ---- mode popover ----
@@ -2547,6 +2572,138 @@ bindTapHold($('crowsModChip'), dir => { crows.usage = 0; crows.mod = Math.max(-2
 // Tap adds a usage die, hold removes one — an item's pool stays within tapping
 // distance, so the small-pool gesture applies, not the rotary dial.
 bindTapHold(crowsUsageBtn, dir => { crows.usage = Math.max(0, Math.min(20, crows.usage + dir)); syncCrows(); });
+
+// ---- Shadowdark (d20 check, advantage/disadvantage, DC, and the torch) ----
+// The check d20 stages on entry like Draw Steel's pair; advantage or
+// disadvantage adds the second d20 and the roll keeps the higher or lower
+// number. The DC chip steps the book's ladder (9/12/15/18) and defaults to
+// unset — the table judges — with any off-ladder DC reachable by typing.
+const sd = { mod: 0, mode: null, dc: null };
+// The four difficulties the book names: Easy, Normal, Hard, Extreme. The chip
+// cycles them the way Mothership's Skill tiers cycle — a tap alone reaches
+// every value, wrapping through unset.
+const SD_DC_LADDER = [9, 12, 15, 18];
+const sdModVal = $('sdMod');
+const sdDcVal = $('sdDcVal');
+const sdAdvButtons = [...document.querySelectorAll('.sd-adv')];
+const sdTorchBtn = $('sdTorchBtn');
+const sdTorchTime = $('sdTorchTime');
+
+function sdNotation() {
+  const m = sd.mod;
+  return 'sd:' + (m ? (m > 0 ? `+${m}` : String(m)) : '') + (sd.mode || '') + (sd.dc !== null ? `@${sd.dc}` : '');
+}
+function syncSd({ writeField = true } = {}) {
+  if (sdModVal) sdModVal.textContent = sd.mod > 0 ? `+${sd.mod}` : String(sd.mod);
+  if (sdDcVal) {
+    sdDcVal.textContent = sd.dc === null ? '—' : String(sd.dc);
+    if (sd.dc === null) sdDcVal.dataset.unset = '1'; else delete sdDcVal.dataset.unset;
+  }
+  for (const b of sdAdvButtons) b.setAttribute('aria-pressed', String(sd.mode === b.dataset.adv));
+  if (writeField && uiSystem === 'shadowdark') $('notation').value = sdNotation();
+  if (uiSystem === 'shadowdark') stageSystemPool();
+}
+// The roll config only — the torch is the crawl's state, not pool setup, and
+// moves only at its own button, by the clock, or under the X's full sweep.
+function resetSd() { sd.mod = 0; sd.mode = null; sd.dc = null; syncSd({ writeField: false }); }
+function syncSdFromField() {
+  try {
+    const p = parseShadowdark($('notation').value);
+    sd.mod = p.modifier; sd.mode = p.mode; sd.dc = p.dc;
+    syncSd({ writeField: false });
+  } catch { /* mid-type, not yet valid */ }
+}
+// Stats run -4..+4 but talents and attack bonuses stack, so the chip shares
+// the notation's sanity bound rather than inventing a cap the book lacks.
+bindTapHold($('sdModChip'), dir => { sd.mod = Math.max(-20, Math.min(20, sd.mod + dir)); syncSd(); });
+// The DC chip walks the ladder: tap up through 9 → 12 → 15 → 18 and around to
+// unset, hold to walk back. A typed off-ladder DC (an 11 AC, say) shows as
+// itself and steps to the nearest rung from wherever it stands.
+bindTapHold($('sdDcChip'), dir => {
+  if (dir > 0) sd.dc = sd.dc === null ? SD_DC_LADDER[0] : (SD_DC_LADDER.find(v => v > sd.dc) ?? null);
+  else sd.dc = sd.dc === null ? SD_DC_LADDER[SD_DC_LADDER.length - 1] : ([...SD_DC_LADDER].reverse().find(v => v < sd.dc) ?? null);
+  syncSd();
+});
+// Advantage/Disadvantage are mutually exclusive; tapping the active choice
+// clears it — the Mothership gesture, keeping the number instead of the check.
+for (const b of sdAdvButtons) b.addEventListener('click', () => { sd.mode = sd.mode === b.dataset.adv ? null : b.dataset.adv; syncSd(); });
+
+// The torch: Shadowdark's real-time hour, a rules clock the table plays
+// against rather than dice — which is why it has no notation and never
+// shares. Each player carries their own light ("your torch, your clock"), so
+// unlike Stress it deliberately stays out of the Owlbear state sync and the
+// room broadcast. What persists is one absolute end-timestamp: reloads and
+// mode switches can never reset the hour, and the 1s interval (running only
+// while this mode is up) merely repaints what the timestamp already says.
+// `told` persists beside it so "The torch gutters out" is said exactly once,
+// even when the death happens with the app closed.
+const SD_TORCH_KEY = 'dicebox:sd:torch';
+const SD_TORCH_MS = 60 * 60 * 1000;
+const sdTorch = { end: null, told: false };
+{
+  // Restore the burning (or burned-out) torch; anything unreadable is unlit.
+  try {
+    const saved = JSON.parse(store.get(SD_TORCH_KEY));
+    if (Number.isFinite(saved?.end)) { sdTorch.end = saved.end; sdTorch.told = !!saved.told; }
+  } catch { /* corrupt or absent — no torch */ }
+}
+function saveTorch() {
+  if (sdTorch.end === null) store.remove(SD_TORCH_KEY);
+  else store.set(SD_TORCH_KEY, JSON.stringify({ end: sdTorch.end, told: sdTorch.told }));
+}
+const torchLit = () => sdTorch.end !== null && torchRemaining(Date.now(), sdTorch.end) > 0;
+
+function syncTorch() {
+  if (!sdTorchBtn) return;
+  if (sdTorch.end === null) {
+    delete sdTorchBtn.dataset.torch;
+    sdTorchTime.textContent = 'Torch';
+    sdTorchBtn.setAttribute('aria-label', 'Light the torch — it burns for one hour of real time');
+    return;
+  }
+  const secs = torchRemaining(Date.now(), sdTorch.end);
+  sdTorchTime.textContent = torchLabel(secs);
+  if (secs <= 0) {
+    sdTorchBtn.dataset.torch = 'dead';
+    sdTorchBtn.setAttribute('aria-label', 'The torch is out — tap to light a fresh one');
+  } else if (secs < 600) {
+    // Under ten minutes the flame gutters: seconds appear, the button dims
+    // and flickers (a CSS state; reduced-motion machines just dim).
+    sdTorchBtn.dataset.torch = 'guttering';
+    sdTorchBtn.setAttribute('aria-label', `The torch gutters — ${torchLabel(secs)} left. Tap to snuff it`);
+  } else {
+    sdTorchBtn.dataset.torch = 'lit';
+    sdTorchBtn.setAttribute('aria-label', `The torch burns — ${torchLabel(secs)} left. Tap to snuff it`);
+  }
+}
+
+// The one-time death announcement, in the readout the way every table-facing
+// sentence goes. The tick only runs in this mode, so a torch that dies while
+// the app is closed (or showing another mode) announces on the next entry —
+// the first tick finds a dead, untold torch.
+function torchTick() {
+  syncTorch();
+  if (sdTorch.end !== null && !sdTorch.told && torchRemaining(Date.now(), sdTorch.end) <= 0) {
+    sdTorch.told = true;
+    saveTorch();
+    $('breakdown').textContent = 'The torch gutters out';
+  }
+}
+let sdTorchTimer = null;
+function startTorchTick() {
+  if (sdTorchTimer) return;
+  torchTick();
+  sdTorchTimer = setInterval(torchTick, 1000);
+}
+function stopTorchTick() {
+  if (sdTorchTimer) { clearInterval(sdTorchTimer); sdTorchTimer = null; }
+}
+
+// Direct, no confirms: relighting is one tap, so snuffing needs no ceremony.
+// Tap while burning snuffs it; tap while unlit or dead strikes a fresh one.
+function lightTorch() { sdTorch.end = Date.now() + SD_TORCH_MS; sdTorch.told = false; saveTorch(); syncTorch(); }
+function snuffTorch() { sdTorch.end = null; sdTorch.told = false; saveTorch(); syncTorch(); }
+if (sdTorchBtn) sdTorchBtn.addEventListener('click', () => { if (torchLit()) snuffTorch(); else lightTorch(); });
 
 // ---- Mothership 1e ----
 //
@@ -5642,6 +5799,13 @@ function systemStageDescriptors() {
       if (crows.usage) { add(crows.usage, { sides: 6, kind: 'crows-usage' }); break; }
       add(2, { sides: 10, kind: 'crows-power' });
       break;
+    case 'shadowdark':
+      // The check d20 always stages; advantage or disadvantage adds the
+      // second. After the roll the dropped one fades — before it, tapping the
+      // extra die clears the condition (the BR advantage-die precedent).
+      add(1, { sides: 20, kind: 'sd' });
+      if (sd.mode) add(1, { sides: 20, kind: 'sd-adv' });
+      break;
     case 'mothership': {
       // Advantage/Disadvantage rolls the complete check twice. Stage both
       // percentile pairs (four physical d10s) or both Panic d20s so the tray
@@ -5765,6 +5929,9 @@ function removeSystemStageKind(kind) {
     // A usage die tapped goes back on the item — and taking the last one off
     // returns the tray to the staged power roll, the flip-back gesture.
     case 'crows-usage': crows.usage = Math.max(0, crows.usage - 1); syncCrows(); return true;
+    // The advantage/disadvantage twin comes off the way it went on: removing
+    // it clears the condition, leaving the plain check staged.
+    case 'sd-adv': sd.mode = null; syncSd(); return true;
     default:
       if (kind && kind.startsWith('gen-')) {
         const type = kind.slice(4);
@@ -5776,7 +5943,9 @@ function removeSystemStageKind(kind) {
       }
       // Not removable, each on purpose: Hope/Fear and the plain Feat die and
       // the fixed 2d6 and the Draw Steel and Crows power rolls' fixed 2d10
-      // ('ds', 'crows-power') are dice the rules fix; 'br'/'t2k' here are the
+      // ('ds', 'crows-power') and Shadowdark's base check d20 ('sd' — the
+      // check is always exactly one die; only its 'sd-adv' twin is optional)
+      // are dice the rules fix; 'br'/'t2k' here are the
       // Attribute and Skill dice (always exactly one each — their SIZE steps
       // at the picker, not their count); 'dg-check' is the fixed percentile
       // pair; the iron-* kinds are whatever roll the shelf loaded, fixed by
@@ -5831,6 +6000,10 @@ function clearPool({ trackers = true } = {}) {
       case 'pbta': case 'mist': resetTwod6(); syncTwod6(); break;
       case 'drawsteel': resetDs(); syncDs(); break;
       case 'crows': resetCrows(); syncCrows(); break;
+      // The X snuffs the torch as part of the full table sweep — the same
+      // tracker rule as Hunger and Stress: it survives mode switches and
+      // reloads, and falls only here or at its own button (or the clock).
+      case 'shadowdark': if (trackers) snuffTorch(); resetSd(); syncSd(); break;
       // The X sweeps Stress back to its floor of 2 — the tracked-stat rule:
       // trackers survive mode switches and fall only to the full table sweep.
       case 'mothership': if (trackers) setStress(2, { restage: false }); resetMothership(); syncMs(); break;
@@ -7167,6 +7340,7 @@ function emptyTrayRoll() {
   if (uiSystem === 'mist') return mistCtl.notation();
   if (uiSystem === 'drawsteel') return dsNotation();
   if (uiSystem === 'crows') return crowsNotation();
+  if (uiSystem === 'shadowdark') return sdNotation();
   if (uiSystem === 'mothership') return msNotation();
   if (uiSystem === 'callofcthulhu') return cocNotation();
   if (uiSystem === 'deltagreen') return dgNotation();
@@ -7197,6 +7371,7 @@ function restageActiveSystem() {
     case 'pbta': case 'mist': syncTwod6(); break;
     case 'drawsteel': syncDs(); break;
     case 'crows': syncCrows(); break;
+    case 'shadowdark': syncSd(); break;
     case 'mothership': syncMs(); break;
     case 'callofcthulhu': syncCoc(); break;
     case 'deltagreen': syncDg(); break;

@@ -53,6 +53,7 @@ const SYSTEM_EXPORTS = [
   'rollPbta', 'rollMist', 'twod6Headline', 'describe2d6', 'parsePbta', 'parseMist',
   'rollDrawSteel', 'describeDrawSteel', 'drawSteelHeadline', 'parseDrawSteel',
   'rollCrows', 'rollCrowsUsage', 'describeCrows', 'crowsHeadline', 'parseCrows',
+  'rollShadowdark', 'describeShadowdark', 'shadowdarkHeadline', 'parseShadowdark', 'torchRemaining', 'torchLabel',
   'rollMothership', 'describeMothership', 'mothershipHeadline', 'parseMothership', 'resolveMothershipStress',
   'rollCallOfCthulhu', 'describeCallOfCthulhu', 'callOfCthulhuHeadline', 'parseCallOfCthulhu',
   'rollDeltaGreen', 'describeDeltaGreen', 'deltaGreenHeadline', 'parseDeltaGreen',

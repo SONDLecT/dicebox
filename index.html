@@ -224,6 +224,14 @@
             <path d="M18.2 12.2c-.8 4.2-3.5 6.6-7.3 6.6-2.4 0-4.4-.9-5.7-2.6"/>
             <path d="M15.2 9.7h.01" stroke-width="2.4"/>
           </g>
+          <!-- Shadowdark: a torch — a stroke flame over a handle, the hour of
+               light made literal. -->
+          <g class="mode-ico" data-for="shadowdark" fill="none" stroke="currentColor"
+             stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2.8c2.3 2.3 3.7 4.3 3.7 6.2 0 2.4-1.7 4-3.7 4s-3.7-1.6-3.7-4c0-1.9 1.4-3.9 3.7-6.2Z"/>
+            <path d="M9.3 15.4h5.4"/>
+            <path d="M12 15.4v6"/>
+          </g>
           <!-- Cards: a single card face showing a spade. -->
           <g class="mode-ico" data-for="cards">
             <rect x="5.5" y="3" width="13" height="18" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.5"/>
@@ -627,6 +635,37 @@
       <p class="note">
         <i>Implements the May 2026 alpha playtest packet. The rules will change
         as Crows develops, and this mode tracks that packet until updated.</i>
+      </p>
+      </div>
+
+      <div id="helpShadowdark" hidden>
+      <dl class="syntax">
+        <dt>sd:</dt>       <dd>d20, no modifier</dd>
+        <dt>sd:+3</dt>     <dd>d20 plus a stat modifier of +3</dd>
+        <dt>sd:+3a</dt>    <dd>the same with advantage — 2d20, keep the higher</dd>
+        <dt>sd:+3d</dt>    <dd>disadvantage — keep the lower</dd>
+        <dt>sd:+3@12</dt>  <dd>the check against DC 12</dd>
+      </dl>
+      <p class="note">
+        The check: <b>d20</b> plus a stat modifier against a DC — <b>equal or
+        over succeeds</b>. The book's ladder is Easy <b>9</b>, Normal
+        <b>12</b>, Hard <b>15</b>, Extreme <b>18</b>: tap the DC chip to step
+        up it, hold to step back, or leave it unset and the table judges the
+        number. A natural <b>20</b> is a <b>critical</b> and always succeeds
+        (an attack deals double damage dice); a natural <b>1</b> is a
+        <b>fumble</b> and always fails. With advantage or disadvantage the
+        crit reads from the <b>kept</b> die. Attacks (vs AC) and spellcasting
+        (vs 10 + spell tier) are this same check — damage is ordinary dice on
+        the strip below.
+      </p>
+      <p class="note">
+        <b>The torch</b> burns for <b>one hour of real time</b>. Tap it and
+        the hour starts — it keeps burning across reloads and mode switches,
+        because the clock is the rule. Tap a burning torch to snuff it, a dead
+        one to light fresh; the <b>X</b> snuffs it with the rest of the table.
+        Under ten minutes it gutters; at zero, darkness. The torch is a clock,
+        not a roll, so it has no notation — and it never shares to a room:
+        your torch, your clock.
       </p>
       </div>
 
@@ -1048,6 +1087,15 @@
         </svg>
         <span class="mode-row-name">PbtA</span>
         <span class="mode-row-sub">2d6 &middot; hit / partial / miss</span>
+      </button>
+      <button type="button" class="mode-row mode-shadowdark" data-system="shadowdark" aria-pressed="false">
+        <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2.8c2.3 2.3 3.7 4.3 3.7 6.2 0 2.4-1.7 4-3.7 4s-3.7-1.6-3.7-4c0-1.9 1.4-3.9 3.7-6.2Z"/>
+          <path d="M9.3 15.4h5.4"/>
+          <path d="M12 15.4v6"/>
+        </svg>
+        <span class="mode-row-name">Shadowdark</span>
+        <span class="mode-row-sub">d20 &middot; the torch burns</span>
       </button>
       <button type="button" class="mode-row mode-starforged" data-system="starforged" aria-pressed="false">
         <svg class="mode-row-ico" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
@@ -1756,6 +1804,46 @@
     <button type="button" class="spin-chip" id="crowsModChip" aria-label="Modifier — characteristic plus skill plus circumstance, tap to raise, hold to lower">
       <span class="spin-chip-label">Modifier</span>
       <span class="spin-chip-val" id="crowsMod">0</span>
+    </button>
+  </section>
+
+  <!-- Shadowdark: the check d20 stages itself, so the row is the two keep-pair
+       flags (kept die + chevrons pointing where the kept NUMBER goes — up for
+       advantage, down for disadvantage) around the torch and the DC ladder
+       chip. The torch is the centerpiece: a real-time rules clock, not a die,
+       whose label is the time it has left. -->
+  <section class="picker sd-picker" id="sdPicker" aria-label="Shadowdark roll" hidden>
+    <button type="button" class="sd-adv" data-adv="a" aria-pressed="false" aria-label="Advantage — roll 2d20, keep the higher">
+      <svg class="sd-keep-dice" viewBox="0 0 40 40" aria-hidden="true">
+        <path class="drop" d="M26 3.5 33.8 8v9L26 21.5 18.2 17V8Z"/>
+        <path class="keep" d="M14 15.5 21.8 20v9L14 33.5 6.2 29v-9Z"/>
+        <g class="chev"><path d="m10 28 4-4 4 4"/><path d="m10 32 4-4 4 4"/></g>
+      </svg>
+      <span class="sd-adv-label">Advantage</span>
+    </button>
+    <button type="button" class="die-btn sd-torch" id="sdTorchBtn" aria-label="Light the torch — it burns for one hour of real time">
+      <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true">
+        <path class="sd-flame" d="M15 3.2c2.8 2.8 4.5 5.2 4.5 7.6 0 2.9-2 4.8-4.5 4.8s-4.5-1.9-4.5-4.8c0-2.4 1.7-4.8 4.5-7.6Z"/>
+        <path d="M11.6 18.4h6.8"/>
+        <path d="M15 18.4v8.2"/>
+      </svg>
+      <span class="die-btn-label" id="sdTorchTime">Torch</span>
+    </button>
+    <button type="button" class="spin-chip" id="sdModChip" aria-label="Stat modifier — tap to raise, hold to lower">
+      <span class="spin-chip-label">Modifier</span>
+      <span class="spin-chip-val" id="sdMod">0</span>
+    </button>
+    <button type="button" class="spin-chip" id="sdDcChip" aria-label="DC — tap to step up the book's ladder, hold to step down; unset and the table judges">
+      <span class="spin-chip-label">DC</span>
+      <span class="spin-chip-val" id="sdDcVal" data-unset="1">—</span>
+    </button>
+    <button type="button" class="sd-adv" data-adv="d" aria-pressed="false" aria-label="Disadvantage — roll 2d20, keep the lower">
+      <svg class="sd-keep-dice" viewBox="0 0 40 40" aria-hidden="true">
+        <path class="drop" d="M14 15.5 21.8 20v9L14 33.5 6.2 29v-9Z"/>
+        <path class="keep" d="M26 3.5 33.8 8v9L26 21.5 18.2 17V8Z"/>
+        <g class="chev"><path d="m22 11 4 4 4-4"/><path d="m22 15 4 4 4-4"/></g>
+      </svg>
+      <span class="sd-adv-label">Disadvantage</span>
     </button>
   </section>
 

@@ -17,6 +17,7 @@ import { parseOneRing, rollOneRing, summarizeOneRing, describeOneRing, oneRingHe
 import { parsePbta, parseMist, rollPbta, rollMist, summarize2d6, describe2d6, twod6Headline } from '../system-dice.js';
 import { parseDrawSteel, rollDrawSteel, summarizeDrawSteel, describeDrawSteel, drawSteelHeadline } from '../system-dice.js';
 import { parseCrows, rollCrows, rollCrowsUsage, summarizeCrows, summarizeCrowsUsage, describeCrows, crowsHeadline } from '../system-dice.js';
+import { parseShadowdark, rollShadowdark, summarizeShadowdark, describeShadowdark, shadowdarkHeadline, torchRemaining, torchLabel } from '../system-dice.js';
 import { parseMothership, rollMothership, summarizeMothershipCheck, summarizeMothershipPanic, describeMothership, mothershipHeadline } from '../system-dice.js';
 import { parseCards, newDeckOrder, summarizeCards, cardsHeadline, describeCards } from '../system-dice.js';
 import { parseTarot, summarizeTarot, tarotHeadline, describeTarot } from '../system-dice.js';
@@ -1011,6 +1012,91 @@ ok('a 2 does not', summarizeCrowsUsage([2]).remain === 0);
   ok('usage describe names the dead faces', /a 1 and a 2 spent/.test(describeCrows(u)));
   ok('usage describe counts doubles', /two 1s and a 2 spent/.test(describeCrows(out)));
   ok('usage describe on a clean roll', /every die holds/.test(describeCrows({ summary: summarizeCrowsUsage([4, 5]) })));
+}
+
+// ---- Shadowdark (d20 vs DC, advantage/disadvantage, the torch clock) ----
+ok('detect shadowdark', detectSystem('sd:+3') === 'shadowdark');
+ok('detect shadowdark bare', detectSystem('sd:') === 'shadowdark');
+ok('shadowdark not numeric', detectSystem('1d20') === 'numeric');
+ok('parse sd bare', eq(parseShadowdark('sd:'), { modifier: 0, mode: null, dc: null }));
+ok('parse sd +3', eq(parseShadowdark('sd:+3'), { modifier: 3, mode: null, dc: null }));
+ok('parse sd -2', eq(parseShadowdark('sd:-2'), { modifier: -2, mode: null, dc: null }));
+ok('parse sd advantage', eq(parseShadowdark('sd:+3a'), { modifier: 3, mode: 'a', dc: null }));
+ok('parse sd disadvantage', eq(parseShadowdark('sd:+3d'), { modifier: 3, mode: 'd', dc: null }));
+ok('parse sd DC', eq(parseShadowdark('sd:+3@12'), { modifier: 3, mode: null, dc: 12 }));
+ok('parse sd everything', eq(parseShadowdark('sd:-1d@15'), { modifier: -1, mode: 'd', dc: 15 }));
+ok('parse sd flag without modifier', eq(parseShadowdark('sd:a'), { modifier: 0, mode: 'a', dc: null }));
+ok('parse sd DC without modifier', eq(parseShadowdark('sd:@18'), { modifier: 0, mode: null, dc: 18 }));
+for (const bad of ['sd', 'sd:x', 'sd:3', 'sd:+21', 'sd:-21', 'sd:@0', 'sd:@31', 'sd:+3ad', 'sd:a+3', 'sd:@12a', 'ms:']) {
+  ok(`reject sd ${bad}`, (() => { try { parseShadowdark(bad); return false; } catch { return true; } })());
+}
+// advantage keeps the higher number, disadvantage the lower, plain keeps its one
+ok('advantage keeps the higher', summarizeShadowdark([7, 15], 'a', 0, null).kept === 15);
+ok('disadvantage keeps the lower', summarizeShadowdark([7, 15], 'd', 0, null).kept === 7);
+ok('a plain roll keeps its die', summarizeShadowdark([11], null, 0, null).kept === 11 && summarizeShadowdark([11], null, 0, null).dropped === null);
+ok('the dropped die is named', summarizeShadowdark([7, 15], 'a', 0, null).dropped === 7);
+ok('a doubled pair keeps one and drops its twin', summarizeShadowdark([9, 9], 'a', 0, null).kept === 9 && summarizeShadowdark([9, 9], 'a', 0, null).dropped === 9);
+// naturals read from the KEPT die — the dropped one is out of the game
+ok('nat 20 crits', summarizeShadowdark([20], null, 0, null).nat20 === true);
+ok('nat 1 fumbles', summarizeShadowdark([1], null, 0, null).nat1 === true);
+ok('advantage keeping a 20 over a dropped 1 is a critical, not a fumble',
+   (() => { const s = summarizeShadowdark([1, 20], 'a', 0, null); return s.nat20 === true && s.nat1 === false; })());
+ok('disadvantage keeping the 1 under a dropped 20 is the fumble',
+   (() => { const s = summarizeShadowdark([1, 20], 'd', 0, null); return s.nat1 === true && s.nat20 === false; })());
+ok('a modified 20 total is not a crit', summarizeShadowdark([17], null, 3, null).nat20 === false);
+// DC resolution: equal or over succeeds, and the naturals override the math
+ok('meets it beats it', summarizeShadowdark([9], null, 3, 12).outcome === 'success');
+ok('one under fails', summarizeShadowdark([8], null, 3, 12).outcome === 'failure');
+ok('no DC asserts no outcome', summarizeShadowdark([18], null, 3, null).outcome === null);
+ok('nat 20 succeeds regardless', (() => { const s = summarizeShadowdark([20], null, -4, 18); return s.total === 16 && s.outcome === 'success'; })());
+ok('nat 1 fails regardless', (() => { const s = summarizeShadowdark([1], null, 15, 9); return s.total === 16 && s.outcome === 'failure'; })());
+// roll shape and routing
+{
+  const r = rollShadowdark('sd:+3');
+  ok('sd system tag', r.system === 'shadowdark');
+  ok('sd rolls one d20', r.groups[0].dice.length === 1 && r.groups[0].sides === 20);
+  ok('sd total = die + mod', r.summary.total === r.groups[0].dice[0].value + 3);
+  const a = rollShadowdark('sd:+1a');
+  ok('advantage rolls two d20', a.groups[0].dice.length === 2);
+  ok('exactly one die stands, and it is the kept value',
+     a.groups[0].dice.filter(d => d.kept).length === 1 &&
+     a.groups[0].dice.find(d => d.kept).value === a.summary.kept);
+  ok('the dropped die fades', a.groups[0].dice.filter(d => !d.kept).length === 1);
+  ok('rollAny routes sd', rollAny('sd:').system === 'shadowdark');
+}
+// headline and detail
+{
+  const win = { summary: summarizeShadowdark([14], null, 3, 12) };
+  ok('sd headline resolves with a DC', shadowdarkHeadline(win).text === 'Success · 17' && shadowdarkHeadline(win).variant === 'sd-success');
+  const lose = { summary: summarizeShadowdark([5], null, 3, 12) };
+  ok('sd failure headline', shadowdarkHeadline(lose).text === 'Failure · 8' && shadowdarkHeadline(lose).variant === 'sd-failure');
+  const bare = { summary: summarizeShadowdark([14], null, 3, null) };
+  ok('no DC reports the number only', shadowdarkHeadline(bare).kind === 'number' && shadowdarkHeadline(bare).text === '17');
+  const crit = { summary: summarizeShadowdark([20], null, 0, null) };
+  ok('the crit takes the headline even without a DC', shadowdarkHeadline(crit).text === 'Critical · 20' && shadowdarkHeadline(crit).variant === 'sd-crit');
+  const fumble = { summary: summarizeShadowdark([1], null, 0, null) };
+  ok('the fumble too', shadowdarkHeadline(fumble).text === 'Fumble · 1' && shadowdarkHeadline(fumble).variant === 'sd-fumble');
+  ok('sd describe shows the math and DC', /d20 14 \+ 3 · total 17 · DC 12/.test(describeShadowdark(win)));
+  ok('sd describe names kept and dropped', /advantage — kept 15, dropped 7/.test(describeShadowdark({ summary: summarizeShadowdark([7, 15], 'a', 2, null) })));
+  ok('sd describe skips a redundant total', describeShadowdark({ summary: summarizeShadowdark([11], null, 0, null) }) === 'd20 11');
+  ok('a rescued crit says it succeeds regardless',
+     /natural 20 — critical, it succeeds regardless/.test(describeShadowdark({ summary: summarizeShadowdark([20], null, -4, 18) })));
+  ok('a doomed fumble says it fails regardless',
+     /natural 1 — fumble, it fails regardless/.test(describeShadowdark({ summary: summarizeShadowdark([1], null, 15, 9) })));
+}
+// the torch clock: pure timestamp math, so a reload can never drift it
+{
+  const now = 1_000_000_000;
+  ok('a fresh torch has the full hour', torchRemaining(now, now + 3_600_000) === 3600);
+  ok('remaining rounds up, never down', torchRemaining(now + 500, now + 3_600_000) === 3600);
+  ok('a dead torch has nothing left', torchRemaining(now + 3_600_001, now + 3_600_000) === 0);
+  ok('long dead clamps at zero', torchRemaining(now + 9_999_999, now + 3_600_000) === 0);
+  ok('garbage reads as dead', torchRemaining(now, NaN) === 0 && torchRemaining(now, undefined) === 0);
+  ok('the label counts minutes with time to spare', torchLabel(3600) === '60 min' && torchLabel(1799) === '29 min');
+  ok('exactly ten minutes still reads as minutes', torchLabel(600) === '10 min');
+  ok('under ten minutes it counts seconds', torchLabel(599) === '9:59' && torchLabel(61) === '1:01');
+  ok('seconds pad to two digits', torchLabel(305) === '5:05');
+  ok('at zero, darkness', torchLabel(0) === 'Darkness');
 }
 
 // ---- Mothership 1e ----

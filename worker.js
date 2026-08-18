@@ -64,7 +64,7 @@ const ALWAYS_REVALIDATE = new Set(['/sw.js', '/', '/index.html', '/manifest.webm
 const SYSTEM_SLUGS = new Set([
   '/cards', '/tarot', '/italiane', '/napoletane', '/scopa', '/hanafuda', '/koikoi', '/hana', '/utagaruta', '/karuta', '/hyakunin', '/vtmv5', '/fate', '/genesys', '/dh', '/ctech2e', '/swrpg', '/tor2e', '/pbta', '/mist', '/mosh1e', '/coc', '/callofcthulhu', '/cthulhu', '/dg', '/deltagreen',
   '/v5', '/vtm', '/daggerheart', '/cthulhutech', '/force', '/feat', '/mothership', '/ctech', '/tor', '/mosh',
-  '/ironsworn', '/starforged', '/iron', '/dcc', '/drawsteel', '/ds', '/crows',
+  '/ironsworn', '/starforged', '/iron', '/dcc', '/drawsteel', '/ds', '/crows', '/shadowdark', '/sd',
   '/yz', '/yearzero', '/alien', '/forbiddenlands', '/vaesen', '/coriolis', '/mutant',
   '/brrpg', '/bladerunner', '/t2k', '/twilight', '/twilight2000',
 ]);

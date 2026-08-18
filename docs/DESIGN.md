@@ -167,7 +167,9 @@ what only the sheet reads.
 A tracked stat persists across reload and mode switches, moves only at its
 own control or by its own rule (a failed Rouse, a failed check), is cleared
 by the X as part of a full table sweep, and syncs through the Owlbear
-background so every surface agrees.
+background so every surface agrees. A real-time rules object the table plays
+against (the torch) follows the same rules: persistent, moved only by its
+own control (or its own clock), and swept by the X.
 
 **No unearned resolution.** Without the table-set number, report the facts —
 successes, criticals, Hunger events — and assert no outcome. Never guess a

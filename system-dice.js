@@ -45,6 +45,7 @@ export function detectSystem(src) {
   if (/^mist:/.test(s)) return 'mist';
   if (/^ds:/.test(s)) return 'drawsteel';
   if (/^crows:/.test(s)) return 'crows';
+  if (/^sd:/.test(s)) return 'shadowdark';
   if (/^ms:/.test(s)) return 'mothership';
   if (/^coc:/.test(s)) return 'callofcthulhu';
   if (/^dg:/.test(s)) return 'deltagreen';
@@ -358,6 +359,7 @@ export function rollAny(src, uiSystem = 'numeric') {
   if (sys === 'mist') return rollMist(src);
   if (sys === 'drawsteel') return rollDrawSteel(src);
   if (sys === 'crows') return rollCrows(src);
+  if (sys === 'shadowdark') return rollShadowdark(src);
   if (sys === 'mothership') return rollMothership(src);
   if (sys === 'callofcthulhu') return rollCallOfCthulhu(src);
   if (sys === 'deltagreen') return rollDeltaGreen(src);
@@ -693,6 +695,135 @@ export function describeCrows(result) {
   if (s.doom) parts.push(CROWS_TIER_WORDS[s.tier].toLowerCase(), `natural ${s.natural} — Doom`);
   else if (s.crit) parts.push(CROWS_TIER_WORDS[s.tier].toLowerCase(), `natural ${s.natural} — Critical`);
   return parts.join(' · ');
+}
+
+// ---- Shadowdark (The Arcane Library) — the d20 check and the torch clock ----
+//
+// Every roll is the same check: d20 plus a stat modifier against a DC, equal
+// or over succeeds. The book's ladder is Easy 9 / Normal 12 / Hard 15 /
+// Extreme 18, but any DC types; with no DC set the roll reports the number
+// and the natural-die facts and asserts no outcome — the table judges, per
+// the no-unearned-resolution rule.
+//
+// A natural 20 "succeeds to your maximum capacity" and a natural 1 "fails to
+// your maximum capacity" — the book's own words — so they resolve the check
+// regardless of the arithmetic: a nat 20 wins a DC the total misses, a nat 1
+// loses one the total clears. On attacks the 20 doubles the damage dice; that
+// second roll is the numeric strip's business, the check just names the crit.
+//
+// Advantage and disadvantage roll the d20 twice and keep the higher or lower
+// NUMBER (unlike Mothership, which keeps the better resolved outcome — here
+// there is nothing to resolve until the modifier lands). The natural-20/1
+// reading follows the KEPT die: an advantage pair that keeps a 20 over a
+// dropped 1 is a critical, never a fumble.
+//
+// Attacks (vs AC) and spellcasting (vs 10 + spell tier) are this same check;
+// damage is ordinary numeric dice, which is why the mode keeps the numeric
+// strip (d4-d12 + d20) on screen the way Daggerheart and Mothership do.
+//
+// The torch — Shadowdark's famous real-time hour — is a rules clock, not a
+// roll, so it has NO notation (the established exception shape: state the
+// dice play against, moved only by its own control). Its arithmetic lives
+// here as pure functions so the countdown is testable without a DOM; the
+// app stores only an absolute end-timestamp, so the display interval can
+// never drift the clock.
+//
+// sd:[+MOD][a|d][@DC]   e.g. "sd:+3", "sd:+3a", "sd:-1d@15"; bare "sd:"
+// rolls a flat d20. Modifier first, then the advantage flag, then the DC.
+const SD_REGEX = /^sd:([+-]\d+)?([ad])?(?:@(\d+))?$/;
+
+export function parseShadowdark(src) {
+  const m = SD_REGEX.exec(String(src || '').trim().toLowerCase());
+  if (!m) throw new Error('Expected a Shadowdark roll like "sd:+3", "sd:+3a" or "sd:+3@12"');
+  const modifier = m[1] ? Number(m[1]) : 0;
+  const mode = m[2] || null;
+  const dc = m[3] === undefined ? null : Number(m[3]);
+  // Stats run -4 to +4, but attack bonuses and talents stack on top, so ±20
+  // is an engine sanity bound far past table reality, not a rule.
+  if (modifier < -20 || modifier > 20) throw new Error('Modifier must be -20 to +20');
+  // The book's ladder tops at 18; 30 leaves room for any monster's AC.
+  if (dc !== null && (dc < 1 || dc > 30)) throw new Error('DC must be 1-30');
+  return { modifier, mode, dc };
+}
+
+export function rollShadowdark(src) {
+  const { modifier, mode, dc } = parseShadowdark(src);
+  const rolls = mode ? [randInt(20), randInt(20)] : [randInt(20)];
+  const summary = summarizeShadowdark(rolls, mode, modifier, dc);
+  // The dropped die fades on the tray (kept:false), the CoC precedent. On a
+  // doubled pair either die could be "the kept one"; mark the first so
+  // exactly one stands.
+  const keptIdx = rolls.indexOf(summary.kept);
+  const dice = rolls.map((v, i) => ({ value: v, sides: 20, kept: i === keptIdx, rerolled: false, exploded: false }));
+  return {
+    schema: 2,
+    system: 'shadowdark',
+    notation: String(src),
+    groups: [{ kind: 'dice', dieType: 'shadowdark', sides: 20, count: rolls.length, dice, subtotal: summary.kept }],
+    summary,
+  };
+}
+
+export function summarizeShadowdark(rolls, mode, modifier, dc) {
+  const kept = mode === 'a' ? Math.max(...rolls) : mode === 'd' ? Math.min(...rolls) : rolls[0];
+  const dropped = rolls.length > 1 ? (rolls[0] === kept ? rolls[1] : rolls[0]) : null;
+  const total = kept + modifier;
+  // The natural die is the KEPT one: advantage that keeps a 20 over a dropped
+  // 1 crits, and disadvantage that keeps the 1 fumbles — the dropped die is
+  // out of the game entirely.
+  const nat20 = kept === 20;
+  const nat1 = kept === 1;
+  const outcome = dc === null ? null
+    : nat20 ? 'success'
+    : nat1 ? 'failure'
+    : total >= dc ? 'success' : 'failure';
+  return { kind: 'shadowdark', rolls: [...rolls], mode, kept, dropped, modifier, total, dc, nat20, nat1, outcome };
+}
+
+// The naturals outrank the DC in the headline: a Critical or Fumble is the
+// event the table reacts to, and it already carries the resolution (a 20
+// always succeeds, a 1 always fails). Without a DC the answer is the number.
+export function shadowdarkHeadline(result) {
+  const s = result.summary;
+  if (s.nat20) return { kind: 'text', text: `Critical · ${s.total}`, variant: 'sd-crit' };
+  if (s.nat1) return { kind: 'text', text: `Fumble · ${s.total}`, variant: 'sd-fumble' };
+  if (s.outcome) return { kind: 'text', text: `${s.outcome === 'success' ? 'Success' : 'Failure'} · ${s.total}`, variant: `sd-${s.outcome}` };
+  return { kind: 'number', text: String(s.total) };
+}
+
+export function describeShadowdark(result) {
+  const s = result.summary;
+  const parts = [];
+  if (s.mode) parts.push(`${s.mode === 'a' ? 'advantage' : 'disadvantage'} — kept ${s.kept}, dropped ${s.dropped}`);
+  let math = `d20 ${s.kept}`;
+  if (s.modifier) math += ` ${s.modifier > 0 ? '+' : '−'} ${Math.abs(s.modifier)}`;
+  parts.push(math);
+  // "total" earns its slot only when arithmetic happened; a bare d20's total
+  // is the die and saying it twice is noise.
+  if (s.modifier) parts.push(`total ${s.total}`);
+  if (s.dc !== null) parts.push(`DC ${s.dc}`);
+  // When a natural overrides what the arithmetic said, say so — the outcome
+  // must never look like a maths slip.
+  if (s.nat20) parts.push(s.dc !== null && s.total < s.dc ? 'natural 20 — critical, it succeeds regardless' : 'natural 20 — critical');
+  if (s.nat1) parts.push(s.dc !== null && s.total >= s.dc ? 'natural 1 — fumble, it fails regardless' : 'natural 1 — fumble');
+  return parts.join(' · ');
+}
+
+// The torch's clock, factored pure so it tests headlessly: whole seconds left
+// on a torch that dies at `endTs`, never negative. Ceil, so a torch lit this
+// instant reads the full hour rather than 59:59.
+export function torchRemaining(now, endTs) {
+  if (!Number.isFinite(endTs)) return 0;
+  return Math.max(0, Math.ceil((endTs - now) / 1000));
+}
+
+// What the torch button says: minutes while there is time to spare, mm:ss
+// once it gutters (under ten minutes — close enough to count seconds), and
+// the fact of the matter at zero.
+export function torchLabel(seconds) {
+  if (seconds <= 0) return 'Darkness';
+  if (seconds < 600) return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+  return `${Math.floor(seconds / 60)} min`;
 }
 
 // ---- Star Wars (FFG / Edge Studio) — Genesys narrative dice + the Force die ----

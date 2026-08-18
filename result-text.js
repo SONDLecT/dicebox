@@ -17,6 +17,7 @@ import {
   starWarsHeadline, describeStarWars, oneRingHeadline, describeOneRing,
   twod6Headline, describe2d6, drawSteelHeadline, describeDrawSteel,
   crowsHeadline, describeCrows,
+  shadowdarkHeadline, describeShadowdark,
   mothershipHeadline, describeMothership,
   callOfCthulhuHeadline, describeCallOfCthulhu, deltaGreenHeadline, describeDeltaGreen,
   ironswornHeadline, describeIronsworn, cardsHeadline, describeCards,
@@ -37,6 +38,7 @@ export function formatHeadline(result) {
   if (result.system === 'pbta' || result.system === 'mist') return twod6Headline(result);
   if (result.system === 'drawsteel') return drawSteelHeadline(result);
   if (result.system === 'crows') return crowsHeadline(result);
+  if (result.system === 'shadowdark') return shadowdarkHeadline(result);
   if (result.system === 'mothership') return mothershipHeadline(result);
   if (result.system === 'coc') return callOfCthulhuHeadline(result);
   if (result.system === 'deltagreen') return deltaGreenHeadline(result);
@@ -64,6 +66,7 @@ export function formatDetail(result) {
   if (result.system === 'pbta' || result.system === 'mist') return describe2d6(result);
   if (result.system === 'drawsteel') return describeDrawSteel(result);
   if (result.system === 'crows') return describeCrows(result);
+  if (result.system === 'shadowdark') return describeShadowdark(result);
   if (result.system === 'mothership') return describeMothership(result);
   if (result.system === 'coc') return describeCallOfCthulhu(result);
   if (result.system === 'deltagreen') return describeDeltaGreen(result);
