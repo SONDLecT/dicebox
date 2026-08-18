@@ -946,7 +946,18 @@ body[data-torchlit] .breakdown {
    pill, fading with distance. touch-action: none is what lets the drag own
    the gesture — without it the browser scrolls the page out from under a
    scrub. */
-.scrub-dial { touch-action: none; }
+/* Doubled on purpose — this is load-bearing, not a typo. Several host
+   buttons declare touch-action: manipulation, and some of those rules sit
+   LATER in this sheet: at equal single-class specificity the later rule
+   wins, which is how the custom die (.dbtn.custom.scrub-dial) computed
+   `manipulation`, let the browser claim every vertical drag for the dice
+   row's horizontal scroll (pointercancel, scrub dead) on real phones —
+   while synthetic pointer events, which never consult gesture
+   arbitration, passed every test. Two classes beat one wherever the rule
+   sits, so no future button styling can silently take the gesture back;
+   the markup suite guards the doubling and rejects rival two-class
+   touch-action rules. */
+.scrub-dial.scrub-dial { touch-action: none; }
 
 /* The huge-range chips' typing door: tapping the value floats a numeric
    field exactly over the chip (never inside it — an input inside a button

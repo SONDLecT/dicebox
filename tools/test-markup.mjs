@@ -178,8 +178,21 @@ ok('a tray tap reaches the torch before the dice',
     return !tag || !/class="[^"]*scrub-dial[^"]*"/.test(tag);
   });
   ok('every barrel chip is marked touch-action none', unmarked.length === 0, unmarked.join(', '));
-  ok('the scrub-dial class carries touch-action none',
-     /\.scrub-dial\s*\{[^}]*touch-action\s*:\s*none/.test(css));
+  // Real-phone gesture arbitration follows COMPUTED touch-action, and the
+  // cascade decides it: the custom die's scrub died because .dbtn declared
+  // touch-action: manipulation LATER in the sheet than .scrub-dial's none,
+  // at equal specificity — invisible to every synthetic-event test, fatal
+  // on a real thumb. The barrel rule is doubled so two classes beat one
+  // wherever it sits; the second check rejects any rival touch-action rule
+  // that reaches two classes and could out-rank it again.
+  ok('the barrel touch-action rule is doubled and says none',
+     /\.scrub-dial\.scrub-dial\s*\{[^}]*touch-action\s*:\s*none/.test(css));
+  const touchRules = [...css.matchAll(/([^{}]+)\{[^{}]*touch-action\s*:/g)].map(m => m[1].trim());
+  const rivals = touchRules.filter(sel =>
+    !sel.includes('.scrub-dial')
+    && sel.split(',').some(part => (part.match(/\.[A-Za-z]/g) || []).length >= 2));
+  ok('no rival touch-action rule can out-rank the barrel', rivals.length === 0,
+     rivals.join(' | '));
 }
 ok('the scrub wheel listener is non-passive',
    /addEventListener\('wheel', [\s\S]{0,600}?\{ passive: false \}\)/.test(js));
