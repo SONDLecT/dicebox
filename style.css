@@ -576,7 +576,9 @@ body {
 .gen-chip[data-type="difficulty"]  { --dc: #8A5CC0; }
 .gen-chip[data-type="challenge"]   { --dc: #C24046; }
 .gen-chip[data-type="setback"]     { --dc: #7C828A; }
-.gen-chip[data-type="force"]       { --dc: #AEB4BC; }
+/* The staged Force die's neutral metal grey — FORCE_STAGE_COLOR in app.js;
+   the chip and the die it stages must be the same grey. */
+.gen-chip[data-type="force"]       { --dc: #9AA0A6; }
 
 /* The Force chip belongs to Star Wars only — hidden until that mode adds it. */
 .genesys-picker:not(.with-force) .gen-chip-force { display: none; }
@@ -944,7 +946,9 @@ body {
 /* One Ring: a Success-d6 button + Target chip, then the condition toggles. */
 .tor-picker { flex-direction: column; align-items: center; gap: 10px; }
 .tor-controls-row { display: flex; gap: 12px; align-items: center; }
-.tor-success-btn { --dc: #B5893C; }
+/* TOR_COLORS.success — the button adds Success dice, so it wears their
+   parchment, not the Feat die's bronze. */
+.tor-success-btn { --dc: #CBBF9F; }
 .tor-flags-row { display: flex; gap: 8px; width: 100%; }
 /* Each condition is an icon toggle: favoured/ill show the two Feat dice with the
    kept one on top (high for favoured, low for ill); Weary a struck Success die. */
@@ -989,7 +993,7 @@ body {
 /* ---- Mothership ---- */
 /* Signature dice are direct roll actions; modifiers flank them in one tactile row. */
 .ms-picker { flex-direction: column; align-items: stretch; gap: 6px; }
-.ms-dice-row, .ms-fields-row, .ms-action-row { display: flex; align-items: stretch; gap: 6px; }
+.ms-fields-row, .ms-action-row { display: flex; align-items: stretch; gap: 6px; }
 /* The second and final visual row is a single horizontal rail: character setup,
    dice-per-tap, then the five rules-grounded dice. It scrolls instead of wrapping. */
 .picker.mothership-rail {

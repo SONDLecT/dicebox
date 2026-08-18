@@ -106,7 +106,6 @@ const THROW_LIMIT = 24;
 const ANIMATE_LIMIT = 220;
 
 const state = {
-  count: 1,
   // What a tap on an empty tray rolls, when nothing is staged.
   defaultSides: 20,
   dice: [],
@@ -649,8 +648,6 @@ function recordRoll(result, who = null, mine = false, at = null) {
     who,
     mine,
     notation: result.notation,
-    // Numeric rolls keep their scalar `total`; system rolls carry a formatted
-    // headline instead of a bogus scalar.
     // Only numeric rolls carry a scalar total; system rolls store a formatted
     // headline instead and leave this null.
     total: result.total ?? null,
@@ -961,13 +958,10 @@ function setSystem(system, { roll = false, url = true } = {}) {
   // The mode button wears the active system's mark (d20 / ankh / …).
   modeToggle.dataset.system = system;
 
-  // Swap the dice row for the active system's controls. Daggerheart keeps the
-  // numeric strip too — its duality is one roll, but weapons and the rest need
-  // ordinary dice — so its own controls sit above the numeric ones. In that mode
-  // the strip is trimmed to the standard polyhedral dice.
-  // Daggerheart and Mothership keep the numeric strip too — their signature roll
-  // is separate, but weapons/damage/wounds are ordinary dice. Mothership's owned
-  // books use d5, d10, d20 and d100; d? remains available for table-specific dice.
+  // Swap the dice row for the active system's controls. Daggerheart and
+  // Mothership keep the numeric strip too — their signature roll is separate,
+  // but weapons/damage/wounds are ordinary dice. Mothership's own books use d5,
+  // d10, d20 and d100; d? remains available for table-specific dice.
   numPicker.hidden = system !== 'numeric' && system !== 'daggerheart' && system !== 'mothership';
   diceButtons.classList.toggle('standard-only', system === 'daggerheart');
   diceButtons.classList.toggle('mothership-only', system === 'mothership');
@@ -1074,6 +1068,11 @@ function setSystem(system, { roll = false, url = true } = {}) {
     // Stress — that is the character's ongoing state, not pool setup, so it must
     // survive a mode switch the way it survives a reload.
     resetMothership();
+    resetCoc();
+    resetDg();
+    // Ironsworn is deliberately not reset here: resetIron clears the pinned
+    // oracle tiles, and pins are standing table setup — they survive a mode
+    // switch the way a tracker does. The X still sweeps them via clearPool.
     clearPool({ trackers: false });
     // Daggerheart and Mothership seed the field with their signature roll so a
     // plain Roll or flick throws it; tapping numeric dice replaces it with a pool.
@@ -1760,23 +1759,6 @@ function packInto(dice, x0, x1, y0, y1) {
   });
 }
 
-// Ease targets for the current tray, ordered by where the dice already sit so
-// nothing jumps across it — a lighter cousin of placeGrid, which snaps.
-function rehomeGrid(dice) {
-  const { left, right, top, floor } = state.bounds;
-  const w = right - left, h = floor - top;
-  const cols = Math.ceil(Math.sqrt(dice.length * (w / Math.max(h, 1))));
-  const rows = Math.ceil(dice.length / cols);
-  const cw = w / cols, ch = h / rows;
-  const size = Math.max(26, Math.min(96, Math.min(cw, ch) * 0.78));
-  [...dice].sort((a, b) => (a.y - b.y) || (a.x - b.x)).forEach((d, i) => {
-    const c = i % cols, r = Math.floor(i / cols);
-    d.homeX = left + cw * (c + 0.5);
-    d.homeY = top + ch * (r + 0.5);
-    d.size = size;
-  });
-}
-
 // During a push, locked dice are authoritative held outcomes. Rehome only the
 // rerolled/added dice so the held dice do not slide toward new targets.
 function rehomeUnlockedGrid(dice) {
@@ -1992,10 +1974,11 @@ bindTapHold(dhAdvButtons.find(b => b.dataset.adv === 'dis'), dir => {
   else if (dhState.advantage < 0) setAdvantage(dhState.advantage + 1);
 });
 
-// The Duality button rolls the Hope + Fear (with the current advantage, modifier
-// and difficulty) straight away — separate from the numeric strip, which builds
-// ordinary rolls for weapons and the rest.
-$('dhRoll').addEventListener('click', () => doRoll(dhNotation()));
+// The Duality button selects and stages the Hope + Fear roll (with the current
+// advantage, modifier and difficulty) — buttons stage, the player rolls, so the
+// throw itself comes from Roll or the tray. Useful after a numeric damage pool
+// took over the tray: one tap brings the duality pair back in hand.
+$('dhRoll').addEventListener('click', () => { $('notation').value = dhNotation(); syncDh({ writeField: true }); });
 
 bindTapHold(dhModChip, dir => { dhState.modifier = Math.max(-100, Math.min(100, dhState.modifier + dir)); syncDh(); });
 dhDiffChip.addEventListener('click', () => {
@@ -2091,7 +2074,8 @@ function syncCt({ writeField = true } = {}) {
 
 // Tap the d10 to add to the pool, hold to remove one (down to empty).
 bindTapHold(ctAddDie, dir => { ct.dice = Math.max(0, Math.min(100, ct.dice + dir)); syncCt(); });
-// Difficulty cycles unset → 1 … 20; holding below 1 returns to unset (report hits).
+// Difficulty opens the shared number dial, with "Table sets it" as the unset
+// state — unresolved rolls just report hits.
 ctDiffChip.addEventListener('click', () => {
   openNumberDial({
     title: 'Difficulty', value: ct.difficulty ?? 3, min: 1, max: 20,
@@ -2161,7 +2145,8 @@ for (const btn of torFlagButtons) {
 }
 // Tap the d6 to add a Success die, hold to remove one.
 bindTapHold(torAddSuccess, dir => { tor.success = Math.max(0, Math.min(20, tor.success + dir)); syncTor(); });
-// Target cycles unset → 10 … 100; holding below 1 returns to unset.
+// The Target Number opens the shared number dial (1-30), with "Table sets it"
+// as the unset state.
 torTnChip.addEventListener('click', () => {
   openNumberDial({
     title: 'Target Number', value: tor.tn ?? 14, min: 1, max: 30,
@@ -2343,7 +2328,7 @@ function cocNotation() {
   else if (coc.modifier < 0) s += 'p' + (-coc.modifier > 1 ? -coc.modifier : '');
   return s;
 }
-function resetCoc() { coc.target = null; coc.modifier = 0; }
+function resetCoc() { coc.target = null; coc.modifier = 0; syncCoc({ writeField: false }); }
 
 function syncCoc({ writeField = true } = {}) {
   cocSkillDial.textContent = coc.target === null ? '—' : String(coc.target);
@@ -2394,7 +2379,7 @@ const dg = { target: null };
 const dgTargetDial = $('dgTargetDial');
 
 function dgNotation() { return 'dg:' + (dg.target !== null ? dg.target : ''); }
-function resetDg() { dg.target = null; }
+function resetDg() { dg.target = null; syncDg({ writeField: false }); }
 
 function syncDg({ writeField = true } = {}) {
   dgTargetDial.textContent = dg.target === null ? '—' : String(dg.target);
@@ -2462,7 +2447,7 @@ function syncIron({ writeField = true } = {}) {
 
 // Load a roll as active and (by default) throw it. doRoll routes iron:/oracle:
 // notation to the right engine, so this is the single path for every tile.
-function selectIronRoll(active, { roll = true } = {}) {
+function selectIronRoll(active, { roll = false } = {}) {
   ironActive = active;
   syncIron();
   const activeTile = $('ironShelf').querySelector('.iron-tile.is-active');
@@ -2470,8 +2455,8 @@ function selectIronRoll(active, { roll = true } = {}) {
   if (roll) doRoll(ironNotation());
 }
 
-// The Action tile: its body rolls the action roll; the +N chip opens the dial to
-// set the stat/adds (which just re-arms it — you tap Action, or Roll, to throw).
+// The Action tile: its body selects and stages the action roll — Roll or a tray
+// tap throws it — and the +N chip opens the dial to set the stat/adds.
 $('ironActionRoll').addEventListener('click', () => selectIronRoll({ kind: 'action' }));
 ironDial.addEventListener('click', () => {
   openNumberDial({
@@ -2653,8 +2638,8 @@ function buildOracleTree() {
 }
 
 // The five Ask the Oracle likelihoods live in the picker as one-tap buttons.
-// Each asks a yes/no at that chance: load the data if needed, roll the matching
-// odds table, and throw its d100 like any roll.
+// Each stages a yes/no ask at that chance: load the data if needed, load the
+// matching odds table onto the tray, and Roll (or the tray) throws its d100.
 for (const btn of document.querySelectorAll('.iron-odd')) {
   btn.addEventListener('click', () => {
     ensureOracles().then(ds => {
@@ -2665,7 +2650,7 @@ for (const btn of document.querySelectorAll('.iron-odd')) {
 }
 
 // Keyboard-driven results, autocomplete-style: as you type, the top match is
-// highlighted; ↑/↓ move it and Enter rolls it, focus staying in the box.
+// highlighted; ↑/↓ move it and Enter stages it, focus staying in the box.
 let oracleHi = -1;
 function oracleVisible() {
   return [...oracleTree.querySelectorAll('.oracle-table')].filter(b => b.offsetParent !== null);
@@ -2751,8 +2736,8 @@ function makeOracleResult(node) {
 }
 
 // A table picked in the browser pins to the shelf and becomes the active roll —
-// its die loads on the tray and throws, and the tile stays so you can re-roll it
-// or jump back to it later.
+// its die loads on the tray ready to throw, and the tile stays so you can roll
+// it again or jump back to it later.
 function rollOracleFromBrowser(id) {
   pinOracle(id);
   closeOracles();
@@ -3570,7 +3555,7 @@ $('deckShuffle').addEventListener('click', () => {
     }
     if (hadDiscard && discardTop && prevDiscardSprite) {
       // The pile goes home as a few backs peeling off in sequence.
-      for (let i = 0; i < Math.min(3, deckStateDiscardWas(hadDiscard)); i++) {
+      for (let i = 0; i < (hadDiscard ? 3 : 0); i++) {
         sprites.push(new CardSprite(discardTop, { x: prevDiscardSprite.x, y: prevDiscardSprite.y },
           { x: stack.x, y: stack.y, w: prevDiscardSprite.size }, { mode: 'return', delay: i * 0.07 }));
       }
@@ -3588,7 +3573,6 @@ $('deckShuffle').addEventListener('click', () => {
   });
 });
 // The pile size just before the reshuffle zeroed it — for the sweep visuals.
-function deckStateDiscardWas(had) { return had ? 3 : 0; }
 for (const b of deckFlagButtons) {
   b.addEventListener('click', () => {
     if (b.dataset.flag === 'jokers') {
@@ -5281,13 +5265,13 @@ function systemStageDescriptors() {
       } else {
         add(1, { sides: br.attr, genColor: BR_COLORS.attribute, kind: 'br' });
         add(1, { sides: br.skill, genColor: BR_COLORS.skill, kind: 'br' });
-        if (br.mod === 'adv') add(1, { sides: Math.min(br.attr, br.skill), genColor: BR_COLORS.advantage, kind: 'br' });
+        if (br.mod === 'adv') add(1, { sides: Math.min(br.attr, br.skill), genColor: BR_COLORS.advantage, kind: 'br-adv' });
       }
       break;
     case 'twilight':
       add(1, { sides: t2k.attr, genColor: T2K_COLORS.attribute, kind: 't2k' });
       add(1, { sides: t2k.skill, genColor: T2K_COLORS.skill, kind: 't2k' });
-      add(t2k.ammo, { sides: 6, genColor: T2K_COLORS.ammo, kind: 't2k' });
+      add(t2k.ammo, { sides: 6, genColor: T2K_COLORS.ammo, kind: 't2k-ammo' });
       break;
     case 'onering':
       add(tor.favour ? 2 : 1, { sides: 12, genColor: TOR_COLORS.feat, kind: 'tor-feat' });
@@ -5392,6 +5376,22 @@ function removeSystemStageKind(kind) {
     case 'v5-normal': v5.pool = Math.max(0, v5.pool - 1); syncV5(); return true;
     case 'v5-hunger': setHunger(v5.hunger - 1); return true;
     case 'v5-rouse': v5.rouse = false; syncV5(); return true;
+    // Optional extras come back off the tray the way they went on: the Blade
+    // Runner advantage die clears the Odds, a Twilight ammo die drops the pool
+    // by one, a Mothership advantage copy clears Advantage/Disadvantage, and a
+    // CoC bonus/penalty die steps the modifier toward zero. The Feat die's
+    // Favoured/Ill twin likewise clears the condition.
+    case 'br-adv': br.mod = null; syncBr(); return true;
+    case 't2k-ammo': t2k.ammo = Math.max(0, t2k.ammo - 1); syncT2k(); return true;
+    case 'ms-check': case 'ms-panic':
+      if (ms.advantage) { ms.advantage = null; syncMs(); return true; }
+      return false;
+    case 'coc-check':
+      if (coc.modifier) { coc.modifier -= Math.sign(coc.modifier); syncCoc(); return true; }
+      return false;
+    case 'tor-feat':
+      if (tor.favour) { tor.favour = null; syncTor(); return true; }
+      return false;
     case 'fate': fate.count = Math.max(1, fate.count - 1); syncFate(); return true;
     case 'ct': ct.dice = Math.max(0, ct.dice - 1); syncCt(); return true;
     case 'tor-success': tor.success = Math.max(0, tor.success - 1); syncTor(); return true;
@@ -5408,7 +5408,13 @@ function removeSystemStageKind(kind) {
         const type = kind.slice(3);
         if (yz[type] > 0) { yz[type] -= 1; syncYz(); return true; }
       }
-      return false; // Hope/Fear, the Feat die, the fixed 2d6 — not removable.
+      // Not removable, each on purpose: Hope/Fear and the plain Feat die and
+      // the fixed 2d6 are dice the rules fix; 'br'/'t2k' here are the
+      // Attribute and Skill dice (always exactly one each — their SIZE steps
+      // at the picker, not their count); 'dg-check' is the fixed percentile
+      // pair; the iron-* kinds are whatever roll the shelf loaded, fixed by
+      // that roll. Every ADJUSTABLE staged die has a case above.
+      return false;
   }
 }
 
@@ -5456,7 +5462,9 @@ function clearPool({ trackers = true } = {}) {
       case 'twilight': resetTwilight(); syncT2k(); break;
       case 'onering': resetOneRing(); syncTor(); break;
       case 'pbta': case 'mist': resetTwod6(); syncTwod6(); break;
-      case 'mothership': resetMothership(); syncMs(); break;
+      // The X sweeps Stress back to its floor of 2 — the tracked-stat rule:
+      // trackers survive mode switches and fall only to the full table sweep.
+      case 'mothership': if (trackers) setStress(2, { restage: false }); resetMothership(); syncMs(); break;
       case 'callofcthulhu': resetCoc(); syncCoc(); break;
       case 'deltagreen': resetDg(); syncDg(); break;
       case 'ironsworn': case 'starforged': resetIron(); syncIron(); break;
@@ -7227,6 +7235,14 @@ function showRemotePushTransition(roll, result) {
   if ($('total').dataset.rolling) return false;
   const flat = flattenRollDice(result);
   if (!flat.length || flat.length > ANIMATE_LIMIT) return false;
+  // A transition arrives from a peer and drives index writes into this tray's
+  // dice, so every structural property is proven before anything moves: the
+  // three index sets must be disjoint and in-bounds, held+rerolled must
+  // exactly partition the dice that existed before (added strictly appended),
+  // and each held die must still show the value and sides the transition
+  // claims it kept. Anything short of that — a malformed client, a stale
+  // parent, a crafted payload — falls through to rendering the result as a
+  // fresh roll instead, which is always safe.
   const heldIndexes = Array.isArray(transition.held) ? transition.held : [];
   const rerolledIndexes = Array.isArray(transition.rerolled) ? transition.rerolled : [];
   const addedIndexes = Array.isArray(transition.added) ? transition.added : [];
@@ -7328,10 +7344,9 @@ function showRemoteRoll(roll) {
   addHistory(result, roll.name, false, roll.at);
 
   // A peer's draw deals through the card dealer, exactly like their own tray:
-  // stack, flight, flip — remote only steers the haptics away. finish() is
-  // called by the dealer's own timer; addHistory ran above, and finish adds
-  // again, so the dealer path for remote skips it via the claim below not
-  // being ours... simpler: cards route renders and sets the readout directly.
+  // stack, flight, flip — remote only steers the haptics away. The cards route
+  // renders and sets the readout directly rather than going through finish(),
+  // which would double-log a draw addHistory already recorded above.
   if (result.system === 'cards' || result.system === 'tarot' || result.system === 'napoletane' || result.system === 'hanafuda' || result.system === 'utagaruta') {
     if ($('total').dataset.rolling && !state.remoteClaim) return;
     const claim = {};

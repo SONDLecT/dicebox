@@ -1511,6 +1511,7 @@
   <!-- Blade Runner: two step-die selectors (Attribute + Skill, each d6-d12) and
        an advantage/disadvantage stepper. Tap a die to step up, hold to step down. -->
   <section class="picker br-picker" id="brPicker" aria-label="Blade Runner roll" hidden>
+    <button type="button" class="yz-push" id="brPush" hidden>Push</button>
     <div class="br-dice">
       <button type="button" class="br-die" id="br-attr" aria-label="Attribute die — tap to step up, hold to step down">
         <span class="br-die-label">Attribute</span>
@@ -1527,12 +1528,12 @@
         <span class="br-die-val" id="br-mod-val">Even odds</span>
       </button>
     </div>
-    <button type="button" class="yz-push" id="brPush" hidden>Push</button>
   </section>
 
   <!-- Twilight: 2000: Attribute + Skill step dice, plus a pool of d6 Ammo dice.
        Tap a die to step up, hold to step down; tap Ammo to add one, hold to drop. -->
   <section class="picker br-picker" id="t2kPicker" aria-label="Twilight: 2000 roll" hidden>
+    <button type="button" class="yz-push" id="t2kPush" hidden>Push</button>
     <div class="br-dice">
       <button type="button" class="br-die" id="t2k-attr" aria-label="Attribute die — tap to step up, hold to step down">
         <span class="br-die-label">Attribute</span>
@@ -1550,7 +1551,6 @@
         <span class="br-die-val" id="t2k-ammo-val">0</span>
       </button>
     </div>
-    <button type="button" class="yz-push" id="t2kPush" hidden>Push</button>
   </section>
 
   <!-- The One Ring: a Feat die is always rolled. The controls are the Success

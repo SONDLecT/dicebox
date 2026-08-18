@@ -103,6 +103,10 @@ function loadHistory(storage, key) {
 function historyPayloads(history, requestId, state) {
   const pages = [];
   let rolls = [];
+  // Pass one only probes sizes, so this envelope is a worst-case stand-in: the
+  // 9999 pageCount is the widest the field can print, which means a page that
+  // fits under the cap here can never overflow when the real (smaller) count is
+  // stamped in below.
   const envelope = (pageRolls, page, pageState) => ({
     v: OBR_PROTOCOL_VERSION, type: 'history.result', requestId,
     page, pageCount: 9999, done: false, rolls: pageRolls,
@@ -337,7 +341,7 @@ async function drawSimpleDeck(decks, notation, config, assertActive) {
 const SIMPLE_DECKS = {
   napoletane: {
     parse: parseNapoletane, module: './nap-art.js', ids: 'NAP_IDS', meta: 'napMeta',
-    key: 'dicebox:nap:v1', prefix: 'ita', system: 'napoletane',
+    key: 'dicebox:nap:v1', prefix: 'nap', system: 'napoletane',
   },
   hanafuda: {
     parse: parseHanafuda, module: './hana-art.js', ids: 'HANA_IDS', meta: 'hanaMeta',

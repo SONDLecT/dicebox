@@ -1566,7 +1566,7 @@ const NAP_REGEX = /^(?:ita|nap):(\d+)\s*(.*)$/;
 
 export function parseNapoletane(src) {
   const m = NAP_REGEX.exec(String(src || '').trim().toLowerCase());
-  if (!m) throw new Error('Expected a draw like "ita:1" or "ita:3"');
+  if (!m) throw new Error('Expected a draw like "nap:1" or "nap:3"');
   const draw = Number(m[1]);
   if (draw < 1 || draw > 10) throw new Error('Draw 1-10 cards');
   let replace = false;
