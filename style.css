@@ -475,86 +475,21 @@ body {
 /* ---- Vampire dice tray ---- */
 
 /* The dice to tap, then a Difficulty chip beneath. */
-.v5-picker {
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-}
-
-.v5-dice-row {
-  display: flex;
-  gap: 10px;
-  width: 100%;
-}
-
-/* Each die type is a tap-to-add button carrying the ankh — regular in the ink
-   colour, Hunger in blood red — with a count badge and a loaded state. */
-.v5-die-btn {
-  --dc: var(--line);
-  flex: 1 1 0;
-  min-width: 0;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 5px;
-  padding: 12px 8px 9px;
-  border: 1px solid var(--hair);
-  border-radius: 12px;
-  background: none;
-  color: var(--dc);
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
-  transition: border-color 140ms ease, background 140ms ease, transform 120ms ease;
-}
-.v5-die-hunger { --dc: var(--accent); }
-.v5-die-name {
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  color: var(--muted);
-}
-.v5-die-btn[data-count] { border-color: var(--dc); background: color-mix(in srgb, var(--dc) 12%, transparent); }
-.v5-die-btn[data-count] .v5-die-name { color: var(--line); }
-.v5-die-btn[data-count]::after {
-  content: attr(data-count);
-  position: absolute;
-  top: -6px;
-  right: -4px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  border-radius: 8px;
-  background: var(--dc);
-  color: var(--paper);
-  font: 700 10px system-ui;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.v5-die-btn:active { transform: scale(0.95); }
-
-/* Hunger and Difficulty are the two trackers, side by side below the dice; a set
-   Hunger reads in the blood accent. */
-.v5-lower { display: flex; gap: 10px; width: 100%; align-items: stretch; }
-.v5-lower .spin-chip { flex: 1 1 0; }
-.v5-hunger-chip .spin-chip-val:not([data-unset]) { color: var(--accent); }
-
-/* The Rouse check is its own action below the trackers, in the blood accent since
-   it spends Hunger. */
-.v5-rouse {
-  appearance: none; cursor: pointer; align-self: center; margin-top: 2px;
-  padding: 7px 22px; border: 1px solid var(--accent); border-radius: 999px;
-  background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--line);
-  font: 600 13px/1 inherit; letter-spacing: 0.02em;
-  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
-  transition: background 140ms ease, transform 120ms ease;
-}
-.v5-rouse:hover { background: color-mix(in srgb, var(--accent) 22%, transparent); }
-.v5-rouse:active { transform: scale(0.96); }
+/* Vampire: a row of die-shaped adders + the difficulty chip, with the Willpower
+   reroll popping above. Pool carries the ink, Hunger and Rouse the blood accent
+   the V5 palette already sets. Reuses the shared .die-btn, so it reads like
+   every other system's picker. */
+.v5-picker { flex-direction: column; align-items: center; gap: 10px; }
+.v5-row { display: flex; gap: 12px; justify-content: center; align-items: center; flex-wrap: wrap; }
+/* Scoped to the picker so these beat .die-btn's own --dc default, which sits
+   later in the sheet — Pool in ink, Hunger and Rouse in the blood accent. */
+.v5-picker .v5-pool { --dc: var(--line); }
+.v5-picker .v5-hunger, .v5-picker .v5-rouse { --dc: var(--accent); }
+/* Rouse staged: the die is in hand waiting to be thrown, so the button reads as
+   loaded even though it carries no count. */
+.v5-picker .v5-rouse.is-staged { border-color: var(--dc); background: color-mix(in srgb, var(--dc) 12%, transparent); }
+.v5-picker .v5-rouse.is-staged .die-btn-label { color: var(--line); }
+.v5-picker .v5-rouse.is-staged .die-ico path { fill-opacity: 0.34; }
 
 /* ---- Fate dice ---- */
 

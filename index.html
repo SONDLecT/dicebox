@@ -1334,33 +1334,31 @@
        invented a number would be lying about the outcome. -->
   <!-- The two die types are tap-to-add buttons (hold to remove), carrying the
        ankh; Difficulty is a subordinate chip. The pool renders in the tray. -->
+  <!-- One row of die-shaped adders — Pool in ink, Hunger and Rouse in blood —
+       with the difficulty as a subordinate chip, matching every other system's
+       picker. Pool and Hunger build the action pool; Rouse stages a single
+       Hunger die to throw on its own. The Willpower reroll pops in above the
+       row after a roll, the way the push button does. -->
   <section class="picker v5-picker" id="v5Picker" aria-label="Vampire dice" hidden>
-    <div class="v5-dice-row">
-      <button type="button" class="v5-die-btn" id="v5NormalFace" aria-label="Add a pool die, hold to remove">
-        <svg viewBox="0 0 24 26" width="30" height="33" aria-hidden="true">
-          <path d="M12 1.5 21 9.5 12 24.5 3 9.5z" fill="none" stroke="currentColor"
-                stroke-width="1.4" stroke-linejoin="round"/>
-          <circle cx="12" cy="9" r="2.4" fill="none" stroke="currentColor" stroke-width="1.4"/>
-          <path d="M12 11.4v7.2M8.4 13.4h7.2" fill="none" stroke="currentColor"
-                stroke-width="1.4" stroke-linecap="round"/>
-        </svg>
-        <span class="v5-die-name">Pool</span>
+    <button type="button" class="yz-push v5-willpower" id="v5Willpower" hidden>Willpower reroll</button>
+    <div class="v5-row">
+      <button type="button" class="die-btn v5-pool" id="v5NormalFace" aria-label="Add a pool die; hold to remove one">
+        <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true"><path d="M15 3 24 9 V17 L15 27 6 17 V9Z"/></svg>
+        <span class="die-btn-label">Pool</span>
       </button>
-    </div>
-    <div class="v5-lower">
-      <button type="button" class="spin-chip v5-hunger-chip" id="v5HungerChip" aria-label="Hunger — tap to raise, hold to lower">
-        <span class="spin-chip-label">Hunger</span>
-        <span class="spin-chip-val" id="v5Hunger" data-unset="1">—</span>
+      <button type="button" class="die-btn v5-hunger" id="v5HungerChip" aria-label="Hunger — tap to raise, hold to lower">
+        <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true"><path d="M15 3 24 9 V17 L15 27 6 17 V9Z"/></svg>
+        <span class="die-btn-label">Hunger</span>
+      </button>
+      <button type="button" class="die-btn v5-rouse" id="v5Rouse" aria-label="Rouse — pull a Hunger die to roll">
+        <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true"><path d="M15 3 24 9 V17 L15 27 6 17 V9Z"/></svg>
+        <span class="die-btn-label">Rouse</span>
       </button>
       <button type="button" class="spin-chip" id="v5DiffChip" aria-haspopup="dialog" aria-controls="dial" aria-label="Set Difficulty">
         <span class="spin-chip-label">Difficulty</span>
         <span class="spin-chip-val" id="v5Difficulty" data-unset="1">—</span>
       </button>
     </div>
-    <button type="button" class="v5-rouse" id="v5Rouse" aria-label="Rouse check, spend a Hunger die">Rouse check</button>
-    <!-- Contextual: appears after a pool roll, spends a point of Willpower to
-         reroll up to three non-Hunger dice. Toggles to Cancel while arming. -->
-    <button type="button" class="yz-push v5-willpower" id="v5Willpower" hidden>Willpower reroll</button>
   </section>
 
   <!-- Fate: how many Fudge dice, and a skill modifier. Standard is 4dF. -->

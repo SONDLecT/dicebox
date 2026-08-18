@@ -412,6 +412,14 @@ function buildTrayDice(flat, result, { remote = false } = {}) {
 }
 
 function doRoll(notation, { viaOwlbear = true } = {}) {
+  // A staged Rouse is consumed the instant it is thrown, whichever route it
+  // takes — the panel sends it to the background and never returns through the
+  // local resolver, so the staging flag and field are cleared here for both.
+  if (typeof notation === 'string' && /^v5:rouse$/i.test(notation.trim())) {
+    v5.rouse = false;
+    v5RouseBtn.classList.remove('is-staged');
+    if ($('notation').value.trim().toLowerCase() === 'v5:rouse') $('notation').value = v5Notation();
+  }
   // In the panel the background service is the authority, so the roll goes to it
   // — but only as the preferred route, never a dependency. If the background is
   // missing (an install that predates it, a browser that denies the frames a
@@ -426,6 +434,10 @@ function doRoll(notation, { viaOwlbear = true } = {}) {
     // way first: a draw is async (the art module loads on demand) and animates
     // through its own dealer rather than the dice thrower.
     const sys = detectSystem(notation);
+    // A staged Rouse resolves as its own single-die check, with the Hunger
+    // tracking, not as a one-die pool roll. (The panel routes v5:rouse through
+    // the background before ever reaching here.)
+    if (sys === 'v5' && /^v5:rouse$/i.test(notation.trim())) { rollRouseLocally(); return; }
     if (sys === 'cards') { dealFromNotation(notation); return; }
     if (sys === 'tarot') { dealFromTarotNotation(notation); return; }
     if (sys === 'napoletane') { dealFromNapNotation(notation); return; }
@@ -1169,14 +1181,16 @@ for (const row of modeRows) {
 // Stress does — and 0 means it is not being tracked, where a Rouse check is only
 // pass/fail.
 const V5_HUNGER_KEY = 'dicebox:v5:hunger';
-const v5 = { pool: 0, hunger: 0, difficulty: null };
+// `rouse` is a transient staging mode: a single Hunger die pulled into hand,
+// thrown on its own as a Rouse check rather than added to the action pool.
+const v5 = { pool: 0, hunger: 0, difficulty: null, rouse: false };
 {
   const saved = Number(store.get(V5_HUNGER_KEY));
   if (Number.isFinite(saved) && saved >= 0 && saved <= 5) v5.hunger = Math.round(saved);
 }
 const v5PoolFace = $('v5NormalFace');
 const v5HungerChip = $('v5HungerChip');
-const v5HungerVal = $('v5Hunger');
+const v5RouseBtn = $('v5Rouse');
 const v5DiffChip = $('v5DiffChip');
 const v5DiffVal = $('v5Difficulty');
 
@@ -1185,6 +1199,7 @@ const v5DiffVal = $('v5Difficulty');
 function resetV5() {
   v5.pool = 0;
   v5.difficulty = null;
+  v5.rouse = false;
   syncV5({ writeField: false });
 }
 
@@ -1198,20 +1213,19 @@ function setHunger(n, { restage = true, fromOwlbear = false } = {}) {
   else syncV5Hunger();
 }
 
-// Hunger is one control, the tracker pill beside Difficulty: it reads "—" until
-// set, and its level is what colours that many red dice into the pool.
+// Hunger is a die-shaped adder whose count badge is your standing Hunger level —
+// the blood dice it puts in the action pool. It reads as bare until you have any.
 function syncV5Hunger() {
-  if (v5.hunger > 0) {
-    v5HungerVal.textContent = String(v5.hunger); delete v5HungerVal.dataset.unset; v5HungerChip.classList.add('is-set');
-  } else {
-    v5HungerVal.textContent = '—'; v5HungerVal.dataset.unset = '1'; v5HungerChip.classList.remove('is-set');
-  }
+  if (v5.hunger > 0) v5HungerChip.dataset.count = String(v5.hunger);
+  else delete v5HungerChip.dataset.count;
 }
 
-// The notation is the whole throw, pool + Hunger dice, with the Hunger count noted
-// so the receiver can colour them back. An empty throw writes nothing, so the
-// readout stays idle rather than showing a "v5:0".
+// The notation is the whole throw. A staged Rouse is its own single-die check;
+// otherwise it is the pool + Hunger dice, with the Hunger count noted so the
+// receiver can colour them back. An empty throw writes nothing, so the readout
+// stays idle rather than showing a "v5:0".
 function v5Notation() {
+  if (v5.rouse) return 'v5:rouse';
   const total = v5.pool + v5.hunger;
   if (total < 1) return '';
   let s = `v5:${total}`;
@@ -1223,6 +1237,7 @@ function v5Notation() {
 function syncV5({ writeField = true } = {}) {
   if (v5.pool > 0) v5PoolFace.dataset.count = String(v5.pool); else delete v5PoolFace.dataset.count;
   syncV5Hunger();
+  v5RouseBtn.classList.toggle('is-staged', v5.rouse);
 
   if (v5.difficulty === null) {
     v5DiffVal.textContent = '—'; v5DiffVal.dataset.unset = '1'; v5DiffChip.classList.remove('is-set');
@@ -1234,8 +1249,9 @@ function syncV5({ writeField = true } = {}) {
   if (uiSystem === 'v5') stageSystemPool();
 }
 
-// The Pool die adds white dice without bound. Building it never touches Hunger.
-function v5StepPool(by) { v5.pool = Math.max(0, Math.min(v5.pool + by, 100)); syncV5(); }
+// The Pool die adds white dice without bound. Building the pool leaves the Rouse
+// staging — you are assembling an action roll now, not throwing a lone die.
+function v5StepPool(by) { v5.rouse = false; v5.pool = Math.max(0, Math.min(v5.pool + by, 100)); syncV5(); }
 
 // Tap the Pool die to add one, hold (or right-click) to remove; a die tapped in
 // the tray comes off too.
@@ -1243,8 +1259,9 @@ bindTapHold(v5PoolFace, dir => v5StepPool(dir));
 
 // Hunger is the one deliberate hunger control: tap to raise your level (a red die
 // joins the pool), hold to lower. It is standing state, so nothing about building
-// the pool moves it — only this and a Rouse check do.
-bindTapHold(v5HungerChip, dir => setHunger(v5.hunger + dir));
+// the pool moves it — only this and a Rouse check do. Touching it also leaves any
+// staged Rouse, since you are back to building the action pool.
+bindTapHold(v5HungerChip, dir => { v5.rouse = false; setHunger(v5.hunger + dir); });
 
 // Difficulty opens the tactile roller, the one number-picker every system
 // shares, with a "Table sets it" release back to unset — the same control as
@@ -1264,6 +1281,7 @@ v5DiffChip.addEventListener('click', () => {
 // the readout can name the new total; untracked (0) it is only pass/fail.
 // setHunger runs with restage off so it does not disturb the die already in flight.
 function rollRouseLocally() {
+  v5.rouse = false;   // the staged die is being thrown; the mode is spent
   const result = rollRouse();
   const tracked = v5.hunger > 0;
   result.summary.tracked = tracked;
@@ -1276,11 +1294,16 @@ function rollRouseLocally() {
     result.summary.hungerRose = v5.hunger > before;
   }
   throwResult(result, { writeField: false });
+  // The mode is spent; revert the field to the pool it will build next.
+  $('notation').value = v5Notation();
 }
 
-$('v5Rouse').addEventListener('click', () => {
-  if (owlbearPanel) { requestOwlbearRoll('v5:rouse', { writeField: false }); return; }
-  rollRouseLocally();
+// Rouse pulls a Hunger die into hand — it stages a lone die to throw, the way
+// every other die button stages its dice, rather than rolling on the click.
+// Tapping it again, tapping the staged die, or building the pool puts it back.
+v5RouseBtn.addEventListener('click', () => {
+  v5.rouse = !v5.rouse;
+  syncV5();
 });
 
 // ---- V5 Willpower reroll ----
@@ -5217,6 +5240,8 @@ function systemStageDescriptors() {
   const add = (n, d) => { for (let i = 0; i < Math.max(0, n); i++) out.push(d); };
   switch (uiSystem) {
     case 'v5':
+      // A staged Rouse is a single Hunger die in hand, thrown on its own.
+      if (v5.rouse) { add(1, { sides: 10, hunger: true, kind: 'v5-rouse' }); break; }
       add(v5.pool, { sides: 10, kind: 'v5-normal' });
       add(v5.hunger, { sides: 10, hunger: true, kind: 'v5-hunger' });
       break;
@@ -5365,6 +5390,7 @@ function removeSystemStageKind(kind) {
     // so a tap on one is a gentle no-op.
     case 'v5-normal': v5.pool = Math.max(0, v5.pool - 1); syncV5(); return true;
     case 'v5-hunger': return false;
+    case 'v5-rouse': v5.rouse = false; syncV5(); return true;
     case 'fate': fate.count = Math.max(1, fate.count - 1); syncFate(); return true;
     case 'ct': ct.dice = Math.max(0, ct.dice - 1); syncCt(); return true;
     case 'tor-success': tor.success = Math.max(0, tor.success - 1); syncTor(); return true;
