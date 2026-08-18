@@ -96,10 +96,12 @@ gestures — so what is in and out of scope is never a surprise at the table.
   Never a generic rectangle for a die.
 - **Tap adds; hold scales with the pool.** Where a pool plausibly stays small
   (a handful of a kind), holding a die button removes one — the quick
-  gesture. Where counts run high (the numeric dice, a V5 pool, a CthulhuTech
-  pool), hold opens a menu on that die instead — the numeric picker's
-  long-press sheet is the pattern — with removal and count controls inside
-  it. Tapping staged dice on the tray removes regardless.
+  gesture. Where counts run high (a V5 pool, the narrative and Year Zero
+  chips, a CthulhuTech pool), hold opens the shared rotary count dial on that
+  die instead — scroll a big handful on in one gesture, or scroll the lot
+  back to nothing. A menu appears only where a die has real per-die options
+  (the numeric picker's modifier sheet). Tapping staged dice on the tray
+  removes regardless.
 - **Numbers are chips or the dial, and unset is the default.** A non-dice
   number (Difficulty, Target, a modifier) is never a bare input: small ranges
   are spin-chips (tap up, hold down), wide ranges open the shared number
@@ -270,15 +272,13 @@ Known places the app predates a rule above, queued for adjustment:
 1. **Daggerheart's Duality button and Ironsworn's tiles/odds pills roll on
    click** — they become select-and-stage (visual design unchanged; the DH
    tray's look is a keeper).
-2. **High-count die buttons still use hold-removes-one** (V5 pool,
-   CthulhuTech, Year Zero, Genesys) — they get the long-press menu.
-3. **Tray taps are silent no-ops on some adjustable dice** — Twilight ammo,
+2. **Tray taps are silent no-ops on some adjustable dice** — Twilight ammo,
    Blade Runner's advantage die, Mothership's advantage copies, CoC
    bonus/penalty dice.
-4. **Blade Runner and Twilight's Push buttons sit below their rows** — they
+3. **Blade Runner and Twilight's Push buttons sit below their rows** — they
    move above, like Year Zero's and Willpower.
-5. **Mothership Stress is not cleared by the X** — it aligns with the
+4. **Mothership Stress is not cleared by the X** — it aligns with the
    tracked-stat rule (swept by the X, kept across modes).
-6. **The numeric picker's die buttons are plain rectangles** without die
+5. **The numeric picker's die buttons are plain rectangles** without die
    silhouettes — the oldest screen in the app vs. the die-shaped rule;
    flagged for design rather than assumed.
