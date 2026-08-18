@@ -5385,11 +5385,12 @@ function stageSystemPool() {
 // tap on them is a gentle no-op rather than an error.
 function removeSystemStageKind(kind) {
   switch (kind) {
-    // A white die taken off the tray drops a pool die. Red dice mirror the Hunger
-    // level and are not removed from the tray — Hunger changes only at its pill —
-    // so a tap on one is a gentle no-op.
+    // A white die taken off the tray drops a pool die; a red one lowers Hunger,
+    // exactly as holding the Hunger button does. (Red dice were once a no-op —
+    // "Hunger only moves at its own control" — but every staged die answering a
+    // tap is the stronger rule, and the tracker is one tap to restore.)
     case 'v5-normal': v5.pool = Math.max(0, v5.pool - 1); syncV5(); return true;
-    case 'v5-hunger': return false;
+    case 'v5-hunger': setHunger(v5.hunger - 1); return true;
     case 'v5-rouse': v5.rouse = false; syncV5(); return true;
     case 'fate': fate.count = Math.max(1, fate.count - 1); syncFate(); return true;
     case 'ct': ct.dice = Math.max(0, ct.dice - 1); syncCt(); return true;
