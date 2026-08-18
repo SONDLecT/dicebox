@@ -859,7 +859,7 @@ const help = $('help');
 const helpToggle = $('helpToggle');
 
 function setHelp(open) {
-  if (open) { closeSheet(); closeDial(); closeHistory(); closeRoom(); closeMode(); }
+  if (open) { closeSheet(); closeHistory(); closeRoom(); closeMode(); }
   // A corner popover under its own button, like the mode picker. anchorPop is a
   // function declaration further down, hoisted, so it is callable from here.
   if (open) anchorPop(help, helpToggle);
@@ -1230,7 +1230,6 @@ function anchorPop(pop, btn) {
 function openMode() {
   setHelp(false);
   closeSheet();
-  closeDial();
   closeHistory();
   closeRoom();
   anchorPop(modeSheet, modeToggle);
@@ -1308,7 +1307,7 @@ const v5 = { pool: 0, hunger: 0, difficulty: null, rouse: false, flipped: 0, sur
 {
   const saved = Number(store.get(V5_HUNGER_KEY));
   if (Number.isFinite(saved) && saved >= 0 && saved <= 5) v5.hunger = Math.round(saved);
-  // Clamped to the dial's own 1-6, not Blood Potency's usual table — the
+  // Clamped to the barrel's own 1-6, not Blood Potency's usual table — the
   // book's line runs to 6 at Potency 10 and the old 1-4 clamp silently ate
   // a legally-saved 5.
   const surge = Number(store.get(V5_SURGE_KEY));
@@ -1391,19 +1390,6 @@ function v5StepPool(by) { v5.rouse = false; v5.pool = Math.max(0, Math.min(v5.po
 
 // Tap the Pool die to add one, hold (or right-click) to remove; a die tapped in
 // the tray comes off too.
-// The count dial a die button opens on hold — only where a SINGLE button's
-// count realistically runs large (a CthulhuTech pool of 8-16, a magazine of
-// ammo dice): scroll straight to any count, including zero. Buttons whose
-// per-type counts stay small keep the quick hold-removes-one instead. Tap
-// still adds one; the tray still removes one.
-function openCountDial(title, value, max, commit) {
-  openNumberDial({
-    title, value, min: 0, max,
-    actionLabel: 'Set dice', inputLabel: 'Dice',
-    commit,
-  });
-}
-
 bindTapHold(v5PoolFace, dir => v5StepPool(dir));
 
 // Hunger is the one deliberate hunger control: tap to raise your level (a red die
@@ -2238,8 +2224,15 @@ function syncT2kFromField() {
 
 bindTapHold($('t2k-attr'), dir => stepT2kDie('attr', dir));
 bindTapHold($('t2k-skill'), dir => stepT2kDie('skill', dir));
-bindTapHold($('t2k-ammo'), dir => stepT2kAmmo(dir), {
-  onHold: () => openCountDial('Ammo dice', t2k.ammo, 20, n => { t2k.ammo = Math.max(0, Math.min(20, n)); syncT2k(); }),
+// The magazine is its own barrel (the Blood Surge button precedent): tap
+// loads one ammo die as ever, scrub or wheel sets the whole magazine in
+// one gesture — the retired count dial's promise, now in place, with the
+// drum rail counting the rungs. Hold does nothing.
+bindScrubDial($('t2k-ammo'), {
+  get: () => t2k.ammo,
+  set: v => { t2k.ammo = v; syncT2k(); },
+  min: 0, max: 20,
+  tap: () => stepT2kAmmo(1),
 });
 
 $('t2kPush').addEventListener('click', preparePush);
@@ -2363,9 +2356,8 @@ function bindTapHold(el, step, { onHold = null } = {}) {
   const cancel = () => { if (timer) { clearTimeout(timer); timer = null; } };
   // Act exactly once per long-press. On touch a long-press fires the hold
   // timer AND a contextmenu; `held` gates the second so they can't both act.
-  // The default hold removes one die; a button whose pool can run large passes
-  // onHold instead, which opens the rotary count dial — scroll a big handful
-  // on in one gesture, or scroll the lot back to nothing.
+  // The default hold removes one die; `onHold` lets a button substitute its
+  // own long-press action (the numeric modifier sheet).
   const removeOnce = () => {
     if (held) return;
     held = true;
@@ -2395,13 +2387,16 @@ function bindTapHold(el, step, { onHold = null } = {}) {
 // difficulties, targets, tracked statuses, cards-per-draw) binds here.
 // Huge ranges ride it too, wearing `tapEntry`: scrub is the gesture, and
 // the tap opens inline typed entry instead of stepping +1 (Mothership
-// Target 1-99, CoC Skill 1-100, Delta Green Target 1-99). What stays off
-// the barrel, by kind: dice buttons keep tap-adds/hold (their own
+// Target 1-99, CoC Skill 1-100, Delta Green Target 1-99, dice-per-tap
+// 1-500, the custom d? up to 1000). Action buttons ride it for their own
+// number while their tap stays an action, via `tap` (Blood Surge spends,
+// the CT pool and Twilight magazine add, d? mints). What stays off the
+// barrel, by kind: plain dice buttons keep tap-adds/hold (their own
 // grammar); wrapping cycles keep tap/hold (Mothership Skill's four named
 // tiers, Blade Runner's even/adv/dis, the CoC bonus/penalty axis — a wrap
-// is the point, and a barrel does not wrap); and the popup number dial
-// survives only for the custom d? die and the dice-count dial a die
-// button opens on hold — dice business, not number chips.
+// is the point, and a barrel does not wrap). The popup number dial is
+// GONE — this binding, with its typing door, is every number surface the
+// app has.
 //
 // Three ways in, ordered by how much they ask a player to learn: a plain tap
 // still bumps +1 (the zero-learning fallback); hovering plus a wheel notch
@@ -2423,7 +2418,7 @@ function bindTapHold(el, step, { onHold = null } = {}) {
 // up from it enters at `enter` (Shadowdark's Normal 12), never at min — a
 // table that says "roll it" means the book's default difficulty, not DC 1.
 // `railLabel` may name specific values on the rail (the DC ladder's words).
-function bindScrubDial(el, { get, set, min, max, format = v => String(v), unset = null, railLabel = null, tapEntry = false, tap = null } = {}) {
+function bindScrubDial(el, { get, set, min, max, format = v => String(v), unset = null, railLabel = null, tapEntry = false, tap = null, onEntry = null } = {}) {
   if (!el) return null;
   const clamp = v => Math.max(min, Math.min(max, v));
 
@@ -2441,8 +2436,10 @@ function bindScrubDial(el, { get, set, min, max, format = v => String(v), unset 
     entry = null;
     if (commit) {
       const text = input.value.trim();
+      // `onEntry` lets a control give typed entry its own meaning (the
+      // custom die MINTS on a typed commit, where a scrub only previews).
       if (text === '' && unset) set(null);
-      else if (/^-?\d+$/.test(text)) set(clamp(parseInt(text, 10)));
+      else if (/^-?\d+$/.test(text)) (onEntry || set)(clamp(parseInt(text, 10)));
       // Anything else — empty without unset, stray characters — changes
       // nothing: a failed entry must never invent a value.
     }
@@ -2702,7 +2699,7 @@ function bindScrubDial(el, { get, set, min, max, format = v => String(v), unset 
     if (wheelIdleTimer) clearTimeout(wheelIdleTimer);
     wheelIdleTimer = setTimeout(() => { wheelIdleTimer = null; hideRail(); }, 900);
   };
-  return { flashRail };
+  return { flashRail, openEntry };
 }
 
 const ct = { dice: 6, difficulty: null };
@@ -2742,9 +2739,14 @@ function syncCt({ writeField = true } = {}) {
   if (uiSystem === 'cthulhutech') stageSystemPool();
 }
 
-// Tap the d10 to add to the pool, hold to remove one (down to empty).
-bindTapHold(ctAddDie, dir => { ct.dice = Math.max(0, Math.min(100, ct.dice + dir)); syncCt(); }, {
-  onHold: () => openCountDial('d10 pool', ct.dice, 20, n => { ct.dice = n; syncCt(); }),
+// The pool die is its own barrel: tap adds one d10 as ever, scrub or
+// wheel sets the whole pool in one gesture (an 8-16 die pool is exactly
+// the count the retired hold-dial existed for). The tray still removes.
+bindScrubDial(ctAddDie, {
+  get: () => ct.dice,
+  set: v => { ct.dice = v; syncCt(); },
+  min: 0, max: 100,
+  tap: () => { ct.dice = Math.min(100, ct.dice + 1); syncCt(); },
 });
 // Difficulty rides the barrel, "—" included — unresolved rolls just report
 // hits; the first step in from unset lands on 3, the old dial default.
@@ -4019,7 +4021,6 @@ function openOracles() {
     buildOracleTree();
     setHelp(false);
     closeSheet();
-    closeDial();
     closeHistory();
     closeMode();
     closeRoom();
@@ -6847,22 +6848,27 @@ $('clear').addEventListener('click', () => {
 });
 
 // ---- how many per tap ----
+//
+// One chip, one gesture: the old −/count/+ input row collapses into a
+// barrel with the huge-range door (1-500) — scrub or wheel steps the
+// count, a tap floats inline typed entry instead of stepping, exactly the
+// Mothership Target pattern. No unset: a tap that adds zero dice is not a
+// state the strip needs.
+let perTapCount = 1;
 
-const countField = $('count');
-
-function perTap() {
-  const n = parseInt(countField.value, 10);
-  return Number.isFinite(n) && n > 0 ? Math.min(n, 500) : 1;
-}
+function perTap() { return perTapCount; }
 
 function setPerTap(n) {
-  countField.value = String(Math.max(1, Math.min(500, n)));
+  perTapCount = Math.max(1, Math.min(500, Math.round(n)));
+  $('count').textContent = String(perTapCount);
 }
 
-$('countUp').addEventListener('click', () => setPerTap(perTap() + 1));
-$('countDown').addEventListener('click', () => setPerTap(perTap() - 1));
-countField.addEventListener('change', () => setPerTap(perTap()));
-countField.addEventListener('focus', () => countField.select());
+bindScrubDial($('countChip'), {
+  get: () => perTapCount,
+  set: setPerTap,
+  min: 1, max: 500,
+  tapEntry: true,
+});
 
 // ---- dice buttons ----
 
@@ -7139,7 +7145,6 @@ applyHistoryText();
 function openHistory() {
   setHelp(false);
   closeSheet();
-  closeDial();
   closeRoom();
   closeMode();
 
@@ -7287,183 +7292,47 @@ $('historyClear').addEventListener('click', () => {
   openHistory();
 });
 
-// ---- tactile number dial ----
+// ---- the custom d? die ----
 //
-// The d? scroll wheel also sets bounded character values. It keeps the tactile
-// phone-timer interaction the user liked while the field beside it still permits
-// a direct jump such as Target 73. Only its title, range, prefix and commit action
-// change; all three launchers share the same accessible dialog.
-
+// The last number modal is gone: d? is a barrel+type hybrid honouring its
+// two jobs (choose a size, mint the die button). SCRUB it and the pending
+// size rolls live — the drum rail shows the neighbouring side counts
+// (d6 · d7 · d8) and the button's own label previews dN — but nothing
+// mints yet: the first TAP after a scrub mints the previewed die. That is
+// the flow that cannot mint an accidental d7 from a stray notch — the
+// button reads exactly what the tap will make, and only a deliberate tap
+// makes it. A tap with nothing pending floats the inline entry instead:
+// type 66, Enter mints d66, Escape cancels. Minting is the old dial's
+// commit verbatim — the dedicated dN button appears (or updates) and a
+// tap's worth of dice goes to the pool. Hold does nothing. Typed notation
+// beyond d1000 is untouched: MAX_SIDES is the picker's bound, not the
+// parser's.
 const MAX_SIDES = 1000;
-const dial = $('dial');
-const wheel = $('wheel');
-const dialInput = $('dialInput');
-const dialTitle = $('dialTitle');
-const dialPrefix = $('dialPrefix');
-const dialAdd = $('dialAdd');
-const dialClear = $('dialClear');
-const dialClose = $('dialClose');
 let customSides = 20;
-let dialReturnFocus = null;
-let dialConfig = {
-  title: 'Custom die', value: customSides, min: 1, max: MAX_SIDES, prefix: 'd',
-  actionLabel: 'Add to tray', inputLabel: 'Number of sides', commit: () => {},
-};
+let customPending = null;
+const customBtn = $('customDie');
+const customLabel = $('customDieLabel');
 
-for (let n = 1; n <= MAX_SIDES; n++) {
-  const item = document.createElement('div');
-  item.className = 'wheel-item';
-  item.dataset.value = String(n);
-  item.textContent = `d${n}`;
-  item.setAttribute('role', 'option');
-  wheel.append(item);
+function setCustomPreview(v) {
+  customPending = v;
+  customLabel.textContent = v === null ? 'd?' : `d${v}`;
 }
 
-const wheelItem = n => wheel.children[n - 1];
-
-function dialValue() {
-  const n = parseInt(dialInput.value, 10);
-  const fallback = Math.max(dialConfig.min, Math.min(dialConfig.max, dialConfig.value));
-  return Number.isFinite(n)
-    ? Math.max(dialConfig.min, Math.min(dialConfig.max, n))
-    : fallback;
+function mintCustomDie(sides) {
+  customSides = sides;
+  setCustomPreview(null);
+  const button = ensureDieButton(sides);
+  addToPool(sides, perTap());
+  button.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
 }
 
-function centreWheel(n, smooth = false) {
-  const item = wheelItem(n);
-  if (!item) return;
-  wheel.scrollTo({
-    top: item.offsetTop - (wheel.clientHeight - item.offsetHeight) / 2,
-    behavior: smooth ? 'smooth' : 'auto',
-  });
-}
-
-function setDial(n, { scroll = true, focusField = false } = {}) {
-  const value = Math.max(dialConfig.min, Math.min(dialConfig.max, Math.round(n)));
-  dialInput.value = String(value);
-  for (const item of wheel.children) {
-    item.setAttribute('aria-selected', String(!item.hidden && Number(item.dataset.value) === value));
-  }
-  if (scroll) centreWheel(value);
-  if (focusField) dialInput.select();
-}
-
-// Read back whichever item settled under the marker.
-let wheelSettle = null;
-wheel.addEventListener('scroll', () => {
-  clearTimeout(wheelSettle);
-  wheelSettle = setTimeout(() => {
-    const middle = wheel.scrollTop + wheel.clientHeight / 2;
-    let closest = dialConfig.min, best = Infinity;
-    for (const item of wheel.children) {
-      if (item.hidden) continue;
-      const d = Math.abs(item.offsetTop + item.offsetHeight / 2 - middle);
-      if (d < best) { best = d; closest = Number(item.dataset.value); }
-    }
-    setDial(closest, { scroll: false });
-  }, 90);
-});
-
-wheel.addEventListener('click', e => {
-  const item = e.target.closest('.wheel-item');
-  if (item) setDial(Number(item.dataset.value));
-});
-
-wheel.addEventListener('keydown', e => {
-  const step = e.key === 'ArrowUp' ? -1 : e.key === 'ArrowDown' ? 1
-             : e.key === 'PageUp' ? -10 : e.key === 'PageDown' ? 10 : 0;
-  if (!step) return;
-  e.preventDefault();
-  setDial(dialValue() + step);
-});
-
-dialInput.addEventListener('input', () => {
-  const n = parseInt(dialInput.value, 10);
-  if (Number.isFinite(n) && n >= dialConfig.min && n <= dialConfig.max) setDial(n, { scroll: true });
-});
-dialInput.addEventListener('focus', () => dialInput.select());
-
-function openNumberDial(config) {
-  const active = document.activeElement;
-  dialReturnFocus = active && typeof active.focus === 'function' ? active : null;
-  dialConfig = { prefix: '', ...config };
-  dialTitle.textContent = dialConfig.title;
-  dialPrefix.textContent = dialConfig.prefix;
-  dialPrefix.hidden = !dialConfig.prefix;
-  dialInput.setAttribute('aria-label', dialConfig.inputLabel);
-  wheel.setAttribute('aria-label', dialConfig.inputLabel);
-  dialAdd.textContent = dialConfig.actionLabel;
-  // An optional release action: some values (the Mothership target) can be
-  // given back to the table rather than set to a number.
-  dialClear.hidden = !dialConfig.clearLabel;
-  if (dialConfig.clearLabel) dialClear.textContent = dialConfig.clearLabel;
-  for (const item of wheel.children) {
-    const value = Number(item.dataset.value);
-    item.hidden = value < dialConfig.min || value > dialConfig.max;
-    item.textContent = `${dialConfig.prefix}${value}`;
-  }
-  setHelp(false);
-  closeSheet();
-  closeHistory();
-  closeRoom();
-  closeMode();
-  dial.hidden = false;
-  setDial(dialConfig.value);
-  dialInput.focus();
-  dialInput.select();
-  hideHint();
-}
-
-function openDial() {
-  openNumberDial({
-    title: 'Custom die', value: customSides, min: 1, max: MAX_SIDES, prefix: 'd',
-    actionLabel: 'Add to tray', inputLabel: 'Number of sides',
-    commit: sides => {
-      customSides = sides;
-      const button = ensureDieButton(sides);
-      addToPool(sides, perTap());
-      button.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
-    },
-  });
-}
-
-function closeDial() {
-  if (dial.hidden) return;
-  dial.hidden = true;
-  const target = dialReturnFocus;
-  dialReturnFocus = null;
-  if (target && target.isConnected && typeof target.focus === 'function') target.focus();
-}
-
-dial.addEventListener('keydown', e => {
-  if (e.key !== 'Tab' || dial.hidden) return;
-  const focusable = [dialClose, wheel, dialInput, dialAdd, dialClear].filter(el => !el.hidden && !el.disabled);
-  if (!focusable.length) return;
-  const first = focusable[0];
-  const last = focusable[focusable.length - 1];
-  if (e.shiftKey && document.activeElement === first) {
-    e.preventDefault();
-    last.focus();
-  } else if (!e.shiftKey && document.activeElement === last) {
-    e.preventDefault();
-    first.focus();
-  } else if (!focusable.includes(document.activeElement)) {
-    e.preventDefault();
-    first.focus();
-  }
-});
-
-$('customDie').addEventListener('click', openDial);
-dialClose.addEventListener('click', closeDial);
-dialClear.addEventListener('click', () => {
-  if (dialConfig && dialConfig.onClear) dialConfig.onClear();
-  closeDial();
-});
-dialAdd.addEventListener('click', () => {
-  const value = dialValue();
-  const commit = dialConfig.commit;
-  closeDial();
-  commit(value);
+const customApi = bindScrubDial(customBtn, {
+  get: () => customPending ?? customSides,
+  set: setCustomPreview,
+  min: 1, max: MAX_SIDES,
+  format: v => `d${v}`,
+  tap: () => { if (customPending !== null) mintCustomDie(customPending); else customApi.openEntry(); },
+  onEntry: mintCustomDie,
 });
 
 // ---- modifier sheet ----
@@ -7535,7 +7404,6 @@ function applyModifier(sides, mod) {
 function openSheet(sides, { focus = null } = {}) {
   // They all fill the tray, so only one can be up at a time.
   setHelp(false);
-  closeDial();
   closeHistory();
   closeRoom();
   $('sheetTitle').textContent = `d${sides}`;
@@ -7707,7 +7575,6 @@ sheet.addEventListener('click', e => {
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
   if (!sheet.hidden) closeSheet();
-  if (!dial.hidden) closeDial();
   if (!historyPanel.hidden) closeHistory();
   if (!roomPanel.hidden) closeRoom();
   if (!modeSheet.hidden) closeMode();
@@ -8313,7 +8180,7 @@ function trayCovered() {
   // them is visible and drawing the tray is wasted. The help and room panels
   // (and the mode picker) are corner popovers: the table shows around them, so
   // the tray must keep rendering or the visible part blanks out.
-  return !sheet.hidden || !dial.hidden || !historyPanel.hidden;
+  return !sheet.hidden || !historyPanel.hidden;
 }
 
 function drawFrame(dt) {
@@ -8908,7 +8775,6 @@ function showRoomNotice(text) {
 function openRoom() {
   setHelp(false);
   closeSheet();
-  closeDial();
   closeHistory();
   closeMode();
   anchorPop(roomPanel, roomToggle);

@@ -65,7 +65,6 @@ ok('Mothership Target and Stress ride the barrel',
    /class="ms-value-dial scrub-dial" id="msStressDial"/.test(html) &&
    /bindScrubDial\(msTargetDial, \{[^]{0,300}min: 1, max: 99/.test(js) &&
    /bindScrubDial\(msStressDial, \{[^]{0,200}min: 2, max: 20/.test(js) &&
-   /function openNumberDial\(config\)/.test(js) &&
    /\.ms-value-dial::after\s*\{[^}]*content:\s*["']↕["']/.test(css));
 
 // Both Daggerheart and Mothership show their signature picker together with the
@@ -184,20 +183,33 @@ ok('a tray tap reaches the torch before the dice',
 }
 ok('the scrub wheel listener is non-passive',
    /addEventListener\('wheel', [\s\S]{0,600}?\{ passive: false \}\)/.test(js));
-// The huge ranges ride the barrel too, wearing the typing door — no number
-// chip opens the popup dial any more. The popup survives only for dice
-// business: the custom d? die, the hold-opened count dial, and the V5
-// surge first-use ask.
+// The huge ranges ride the barrel wearing the typing door — no number
+// chip opens a popup any more.
 ok('the huge-range chips scrub and type, never popup',
    /bindScrubDial\(msTargetDial, \{[\s\S]{0,300}tapEntry: true/.test(js) &&
    /bindScrubDial\(cocSkillDial, \{[\s\S]{0,300}tapEntry: true/.test(js) &&
    /bindScrubDial\(dgTargetDial, \{[\s\S]{0,300}tapEntry: true/.test(js) &&
-   !/TargetDial\.addEventListener\('click'[\s\S]{0,200}openNumberDial/.test(js) &&
-   !/cocSkillDial\.addEventListener\('click'[\s\S]{0,200}openNumberDial/.test(js));
-ok('the popup dial survives only for dice business',
-   (js.match(/openNumberDial\(\{/g) || []).length === 2 &&
-   /function openCountDial[\s\S]{0,200}openNumberDial\(\{/.test(js) &&
-   /function openDial\(\)[\s\S]{0,200}openNumberDial\(\{/.test(js));
+   /bindScrubDial\(\$\('countChip'\), \{[\s\S]{0,200}tapEntry: true/.test(js));
+// The popup number dial is GONE — a real subtraction. Its last callers
+// (the custom d?, the hold-opened count dials) became button barrels, so
+// the function, the dialog markup and the wheel CSS must all stay deleted.
+ok('the popup number dial is fully retired',
+   !/openNumberDial/.test(js) && !/openCountDial/.test(js) &&
+   !/id="dial"/.test(html) && !/id="wheel"/.test(html) &&
+   !css.includes('.wheel-item') && !css.includes('.dial-entry'));
+// The d? flow that cannot mint an accidental die: scrubbing only previews
+// (the label says dN), and only a tap mints — the previewed size after a
+// scrub, or the typed size through the entry door.
+ok('the custom die previews on scrub and mints only on a tap',
+   /set: setCustomPreview/.test(js) &&
+   /tap: \(\) => \{ if \(customPending !== null\) mintCustomDie\(customPending\); else customApi\.openEntry\(\); \}/.test(js) &&
+   /onEntry: mintCustomDie/.test(js) &&
+   /function mintCustomDie\(sides\) \{[\s\S]{0,300}ensureDieButton\(sides\);[\s\S]{0,80}addToPool\(sides, perTap\(\)\);/.test(js));
+// The two hold count-dials became button barrels on the Blood Surge
+// precedent: tap still adds one (the dice grammar), scrub sets the count.
+ok('the CT pool and the Twilight magazine scrub their counts in place',
+   /bindScrubDial\(ctAddDie, \{[\s\S]{0,300}tap: \(\) => \{ ct\.dice = Math\.min\(100, ct\.dice \+ 1\); syncCt\(\); \}/.test(js) &&
+   /bindScrubDial\(\$\('t2k-ammo'\), \{[\s\S]{0,300}tap: \(\) => stepT2kAmmo\(1\)/.test(js));
 // The Blood Surge button is its own barrel: scrubbing sets the size, only
 // a clean tap surges (the shared 6px tap budget is the gate), and a tap
 // with no size set arms the default instead of spending blood on a guess.
@@ -251,12 +263,8 @@ ok('Mothership tactile value buttons own the full 44px target',
    (numMarkup.match(/class="ms-direct-field ms-dial-field"/g) || []).length === 2 &&
    /\.mothership-rail \.ms-dial-field\s*\{[^}]*padding:\s*0/.test(css) &&
    /\.ms-value-dial\s*\{[^}]*width:\s*100%[^}]*min-height:\s*44px/.test(css));
-ok('Shared number dial is modal and manages keyboard focus',
-   /id="dial"[^>]*role="dialog"[^>]*aria-modal="true"/.test(html) &&
-   /let dialReturnFocus\s*=\s*null/.test(js) &&
-   /dialInput\.focus\(\)/.test(js) &&
-   /dial\.addEventListener\('keydown'[^]*e\.key !== 'Tab'/.test(js) &&
-   /function closeDial[^]*dialReturnFocus[^]*\.focus\(\)/.test(js));
+// (The shared number dial's modality assertion lived here until the dial
+// itself retired — see 'the popup number dial is fully retired'.)
 ok('Mothership rail and notation form remain within the page width',
    /\.picker\.mothership-rail\s*\{[^}]*width:\s*100%[^}]*max-width:\s*100%[^}]*min-width:\s*0[^}]*scrollbar-width:\s*thin/.test(css) &&
    /\.picker\.mothership-rail::-webkit-scrollbar\s*\{[^}]*height:\s*4px/.test(css) &&

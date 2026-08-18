@@ -104,16 +104,17 @@ A system may add controls; it may never change what these four do.
   silhouette of its die (d6 rounded square, d8 diamond, d10 kite, d12
   pentagon) or the system's own mark (the V5 ankh-in-a-d10, the Rouse maw).
   Never a generic rectangle for a die.
-- **Tap adds; hold scales with the button's count.** The measure is one
-  button's realistic count, not the whole roll's. Where that count stays
-  within tapping distance (a rating of 1-5 per chip, a V5 pool in the low
-  teens), holding the button removes one — the quick gesture. Where a single
-  button's count genuinely runs large (a CthulhuTech pool of 8-16, a magazine
-  of Twilight ammo), hold opens the shared rotary count dial instead —
-  scroll a big handful on in one gesture, or scroll the lot back to nothing.
-  A menu appears only where a die has real per-die options (the numeric
-  picker's modifier sheet). Tapping staged dice on the tray removes
-  regardless.
+- **Tap adds; a large count scrubs on the button itself.** The measure is
+  one button's realistic count, not the whole roll's. Where that count
+  stays within tapping distance (a rating of 1-5 per chip, a V5 pool in
+  the low teens), holding the button removes one — the quick gesture.
+  Where a single button's count genuinely runs large (a CthulhuTech pool
+  of 8-16, a magazine of Twilight ammo), the button is its own barrel:
+  tap still adds one, and scrubbing or wheeling the button sets the whole
+  count in one gesture — the rotary drum in place of the retired count
+  dial. A menu appears only where a die has real per-die options (the
+  numeric picker's modifier sheet). Tapping staged dice on the tray
+  removes regardless.
 - **Caps come from the book or nowhere.** A tracked stat wears its printed
   cap (Hunger 0-5, Stress's floor of 2). A pool the rules leave uncapped gets
   only an engine sanity bound, far past table reality — and counts always
@@ -134,14 +135,17 @@ A system may add controls; it may never change what these four do.
   and the wrap is the point. A button whose tap is an ACTION may still be
   a barrel for its own number (Blood Surge: scrub sets the size, tap
   spends it — and a first tap with no size set arms the default without
-  acting, never spending on a guess). The popup number dial survives only
-  for dice business: the custom d? die and the count dial a die button
-  opens on hold. Dice buttons are not numbers and keep their own grammar (tap
-  adds, hold removes or opens the count dial). Where the number is a
-  resolution target the table may judge, the control defaults to unset —
-  it reads "—", the roll reports raw facts, scrubbing below minimum falls
-  off into "—", and the first step back in lands on the system's default
-  value, never the minimum.
+  acting, never spending on a guess — and the custom d? die: scrubbing it
+  previews the size on its own label, and only a tap mints the previewed
+  die or opens typed entry, so a stray notch can never create a die). The
+  popup number dial is gone entirely; the barrel with its typing door is
+  every number surface the app has. Dice buttons are not numbers and keep
+  their own grammar (tap adds, hold removes; large counts scrub on the
+  button, per the picker rule above). Where the number is a resolution
+  target the table may judge, the control defaults to unset — it reads
+  "—", the roll reports raw facts, scrubbing below minimum falls off into
+  "—", and the first step back in lands on the system's default value,
+  never the minimum.
 - **Buttons stage; the player rolls.** A control that assembles or selects a
   roll puts it on the tray — a pool button adds dice, a named-roll tile
   (Duality, Action, an oracle ask, Check/Save) selects and stages its roll —

@@ -1426,13 +1426,13 @@ body[data-torchlit] .breakdown {
 }
 .picker.mothership-rail::-webkit-scrollbar { height: 4px; }
 .picker.mothership-rail::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--accent) 65%, transparent); border-radius: 999px; }
-.mothership-rail .ms-fields-row, .mothership-rail .counter, .mothership-rail .dice-scroll { flex: 0 0 auto; }
+.mothership-rail .ms-fields-row, .mothership-rail .count-chip, .mothership-rail .dice-scroll { flex: 0 0 auto; }
 .mothership-rail .dice-scroll { min-width: max-content; }
 .mothership-rail .dice-scroll { order: 2; }
-.mothership-rail .counter { order: 3; }
+.mothership-rail .count-chip { order: 3; }
 .mothership-rail .dice-buttons { overflow: visible; }
 .mothership-rail .nudge { display: none; }
-.mothership-rail .counter .step, .mothership-rail .count, .mothership-rail .dbtn { min-height: 44px; }
+.mothership-rail .count-chip, .mothership-rail .dbtn { min-height: 44px; }
 .mothership-rail .ms-direct-field {
   width: 72px;
   box-sizing: border-box;
@@ -1462,8 +1462,7 @@ body[data-torchlit] .breakdown {
   text-align: center;
   pointer-events: none;
 }
-.mothership-rail .counter .step { width: 22px; }
-.mothership-rail .counter .count { width: 28px; }
+.mothership-rail .count-chip { padding: 0 8px; }
 .mothership-rail .dice-buttons { gap: 2px; }
 .mothership-rail .dbtn { min-width: 38px; padding-inline: 3px; }
 /* Square SVG viewports prevent the percentile pair and d20 from inheriting the
@@ -1872,23 +1871,6 @@ body[data-torchlit] .breakdown {
    reversal is a meaning, not a failure. */
 #total[data-variant="tarot-rev"] { color: var(--accent); }
 
-/* The dial's optional second action: releases the value back to "unset"
-   (the Mothership target's table-sets-it state). A quiet ghost next to the
-   primary commit. */
-.dial-clear {
-  appearance: none;
-  border: 1px solid var(--hair);
-  background: none;
-  color: var(--muted);
-  border-radius: 10px;
-  padding: 10px 14px;
-  font: inherit;
-  font-size: 14px;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-.dial-clear:hover { color: var(--line); border-color: var(--muted); }
-
 /* ---- system picker popover ---- */
 /* A corner menu anchored under the header's mode button (openMode positions it
    from the button's rect). One-line rows: mark, shorthand, dice. */
@@ -2103,6 +2085,10 @@ body[data-torchlit] .breakdown {
 
 /* How many dice each tap adds. Typing a number here and tapping d6 is how you
    get 100d6 without tapping a hundred times. */
+/* The classic −/n/+ trio survives in ONE place: the modifier sheet's
+   exact-count row — a typed count beside per-die options, inside the one
+   menu the picker grammar allows. The strip's dice-per-tap control is the
+   .count-chip barrel below. */
 .counter {
   display: flex;
   align-items: center;
@@ -2150,6 +2136,33 @@ body[data-torchlit] .breakdown {
   font-size: 18px;
   line-height: 1;
   cursor: pointer;
+}
+
+/* Dice per tap: one barrel chip where the strip's −/count/+ row stood.
+   The × is the multiplication it performs on every die tap, quiet. */
+.count-chip {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+  border: 1px solid var(--hair);
+  border-radius: 8px;
+  background: none;
+  color: var(--line);
+  font: inherit;
+  height: 34px;
+  padding: 0 10px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.count-chip-val {
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+.count-x {
+  font-size: 11px;
+  color: var(--muted);
 }
 
 /* The row holds more dice than fit, so it scrolls. Arrows appear at whichever
@@ -2258,108 +2271,14 @@ body[data-torchlit] .breakdown {
   color: var(--accent);
 }
 
-/* ---- custom die wheel ---- */
-
-.dial .sheet-panel {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-
-/* Scroll-snap does the physics: flick and a number settles under the marker,
-   the way a phone's timer picker behaves. */
-.wheel {
-  flex: 1 1 auto;
-  min-height: 96px;
-  max-height: 150px;
-  overflow-y: auto;
-  scroll-snap-type: y mandatory;
-  scrollbar-width: none;
-  position: relative;
-  /* Fades the ends so the list reads as a wheel rather than a cut-off column. */
-  mask-image: linear-gradient(transparent, #000 22%, #000 78%, transparent);
-  -webkit-mask-image: linear-gradient(transparent, #000 22%, #000 78%, transparent);
-  /* Half the visible height, so the first and last items can reach the middle. */
-  padding: 56px 0;
-}
-.wheel::-webkit-scrollbar { display: none; }
-
-.wheel-item {
-  scroll-snap-align: center;
-  height: 30px;
-  line-height: 30px;
-  text-align: center;
-  font-family: "Iosevka Etoile", ui-monospace, monospace;
-  font-size: 15px;
-  font-variant-numeric: tabular-nums;
-  color: var(--muted);
-  opacity: 0.45;
-  cursor: pointer;
-  transition: color 120ms ease, opacity 120ms ease;
-}
-.wheel-item[aria-selected="true"] {
-  color: var(--accent);
-  opacity: 1;
-  font-size: 19px;
-}
-
-/* The marker: two hairlines the selected number sits between. */
-.dial .sheet-panel {
-  position: relative;
-}
-.wheel::before,
-.wheel::after {
-  content: "";
-  position: sticky;
-  left: 0;
-  display: block;
-  height: 1px;
-  background: var(--hair);
-  z-index: 1;
-}
-.wheel::before { top: calc(50% - 16px); }
-.wheel::after  { bottom: calc(50% - 16px); }
-
-.dial-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  padding: 8px 2px 2px;
-}
-
-.dial-entry {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  border: 1px solid var(--hair);
-  border-radius: 10px;
-  padding: 0 10px;
-  min-height: var(--tap);
-  font-family: "Iosevka Etoile", ui-monospace, monospace;
-  font-size: 15px;
-  color: var(--muted);
-}
-
-.dial-entry input {
-  width: 3.6em;
-  border: 0;
-  background: none;
-  color: var(--line);
-  font: inherit;
-  font-variant-numeric: tabular-nums;
-  padding: 0;
-}
-.dial-entry input:focus { outline: none; }
-
-.dial-add {
-  flex: 1 1 auto;
-}
-
-/* The custom-die button reads as an action rather than a die. */
+/* The custom-die button reads as an action rather than a die. Its label
+   span is what the scrub previews — d? at rest, dN while a pending size
+   waits for the minting tap. */
 .dbtn.custom {
   color: var(--muted);
   font-family: "Iosevka Etoile", ui-monospace, monospace;
 }
+.custom-label { position: relative; font-variant-numeric: tabular-nums; }
 
 /* A die added through the picker. Dashed to show it is not part of the standard
    set, but otherwise a full die: tappable, countable, holdable for modifiers. */

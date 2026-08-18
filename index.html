@@ -1413,30 +1413,9 @@
         <p class="room-state" id="roomState"></p>
     </div>
 
-    <!-- Custom die picker: a scroll wheel for browsing and a field for jumping
-         straight to a number. -->
-    <div class="sheet dial" id="dial" hidden role="dialog" aria-modal="true" aria-labelledby="dialTitle">
-      <div class="sheet-panel">
-        <p class="sheet-title">
-          <span id="dialTitle">Custom die</span>
-          <button type="button" class="sheet-close" id="dialClose"
-                  aria-label="Close">✕</button>
-        </p>
-
-        <div class="wheel" id="wheel" role="listbox" aria-label="Number of sides"
-             tabindex="0"></div>
-
-        <div class="dial-actions">
-          <label class="dial-entry">
-            <span id="dialPrefix">d</span>
-            <input id="dialInput" type="text" inputmode="numeric" autocomplete="off"
-                   value="20" aria-label="Number of sides">
-          </label>
-          <button type="button" class="roll dial-add" id="dialAdd">Add to tray</button>
-          <button type="button" class="dial-clear" id="dialClear" hidden>Table sets it</button>
-        </div>
-      </div>
-    </div>
+    <!-- The custom die picker's modal used to live here; d? in the dice
+         strip is its own barrel now — scrub previews the size, a tap mints
+         it or types it. -->
   </section>
 
   <output class="readout" id="readout" aria-live="polite">
@@ -1459,18 +1438,18 @@
         <button type="button" class="ms-skill-dial" id="msSkillDial" aria-label="Skill tier, current None — tap to raise, hold to lower">None</button>
       </div>
     </div>
-    <div class="counter" title="How many dice each tap adds">
-      <button class="step" id="countDown" aria-label="One fewer die per tap">−</button>
-      <input id="count" class="count" type="text" inputmode="numeric"
-             value="1" autocomplete="off" aria-label="Dice per tap">
-      <button class="step" id="countUp" aria-label="One more die per tap">+</button>
-    </div>
+    <!-- Dice per tap: one barrel chip where the −/count/+ row stood — scrub
+         steps it, a tap types it (the huge-range door, 1-500). -->
+    <button type="button" class="count-chip scrub-dial" id="countChip" title="How many dice each tap adds"
+            aria-label="Dice per tap — tap to type it, drag or scroll to scrub 1 to 500">
+      <span class="count-chip-val" id="count">1</span><span class="count-x">×</span>
+    </button>
     <div class="dice-scroll">
       <button type="button" class="nudge" id="diceLeft" aria-label="Show smaller dice"
               hidden>‹</button>
       <div class="dice-buttons" id="diceButtons" role="group">
-        <button class="dbtn custom" id="customDie" type="button"
-                aria-label="Choose a custom number of sides"><span class="dbtn-fill"></span>d?</button>
+        <button class="dbtn custom scrub-dial" id="customDie" type="button"
+                aria-label="Custom die — drag or scroll to pick the sides (the button previews dN, tap to make it); tap now to type the sides"><span class="dbtn-fill"></span><span class="custom-label" id="customDieLabel">d?</span></button>
       </div>
       <button type="button" class="nudge" id="diceRight" aria-label="Show larger dice"
               hidden>›</button>
@@ -1646,7 +1625,7 @@
   <!-- CthulhuTech 2e: how many d10 (Attribute + Skill), and the Difficulty (the
        number of even-die Hits you need). -->
   <section class="picker ct-picker" id="ctPicker" aria-label="CthulhuTech pool" hidden>
-    <button type="button" class="die-btn" id="ctAddDie" aria-label="Add a d10 to the pool; hold to remove one">
+    <button type="button" class="die-btn scrub-dial" id="ctAddDie" aria-label="Pool — tap to add a d10, drag or scroll to set the whole pool">
       <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true"><path d="M15 3 24 9 V17 L15 27 6 17 V9Z"/></svg>
       <span class="die-btn-label">d10</span>
     </button>
@@ -1718,7 +1697,7 @@
         <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true"><path d="M10 5H20A5 5 0 0 1 25 10V20A5 5 0 0 1 20 25H10A5 5 0 0 1 5 20V10A5 5 0 0 1 10 5Z"/></svg>
         <span class="br-die-val" id="t2k-skill-val">d6</span>
       </button>
-      <button type="button" class="br-die" id="t2k-ammo" aria-label="Ammo dice — tap to add, hold to remove">
+      <button type="button" class="br-die scrub-dial" id="t2k-ammo" aria-label="Ammo dice — tap to add one, drag or scroll to set the magazine">
         <span class="br-die-label">Ammo</span>
         <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true"><path d="M10 5H20A5 5 0 0 1 25 10V20A5 5 0 0 1 20 25H10A5 5 0 0 1 5 20V10A5 5 0 0 1 10 5Z"/></svg>
         <span class="br-die-val" id="t2k-ammo-val">0</span>
