@@ -749,6 +749,44 @@ function addHistory(result, who = null, mine = false, at = null) {
   while (list.children.length > 12) list.lastElementChild.remove();
 }
 
+// A table event that is not a roll — the torch lit, snuffed, guttering out —
+// written into the same session log, because the log is the play record and
+// "when did the light die" is a question the record should answer. The entry
+// wears the roll shape with the dice-bearing fields empty (`event: true`,
+// notation '', dice []), so Full History, the JSON export and the copy text
+// all render it without a special case leaking; the CSV emits one row with
+// the die columns blank, flagged only for events so diceless ROLLS (card
+// draws) keep their current absence. Local only, deliberately: the torch is
+// "your torch, your clock" (see the torch block) and never crosses a room
+// or the Owlbear bus, so its events must not either.
+function addHistoryEvent(text) {
+  history.push({
+    at: new Date().toISOString(),
+    who: null,
+    mine: true,
+    event: true,
+    notation: '',
+    total: null,
+    headline: text,
+    detail: '',
+    dice: [],
+  });
+  if (history.length > HISTORY_LIMIT) history.shift();
+  $('historyCount').textContent = history.length > 12 ? `${history.length} rolls` : '';
+  const li = document.createElement('li');
+  li.dataset.event = '1';
+  const top = document.createElement('div');
+  top.className = 'log-line';
+  const label = document.createElement('span');
+  label.className = 'log-event';
+  label.textContent = text;
+  top.append(label);
+  li.append(top);
+  const list = $('history');
+  list.prepend(li);
+  while (list.children.length > 12) list.lastElementChild.remove();
+}
+
 function showError(msg) {
   const el = $('error');
   el.textContent = msg;
@@ -1374,14 +1412,14 @@ bindTapHold(v5HungerChip, dir => { v5.rouse = false; setHunger(v5.hunger + dir);
 // Difficulty opens the tactile roller, the one number-picker every system
 // shares, with a "Table sets it" release back to unset — the same control as
 // the Mothership target and the custom die.
-v5DiffChip.addEventListener('click', () => {
-  openNumberDial({
-    title: 'Difficulty', value: v5.difficulty ?? 3, min: 1, max: 10,
-    actionLabel: 'Set Difficulty', inputLabel: 'Difficulty',
-    clearLabel: 'Table sets it',
-    commit: value => { v5.difficulty = value; syncV5(); },
-    onClear: () => { v5.difficulty = null; syncV5(); },
-  });
+// Difficulty is a ten-step line — barrel territory, not popup territory:
+// scrub below 1 for the table-judged "—", first step in enters at 3 (the
+// popup dial's old default, kept).
+bindScrubDial(v5DiffChip, {
+  get: () => v5.difficulty,
+  set: v => { v5.difficulty = v; syncV5(); },
+  min: 1, max: 10,
+  unset: { enter: 3 },
 });
 
 // A Rouse check throws a single Hunger die on its own, outside the action pool. If
@@ -1784,7 +1822,12 @@ function syncFate({ writeField = true } = {}) {
   if (uiSystem === 'fate') stageSystemPool();
 }
 
-bindTapHold($('fateModChip'), dir => { fate.modifier = Math.max(-100, Math.min(100, fate.modifier + dir)); syncFate(); });
+bindScrubDial($('fateModChip'), {
+  get: () => fate.modifier,
+  set: v => { fate.modifier = v; syncFate(); },
+  min: -100, max: 100,
+  format: v => (v > 0 ? `+${v}` : String(v)),
+});
 
 function syncFateFromField() {
   try {
@@ -2257,15 +2300,20 @@ bindTapHold(dhAdvButtons.find(b => b.dataset.adv === 'dis'), dir => {
 // took over the tray: one tap brings the duality pair back in hand.
 $('dhRoll').addEventListener('click', () => { $('notation').value = dhNotation(); syncDh({ writeField: true }); });
 
-bindTapHold(dhModChip, dir => { dhState.modifier = Math.max(-100, Math.min(100, dhState.modifier + dir)); syncDh(); });
-dhDiffChip.addEventListener('click', () => {
-  openNumberDial({
-    title: 'Difficulty', value: dhState.difficulty ?? 15, min: 1, max: 40,
-    actionLabel: 'Set Difficulty', inputLabel: 'Difficulty',
-    clearLabel: 'Table sets it',
-    commit: value => { dhState.difficulty = value; syncDh(); },
-    onClear: () => { dhState.difficulty = null; syncDh(); },
-  });
+bindScrubDial(dhModChip, {
+  get: () => dhState.modifier,
+  set: v => { dhState.modifier = v; syncDh(); },
+  min: -100, max: 100,
+  format: v => (v > 0 ? `+${v}` : String(v)),
+});
+// Difficulty rides the barrel like the DC precedent: below 1 falls off into
+// the table-judged "—", and the first step in lands on 15 — the popup dial's
+// old default entry, kept as the barrel's.
+bindScrubDial(dhDiffChip, {
+  get: () => dhState.difficulty,
+  set: v => { dhState.difficulty = v; syncDh(); },
+  min: 1, max: 40,
+  unset: { enter: 15 },
 });
 
 function syncDhFromField() {
@@ -2320,10 +2368,16 @@ function bindTapHold(el, step, { onHold = null } = {}) {
   });
 }
 
-// The scrub dial: the spin-chip's gesture grown up, PROTOTYPED on three
-// chips (the Crows Modifier, the Shadowdark Modifier and DC) — every other
-// chip keeps bindTapHold until the owner has felt this out and ruled on a
-// wider rollout.
+// The scrub dial — the barrel — is THE number gesture, owner-approved and
+// rolled out app-wide: every non-dice number control (modifiers,
+// difficulties, targets, tracked statuses, cards-per-draw) binds here.
+// What stays off it, by kind: dice buttons keep tap-adds/hold (their own
+// grammar); wrapping cycles keep tap/hold (Mothership Skill's four named
+// tiers, Blade Runner's even/adv/dis, the CoC bonus/penalty axis — a wrap
+// is the point, and a barrel does not wrap); the popup number dial survives
+// only where the range is genuinely huge and a typed direct jump beats any
+// scrub (Mothership Target 1-99, CoC Skill 1-100, Delta Green Target 1-99,
+// the numeric d? sides and dice-per-tap inputs).
 //
 // Three ways in, ordered by how much they ask a player to learn: a plain tap
 // still bumps +1 (the zero-learning fallback); hovering plus a wheel notch
@@ -2601,16 +2655,13 @@ function syncCt({ writeField = true } = {}) {
 bindTapHold(ctAddDie, dir => { ct.dice = Math.max(0, Math.min(100, ct.dice + dir)); syncCt(); }, {
   onHold: () => openCountDial('d10 pool', ct.dice, 20, n => { ct.dice = n; syncCt(); }),
 });
-// Difficulty opens the shared number dial, with "Table sets it" as the unset
-// state — unresolved rolls just report hits.
-ctDiffChip.addEventListener('click', () => {
-  openNumberDial({
-    title: 'Difficulty', value: ct.difficulty ?? 3, min: 1, max: 20,
-    actionLabel: 'Set Difficulty', inputLabel: 'Difficulty',
-    clearLabel: 'Table sets it',
-    commit: value => { ct.difficulty = value; syncCt(); },
-    onClear: () => { ct.difficulty = null; syncCt(); },
-  });
+// Difficulty rides the barrel, "—" included — unresolved rolls just report
+// hits; the first step in from unset lands on 3, the old dial default.
+bindScrubDial(ctDiffChip, {
+  get: () => ct.difficulty,
+  set: v => { ct.difficulty = v; syncCt(); },
+  min: 1, max: 20,
+  unset: { enter: 3 },
 });
 
 function syncCtFromField() {
@@ -2672,16 +2723,13 @@ for (const btn of torFlagButtons) {
 }
 // Tap the d6 to add a Success die, hold to remove one.
 bindTapHold(torAddSuccess, dir => { tor.success = Math.max(0, Math.min(20, tor.success + dir)); syncTor(); });
-// The Target Number opens the shared number dial (1-30), with "Table sets it"
-// as the unset state.
-torTnChip.addEventListener('click', () => {
-  openNumberDial({
-    title: 'Target Number', value: tor.tn ?? 14, min: 1, max: 30,
-    actionLabel: 'Set Target', inputLabel: 'Target Number',
-    clearLabel: 'Table sets it',
-    commit: value => { tor.tn = value; syncTor(); },
-    onClear: () => { tor.tn = null; syncTor(); },
-  });
+// The Target Number rides the barrel across 1-30, with the table-judged "—"
+// below 1; the first step in enters at 14, the old dial default.
+bindScrubDial(torTnChip, {
+  get: () => tor.tn,
+  set: v => { tor.tn = v; syncTor(); },
+  min: 1, max: 30,
+  unset: { enter: 14 },
 });
 
 function syncTorFromField() {
@@ -2722,7 +2770,12 @@ function syncTwod6FromField() {
   try { twod6.modifier = parse(src).modifier; syncTwod6({ writeField: false }); }
   catch { /* mid-type, not yet valid */ }
 }
-bindTapHold($('twod6ModChip'), dir => { twod6.modifier = Math.max(-100, Math.min(100, twod6.modifier + dir)); syncTwod6(); });
+bindScrubDial($('twod6ModChip'), {
+  get: () => twod6.modifier,
+  set: v => { twod6.modifier = v; syncTwod6(); },
+  min: -100, max: 100,
+  format: v => (v > 0 ? `+${v}` : String(v)),
+});
 
 // Both modes go through the one controller; the picker is shared, so a modifier
 // set in PbtA carries into Mist and vice versa — which is the intuitive result.
@@ -2780,11 +2833,30 @@ function syncDsFromField() {
     syncDs({ writeField: false });
   } catch { /* mid-type, not yet valid */ }
 }
-bindTapHold($('dsCharChip'), dir => { ds.char = Math.max(-5, Math.min(9, ds.char + dir)); syncDs(); });
+bindScrubDial($('dsCharChip'), {
+  get: () => ds.char,
+  set: v => { ds.char = v; syncDs(); },
+  min: -5, max: 9,
+  format: v => (v > 0 ? `+${v}` : String(v)),
+});
 // Tap raises 0 → 1 → 2, hold lowers — the counts clamp at the book's cap of
 // two, where a third edge or bane stops meaning anything.
-bindTapHold(dsEdgeChip, dir => { ds.edges = Math.max(0, Math.min(2, ds.edges + dir)); syncDs(); });
-bindTapHold(dsBaneChip, dir => { ds.banes = Math.max(0, Math.min(2, ds.banes + dir)); syncDs(); });
+// Three-step lines, but they still ride the barrel: one gesture for every
+// non-dice number. The rail reads each rung's EFFECT — the same words the
+// chip shows — not a bare count.
+const dsEffectRail = up => v => (v === 0 ? '—' : v === 1 ? (up ? '+2' : '−2') : (up ? 'Tier ↑' : 'Tier ↓'));
+bindScrubDial(dsEdgeChip, {
+  get: () => ds.edges,
+  set: v => { ds.edges = v; syncDs(); },
+  min: 0, max: 2,
+  format: dsEffectRail(true),
+});
+bindScrubDial(dsBaneChip, {
+  get: () => ds.banes,
+  set: v => { ds.banes = v; syncDs(); },
+  min: 0, max: 2,
+  format: dsEffectRail(false),
+});
 // The Power Roll button selects and stages the fixed 2d10 with the current
 // chips — buttons stage, the player rolls (the Duality and Check/Save
 // precedents), so the throw itself comes from Roll or the tray. Useful after
@@ -2831,9 +2903,8 @@ function syncCrowsFromField() {
 }
 // One modifier chip carries characteristic + skill + circumstance, resolved by
 // the player — circumstance bonuses are unlimited by rule, so ±20 is the
-// notation's sanity bound, not a cap from the book. This chip is the scrub
-// dial prototype (see bindScrubDial); touching it is power-roll business, so
-// it hands the tray back from a usage pool exactly as the tap-hold did.
+// notation's sanity bound, not a cap from the book. Touching it is
+// power-roll business, so it hands the tray back from a usage pool.
 bindScrubDial($('crowsModChip'), {
   get: () => crows.mod,
   set: v => { crows.usage = 0; crows.mod = v; syncCrows(); },
@@ -2893,7 +2964,6 @@ function syncSdFromField() {
 }
 // Stats run -4..+4 but talents and attack bonuses stack, so the chip shares
 // the notation's sanity bound rather than inventing a cap the book lacks.
-// Scrub-dial prototype, alongside the Crows Modifier.
 bindScrubDial($('sdModChip'), {
   get: () => sd.mod,
   set: v => { sd.mod = v; syncSd(); },
@@ -2984,6 +3054,10 @@ function torchTick() {
     sdTorch.told = true;
     saveTorch();
     $('breakdown').textContent = 'The torch gutters out';
+    // The death goes in the record once, riding `told` — a torch that died
+    // while the app was closed logs at the moment the table finds it dark,
+    // which is when the event happened as far as the table knows.
+    addHistoryEvent('The torch gutters out');
   }
 }
 let sdTorchTimer = null;
@@ -3001,8 +3075,23 @@ function stopTorchTick() {
 
 // Direct, no confirms: relighting is one tap, so snuffing needs no ceremony.
 // Tap while burning snuffs it; tap while unlit or dead strikes a fresh one.
-function lightTorch() { sdTorch.end = Date.now() + SD_TORCH_MS; sdTorch.told = false; saveTorch(); syncTorch(); }
-function snuffTorch() { sdTorch.end = null; sdTorch.told = false; saveTorch(); syncTorch(); }
+// Lighting and snuffing write to the session log — the play record should
+// answer "when did we light it" — through addHistoryEvent, which never
+// shares: your torch, your clock, your log. Both the tray tap and the
+// picker button land here, so both paths log for free. snuffTorch guards on
+// a torch actually standing: the X's full sweep calls it unconditionally,
+// and a sweep with no torch is not an event that happened.
+function lightTorch() {
+  sdTorch.end = Date.now() + SD_TORCH_MS; sdTorch.told = false; saveTorch(); syncTorch();
+  addHistoryEvent('Torch lit');
+}
+function snuffTorch() {
+  if (sdTorch.end === null) return;
+  // Clearing a dead stub is housekeeping, not an event — only a burning
+  // torch put out is worth a line.
+  if (torchRemaining(Date.now(), sdTorch.end) > 0) addHistoryEvent('Torch snuffed');
+  sdTorch.end = null; sdTorch.told = false; saveTorch(); syncTorch();
+}
 if (sdTorchBtn) sdTorchBtn.addEventListener('click', () => { if (torchLit()) snuffTorch(); else lightTorch(); });
 
 // ---- the torch on the tray ----
@@ -3149,9 +3238,11 @@ function torchZonePath(gx, gy, R, p1, p2, p3) {
 
 // The torchlight, drawn UNDER the dice so they sit on the lit ground.
 // Pen-and-ink and TWO-TONED (the owner's ruling): an inner bright pool and
-// an outer dim ring, two flat lightened shades of the felt, each ending
-// sharply at its own hand-inked wobbling edge — no rim strokes, no
-// falloff, the colour changes ARE the boundaries. The two edges ride
+// an outer dim ring, two flat shades of the felt, each ending sharply at
+// its own hand-inked wobbling edge — no falloff ever. Per scheme: dark
+// keeps the approved treatment, the colour change alone drawing each
+// boundary; light adds a stroked ink rim over deeper washes (the
+// engraving read — see the scheme fork below). The two edges ride
 // different phases so they never move in lockstep. (Presentation, not a
 // rules claim: the book gives the torch one "near" radius — the help says
 // so.)
@@ -3181,11 +3272,36 @@ function drawTorchGlow(ctx, t, r) {
   const brightR = dimR * 0.58;
   const s = reduceMotion.matches ? 0 : performance.now() / 1000;
   const gx = cx, gy = r.height / 2;
+  const dimPath = torchZonePath(gx, gy, dimR, 1.7 + s * 0.26, 4.1 + s * 0.19, 0.6 + s * 0.33);
+  const brightPath = torchZonePath(gx, gy, brightR, 3.9 + s * 0.31, 0.8 + s * 0.23, 2.6 + s * 0.28);
   ctx.save();
-  ctx.fillStyle = torchPoolColor(t.paper, 0.06);
-  ctx.fill(torchZonePath(gx, gy, dimR, 1.7 + s * 0.26, 4.1 + s * 0.19, 0.6 + s * 0.33));
-  ctx.fillStyle = torchPoolColor(t.paper, 0.12);
-  ctx.fill(torchZonePath(gx, gy, brightR, 3.9 + s * 0.31, 0.8 + s * 0.23, 2.6 + s * 0.28));
+  if (isDark()) {
+    // The approved dark treatment, untouched: two lightened felts, the
+    // colour change alone drawing each boundary.
+    ctx.fillStyle = torchPoolColor(t.paper, 0.06);
+    ctx.fill(dimPath);
+    ctx.fillStyle = torchPoolColor(t.paper, 0.12);
+    ctx.fill(brightPath);
+  } else {
+    // On parchment a lighter wash disappears — lamplight there reads as
+    // WARMTH, not lightness. So the light scheme deepens instead: two
+    // amber washes strong enough to sit visibly warm on the paper, and —
+    // because a wash alone still whispers — each rim is also stroked in
+    // the scheme's ink, pen linework over the tone, the way an engraving
+    // draws a lamp's reach. Two-tone stays meaningful: deeper wash and
+    // firmer line for bright, fainter both for dim.
+    ctx.fillStyle = torchPoolColor(t.paper, 0.14);
+    ctx.fill(dimPath);
+    ctx.fillStyle = torchPoolColor(t.paper, 0.28);
+    ctx.fill(brightPath);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = t.line;
+    ctx.globalAlpha = 0.4;
+    ctx.stroke(dimPath);
+    ctx.globalAlpha = 0.55;
+    ctx.stroke(brightPath);
+    ctx.globalAlpha = 1;
+  }
   ctx.restore();
 }
 
@@ -3383,7 +3499,7 @@ function syncMs({ writeField = true } = {}) {
   msCheckRoll.setAttribute('aria-pressed', String(ms.mode === 'check'));
   msPanicRoll.setAttribute('aria-pressed', String(ms.mode === 'panic'));
   msStressDial.textContent = String(ms.stress);
-  msStressDial.setAttribute('aria-label', `Set Stress, current ${ms.stress}`);
+  msStressDial.setAttribute('aria-label', `Stress ${ms.stress} — tap to raise, drag or scroll to scrub`);
   if (writeField) $('notation').value = msNotation();
   if (uiSystem === 'mothership') stageSystemPool();
 }
@@ -3410,12 +3526,13 @@ bindTapHold(msSkillDial, dir => {
   ms.skill = MS_SKILL_ORDER[(i + dir + n) % n];
   syncMs();
 });
-msStressDial.addEventListener('click', () => {
-  openNumberDial({
-    title: 'Stress', value: ms.stress, min: 2, max: 20,
-    actionLabel: 'Set Stress', inputLabel: 'Current Stress',
-    commit: setStress,
-  });
+// Stress is nineteen steps of tracked status — barrel territory. Target
+// keeps the popup dial above on purpose: a 1-99 line wants a typed direct
+// jump ("Target 73") more than it wants a scrub.
+bindScrubDial(msStressDial, {
+  get: () => ms.stress,
+  set: setStress,
+  min: 2, max: 20,
 });
 // The two tiles choose the roll type: each stages its dice in the tray (the
 // percentile pair or the Panic d20) and lights its tile — they do not roll.
@@ -3571,22 +3688,21 @@ function selectIronRoll(active, { roll = false } = {}) {
 // The Action tile: its body selects and stages the action roll — Roll or a tray
 // tap throws it — and the +N chip opens the dial to set the stat/adds.
 $('ironActionRoll').addEventListener('click', () => selectIronRoll({ kind: 'action' }));
-ironDial.addEventListener('click', () => {
-  openNumberDial({
-    title: 'Modifier', value: Math.max(1, iron.modifier), min: 1, max: 9, prefix: '+',
-    actionLabel: 'Set Modifier', inputLabel: 'Modifier',
-    commit: v => { iron.modifier = v; selectIronRoll({ kind: 'action' }, { roll: false }); },
-  });
+// The +N chip rides the barrel across the nine-step stat+adds line; setting
+// it selects the action roll without throwing, as the popup dial used to.
+bindScrubDial(ironDial, {
+  get: () => Math.max(1, iron.modifier),
+  set: v => { iron.modifier = v; selectIronRoll({ kind: 'action' }, { roll: false }); },
+  min: 1, max: 9,
+  format: v => `+${v}`,
 });
 // Mirrors the Action tile: the body rolls the progress roll at the current box
-// count; the value chip opens the dial to set the boxes (0-10) without rolling.
+// count; the value chip scrubs the boxes (1-10) without rolling.
 $('ironProgressRoll').addEventListener('click', () => selectIronRoll({ kind: 'progress' }));
-$('ironProgressDial').addEventListener('click', () => {
-  openNumberDial({
-    title: 'Progress — filled boxes', value: iron.progressScore, min: 1, max: 10,
-    actionLabel: 'Set boxes', inputLabel: 'Filled boxes',
-    commit: v => { iron.progressScore = v; selectIronRoll({ kind: 'progress' }, { roll: false }); },
-  });
+bindScrubDial($('ironProgressDial'), {
+  get: () => iron.progressScore,
+  set: v => { iron.progressScore = v; selectIronRoll({ kind: 'progress' }, { roll: false }); },
+  min: 1, max: 10,
 });
 
 function syncIronFromField() {
@@ -4645,10 +4761,10 @@ function syncCardsUI({ writeField = true, restage = true } = {}) {
   if (restage && uiSystem === 'cards' && !$('total').dataset.rolling) stageDeckIdle();
 }
 
-bindTapHold($('deckCountChip'), dir => {
-  deckState.draw = Math.max(1, Math.min(10, deckState.draw + dir));
-  persistDeck();
-  syncCardsUI({ restage: false });
+bindScrubDial($('deckCountChip'), {
+  get: () => deckState.draw,
+  set: v => { deckState.draw = v; persistDeck(); syncCardsUI({ restage: false }); },
+  min: 1, max: 10,
 });
 $('deckShuffle').addEventListener('click', () => {
   if (owlbearPanel && obrBackgroundUp) { requestOwlbearAction('shuffle', { deck: 'cards', notation: deckNotation() }); return; }
@@ -5013,10 +5129,10 @@ function syncTarotUI({ writeField = true, restage = true } = {}) {
   if (restage && uiSystem === 'tarot' && !$('total').dataset.rolling) stageTarotIdle();
 }
 
-bindTapHold($('tarotCountChip'), dir => {
-  tarotState.draw = Math.max(1, Math.min(10, tarotState.draw + dir));
-  persistTarot();
-  syncTarotUI({ restage: false });
+bindScrubDial($('tarotCountChip'), {
+  get: () => tarotState.draw,
+  set: v => { tarotState.draw = v; persistTarot(); syncTarotUI({ restage: false }); },
+  min: 1, max: 10,
 });
 $('tarotShuffle').addEventListener('click', () => {
   if (owlbearPanel && obrBackgroundUp) { requestOwlbearAction('shuffle', { deck: 'tarot', notation: tarotNotation() }); return; }
@@ -5336,10 +5452,10 @@ function syncNapUI({ writeField = true, restage = true } = {}) {
   if (restage && uiSystem === 'napoletane' && !$('total').dataset.rolling) stageNapIdle();
 }
 
-bindTapHold($('napCountChip'), dir => {
-  napState.draw = Math.max(1, Math.min(10, napState.draw + dir));
-  persistNap();
-  syncNapUI({ restage: false });
+bindScrubDial($('napCountChip'), {
+  get: () => napState.draw,
+  set: v => { napState.draw = v; persistNap(); syncNapUI({ restage: false }); },
+  min: 1, max: 10,
 });
 $('napShuffle').addEventListener('click', () => {
   if (owlbearPanel && obrBackgroundUp) { requestOwlbearAction('shuffle', { deck: 'napoletane', notation: napNotation() }); return; }
@@ -5636,10 +5752,10 @@ function syncHanaUI({ writeField = true, restage = true } = {}) {
   if (restage && uiSystem === 'hanafuda' && !$('total').dataset.rolling) stageHanaIdle();
 }
 
-bindTapHold($('hanaCountChip'), dir => {
-  hanaState.draw = Math.max(1, Math.min(10, hanaState.draw + dir));
-  persistHana();
-  syncHanaUI({ restage: false });
+bindScrubDial($('hanaCountChip'), {
+  get: () => hanaState.draw,
+  set: v => { hanaState.draw = v; persistHana(); syncHanaUI({ restage: false }); },
+  min: 1, max: 10,
 });
 $('hanaShuffle').addEventListener('click', () => {
   if (owlbearPanel && obrBackgroundUp) { requestOwlbearAction('shuffle', { deck: 'hanafuda', notation: hanaNotation() }); return; }
@@ -5988,10 +6104,10 @@ function syncUtaUI({ writeField = true, restage = true } = {}) {
   if (restage && uiSystem === 'utagaruta' && !$('total').dataset.rolling) stageUtaIdle();
 }
 
-bindTapHold($('utaCountChip'), dir => {
-  utaState.draw = Math.max(1, Math.min(10, utaState.draw + dir));
-  persistUta();
-  syncUtaUI({ restage: false });
+bindScrubDial($('utaCountChip'), {
+  get: () => utaState.draw,
+  set: v => { utaState.draw = v; persistUta(); syncUtaUI({ restage: false }); },
+  min: 1, max: 10,
 });
 $('utaShuffle').addEventListener('click', () => {
   if (owlbearPanel && obrBackgroundUp) { requestOwlbearAction('shuffle', { deck: 'utagaruta', notation: utaNotation() }); return; }
@@ -6960,6 +7076,8 @@ function openHistory() {
   for (const entry of [...history].reverse()) {
     const li = document.createElement('li');
     if (entry.who && !entry.mine) li.dataset.remote = '1';
+    // Table events (the torch) read quiet: same row shape, muted voice.
+    if (entry.event) li.dataset.event = '1';
 
     const line = document.createElement('div');
     line.className = 'log-line';
@@ -7015,6 +7133,13 @@ historyPanel.addEventListener('click', e => {
 function historyCsv() {
   const rows = [['time', 'who', 'notation', 'total', 'die', 'sides', 'value', 'kept', 'exploded', 'rerolled']];
   for (const entry of history) {
+    // A table event keeps its place in the record as one row with the die
+    // columns empty — gated on `event`, not on `dice.length`, so diceless
+    // rolls (card draws) keep their current absence from the die-level CSV.
+    if (entry.event) {
+      rows.push([entry.at, entry.who || 'you', '', entry.headline, '', '', '', '', '', '']);
+      continue;
+    }
     entry.dice.forEach((d, i) => {
       rows.push([
         entry.at, entry.who || 'you', entry.notation, entry.headline ?? entry.total, i + 1,
@@ -7032,7 +7157,11 @@ function historyCsv() {
 
 function historyText() {
   return history
-    .map(e => `${new Date(e.at).toLocaleTimeString()}  ${e.who ? e.who + '  ' : ''}${e.notation} = ${e.headline ?? e.total}\n    ${e.detail}`)
+    // An event has no notation and no arithmetic — "12:01:33  Torch lit"
+    // says everything it knows.
+    .map(e => e.event
+      ? `${new Date(e.at).toLocaleTimeString()}  ${e.headline}`
+      : `${new Date(e.at).toLocaleTimeString()}  ${e.who ? e.who + '  ' : ''}${e.notation} = ${e.headline ?? e.total}\n    ${e.detail}`)
     .join('\n');
 }
 

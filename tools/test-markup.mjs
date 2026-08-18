@@ -57,13 +57,14 @@ ok('Mothership failed rolls surface Stress overflow consequences',
    /resolveMothershipStress\(ms\.stress, result\.summary\.stressDelta\)/.test(js) &&
    /result\.summary\.stressOverflow\s*=/.test(js));
 
-// Character values use the same wheel + direct-jump sheet as d?. This keeps the
-// tactile interaction without restoring one-point steppers to the compact rail.
-ok('Mothership Target and Stress open bounded tactile number dials',
+// Target keeps the wheel + direct-jump sheet (a 1-99 line wants "Target 73"
+// typed more than it wants a scrub); Stress is nineteen steps of tracked
+// status and rides the barrel like every other scrubbable number.
+ok('Mothership Target opens the bounded tactile number dial, Stress scrubs',
    /id="msTargetDial"[^>]*aria-haspopup="dialog"[^>]*aria-controls="dial"/.test(html) &&
-   /id="msStressDial"[^>]*aria-haspopup="dialog"[^>]*aria-controls="dial"/.test(html) &&
+   /class="ms-value-dial scrub-dial" id="msStressDial"/.test(html) &&
    /msTargetDial\.addEventListener\('click'[^]*openNumberDial\(\{[^]*title: 'Target'[^]*min: 1[^]*max: 99[^]*actionLabel: 'Set Target'/.test(js) &&
-   /msStressDial\.addEventListener\('click'[^]*openNumberDial\(\{[^]*title: 'Stress'[^]*min: 2[^]*max: 20[^]*actionLabel: 'Set Stress'/.test(js) &&
+   /bindScrubDial\(msStressDial, \{[^]{0,200}min: 2, max: 20/.test(js) &&
    /function openNumberDial\(config\)/.test(js) &&
    /\.ms-value-dial::after\s*\{[^}]*content:\s*["']↕["']/.test(css));
 
@@ -156,22 +157,53 @@ ok('a tray tap reaches the torch before the dice',
    js.indexOf('torchTrayHitAt(downX, downY)') !== -1 &&
    js.indexOf('torchTrayHitAt(downX, downY)') < js.indexOf('removeDieAt(downX, downY)'));
 
-// The scrub dial is a prototype on exactly three chips — the Crows Modifier
-// and Shadowdark's Modifier and DC — while every other spin-chip keeps
-// bindTapHold. The wheel must be a non-passive listener or preventDefault is
-// a no-op and the page scrolls out from under a scrub.
-ok('the scrub dial is wired to its three prototype chips',
-   /bindScrubDial\(\$\('crowsModChip'\)/.test(js) &&
-   /bindScrubDial\(\$\('sdModChip'\)/.test(js) &&
-   /bindScrubDial\(\$\('sdDcChip'\)/.test(js) &&
-   (js.match(/bindScrubDial\(\$\(/g) || []).length === 3);
+// The barrel is THE number gesture, app-wide (owner-approved): every chip
+// bound to bindScrubDial must carry the scrub-dial class in the markup, or
+// the browser scrolls the page out from under the drag on a phone —
+// touch-action: none is what the class buys, and forgetting it on one chip
+// has no error, just a dial that fights the scroll at the table.
+{
+  // Both call shapes: bindScrubDial($('id')) and bindScrubDial(varName) —
+  // the variables resolve through their `const name = $('id')` bindings.
+  const direct = [...js.matchAll(/bindScrubDial\(\$\('(\w+)'\)/g)].map(m => m[1]);
+  const viaVar = [...js.matchAll(/(?<!function )bindScrubDial\((\w+),/g)]
+    .map(m => m[1])
+    .filter(name => name !== '$')
+    .map(name => new RegExp(`const ${name} = \\$\\('(\\w+)'\\)`).exec(js)?.[1])
+    .filter(Boolean);
+  const bound = [...new Set([...direct, ...viaVar])];
+  ok('the barrel is rolled out wide', bound.length >= 20, `${bound.length} chips`);
+  const unmarked = bound.filter(id => {
+    const tag = new RegExp(`<button[^>]*id="${id}"[^>]*>`).exec(html)?.[0]
+             ?? new RegExp(`<button[^>]*id="${id}"[^>]*>`, 's').exec(html)?.[0];
+    return !tag || !/class="[^"]*scrub-dial[^"]*"/.test(tag);
+  });
+  ok('every barrel chip is marked touch-action none', unmarked.length === 0, unmarked.join(', '));
+  ok('the scrub-dial class carries touch-action none',
+     /\.scrub-dial\s*\{[^}]*touch-action\s*:\s*none/.test(css));
+}
 ok('the scrub wheel listener is non-passive',
    /addEventListener\('wheel', [\s\S]{0,600}?\{ passive: false \}\)/.test(js));
-ok('the prototype chips are marked touch-action none',
-   /id="crowsModChip"/.test(html) && /class="spin-chip scrub-dial" id="crowsModChip"/.test(html) &&
-   /class="spin-chip scrub-dial" id="sdModChip"/.test(html) &&
-   /class="spin-chip scrub-dial" id="sdDcChip"/.test(html) &&
-   /\.scrub-dial\s*\{[^}]*touch-action\s*:\s*none/.test(css));
+// The popup number dial survives only on the genuinely huge ranges, where a
+// typed direct jump beats any scrub — everything else scrubs.
+ok('the popup dial is limited to the huge-range launchers',
+   /msTargetDial\.addEventListener\('click'[\s\S]{0,200}openNumberDial/.test(js) &&
+   /cocSkillDial\.addEventListener\('click'[\s\S]{0,200}openNumberDial/.test(js) &&
+   /dgTargetDial\.addEventListener\('click'[\s\S]{0,200}openNumberDial/.test(js) &&
+   !/msStressDial\.addEventListener\('click'[\s\S]{0,200}openNumberDial/.test(js) &&
+   !/torTnChip\.addEventListener\('click'[\s\S]{0,200}openNumberDial/.test(js) &&
+   !/dhDiffChip\.addEventListener\('click'[\s\S]{0,200}openNumberDial/.test(js));
+
+// Torch events belong to the play record: both torch controls funnel through
+// lightTorch/snuffTorch and the tick's death notice, each of which writes a
+// local-only line into the session history — never into a room.
+ok('the torch writes its events into the history',
+   /function lightTorch\(\)[\s\S]{0,300}addHistoryEvent\('Torch lit'\)/.test(js) &&
+   /function snuffTorch\(\)[\s\S]{0,400}addHistoryEvent\('Torch snuffed'\)/.test(js) &&
+   /addHistoryEvent\('The torch gutters out'\)/.test(js));
+ok('history events never share',
+   !/function addHistoryEvent[\s\S]{0,900}roomLink\.share/.test(js) &&
+   !/function addHistoryEvent[\s\S]{0,900}publishLocalRollToOwlbear/.test(js));
 
 // Mothership follows the established tactile picker grammar: illustrated role
 // dice, compact number pills, and keep/drop dice around the primary roll action.

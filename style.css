@@ -756,6 +756,13 @@ body[data-torchlit] .breakdown {
 .spin-chip-val[data-unset="1"] { color: var(--muted); font-size: 12.5px; line-height: 20px; }
 .spin-chip.is-set { border-color: color-mix(in srgb, var(--accent) 55%, var(--hair)); }
 .spin-chip:active { transform: scale(0.96); }
+/* Text chips wear a small mark in the family stroke — the V5 brain/drop
+   precedent. The ± ligature marks the signed number you bring to the roll
+   (DS Characteristic, the Crows Modifier): neither rolls a die of its own,
+   so an abstract mark tells the truth where a die silhouette would lie,
+   and a plus-over-minus still reads at 15px. Baseline-aligned chips need
+   the mark pulled to centre or it hangs. */
+.spin-mark { width: 13px; height: 13px; flex: none; align-self: center; color: var(--muted); }
 
 /* CthulhuTech: one d10 to build the pool, Difficulty as a subordinate chip. */
 .ct-picker { display: flex; gap: 14px; justify-content: center; align-items: center; }
@@ -776,8 +783,15 @@ body[data-torchlit] .breakdown {
 .ds-ico-down { transform: none; }   /* the bane's chevrons point down in their own paths */
 .ds-count .ds-chev-two { opacity: 0.18; }
 .ds-count[data-count="2"] .ds-chev-two { opacity: 1; }
-.ds-effect { min-width: 34px; text-align: right; }
+/* Floors the value slot so "—" → "+2" → "Tier ↑" doesn't wobble the chip;
+   24px is the narrowest that still holds "+2" steady, and the flank budget
+   needs the other ten since the ± mark joined Characteristic. */
+.ds-effect { min-width: 24px; text-align: right; }
 .ds-picker { display: flex; gap: 10px; align-items: center; }
+/* Slightly tighter than the stock spin-chip: the ± mark joined
+   Characteristic, and the flank budget that centres the Power Roll pays
+   for it here rather than by clipping the row's left edge. */
+.ds-picker .spin-chip { padding: 10px 12px; gap: 6px; }
 .ds-count { position: relative; }
 
 /* Row-overflow guard for the one-row system pickers — the Mothership rail
@@ -826,16 +840,19 @@ body[data-torchlit] .breakdown {
   .lbl-wide { display: none; }
   .lbl-narrow { display: inline; }
   /* Cheap compressions before the scroll has to earn its keep: tighter
-     gaps and chip padding, narrower value slots, and the Edge/Bane
-     chevron icons yield to their words (the tint and count badge still
-     colour the state; the aria-labels never shorten). */
+     gaps and chip padding, narrower value slots. The Edge/Bane chevrons
+     stay at every width (the owner's call — the icon IS the identity);
+     it is their words that yield when pinched, with the tint, badge and
+     aria-labels still carrying the state in full. */
   .ds-picker { gap: 6px; padding-inline: 6px; }
   .pick-side { gap: 6px; }
   .ds-picker .spin-chip { padding: 8px 8px; gap: 5px; }
   .ds-picker .power-roll { padding: 8px 10px 6px; }
-  .ds-count .ds-count-ico { display: none; }
+  .ds-count .spin-chip-label { display: none; }
   .ds-effect { min-width: 14px; }
   .crows-picker { gap: 8px; }
+  /* The ± mark widened the Modifier chip; the padding pays it back. */
+  .crows-picker .spin-chip { padding: 8px 8px; gap: 5px; }
   .sd-picker { gap: 6px; }
   .sd-picker .spin-chip { padding: 5px 8px 4px; }
   .sd-adv { padding: 5px 4px 4px; }
@@ -2752,6 +2769,19 @@ body[data-torchlit] .breakdown {
 .history-clear {
   flex: 0 0 auto !important;
   color: var(--danger) !important;
+}
+
+/* Table events in the log — the torch lit, snuffed, guttered out. Same row
+   shape as a roll, quieter voice: no notation, no arithmetic, just the fact
+   at its time, muted so the rolls stay the subject of the record. */
+#history li[data-event] .log-event {
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.01em;
+}
+#historyPanel li[data-event] b {
+  color: var(--muted);
+  font-weight: 500;
 }
 
 /* What each die landed on, under its own roll. Quieter than the total, since
