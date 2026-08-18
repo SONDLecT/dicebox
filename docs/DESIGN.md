@@ -191,7 +191,10 @@ own control or by its own rule (a failed Rouse, a failed check), is cleared
 by the X as part of a full table sweep, and syncs through the Owlbear
 background so every surface agrees. A real-time rules object the table plays
 against (the torch) follows the same rules: persistent, moved only by its
-own control (or its own clock), and swept by the X.
+own control (or its own clock), and swept by the X. The line between them:
+per-player stats (Hunger, Stress) stay per-browser, but table-shared
+fiction — the decks, the torch — belongs to the room and syncs to it
+wherever one exists, because one deck deals and one torch lights the party.
 
 **No unearned resolution.** Without the table-set number, report the facts —
 successes, criticals, Hunger events — and assert no outcome. Never guess a

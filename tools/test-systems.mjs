@@ -17,7 +17,7 @@ import { parseOneRing, rollOneRing, summarizeOneRing, describeOneRing, oneRingHe
 import { parsePbta, parseMist, rollPbta, rollMist, summarize2d6, describe2d6, twod6Headline } from '../system-dice.js';
 import { parseDrawSteel, rollDrawSteel, summarizeDrawSteel, describeDrawSteel, drawSteelHeadline } from '../system-dice.js';
 import { parseCrows, rollCrows, rollCrowsUsage, summarizeCrows, summarizeCrowsUsage, describeCrows, crowsHeadline } from '../system-dice.js';
-import { parseShadowdark, rollShadowdark, summarizeShadowdark, describeShadowdark, shadowdarkHeadline, torchRemaining, torchLabel } from '../system-dice.js';
+import { parseShadowdark, rollShadowdark, summarizeShadowdark, describeShadowdark, shadowdarkHeadline, torchRemaining, torchLabel, mergeTorch, joinTorch } from '../system-dice.js';
 import { parseMothership, rollMothership, summarizeMothershipCheck, summarizeMothershipPanic, describeMothership, mothershipHeadline } from '../system-dice.js';
 import { parseCards, newDeckOrder, summarizeCards, cardsHeadline, describeCards } from '../system-dice.js';
 import { parseTarot, summarizeTarot, tarotHeadline, describeTarot } from '../system-dice.js';
@@ -1098,6 +1098,36 @@ ok('nat 1 fails regardless', (() => { const s = summarizeShadowdark([1], null, 1
   ok('under ten minutes it counts seconds', torchLabel(599) === '9:59' && torchLabel(61) === '1:01');
   ok('seconds pad to two digits', torchLabel(305) === '5:05');
   ok('at zero, darkness', torchLabel(0) === 'Darkness');
+}
+
+// the shared torch: one torch lights the party, and these two pure rules
+// decide every collision a room can produce
+{
+  const now = 1_000_000_000;
+  const lit = at => ({ end: now + 3_600_000, setAt: at });
+  const snuffed = at => ({ end: null, setAt: at });
+  ok('a newer decision from the room wins',
+     eq(mergeTorch(lit(now), snuffed(now + 5_000)), snuffed(now + 5_000)));
+  ok('an older decision from the room loses',
+     mergeTorch(snuffed(now + 5_000), lit(now)) === null);
+  ok('an equal-time echo changes nothing',
+     mergeTorch(lit(now), lit(now)) === null);
+  ok('no local record means anything heard wins',
+     eq(mergeTorch(null, lit(now)), lit(now)));
+  ok('on JOIN the room wins however fresh the local torch',
+     eq(mergeTorch(lit(now + 60_000), snuffed(now), { joining: true }), snuffed(now)));
+  ok('malformed states never win',
+     mergeTorch(lit(now), null) === null &&
+     mergeTorch(lit(now), { end: 'soon', setAt: now + 9 }) === null &&
+     mergeTorch(lit(now), { end: now + 10, setAt: NaN }) === null);
+  ok('joining a room with torch state adopts it',
+     eq(joinTorch(lit(now + 60_000), snuffed(now), now), { adopt: snuffed(now) }));
+  ok('joining a quiet room walks a burning torch in',
+     eq(joinTorch(lit(now), null, now + 10), { publish: lit(now) }));
+  ok('a dead torch walks in as nothing',
+     joinTorch({ end: now - 1, setAt: now - 3_600_001 }, null, now) === null);
+  ok('an unlit torch walks in as nothing',
+     joinTorch(snuffed(now), null, now) === null && joinTorch(null, null, now) === null);
 }
 
 // ---- Mothership 1e ----

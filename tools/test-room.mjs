@@ -772,6 +772,81 @@ const sampleSystemRoll = {
   r.leave();
 }
 
+// --- the table's torch travels ---
+//
+// One torch lights the party: a `torch` payload carries the absolute end
+// timestamp (null for snuffed) and the decision time, bounded on receipt so
+// a liar's clock cannot own the table forever, and a newcomer's hello is
+// answered with the local state through getTorch — the same jittered path
+// that answers with the roster.
+{
+  const torches = [];
+  const { r, sock, clock, events } = await liveRoom({ overrides: {
+    onTorch: t => torches.push(t),
+    getTorch: () => ({ end: 2_000_000, setAt: 1_500_000 }),
+  } });
+  const peer = newSender();
+  const at = clock.now();
+
+  sock.deliver({ t: 'msg', c: await encryptMessage(room, peer, {
+    k: 'torch', at, name: 'Kara', end: at + 3_500_000, setAt: at,
+  }) });
+  await settle(() => torches.length === 1);
+  ok('a torch decision reaches onTorch', torches.length === 1);
+  ok('the torch carries name, end and setAt',
+     torches[0].name === 'Kara' && torches[0].end === at + 3_500_000 && torches[0].setAt === at);
+  ok('the torch carries the crypto sender id', torches[0].from === peer.id);
+
+  sock.deliver({ t: 'msg', c: await encryptMessage(room, peer, {
+    k: 'torch', at, name: 'Kara', end: null, setAt: at + 1,
+  }) });
+  await settle(() => torches.length === 2);
+  ok('a snuffed torch (end null) is a valid state', torches[1].end === null);
+
+  // Bounds: a torch that outlives two hours or a decision stamped from the
+  // future would win every merge forever — both are dropped on receipt.
+  sock.deliver({ t: 'msg', c: await encryptMessage(room, peer, {
+    k: 'torch', at, name: 'Kara', end: at + 9 * 3600 * 1000, setAt: at,
+  }) });
+  sock.deliver({ t: 'msg', c: await encryptMessage(room, peer, {
+    k: 'torch', at, name: 'Kara', end: at + 1000, setAt: at + 3600 * 1000,
+  }) });
+  await settleQuiet(() => torches.length);
+  ok('out-of-bounds torch states are dropped', torches.length === 2,
+     String(torches.length));
+
+  // A newcomer's hello draws the torch announce alongside the hello answer.
+  // Settle on the hello being absorbed BEFORE advancing the clock — the
+  // decrypt is async, and advancing first races the reply timer's creation
+  // (the same trap the presence test documents).
+  const before = sock.frames('send').length;
+  const peer2 = newSender();
+  sock.deliver({ t: 'msg', c: await encryptMessage(room, peer2, {
+    k: 'hello', at: clock.now(), name: 'Cass Fen', reply: true,
+  }) });
+  await settle(() => events.presence.some(list => list.some(m => m.name === 'Cass Fen')));
+  clock.advance(HELLO_REPLY_WINDOW_MS + 100);
+  await settle(() => sock.frames('send').length >= before + 2);
+  const sent = [];
+  for (const frame of sock.frames('send').slice(before)) {
+    sent.push(await decryptMessage(room, new Map(), frame.c));
+  }
+  const announced = sent.find(m => m.k === 'torch');
+  ok('a newcomer hears the torch with the roster',
+     !!announced && announced.end === 2_000_000 && announced.setAt === 1_500_000);
+  ok('the announce carries no per-client fields',
+     !!announced && !('told' in announced));
+
+  // shareTorch puts a decision on the wire in the same shape.
+  const beforeShare = sock.frames('send').length;
+  r.shareTorch({ end: clock.now() + 3_600_000, setAt: clock.now() });
+  await settle(() => sock.frames('send').length > beforeShare);
+  const shared = await decryptMessage(room, new Map(), sock.frames('send')[sock.frames('send').length - 1].c);
+  ok('shareTorch sends the torch kind', shared.k === 'torch' && Number.isFinite(shared.end));
+
+  r.leave();
+}
+
 // --- malformed frames from the relay ---
 
 // A hostile or broken relay must not be able to crash a client. Every one of

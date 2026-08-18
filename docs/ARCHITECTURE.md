@@ -129,7 +129,10 @@ vendored SDK, and the background service. The background is the authority
 for rolls, decks, trackers, and history; the panel is its client over a
 LOCAL, HMAC-signed RPC — but never its dependent: every request path has a
 local fallback, because dice that do not land is the one unacceptable
-failure. Deck state lives in room metadata (one deck per table); completed
+failure. Deck state lives in room metadata (one deck per table), and the
+Shadowdark torch rides the same seam under its own metadata prefix (one
+torch per table; over passphrase rooms it travels as its own encrypted
+payload kind instead — per-player stats never do either); completed
 rolls publish REMOTE (plus ALL for fallback rolls, pre-marked seen). The
 16 KiB broadcast ceiling is respected with a 12 KiB application cap and
 paged history. The public contract is [`owlbear/API.md`](../owlbear/API.md).

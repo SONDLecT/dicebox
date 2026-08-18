@@ -269,6 +269,12 @@ export function createRoom(options = {}) {
   const onRoll = options.onRoll || noop;
   const onPresence = options.onPresence || noop;
   const onNotice = options.onNotice || noop;
+  // The table's shared torch (Shadowdark): heard states arrive through
+  // onTorch, and getTorch is read when answering a newcomer's hello so they
+  // learn the table's light along with its roster. Optional — a caller
+  // without a torch passes neither and the kind flows around them.
+  const onTorch = options.onTorch || noop;
+  const getTorch = options.getTorch || (() => null);
 
   // Injectable so tests can drive this with a fake socket and fake timers, and
   // so nothing here reaches for a global that the bundle might not have.
@@ -431,8 +437,15 @@ export function createRoom(options = {}) {
 
       // Answer a newcomer so they learn the room without the relay holding a
       // roster. reply:false on the answer is load-bearing — without it N members
-      // answering one newcomer trigger N more answers each.
-      if (msg.reply) later(() => sendHello(false), Math.floor(Math.random() * HELLO_REPLY_MAX_MS));
+      // answering one newcomer trigger N more answers each. The answer also
+      // carries the table's torch when this client has a state to report, so
+      // the newcomer learns the light with the roster — same jitter, so a
+      // full table does not chorus.
+      if (msg.reply) later(() => {
+        sendHello(false);
+        const torch = getTorch();
+        if (torch) sendEncrypted({ k: 'torch', at: now(), name, end: torch.end, setAt: torch.setAt });
+      }, Math.floor(Math.random() * HELLO_REPLY_MAX_MS));
       return;
     }
 
@@ -476,6 +489,24 @@ export function createRoom(options = {}) {
           parentId: typeof msg.parentId === 'string' ? msg.parentId : null,
           transition: msg.transition && typeof msg.transition === 'object' ? msg.transition : null,
         });
+      } catch { /* see setState */ }
+      return;
+    }
+
+    if (msg.k === 'torch') {
+      touchMember(msg.from, at);
+      // The table's torch: an absolute end timestamp (null for snuffed) and
+      // when that was decided, for last-write-wins in the caller. Bounds: a
+      // torch burns one hour, so an end more than two hours out (generous
+      // clock-skew allowance) is a liar's, and a decision timestamped far in
+      // the future would win every merge forever.
+      const end = msg.end === null ? null : Number(msg.end);
+      const setAt = Number(msg.setAt);
+      if (end !== null && !(Number.isFinite(end) && end > 0 && end < at + 2 * 3600 * 1000)) return;
+      if (!Number.isFinite(setAt) || setAt < 0 || setAt > at + 5 * 60 * 1000) return;
+      const clean = cleanName(msg.name);
+      try {
+        onTorch({ from: msg.from, name: clean || 'Someone', end, setAt: Math.round(setAt) });
       } catch { /* see setState */ }
       return;
     }
@@ -762,6 +793,16 @@ export function createRoom(options = {}) {
     // If the socket is down this is a no-op and the roll is NOT queued. A roll
     // that turns up ten minutes later is worse than one that never arrives — the
     // table has moved on, and a roll appearing out of nowhere reads as a replay.
+    // Announce a torch decision to the table: {end, setAt}, exactly the shape
+    // heard back through onTorch. Old clients ignore the unknown kind, which
+    // is the compatibility story the payload comment below relies on.
+    shareTorch(torch) {
+      if (!isOpen() || !room || !sender) return;
+      if (!torch || typeof torch !== 'object' || !Number.isFinite(torch.setAt)) return;
+      if (torch.end !== null && !Number.isFinite(torch.end)) return;
+      sendEncrypted({ k: 'torch', at: now(), name, end: torch.end, setAt: torch.setAt });
+    },
+
     share(result) {
       if (!isOpen() || !room || !sender) return;
       if (!result || typeof result !== 'object') return;

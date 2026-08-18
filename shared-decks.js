@@ -18,8 +18,12 @@ function safeSet(storage, key, value) {
   try { storage?.setItem?.(key, value); } catch { /* memory still serves */ }
 }
 
-export function createSharedDecks(OBR, storage, { onChange } = {}) {
-  const META_PREFIX = 'cc.dicebox/deck:';
+// `prefix` namespaces the room-metadata keys: the decks keep their original
+// 'cc.dicebox/deck:' (renaming it would orphan every live room's state), and
+// other table-shared fiction — the Shadowdark torch — rides the same
+// machinery under 'cc.dicebox/table:'.
+export function createSharedDecks(OBR, storage, { onChange, prefix = 'cc.dicebox/deck:' } = {}) {
+  const META_PREFIX = prefix;
   const mirror = new Map();
   const shared = typeof OBR?.room?.getMetadata === 'function'
     && typeof OBR?.room?.setMetadata === 'function';

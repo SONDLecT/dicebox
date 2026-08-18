@@ -826,6 +826,39 @@ export function torchLabel(seconds) {
   return `${Math.floor(seconds / 60)} min`;
 }
 
+// The torch is table fiction — one torch lights the party — so in a room its
+// state is shared, and these two rules decide every collision, factored pure
+// so the suite can roll them dry. A shared torch is `{ end, setAt }`: the
+// absolute timestamp it dies (null while snuffed/unlit) and when that was
+// decided, for last-write-wins. Clock skew is seconds against a one-hour
+// burn, so absolute timestamps are the honest trade.
+
+// A state heard from the room against the local one: the newer decision wins;
+// on JOIN the room's fiction wins outright, however fresh the joiner's own
+// torch — you walk into the dungeon the party is already in. Returns the
+// state to adopt, or null to keep what you have. Malformed input never wins.
+export function mergeTorch(local, incoming, { joining = false } = {}) {
+  if (!incoming || typeof incoming !== 'object') return null;
+  if (incoming.end !== null && !Number.isFinite(incoming.end)) return null;
+  if (!Number.isFinite(incoming.setAt)) return null;
+  if (joining) return { end: incoming.end, setAt: incoming.setAt };
+  if (!local || !Number.isFinite(local.setAt) || incoming.setAt > local.setAt) {
+    return { end: incoming.end, setAt: incoming.setAt };
+  }
+  return null;
+}
+
+// What joining a room does with the torch: a room that HAS torch state (any
+// decision, lit or snuffed) wins; a room with none learns about a torch you
+// carried in — but only one still burning at `at`. A dead or unlit local
+// torch walks in as nothing.
+export function joinTorch(local, room, at) {
+  const adopt = mergeTorch(local, room, { joining: true });
+  if (adopt) return { adopt };
+  if (local && Number.isFinite(local.end) && local.end > at) return { publish: local };
+  return null;
+}
+
 // ---- Star Wars (FFG / Edge Studio) — Genesys narrative dice + the Force die ----
 //
 // The six narrative dice resolve exactly as Genesys does; Star Wars adds a

@@ -54,6 +54,7 @@ const SYSTEM_EXPORTS = [
   'rollDrawSteel', 'describeDrawSteel', 'drawSteelHeadline', 'parseDrawSteel',
   'rollCrows', 'rollCrowsUsage', 'describeCrows', 'crowsHeadline', 'parseCrows',
   'rollShadowdark', 'describeShadowdark', 'shadowdarkHeadline', 'parseShadowdark', 'torchRemaining', 'torchLabel',
+  'mergeTorch', 'joinTorch',
   'rollMothership', 'describeMothership', 'mothershipHeadline', 'parseMothership', 'resolveMothershipStress',
   'rollCallOfCthulhu', 'describeCallOfCthulhu', 'callOfCthulhuHeadline', 'parseCallOfCthulhu',
   'rollDeltaGreen', 'describeDeltaGreen', 'deltaGreenHeadline', 'parseDeltaGreen',

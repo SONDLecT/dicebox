@@ -461,6 +461,13 @@ export async function initializeOwlbearBackground(OBR, options = {}) {
   // briefly so the opening draw comes off the room's deck, not a stale local.
   const decks = createSharedDecks(OBR, storage);
   try { await withTimeout(() => decks.ready, 1_500); } catch { /* local decks serve */ }
+  // The table's other shared fiction — the Shadowdark torch — lives beside
+  // the decks under its own metadata prefix. The background holds a live
+  // mirror so its picture of the table is complete; the PANEL is what
+  // renders, publishes and attributes it (the torch never crosses the
+  // broadcast API — room metadata is the state seam, not the contract).
+  const table = createSharedDecks(OBR, null, { prefix: 'cc.dicebox/table:' });
+  try { await withTimeout(() => table.ready, 1_500); } catch { /* mirror fills on first change */ }
   const storedHunger = Number(safeGet(storage, 'dicebox:v5:hunger'));
   const storedStress = Number(safeGet(storage, 'dicebox:ms:stress'));
   const trackedState = {
@@ -1076,6 +1083,7 @@ export async function initializeOwlbearBackground(OBR, options = {}) {
       closed = true;
       if (typeof unsubscribePlayer === 'function') { try { unsubscribePlayer(); } catch { /* gone */ } }
       decks.dispose();
+      table.dispose();
       if (typeof unsubscribeAction === 'function') { try { unsubscribeAction(); } catch { /* gone */ } }
       if (toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
       if (typeof unsubscribe === 'function') unsubscribe();

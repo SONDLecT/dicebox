@@ -25,7 +25,7 @@ import { rollOneRing, describeOneRing, oneRingHeadline, parseOneRing } from './s
 import { rollPbta, rollMist, twod6Headline, describe2d6, parsePbta, parseMist } from './system-dice.js';
 import { rollDrawSteel, describeDrawSteel, drawSteelHeadline, parseDrawSteel } from './system-dice.js';
 import { rollCrows, describeCrows, crowsHeadline, parseCrows } from './system-dice.js';
-import { rollShadowdark, parseShadowdark, torchRemaining, torchLabel } from './system-dice.js';
+import { rollShadowdark, parseShadowdark, torchRemaining, torchLabel, mergeTorch, joinTorch } from './system-dice.js';
 import { scrubValue, wheelValue, drumRow, SCRUB_PX_PER_STEP } from './scrub-math.js';
 
 const $ = id => document.getElementById(id);
@@ -3111,29 +3111,117 @@ bindScrubDial($('sdDcChip'), {
 for (const b of sdAdvButtons) b.addEventListener('click', () => { sd.mode = sd.mode === b.dataset.adv ? null : b.dataset.adv; syncSd(); });
 
 // The torch: Shadowdark's real-time hour, a rules clock the table plays
-// against rather than dice — which is why it has no notation and never
-// shares. Each player carries their own light ("your torch, your clock"), so
-// unlike Stress it deliberately stays out of the Owlbear state sync and the
-// room broadcast. What persists is one absolute end-timestamp: reloads and
-// mode switches can never reset the hour, and the 1s interval (running only
+// against rather than dice — which is why it has no notation. It shipped
+// per-browser through the tracked-stat pattern, but it is TABLE FICTION,
+// not a character stat: one torch lights the party. So wherever a room
+// exists the {end, setAt} pair is shared — Owlbear room metadata beside the
+// decks, a `torch` payload over the passphrase relay — and anyone may light
+// or snuff, the same trust model as anyone-may-shuffle. Solo it is exactly
+// the old localStorage behaviour. What persists is one absolute
+// end-timestamp (clock skew is seconds against a one-hour burn) plus setAt,
+// the decision time last-write-wins compares; the 1s interval (running only
 // while this mode is up) merely repaints what the timestamp already says.
-// `told` persists beside it so "The torch gutters out" is said exactly once,
-// even when the death happens with the app closed.
+// `told` persists beside them so "The torch gutters out" is said exactly
+// once per browser — deliberately PER CLIENT, never synced: each browser
+// warns its own player.
 const SD_TORCH_KEY = 'dicebox:sd:torch';
 const SD_TORCH_MS = 60 * 60 * 1000;
-const sdTorch = { end: null, told: false };
+const sdTorch = { end: null, told: false, setAt: 0 };
 {
   // Restore the burning (or burned-out) torch; anything unreadable is unlit.
   try {
     const saved = JSON.parse(store.get(SD_TORCH_KEY));
-    if (Number.isFinite(saved?.end)) { sdTorch.end = saved.end; sdTorch.told = !!saved.told; }
+    if (Number.isFinite(saved?.end) || saved?.end === null) {
+      sdTorch.end = saved.end;
+      sdTorch.told = !!saved.told;
+      if (Number.isFinite(saved.setAt)) sdTorch.setAt = saved.setAt;
+    }
   } catch { /* corrupt or absent — no torch */ }
 }
 function saveTorch() {
-  if (sdTorch.end === null) store.remove(SD_TORCH_KEY);
-  else store.set(SD_TORCH_KEY, JSON.stringify({ end: sdTorch.end, told: sdTorch.told }));
+  // A snuffed torch keeps its record (end: null + setAt): the decision time
+  // is what stops a stale remote "lit" from relighting a table that has
+  // since put its torch out.
+  if (sdTorch.end === null && !sdTorch.setAt) store.remove(SD_TORCH_KEY);
+  else store.set(SD_TORCH_KEY, JSON.stringify({ end: sdTorch.end, told: sdTorch.told, setAt: sdTorch.setAt }));
 }
 const torchLit = () => sdTorch.end !== null && torchRemaining(Date.now(), sdTorch.end) > 0;
+
+// ---- the torch over the wire ----
+//
+// Only {end, setAt} travels — never `told`. `by` rides the Owlbear metadata
+// so a change can be attributed; the relay payload carries the sender name
+// itself. The torch stays OFF the Owlbear broadcast API on purpose: room
+// metadata is the state seam (the decks' precedent), not the broadcast
+// contract.
+let torchRoomStore = null;        // Owlbear room-metadata mirror, panel only
+const TORCH_TABLE_KEY = 'torch';
+let torchJoinWindow = false;      // passphrase join: room announcements win
+let torchJoinHeard = false;
+let torchJoinTimer = null;
+
+function torchSharedState() {
+  return { end: sdTorch.end, setAt: sdTorch.setAt };
+}
+
+function publishTorch() {
+  if (!sdTorch.setAt) return;   // nothing decided yet — nothing to say
+  if (torchRoomStore) {
+    torchRoomStore.set(TORCH_TABLE_KEY, { ...torchSharedState(), by: obrPlayerName || null });
+  }
+  roomLink.shareTorch(torchSharedState());
+}
+
+// A torch state heard from the room. mergeTorch (pure, tested dry) rules on
+// it: newer decisions win, and during a join the room wins outright. `by`
+// names the player for the history line; adoption without an actor — a
+// join, a same-state echo — stays silent.
+function adoptTorch(incoming, { joining = false, by = null } = {}) {
+  const next = mergeTorch(torchSharedState(), incoming, { joining });
+  if (!next) return;
+  const changed = next.end !== sdTorch.end;
+  sdTorch.setAt = next.setAt;
+  if (changed) {
+    sdTorch.end = next.end;
+    sdTorch.told = false;
+    if (by && !joining) addHistoryEvent(next.end !== null ? `${by} lit a torch` : `${by} snuffed the torch`);
+  }
+  saveTorch();
+  if (changed) syncTorch();
+}
+
+// Joining a table (either transport): the room's torch wins; a room with no
+// torch record learns about the burning one you walked in with.
+function torchJoinMerge(roomState) {
+  const move = joinTorch(torchSharedState(), roomState, Date.now());
+  if (move?.adopt) adoptTorch(move.adopt, { joining: true });
+  else if (move?.publish) publishTorch();
+}
+
+// The passphrase join window: announcements arriving in the first beats
+// after `live` are the room telling a newcomer its fiction — they win, per
+// the join rule. After the window closes, a quiet room learns about a
+// burning local torch, and later announcements settle by last-write-wins.
+function torchRoomState(next) {
+  if (next !== 'live') return;
+  torchJoinWindow = true;
+  torchJoinHeard = false;
+  if (torchJoinTimer) clearTimeout(torchJoinTimer);
+  torchJoinTimer = setTimeout(() => {
+    torchJoinWindow = false;
+    torchJoinTimer = null;
+    if (!torchJoinHeard && torchLit()) publishTorch();
+  }, 2500);
+}
+
+function handleRoomTorch(msg) {
+  if (torchJoinWindow) {
+    torchJoinHeard = true;
+    adoptTorch({ end: msg.end, setAt: msg.setAt }, { joining: true });
+    return;
+  }
+  adoptTorch({ end: msg.end, setAt: msg.setAt }, { by: msg.name });
+}
 
 function syncTorch() {
   if (!sdTorchBtn) return;
@@ -3201,21 +3289,27 @@ function stopTorchTick() {
 // Direct, no confirms: relighting is one tap, so snuffing needs no ceremony.
 // Tap while burning snuffs it; tap while unlit or dead strikes a fresh one.
 // Lighting and snuffing write to the session log — the play record should
-// answer "when did we light it" — through addHistoryEvent, which never
-// shares: your torch, your clock, your log. Both the tray tap and the
-// picker button land here, so both paths log for free. snuffTorch guards on
-// a torch actually standing: the X's full sweep calls it unconditionally,
-// and a sweep with no torch is not an event that happened.
+// answer "when did we light it" — through addHistoryEvent (which never
+// shares; the local line stays plain, a remote player's carries their
+// name). Both the tray tap and the picker button land here, so both paths
+// log and PUBLISH for free: every decision stamps setAt and tells whatever
+// room is listening. snuffTorch guards on a torch actually standing: the
+// X's full sweep calls it unconditionally, and a sweep with no torch is
+// not an event that happened — nor one the room should hear.
 function lightTorch() {
-  sdTorch.end = Date.now() + SD_TORCH_MS; sdTorch.told = false; saveTorch(); syncTorch();
+  sdTorch.end = Date.now() + SD_TORCH_MS; sdTorch.told = false; sdTorch.setAt = Date.now();
+  saveTorch(); syncTorch();
   addHistoryEvent('Torch lit');
+  publishTorch();
 }
 function snuffTorch() {
   if (sdTorch.end === null) return;
   // Clearing a dead stub is housekeeping, not an event — only a burning
   // torch put out is worth a line.
   if (torchRemaining(Date.now(), sdTorch.end) > 0) addHistoryEvent('Torch snuffed');
-  sdTorch.end = null; sdTorch.told = false; saveTorch(); syncTorch();
+  sdTorch.end = null; sdTorch.told = false; sdTorch.setAt = Date.now();
+  saveTorch(); syncTorch();
+  publishTorch();
 }
 if (sdTorchBtn) sdTorchBtn.addEventListener('click', () => { if (torchLit()) snuffTorch(); else lightTorch(); });
 
@@ -8500,10 +8594,17 @@ let roomPhrase = null;
 const roomLink = createRoom({
   url: RELAY_URL,
   name: suggestName(),
-  onState: showRoomState,
+  // torchRoomState rides the state callback: going live opens the join
+  // window in which the room's torch announcements win outright.
+  onState: (next, detail) => { showRoomState(next, detail); torchRoomState(next); },
   onRoll: showRemoteRoll,
   onPresence: showRoster,
   onNotice: showRoomNotice,
+  // The table's torch: heard decisions merge by last-write-wins (join
+  // window aside), and a newcomer's hello is answered with ours when we
+  // have a state to report.
+  onTorch: handleRoomTorch,
+  getTorch: () => (sdTorch.setAt ? torchSharedState() : null),
 });
 
 // A remote roll animates exactly as a local one does. It has to: the point of a
@@ -9418,6 +9519,25 @@ function initializeOwlbear(OBR, roomObr) {
       });
       panelDecks.ready.then(() => {
         for (const system of Object.keys(PANEL_DECKS)) hydrateSharedDeck(system, { refreshUi: uiSystem === system });
+      }).catch(() => {});
+      // The Shadowdark torch is table fiction like the decks, so its
+      // {end, setAt} rides room metadata under its own prefix — one torch
+      // lights the party, anyone may touch it, and the tray re-renders the
+      // moment anyone does. Local persistence stays with saveTorch (told is
+      // per-client), so the store carries no storage of its own. The mirror
+      // already holds our own writes before the metadata echo, so onChange
+      // only ever fires for someone ELSE's hand on the torch — which is
+      // exactly when the history line wants their name.
+      torchRoomStore = createSharedDecks(OBR, null, {
+        prefix: 'cc.dicebox/table:',
+        onChange: key => {
+          if (key !== TORCH_TABLE_KEY) return;
+          const t = torchRoomStore.get(TORCH_TABLE_KEY);
+          if (t) adoptTorch(t, { by: typeof t.by === 'string' ? t.by.slice(0, 40) : null });
+        },
+      });
+      torchRoomStore.ready.then(() => {
+        torchJoinMerge(torchRoomStore.get(TORCH_TABLE_KEY));
       }).catch(() => {});
       OBR.broadcast.onMessage(OBR_CHANNEL, handleOwlbearMessage);
       if (roomObr) roomObr.hidden = false;

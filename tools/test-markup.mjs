@@ -247,6 +247,37 @@ ok('history events never share',
    !/function addHistoryEvent[\s\S]{0,900}roomLink\.share/.test(js) &&
    !/function addHistoryEvent[\s\S]{0,900}publishLocalRollToOwlbear/.test(js));
 
+// The torch is table fiction: one torch lights the party. The seams cross
+// four files (app, room, shared-decks, owlbear-session) and a miss in any
+// of them fails silently — a torch that just doesn't sync — so each is
+// asserted: both decision funnels publish, only {end, setAt} ever travels
+// (told stays per-client), both transports run the join-merge rule, and
+// the torch never touches the Owlbear broadcast API (metadata is the state
+// seam, not the contract).
+{
+  const roomJs = readFileSync(join(root, 'room.js'), 'utf8');
+  const sessionJs = readFileSync(join(root, 'owlbear-session.js'), 'utf8');
+  ok('lighting and snuffing publish to the room',
+     /function lightTorch\(\)[\s\S]{0,400}publishTorch\(\);/.test(js) &&
+     /function snuffTorch\(\)[\s\S]{0,500}publishTorch\(\);/.test(js));
+  ok('only end and setAt travel — told stays per-client',
+     /function torchSharedState\(\) \{\s*\n\s*return \{ end: sdTorch\.end, setAt: sdTorch\.setAt \};/.test(js) &&
+     !/told/.test(roomJs));
+  ok('both transports run the join-merge rule',
+     /torchRoomStore\.ready\.then\(\(\) => \{\s*\n\s*torchJoinMerge\(/.test(js) &&
+     /if \(!torchJoinHeard && torchLit\(\)\) publishTorch\(\);/.test(js) &&
+     /import \{[^}]*mergeTorch, joinTorch[^}]*\} from '.\/system-dice\.js'/.test(js));
+  ok('the torch rides room metadata and the relay, never the broadcast API',
+     /prefix: 'cc\.dicebox\/table:'/.test(js) &&
+     /prefix: 'cc\.dicebox\/table:'/.test(sessionJs) &&
+     /k: 'torch'/.test(roomJs) &&
+     !/requestOwlbearAction\('torch/.test(js) &&
+     !/torch/.test(readFileSync(join(root, 'owlbear', 'API.md'), 'utf8')));
+  ok('a remote hand on the torch is named in the log',
+     /adoptTorch\(t, \{ by: typeof t\.by === 'string'/.test(js) &&
+     /addHistoryEvent\(next\.end !== null \? `\$\{by\} lit a torch` : `\$\{by\} snuffed the torch`\)/.test(js));
+}
+
 // Mothership follows the established tactile picker grammar: illustrated role
 // dice, compact number pills, and keep/drop dice around the primary roll action.
 const msMarkup = html.slice(html.indexOf('id="msPicker"'), html.indexOf('</section>', html.indexOf('id="msPicker"')));
