@@ -25,7 +25,7 @@ With Dicebox you can:
   the picker (typed notation accepts sides up to d10000);
 - build rolls by tapping or typing standard notation, with advantage,
   disadvantage, keep/drop, exploding dice, and rerolls;
-- switch among **19 built-in game modes**, each with its own controls, dice,
+- switch among **22 built-in game modes**, each with its own controls, dice,
   result reading, colours, and short URL;
 - draw from **five card decks**, including the Woodcut playing cards and tarot,
   carte napoletane, Hanafuda, and Uta-garuta;
@@ -124,8 +124,10 @@ picker and the notation all change to match.
 | **Blade Runner RPG** | `br:12,8` | Attribute and Skill step dice, advantage/disadvantage and push |
 | **Call of Cthulhu 7e** | `coc:65b` | d100 roll-under with bonus and penalty dice |
 | **CthulhuTech 2e** | `ct:8@4` | a d10 pool counting even-face hits |
+| **Crows (Alpha)** | `crows:+2` | the 2d10 power roll with Doom and Critical, plus usage dice |
 | **Dungeon Crawl Classics** | `d16` | the complete dice chain, with an active die that steps up and down |
 | **Delta Green** | `dg:50` | d100 roll-under, criticals on matching digits |
+| **Draw Steel** | `ds:+2e1` | the 2d10 power roll in three tiers, with edges and banes |
 | **Daggerheart** | `dh:+2@15` | the Hope and Fear duality dice |
 | **Fate / Fudge** | `4dF+2` | four +/blank/− dice and the ladder |
 | **Genesys** | `gen:2A+1P+2D` | narrative dice with symbol cancellation |
@@ -133,6 +135,7 @@ picker and the notation all change to match.
 | **Mist Engine** | `mist:+1` | 2d6 + Power for City of Mist and Legend in the Mist |
 | **Mothership 1e** | `ms:c@35` | d100 roll-under, Panic and tracked Stress |
 | **Powered by the Apocalypse** | `pbta:+1` | 2d6 + stat with the 10+ / 7–9 / 6− ladder |
+| **Shadowdark** | `sd:+3a@12` | d20 checks with advantage — and a torch that burns for one real hour |
 | **Starforged** | `iron:+2` | action and progress rolls, plus Starforged oracle tables |
 | **Star Wars RPG** | `sw:2A+2D+1F` | narrative dice with the Force die |
 | **Twilight: 2000 4e** | `t2k:12,8,3` | Attribute and Skill step dice with ammo dice and push |

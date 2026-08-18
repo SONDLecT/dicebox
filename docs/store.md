@@ -1,6 +1,6 @@
 ---
 title: Dicebox
-description: Dice rolling and card drawing with built-in rules and trays for 19 game systems. Open source and self-hostable.
+description: Dice rolling and card drawing with built-in rules and trays for 22 game systems. Open source and self-hostable.
 author: SONDLecT
 image: https://raw.githubusercontent.com/SONDLecT/dicebox/master/og.png
 icon: https://dicebox.cc/icons/icon-512.png
@@ -24,7 +24,10 @@ membership.
 exploding dice and rerolls — up to 500 dice a term, from d1 to d1000, all
 decided by the browser's cryptographic random source.
 
-**19 game systems built in.** Vampire: The Masquerade V5 with Hunger and Rouse
+**22 game systems built in.** Vampire: The Masquerade V5 with Hunger, Rouse
+checks, Willpower rerolls and Blood Surge, Draw Steel's tiered power roll,
+Crows (locked honestly to its current alpha packet), Shadowdark with a torch
+that burns for one real hour and lights the tray while it does,
 checks, Genesys and Star Wars narrative dice, Year Zero and Alien with push,
 Blade Runner, Twilight: 2000, Call of Cthulhu, Delta Green, Mothership with
 tracked Stress, Daggerheart, The One Ring, Ironsworn and Starforged with their
