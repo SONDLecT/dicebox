@@ -94,3 +94,39 @@ try {
   console.log((err.stack||'').split('\n').slice(1,3).join('\n'));
   process.exit(1);
 }
+
+// --- Every cross-module name app.js uses must be pulled into its scope. ---
+//
+// The bundle strips import statements and hands each module the names it asks
+// for from the __dicebox namespace. A name missing from the pull list parses
+// and boots fine, then throws ReferenceError the first time a roll (or a mode
+// switch, or a received room roll) touches it — which is how the single-file
+// build shipped with rolling broken while every other build worked. This diff
+// is static and complete: it can only miss what app.js does not import.
+{
+  const appSource = readFileSync(join(root, 'app.js'), 'utf8');
+  const bundled = readFileSync(join(root, 'dist', 'dicebox.html'), 'utf8');
+
+  const imported = new Set();
+  for (const m of appSource.matchAll(/import\s*\{([^}]*)\}\s*from\s*'\.\/[\w-]+\.js'/g)) {
+    for (const raw of m[1].split(',')) {
+      const name = raw.trim();
+      if (!name) continue;
+      // `x as y` binds the alias, which the stripped bundle can never supply —
+      // that is not a list problem but an unsupported shape. Refuse it here.
+      if (/\sas\s/.test(name)) { console.log('BUNDLE-UNSAFE IMPORT ALIAS in app.js: ' + name); process.exit(1); }
+      imported.add(name);
+    }
+  }
+
+  // The app scope's pull is the last `const { ... } = __dicebox;` in the file.
+  const pulls = [...bundled.matchAll(/const \{ ([^}]*)\} = __dicebox;/g)];
+  const appPull = new Set(pulls.length ? pulls[pulls.length - 1][1].split(',').map(s => s.trim()) : []);
+  const unpulled = [...imported].filter(name => !appPull.has(name));
+  if (unpulled.length) {
+    console.log('APP IMPORTS MISSING FROM THE BUNDLE PULL: ' + unpulled.join(', '));
+    console.log('Add them to the matching *_EXPORTS list in tools/bundle.mjs.');
+    process.exit(1);
+  }
+  console.log(`bundle pull covers all ${imported.size} of app.js's cross-module imports`);
+}

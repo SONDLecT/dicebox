@@ -1074,7 +1074,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
     // Stress — that is the character's ongoing state, not pool setup, so it must
     // survive a mode switch the way it survives a reload.
     resetMothership();
-    clearPool();
+    clearPool({ trackers: false });
     // Daggerheart and Mothership seed the field with their signature roll so a
     // plain Roll or flick throws it; tapping numeric dice replaces it with a pool.
     if (system === 'daggerheart') $('notation').value = dhNotation();
@@ -5431,7 +5431,7 @@ function modifierGlyph(mod) {
   return { mark: '•', label: mod };
 }
 
-function clearPool() {
+function clearPool({ trackers = true } = {}) {
   pool = new Map();
   clearError();
 
@@ -5443,8 +5443,10 @@ function clearPool() {
   if (uiSystem !== 'numeric' && uiSystem !== 'dcc') {
     switch (uiSystem) {
       // The X sweeps the whole table, Hunger dice included, so it clears the
-      // tracker too — unlike a mode switch, which keeps Hunger as standing state.
-      case 'v5': setHunger(0, { restage: false }); resetV5(); syncV5(); break;
+      // tracker too — unlike a mode switch, which keeps Hunger as standing
+      // state. That difference is the `trackers` flag: entering V5 must never
+      // wipe the level a player is carrying between sessions.
+      case 'v5': if (trackers) setHunger(0, { restage: false }); resetV5(); syncV5(); break;
       case 'fate': resetFate(); syncFate(); break;
       case 'genesys': case 'starwars': resetGenesys(); syncGen(); break;
       case 'daggerheart': resetDaggerheart(); syncDh(); break;

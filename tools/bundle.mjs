@@ -74,10 +74,16 @@ const ROOM_CRYPTO_EXPORTS = [
   'deriveRoom', 'newSender', 'encryptMessage', 'decryptMessage',
   'normalizePassphrase', 'generatePassphrase', 'PROTOCOL_VERSION',
 ];
-const ROOM_EXPORTS = ['createRoom', 'parsePassphraseFromHash'];
+const ROOM_EXPORTS = ['createRoom', 'parsePassphraseFromHash', 'validateRoll', 'validateSystemRoll'];
 const RESULT_TEXT_EXPORTS = ['formatHeadline', 'formatDetail'];
 const SYSTEM_THEME_EXPORTS = ['SYSTEM_THEMES'];
 const SHARED_DECK_EXPORTS = ['createSharedDecks'];
+const TRAY_FACES_EXPORTS = [
+  'flattenRollDice', 'stampTrayDie',
+  'BAND_COLORS', 'FORCE_COLORS', 'TOR_COLORS', 'CT_COLORS', 'DH_COLORS',
+  'MS_COLORS', 'GEN_COLORS', 'YZ_COLORS', 'BR_COLORS', 'T2K_COLORS',
+  'COC_COLORS', 'DG_COLORS', 'IRON_COLORS',
+];
 
 // room-crypto.js before room.js before app.js: each pulls only from the ones
 // above it. Omitting these two entirely is what made an earlier bundle a dead
@@ -104,7 +110,7 @@ const script = [
   moduleScope('room-crypto.js'),
   moduleScope('room.js', ROOM_CRYPTO_EXPORTS),
   moduleScope('app.js', [
-    ...DICE_EXPORTS, ...SYSTEM_EXPORTS, ...RESULT_TEXT_EXPORTS, ...SYSTEM_THEME_EXPORTS, ...SHARED_DECK_EXPORTS, ...ORACLE_EXPORTS, ...IRON_ORACLE_EXPORTS, ...CARDS_ART_EXPORTS, ...TAROT_ART_EXPORTS, ...NAP_ART_EXPORTS, ...HANA_ART_EXPORTS, ...UTA_ART_EXPORTS, ...RENDER_EXPORTS, ...ROOM_CRYPTO_EXPORTS, ...ROOM_EXPORTS,
+    ...DICE_EXPORTS, ...SYSTEM_EXPORTS, ...RESULT_TEXT_EXPORTS, ...SYSTEM_THEME_EXPORTS, ...SHARED_DECK_EXPORTS, ...TRAY_FACES_EXPORTS, ...ORACLE_EXPORTS, ...IRON_ORACLE_EXPORTS, ...CARDS_ART_EXPORTS, ...TAROT_ART_EXPORTS, ...NAP_ART_EXPORTS, ...HANA_ART_EXPORTS, ...UTA_ART_EXPORTS, ...RENDER_EXPORTS, ...ROOM_CRYPTO_EXPORTS, ...ROOM_EXPORTS,
   ]),
 ].join('\n\n');
 
