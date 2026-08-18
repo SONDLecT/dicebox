@@ -77,6 +77,9 @@ globalThis.location = { protocol: 'file:', href: 'file:///dicebox.html', search:
 globalThis.window = { addEventListener(){}, devicePixelRatio:2, matchMedia: globalThis.matchMedia, navigator:{standalone:false} };
 globalThis.document = {
   documentElement: makeEl('html'),
+    // app.js touches body at load now (the torchlit readout flag clears on
+    // the initial setSystem), so the shim has to model it like the root.
+    body: makeEl('body'),
   getElementById: id => { const el = store.get(id) || null; if (!el) missing.push(id); return el; },
   createElement: () => makeEl(),
   createTextNode: t => ({nodeType:3,textContent:String(t)}),

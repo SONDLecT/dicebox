@@ -144,8 +144,10 @@ ok('Shadowdark small text meets WCAG AA contrast in both themes', sdContrastPass
 // the seams are asserted: the glow under the dice, the sprite over the felt,
 // the cache gated while the flame animates, and the tap checked before the
 // die hit-test.
-ok('the torchlight pool draws under the dice',
-   /drawTorchGlow\(ctx, t, r\);\s*\n\s*for \(const d of state\.dice\) d\.draw\(ctx, t\);/.test(js));
+// The pool is an opaque lighter ground now, so it must be the FIRST thing
+// on the felt — after the contact marks it would erase them.
+ok('the torchlight pool draws under the contact marks and the dice',
+   /drawTorchGlow\(ctx, t, r\);[\s\S]{0,400}state\.surface\.drawRests\(ctx, t, state\.dice\);[\s\S]{0,200}for \(const d of state\.dice\) d\.draw\(ctx, t\);/.test(js));
 ok('the torch sprite draws in the frame loop',
    /drawWillpowerMarks\(ctx, t\);[\s\S]{0,200}drawTorchOnTray\(ctx, t, r\);/.test(js));
 ok('an animating flame gates the idle cache, both directions',
@@ -248,6 +250,18 @@ ok('Mothership numeric rail is limited to rules dice plus d-question',
      /class="mode-pop"/.test(pop) &&
      order.join(',') === 'numeric,alien,bladerunner,callofcthulhu,crows,cthulhutech,dcc,drawsteel,deltagreen,daggerheart,fate,genesys,ironsworn,mist,mothership,pbta,shadowdark,starforged,starwars,twilight,onering,v5,yearzero,cards,tarot,napoletane,hanafuda,utagaruta' &&
      /class="mode-row mode-row-pinned" data-system="numeric"[^]*?>Dicebox</.test(pop));
+  // The header toggle is the only always-visible statement of which system
+  // is active, and a missing rule fails silently — the button just goes
+  // blank (how Draw Steel, Crows and Shadowdark shipped without theirs). So
+  // every mode the picker offers must both carry a mark in the toggle's SVG
+  // and have the CSS rule that shows it.
+  const toggleSvg = html.slice(html.indexOf('id="modeToggle"'),
+                               html.indexOf('</button>', html.indexOf('id="modeToggle"')));
+  const noMark = order.filter(sys => !toggleSvg.includes(`data-for="${sys}"`));
+  const noRule = order.filter(sys =>
+    !css.includes(`#modeToggle[data-system="${sys}"] .mode-ico[data-for="${sys}"]`));
+  ok('every picker mode has a toggle mark', noMark.length === 0, noMark.join(', '));
+  ok('every toggle mark has its CSS show rule', noRule.length === 0, noRule.join(', '));
   ok('picker rows carry the community shorthand',
      ['CTech 2e', 'DH', 'Fate', 'Genesys', 'Mist', 'MoSh 1e', 'PbtA', 'SWRPG', 'TOR 2e', 'VtM V5']
        .every(nm => pop.includes(`<span class="mode-row-name">${nm}</span>`)));

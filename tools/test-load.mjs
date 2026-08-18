@@ -69,6 +69,9 @@ define('navigator', { ...globalThis.navigator, userAgent: 'node' });
 globalThis.location = { protocol: 'https:', href: 'https://example.invalid/', search: '', hash: '' };
 globalThis.document = {
   documentElement: makeEl('html'),
+  // app.js touches body at load now (the torchlit readout flag clears on the
+  // initial setSystem), so the shim has to model it like the root element.
+  body: makeEl('body'),
   getElementById: id => store.get(id) || null,
   createElement: () => makeEl(),
   createTextNode: text => ({ nodeType: 3, textContent: String(text) }),

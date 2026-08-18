@@ -24,7 +24,7 @@ import { parseTarot, summarizeTarot, tarotHeadline, describeTarot } from '../sys
 import { parseNapoletane } from '../system-dice.js';
 import { parseIronsworn, rollIronsworn, summarizeIronsworn, describeIronsworn, ironswornHeadline } from '../system-dice.js';
 import * as systemModule from '../system-dice.js';
-import { scrubValue, wheelStep, SCRUB_PX_PER_STEP } from '../scrub-math.js';
+import { scrubValue, wheelStep, wheelValue, SCRUB_PX_PER_STEP } from '../scrub-math.js';
 
 let pass = 0, fail = 0;
 const ok = (name, cond, extra = '') => {
@@ -1356,6 +1356,18 @@ for (const bad of ['iron:p11', 'iron:21', 'iron:-10', 'iron:xyz', 'ironx', 'dg:6
   ok('a zero delta is no step', wheelStep(5, 0, -20, 20) === 5);
   ok('the wheel clamps, never wraps', wheelStep(20, -1, -20, 20) === 20 && wheelStep(-20, 1, -20, 20) === -20);
   ok('one default step is 28px', SCRUB_PX_PER_STEP === 28);
+  // The unset-aware wheel must walk the exact line the drag walks: off the
+  // bottom into the table-judged "—", back in at the book's default.
+  ok('a wheel notch down at min falls off into unset',
+     wheelValue(1, 120, 1, 30, { enter: 12 }) === null);
+  ok('a wheel notch up from unset enters at the book default',
+     wheelValue(null, -120, 1, 30, { enter: 12 }) === 12);
+  ok('wheeling further down from unset stays unset',
+     wheelValue(null, 120, 1, 30, { enter: 12 }) === null);
+  ok('the unset-aware wheel still clamps at max',
+     wheelValue(30, -1, 1, 30, { enter: 12 }) === 30);
+  ok('without unset the wheel is plain wheelStep',
+     wheelValue(1, 1, 1, 30) === 1 && wheelValue(5, -1, 1, 30) === 6);
 }
 
 console.log(`\nsystem-dice: ${pass} passed, ${fail} failed`);

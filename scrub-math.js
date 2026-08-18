@@ -32,3 +32,19 @@ export function wheelStep(value, deltaY, min, max) {
   const dir = deltaY < 0 ? 1 : deltaY > 0 ? -1 : 0;
   return Math.max(min, Math.min(max, value + dir));
 }
+
+// The wheel on the same line the drag walks, "—" included. `unset` mirrors
+// bindScrubDial's option: a notch down at min falls off into the table-judged
+// null, a further notch down stays there rather than inventing a number, and
+// the first notch up from null enters at `unset.enter` — the book's default
+// difficulty — never at min. Without `unset` this is plain wheelStep. Kept
+// here rather than in the listener so drag and wheel can be asserted
+// identical dry, where a divergence fails a suite instead of confusing a
+// table.
+export function wheelValue(cur, deltaY, min, max, unset = null) {
+  if (unset) {
+    if (cur === null) return deltaY < 0 ? unset.enter : null;
+    if (cur === min && deltaY > 0) return null;
+  }
+  return wheelStep(cur, deltaY, min, max);
+}

@@ -26,7 +26,7 @@ import { rollPbta, rollMist, twod6Headline, describe2d6, parsePbta, parseMist } 
 import { rollDrawSteel, describeDrawSteel, drawSteelHeadline, parseDrawSteel } from './system-dice.js';
 import { rollCrows, describeCrows, crowsHeadline, parseCrows } from './system-dice.js';
 import { rollShadowdark, parseShadowdark, torchRemaining, torchLabel } from './system-dice.js';
-import { scrubValue, wheelStep } from './scrub-math.js';
+import { scrubValue, wheelValue } from './scrub-math.js';
 
 const $ = id => document.getElementById(id);
 const canvas = $('tray');
@@ -378,10 +378,11 @@ function tidyOrder(dice) {
 
 function placeGrid(dice) {
   let { left, right, top, floor } = state.bounds;
-  // The Shadowdark torch owns the bottom-left corner while it shows, so the
-  // grid cedes it a margin — a staged check must never settle behind the
-  // sprite. Cheap and honest: the whole grid shifts right a die's width,
-  // which at Shadowdark's pool sizes (one or two d20s) is invisible.
+  // The Shadowdark torch hangs on the tray's left wall for the whole mode —
+  // lit or not — so the grid cedes it a margin: a staged check must never
+  // settle behind the sprite. Cheap and honest: the whole grid shifts right
+  // a die's width, which at Shadowdark's pool sizes (one or two d20s) is
+  // invisible.
   if (torchTrayState()) left += 48;
   const w = right - left, h = floor - top;
   const cols = Math.ceil(Math.sqrt(dice.length * (w / Math.max(h, 1))));
@@ -2327,10 +2328,13 @@ function bindTapHold(el, step, { onHold = null } = {}) {
 // Three ways in, ordered by how much they ask a player to learn: a plain tap
 // still bumps +1 (the zero-learning fallback); hovering plus a wheel notch
 // steps ±1; and a press-drag scrubs — ~28px of vertical travel a step, up is
-// positive, the value committing live as each step crosses. While a scrub is
-// live a ghost rail of neighbouring values materialises around the pill,
-// fading with distance, so the player sees where the drag is headed without
-// the pill ever moving (an overlay, never a layout shift). The old
+// positive, the value committing live as each step crosses. Both moving
+// gestures raise the same ghost rail of neighbouring values around the pill,
+// fading with distance, so the player sees where the value is headed without
+// the pill ever moving (an overlay, never a layout shift). The drag slides
+// the rail on its remainder, finger-tracked; the wheel rolls it a full row
+// per notch — the rotary-wheel beat, the passing value visibly rolling
+// through the pill — then fades it out after ~600ms of quiet. The old
 // hold-to-decrement is deliberately gone here: the drag IS the way down.
 //
 // `unset: { enter }` teaches the dial a table-judged "—" below min: get()
@@ -2343,23 +2347,30 @@ function bindScrubDial(el, { get, set, min, max, format = v => String(v), unset 
   const clamp = v => Math.max(min, Math.min(max, v));
 
   // The rail is built once, lazily, and re-anchored to the chip on every
-  // show — position: fixed keeps it out of the picker's layout entirely.
-  let rail = null, railRows = null, railGap = null, railHideTimer = null;
+  // show — position: fixed keeps it out of the picker's layout entirely. The
+  // rows live in an inner column so movement (the drag's nudge, the wheel's
+  // roll) never touches the shell's transform: the shell owns anchoring and
+  // the fade, and the two can't fight over one style property.
+  let rail = null, railCol = null, railRows = null, railGap = null;
+  let railHideTimer = null, wheelIdleTimer = null;
   const buildRail = () => {
     rail = document.createElement('div');
     rail.className = 'scrub-rail';
+    railCol = document.createElement('div');
+    railCol.className = 'scrub-rail-col';
+    rail.append(railCol);
     railRows = [];
     for (const off of [3, 2, 1, 0, -1, -2, -3]) {
       if (off === 0) {
         // The hole the pill shows through — sized to the chip at show time.
         railGap = document.createElement('div');
         railGap.className = 'scrub-rail-gap';
-        rail.append(railGap);
+        railCol.append(railGap);
         continue;
       }
       const row = document.createElement('div');
       row.className = `scrub-rail-val scrub-d${Math.abs(off)}`;
-      rail.append(row);
+      railCol.append(row);
       railRows.push({ row, off });
     }
   };
@@ -2380,19 +2391,43 @@ function bindScrubDial(el, { get, set, min, max, format = v => String(v), unset 
     }
     // The drag remainder nudges the whole column a few px — the iOS-wheel
     // feel on the cheap. Dragging up pulls the next value down toward the
-    // finger. Reduced motion gets a rock-steady rail: the numbers still
-    // change, nothing slides.
+    // finger. Transition off so the column tracks the finger dead, not on a
+    // lag. Reduced motion gets a rock-steady rail: the numbers still change,
+    // nothing slides.
     const shift = reduceMotion.matches ? 0 : Math.max(-9, Math.min(9, remainder * 0.35));
-    rail.style.transform = `translate(-50%, calc(-50% + ${shift}px))`;
+    railCol.style.transition = 'none';
+    railCol.style.transform = `translateY(${shift}px)`;
+  };
+  // The wheel's rotary beat: the column starts a full row out of place and
+  // slides home in one control-tempo move (120ms — DESIGN.md's answer tempo),
+  // so each notch visibly rolls the passing value through the pill instead of
+  // teleporting it. Reduced motion keeps the rail — it is information — and
+  // swaps the slide for a plain step.
+  const rollRail = (value, dir, floor) => {
+    updateRail(value, 0, floor);
+    if (reduceMotion.matches) return;
+    const a = railRows[0].row.getBoundingClientRect();
+    const b = railRows[1].row.getBoundingClientRect();
+    const stepH = Math.abs(b.top - a.top) || 26;
+    railCol.style.transform = `translateY(${-dir * stepH}px)`;
+    // Reflow commits the out-of-place start, so the transition has a real
+    // "from" instead of collapsing into a no-op.
+    void railCol.offsetHeight;
+    railCol.style.transition = 'transform 120ms ease-out';
+    railCol.style.transform = 'translateY(0)';
   };
   const showRail = () => {
     if (railHideTimer) { clearTimeout(railHideTimer); railHideTimer = null; }
+    // A drag that begins inside the wheel's quiet window adopts the rail —
+    // the pending fade must not pull it out from under the finger.
+    if (wheelIdleTimer) { clearTimeout(wheelIdleTimer); wheelIdleTimer = null; }
     if (!rail) buildRail();
     const r = el.getBoundingClientRect();
     railGap.style.height = `${Math.round(r.height)}px`;
     rail.style.left = `${Math.round(r.left + r.width / 2)}px`;
     rail.style.top = `${Math.round(r.top + r.height / 2)}px`;
-    rail.style.transform = 'translate(-50%, -50%)';
+    railCol.style.transition = 'none';
+    railCol.style.transform = 'translateY(0)';
     document.body.append(rail);
     // Two frames so the opacity transition has a "from" to leave.
     requestAnimationFrame(() => requestAnimationFrame(() => { if (rail.isConnected) rail.dataset.show = '1'; }));
@@ -2406,19 +2441,34 @@ function bindScrubDial(el, { get, set, min, max, format = v => String(v), unset 
   };
 
   // Hover + wheel: the notch must turn the dial, not scroll the page, which
-  // is what passive:false + preventDefault buys.
-  el.addEventListener('wheel', e => {
+  // is what passive:false + preventDefault buys. One notch walks the same
+  // line the drag does, "—" included — wheelValue owns those semantics so
+  // the two gestures cannot drift apart.
+  const onWheelNotch = e => {
     e.preventDefault();
     const cur = get();
-    if (unset && cur === null) {
-      // From "—" the only move a notch can make is IN, at the entry value;
-      // scrolling further down stays unset rather than inventing a number.
-      if (e.deltaY < 0) set(unset.enter);
-      return;
+    const next = wheelValue(cur, e.deltaY, min, max, unset);
+    // The rail rides the wheel exactly as it rides a drag. Its floor mirrors
+    // the drag's: entering from "—" seats the dash one row under the entry
+    // value; everywhere else it sits one under min, where the line falls off.
+    const fromUnset = unset && cur === null;
+    const floor = unset ? (fromUnset && next !== null ? unset.enter - 1 : min - 1) : min;
+    const railVal = v => (v === null ? floor : v);
+    // Raise the rail on the first notch — and re-raise it if a notch lands
+    // while the last session's fade is still playing out.
+    if (!rail || !rail.isConnected || !rail.dataset.show) showRail();
+    if (next !== cur) {
+      set(next);
+      rollRail(railVal(next), railVal(next) > railVal(cur) ? 1 : -1, floor);
+    } else {
+      // Pinned at a bound (or resting on "—"): the rail still answers the
+      // notch so the player sees why nothing moved.
+      updateRail(railVal(cur), 0, floor);
     }
-    const next = wheelStep(cur, e.deltaY, min, max);
-    if (next !== cur) set(next);
-  }, { passive: false });
+    if (wheelIdleTimer) clearTimeout(wheelIdleTimer);
+    wheelIdleTimer = setTimeout(() => { wheelIdleTimer = null; hideRail(); }, 600);
+  };
+  el.addEventListener('wheel', onWheelNotch, { passive: false });
 
   let scrub = null, scrubbed = false;
   el.addEventListener('pointerdown', e => {
@@ -2871,6 +2921,13 @@ const torchLit = () => sdTorch.end !== null && torchRemaining(Date.now(), sdTorc
 
 function syncTorch() {
   if (!sdTorchBtn) return;
+  // The results print in the torchlight: while the torch burns, the body
+  // carries a flag the stylesheet reads to warm the readout — and loses it
+  // the moment the torch dies or is snuffed, so the words go cold with the
+  // light. Cleared on mode exit by stopTorchTick, the one path syncTorch
+  // never sees.
+  if (uiSystem === 'shadowdark' && torchLit()) document.body.dataset.torchlit = '1';
+  else delete document.body.dataset.torchlit;
   // The felt mirrors the button (two views of one state), and its cached
   // frame goes stale the moment the phase moves — see torchTrayInvalidate.
   torchTrayInvalidate();
@@ -2916,6 +2973,9 @@ function startTorchTick() {
 }
 function stopTorchTick() {
   if (sdTorchTimer) { clearInterval(sdTorchTimer); sdTorchTimer = null; }
+  // Leaving the mode takes the torchlight off the readout — another system's
+  // results have no torch to print by.
+  delete document.body.dataset.torchlit;
 }
 
 // Direct, no confirms: relighting is one tap, so snuffing needs no ceremony.
@@ -2927,34 +2987,47 @@ if (sdTorchBtn) sdTorchBtn.addEventListener('click', () => { if (torchLit()) snu
 // ---- the torch on the tray ----
 //
 // The picker button says how long the torch has; the felt says THAT it
-// burns. While the mode is up and the torch has a state worth showing, an
-// illustrated torch stands in the bottom-left corner of the tray — grip,
-// wrap and sconce in the same wireframe ink the dice wear, the flame a
-// layered warm-filled thing, gently alive — and while it burns it CASTS
-// LIGHT: a pool of warm torchlight under the dice, pushing back the dark.
-// The light is the point. This is deliberately the one living, detailed
-// object on the quiet felt — the same contrast the hand-traced card decks
-// strike (DESIGN.md, "The counterpoint"): respect the artifact, modernize
-// the rendering, keep everything around it silent. Unlit shows nothing —
-// an absent torch is not a state the felt needs to narrate.
+// burns. Whenever Shadowdark is up an illustrated dungeon torch stands at
+// mid-height on the tray's left wall, sconce-style — a rough tapered wooden
+// stave with a wrapped cloth head, crisscross binding and all, in the same
+// wireframe ink the dice wear (no metal bracket: this is the crawl's
+// expendable torch, drawn as itself). The flame is a layered warm-filled
+// thing, gently alive — and while it burns it CASTS LIGHT: a pen-and-ink
+// pool of torchlight thrown into the felt, a flat lighter ground with a
+// drawn edge, pushing back the dark. The light is the point. This is
+// deliberately the one living, detailed object on the quiet felt — the
+// same contrast the hand-traced card decks strike (DESIGN.md, "The
+// counterpoint"): respect the artifact, modernize the rendering, keep
+// everything around it silent. Unlit, the torch still stands — muted ink,
+// no flame, no light — waiting to be tapped alight; dead, it carries a
+// cold ember. The tap answers in every state.
+//
+// The placement is the owner's option 3: mid-wall, with the pool sized and
+// centred so its wobbling rim clears every canvas edge — an inked boundary
+// cut off by a straight clip line stops reading as a drawing, so the whole
+// edge stays whole all the way round.
 //
 // The picker button stays as the secondary control; the tray torch is the
 // primary object. They are two views of ONE state: tapping either snuffs or
 // lights, and both read the same end-timestamp.
 
-// Geometry shared by the draw, the hit test and the grid inset, in CSS px
-// from the tray's bottom-left corner.
-const TORCH_TRAY = { cx: 36, baseUp: 12, hitHalf: 22, hitUp: 88 };
+// Geometry shared by the draw, the hit test and the grid inset, in CSS px.
+// cx hugs the left wall; the vertical anchor is the tray's midline.
+const TORCH_TRAY = { cx: 26, hitHalf: 22 };
 
 // Warm fixed hexes rather than theme tokens, on the colored-dice precedent:
 // the flame is the one place Shadowdark out-votes its own palette, and it
 // must stay fire-coloured even in the light scheme's deep-ember accent.
 const TORCH_FLAME = { amber: '#E39A2E', orange: '#D96A2B', gold: '#F2C14E' };
 
-// What the felt shows: 'lit', 'guttering', 'dead' (the cold ember until the
-// player relights or the X sweeps), or null for nothing at all.
+// What the felt shows: 'unlit' (the drawn torch in muted ink, there to be
+// tapped alight), 'lit', 'guttering', 'dead' (the cold ember until the
+// player relights or the X sweeps), or null outside Shadowdark. In mode the
+// torch is ALWAYS on the felt — an unlit torch is an invitation, not an
+// absence.
 function torchTrayState() {
-  if (uiSystem !== 'shadowdark' || sdTorch.end === null) return null;
+  if (uiSystem !== 'shadowdark') return null;
+  if (sdTorch.end === null) return 'unlit';
   const secs = torchRemaining(Date.now(), sdTorch.end);
   return secs <= 0 ? 'dead' : secs < 600 ? 'guttering' : 'lit';
 }
@@ -2980,7 +3053,7 @@ function torchAnimating() {
 function torchFlameNow() {
   const phase = torchTrayState();
   if (!phase) return null;
-  if (phase === 'dead') return { phase };
+  if (phase === 'dead' || phase === 'unlit') return { phase };
   const gut = phase === 'guttering';
   let flick = 1, sway = 0, breathe = 1;
   if (!reduceMotion.matches) {
@@ -2998,98 +3071,177 @@ function torchFlameNow() {
   return { phase, gut, flick, sway, breathe };
 }
 
-// Where the flame lives on this frame's canvas: the sprite is anchored to the
-// bottom-left corner, so everything is measured up from the floor.
+// Where the torch lives on this frame's canvas: hung at mid-height on the
+// left wall, so everything is measured off the tray's midline. The drawing
+// spans roughly foot to flame tip around it — foot a little under centre,
+// head a little over. wrapBase to wrapTop is the cloth head; the flame
+// rises from just inside the wrap.
 function torchAnchor(r) {
-  const baseY = r.height - TORCH_TRAY.baseUp;
-  const cupY = baseY - 24;
-  return { cx: TORCH_TRAY.cx, baseY, cupY, fy: cupY - 3 };
+  const baseY = r.height / 2 + 34;
+  const wrapBase = baseY - 26;
+  const wrapTop = wrapBase - 16;
+  return { cx: TORCH_TRAY.cx, baseY, wrapBase, wrapTop, fy: wrapTop + 2 };
 }
 
 function torchTrayHitAt(clientX, clientY) {
   if (!torchTrayState()) return false;
   const r = canvas.getBoundingClientRect();
   const x = clientX - r.left, y = clientY - r.top;
-  // A ≥44px target around the drawn torch, but never past its own corner —
-  // it must not steal taps meant for dice elsewhere on the felt.
-  return Math.abs(x - TORCH_TRAY.cx) <= TORCH_TRAY.hitHalf && y >= r.height - TORCH_TRAY.hitUp;
+  // A ≥44px target spanning the drawn torch, foot to flame — but no wider —
+  // so it must not steal taps meant for dice elsewhere on the felt.
+  const { baseY } = torchAnchor(r);
+  return Math.abs(x - TORCH_TRAY.cx) <= TORCH_TRAY.hitHalf
+      && y >= baseY - 78 && y <= baseY + 8;
 }
 
-// The pool of torchlight, drawn UNDER the dice so they sit in the light. A
-// radial gradient from the flame's heart out to 40–55% of the tray's smaller
-// side — large enough to feel like illumination, low-alpha at the rim so the
-// dark it pushes back is still dark. Its radius and warmth ride the same
-// flicker as the flame; guttering visibly shrinks it.
+// One solid lighter shade of the felt per zone: the paper token nudged
+// toward the flame amber by `mix`. An inked illustration of lamplight is
+// flat grounds with drawn edges, never a gradient (the owner's call) — the
+// mixes stay low so the zones read as lighter felt, not as orange paint,
+// in both schemes.
+function torchPoolColor(paper, mix) {
+  const p = parseInt(paper.slice(1), 16), a = parseInt(TORCH_FLAME.amber.slice(1), 16);
+  const ch = s => Math.round(((p >> s) & 255) * (1 - mix) + ((a >> s) & 255) * mix);
+  return `rgb(${ch(16)}, ${ch(8)}, ${ch(0)})`;
+}
+
+// One wobbly-edged zone of light. The edge is not a circle: three
+// low-frequency sines perturb the radius around the circumference (~2-3%
+// each) and their phases crawl at incommensurate speeds, so the boundary
+// wavers like light an illustrator inked from a flickering source and the
+// pattern never visibly repeats. Built as a coarse polygon — cheap per
+// frame, and the flat fill hides the facets.
+function torchZonePath(gx, gy, R, p1, p2, p3) {
+  const N = 56;
+  const path = new Path2D();
+  for (let i = 0; i <= N; i++) {
+    const a = (i / N) * Math.PI * 2;
+    const rr = R * (1 + 0.025 * Math.sin(3 * a + p1)
+                      + 0.02 * Math.sin(5 * a - p2)
+                      + 0.015 * Math.sin(8 * a + p3));
+    if (i === 0) path.moveTo(gx + Math.cos(a) * rr, gy + Math.sin(a) * rr);
+    else path.lineTo(gx + Math.cos(a) * rr, gy + Math.sin(a) * rr);
+  }
+  path.closePath();
+  return path;
+}
+
+// The torchlight, drawn UNDER the dice so they sit on the lit ground.
+// Pen-and-ink and TWO-TONED (the owner's ruling): an inner bright pool and
+// an outer dim ring, two flat lightened shades of the felt, each ending
+// sharply at its own hand-inked wobbling edge — no rim strokes, no
+// falloff, the colour changes ARE the boundaries. The two edges ride
+// different phases so they never move in lockstep. (Presentation, not a
+// rules claim: the book gives the torch one "near" radius — the help says
+// so.)
+//
+// Containment governs the size: the dim edge runs as close to the tray's
+// top and bottom as it can WITHOUT ever touching them. The reach formula
+// below is the rim's true maximum — breath (±5%) and edge wobble (+6%)
+// are divided back out of the base radius — leaving the 0.46/0.55 shares
+// as the hard ceiling, ~2% of the tray height clear of the edge from the
+// midline anchor. The left edge may clip on purpose: mid-wall light
+// entering from the wall. Guttering shrinks both zones hard; reduced
+// motion freezes phase and breath, so the idle cache can hold the frame.
 function drawTorchGlow(ctx, t, r) {
   const f = torchFlameNow();
-  if (!f || f.phase === 'dead') return;
-  const { cx, fy } = torchAnchor(r);
-  const fh = (f.gut ? 14 : 26) * f.flick;
-  const gx = cx + f.sway * 0.5, gy = fy - fh * 0.55;
-  const R = Math.min(r.width, r.height) * (f.gut ? 0.26 : 0.5) * (0.92 + 0.1 * (f.flick - 1) * 4 + 0.08 * (f.breathe - 0.92));
-  if (R <= 0) return;
-  const a = (f.gut ? 0.14 : 0.2) * f.breathe;
-  const grad = ctx.createRadialGradient(gx, gy, 0, gx, gy, R);
-  grad.addColorStop(0, `rgba(227, 154, 46, ${a.toFixed(3)})`);
-  grad.addColorStop(0.45, `rgba(217, 106, 43, ${(a * 0.45).toFixed(3)})`);
-  grad.addColorStop(1, 'rgba(217, 106, 43, 0)');
+  if (!f || f.phase === 'dead' || f.phase === 'unlit') return;
+  const { cx } = torchAnchor(r);
+  // flick runs ~±10%; normalised and clamped it wobbles the radius ±5% at
+  // most, and the guttering stutter bottoms out at the clamp instead of
+  // snapping the edge around.
+  const wobble = Math.max(-1, Math.min(1, (f.flick - 1) / 0.105));
+  const reach = Math.min(0.46 * r.height, 0.55 * r.width);
+  const base = (reach / 1.113) * (f.gut ? 0.55 : 1);   // 1.05 breath × 1.06 edge sines
+  const dimR = base * (1 + 0.05 * wobble);
+  if (dimR <= 0) return;
+  // Bright inside dim at just over half its span, the classic bright-light/
+  // dim-light read at a glance.
+  const brightR = dimR * 0.58;
+  const s = reduceMotion.matches ? 0 : performance.now() / 1000;
+  const gx = cx, gy = r.height / 2;
   ctx.save();
-  ctx.fillStyle = grad;
-  ctx.fillRect(Math.max(0, gx - R), Math.max(0, gy - R), R * 2, R * 2);
+  ctx.fillStyle = torchPoolColor(t.paper, 0.06);
+  ctx.fill(torchZonePath(gx, gy, dimR, 1.7 + s * 0.26, 4.1 + s * 0.19, 0.6 + s * 0.33));
+  ctx.fillStyle = torchPoolColor(t.paper, 0.12);
+  ctx.fill(torchZonePath(gx, gy, brightR, 3.9 + s * 0.31, 0.8 + s * 0.23, 2.6 + s * 0.28));
   ctx.restore();
 }
 
-// The torch itself, drawn over the felt each frame it has a state. Line art
-// for everything that is not fire: a tapered stave, three wraps of the grip,
-// the sconce cup. The flame is the illustration — outer tongue with a side
-// tongue leaning off the sway, an orange mid-flame, a gold heart.
+// The torch itself, drawn over the felt each frame the mode is up. Line art
+// for everything that is not fire — a dungeon torch, not a wall sconce: a
+// rough tapered wooden stave (a knot and a grain tick, the way a woodcut
+// says "wood") under a wrapped cloth head, crisscross binding bulging at
+// the top. No metal anywhere. The flame is the illustration — outer tongue
+// with a side tongue leaning off the sway, an orange mid-flame, a gold
+// heart.
 function drawTorchOnTray(ctx, t, r) {
   const f = torchFlameNow();
   if (!f) return;
-  const { cx, baseY, cupY, fy } = torchAnchor(r);
+  const { cx, baseY, wrapBase, wrapTop, fy } = torchAnchor(r);
+  const cold = f.phase === 'dead' || f.phase === 'unlit';
   ctx.save();
 
-  // Grip, wrap and sconce: wireframe, like everything else that isn't flame.
-  ctx.strokeStyle = f.phase === 'dead' ? t.muted : t.line;
+  // Stave and wrap: wireframe ink at the dice's stroke weight; muted ink
+  // when nothing burns, so the cold torch sits quiet on the felt.
+  ctx.strokeStyle = cold ? t.muted : t.line;
   ctx.lineWidth = 2;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.beginPath();
-  // the tapered stave, capped at the foot
-  ctx.moveTo(cx - 3, baseY); ctx.lineTo(cx - 2, cupY + 6);
-  ctx.moveTo(cx + 3, baseY); ctx.lineTo(cx + 2, cupY + 6);
-  ctx.moveTo(cx - 3, baseY); ctx.lineTo(cx + 3, baseY);
+  // the stave: slightly tapered — narrow at the foot, widening toward the
+  // head — with a gentle bow so it reads hewn, not machined
+  ctx.moveTo(cx - 2.4, baseY);
+  ctx.quadraticCurveTo(cx - 3.6, baseY - 13, cx - 3.2, wrapBase);
+  ctx.moveTo(cx + 2.4, baseY);
+  ctx.quadraticCurveTo(cx + 2.8, baseY - 13, cx + 3.4, wrapBase);
+  // capped at the foot
+  ctx.moveTo(cx - 2.4, baseY); ctx.lineTo(cx + 2.4, baseY);
   ctx.stroke();
-  // the wrapped grip — three diagonal turns of cord
+  // the wood's own marks: a knot and a grain tick along the shaft
   ctx.lineWidth = 1.3;
   ctx.beginPath();
-  ctx.moveTo(cx - 3, baseY - 4); ctx.lineTo(cx + 3, baseY - 7);
-  ctx.moveTo(cx - 3, baseY - 9); ctx.lineTo(cx + 3, baseY - 12);
-  ctx.moveTo(cx - 3, baseY - 14); ctx.lineTo(cx + 3, baseY - 17);
+  ctx.arc(cx + 1, baseY - 9, 1.2, 0, Math.PI * 2);
+  ctx.moveTo(cx - 1.6, baseY - 19);
+  ctx.lineTo(cx - 1.2, baseY - 14);
   ctx.stroke();
-  // the sconce cup and its band
+  // the wrapped cloth head: a bundle bulging past the stave, rounded at
+  // the crown where the cloth doubles over
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(cx - 7, cupY + 6); ctx.lineTo(cx + 7, cupY + 6);
-  ctx.lineTo(cx + 5, cupY - 2); ctx.lineTo(cx - 5, cupY - 2);
-  ctx.closePath();
+  ctx.moveTo(cx - 3.2, wrapBase);
+  ctx.quadraticCurveTo(cx - 7, wrapBase - 3, cx - 6.2, wrapTop + 4);
+  ctx.quadraticCurveTo(cx - 5.4, wrapTop - 1.5, cx, wrapTop - 2);
+  ctx.quadraticCurveTo(cx + 5.4, wrapTop - 1.5, cx + 6.2, wrapTop + 4);
+  ctx.quadraticCurveTo(cx + 7, wrapBase - 3, cx + 3.4, wrapBase);
   ctx.stroke();
+  // the binding: two crisscross turns of cord over the cloth
   ctx.lineWidth = 1.3;
   ctx.beginPath();
-  ctx.moveTo(cx - 6.2, cupY + 3); ctx.lineTo(cx + 6.2, cupY + 3);
+  ctx.moveTo(cx - 6, wrapBase - 3); ctx.lineTo(cx + 5.6, wrapBase - 8);
+  ctx.moveTo(cx - 5.6, wrapBase - 8); ctx.lineTo(cx + 6, wrapBase - 3);
+  ctx.moveTo(cx - 5.8, wrapTop + 8); ctx.lineTo(cx + 5.4, wrapTop + 3);
+  ctx.moveTo(cx - 5.4, wrapTop + 3); ctx.lineTo(cx + 5.8, wrapTop + 8);
   ctx.stroke();
 
+  if (f.phase === 'unlit') {
+    // Waiting: the whole drawing in muted ink, nothing at the head. The
+    // absence of fire IS the state — tap it alight.
+    ctx.restore();
+    return;
+  }
+
   if (f.phase === 'dead') {
-    // Darkness: a cold ember where the flame stood, and no light at all.
-    // No colour, no motion — the mark is the absence.
+    // Darkness: a cold ember on the spent cloth, and no light at all.
+    // No colour, no motion — still tappable to relight.
     ctx.fillStyle = t.muted;
     ctx.globalAlpha = 0.55;
     ctx.beginPath();
-    ctx.arc(cx, cupY - 7, 2.6, 0, Math.PI * 2);
+    ctx.arc(cx, wrapTop + 3, 2.6, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = 0.3;
     ctx.beginPath();
-    ctx.arc(cx - 4, cupY - 4.5, 1.4, 0, Math.PI * 2);
+    ctx.arc(cx - 4, wrapTop + 6, 1.4, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
     return;
@@ -7989,12 +8141,13 @@ function drawFrame(dt) {
   // translucent and saves the frame.
   if (trayCovered()) return;
 
+  // The pool of torchlight is the ground itself — a flat lighter felt — so
+  // it goes down before everything: contact marks, ripples and dice all sit
+  // ON the lit ground, and the light never washes over them.
+  drawTorchGlow(ctx, t, r);
   // Contact marks sit under the dice, so they draw first.
   state.surface.drawRests(ctx, t, state.dice);
   state.surface.draw(ctx, t);
-  // The pool of torchlight lies under the dice — they sit IN the light, the
-  // light never washes over them.
-  drawTorchGlow(ctx, t, r);
   for (const d of state.dice) d.draw(ctx, t);
   // Bursts go over the dice: an explosion happens in front of the thing that
   // exploded, not behind it.

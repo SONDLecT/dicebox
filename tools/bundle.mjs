@@ -78,7 +78,7 @@ const ROOM_CRYPTO_EXPORTS = [
   'normalizePassphrase', 'generatePassphrase', 'PROTOCOL_VERSION',
 ];
 const ROOM_EXPORTS = ['createRoom', 'parsePassphraseFromHash', 'validateRoll', 'validateSystemRoll'];
-const SCRUB_EXPORTS = ['scrubValue', 'wheelStep'];
+const SCRUB_EXPORTS = ['scrubValue', 'wheelStep', 'wheelValue'];
 const RESULT_TEXT_EXPORTS = ['formatHeadline', 'formatDetail'];
 const SYSTEM_THEME_EXPORTS = ['SYSTEM_THEMES'];
 const SHARED_DECK_EXPORTS = ['createSharedDecks'];

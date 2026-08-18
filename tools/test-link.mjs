@@ -78,6 +78,9 @@ async function load(historyImpl, hash = '#' + PHRASE) {
   globalThis.history = historyImpl;
   globalThis.document = {
     documentElement: makeEl('html'),
+    // app.js touches body at load now (the torchlit readout flag clears on
+    // the initial setSystem), so the shim has to model it like the root.
+    body: makeEl('body'),
     getElementById: id => store.get(id) || null,
     createElement: () => makeEl(),
     createTextNode: text => ({ nodeType: 3, textContent: String(text) }),

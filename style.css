@@ -413,6 +413,21 @@ body {
 .total[data-idle="1"] { color: var(--muted); }
 .total[data-rolling="1"] { opacity: 0.35; }
 
+/* Results in the torchlight. While the Shadowdark torch burns (body carries
+   data-torchlit from syncTorch), the readout warms: the headline leans
+   toward the flame's gold and the breakdown lifts out of the cold muted
+   grey; torch dies, words go cold. Token-anchored mixes so both schemes
+   follow their own palette. Contrast holds AA: the headline is large text
+   (56px+, 3:1 bar) and the warmed breakdown stays >=4.5:1 on both schemes'
+   paper and face. Outcome-variant headlines (a nat-20's gold) keep their
+   own colour — the variant is the louder fact. */
+body[data-torchlit] .total:not([data-variant]) {
+  color: color-mix(in srgb, var(--accent) 82%, #F2C14E 18%);
+}
+body[data-torchlit] .breakdown {
+  color: color-mix(in srgb, var(--muted) 78%, var(--accent) 22%);
+}
+
 .breakdown {
   font-size: 13px;
   color: var(--muted);
@@ -457,6 +472,9 @@ body {
 #modeToggle[data-system="pbta"] .mode-ico[data-for="pbta"] { display: block; }
 #modeToggle[data-system="mist"] .mode-ico[data-for="mist"] { display: block; }
 #modeToggle[data-system="mothership"] .mode-ico[data-for="mothership"] { display: block; }
+#modeToggle[data-system="crows"] .mode-ico[data-for="crows"] { display: block; }
+#modeToggle[data-system="drawsteel"] .mode-ico[data-for="drawsteel"] { display: block; }
+#modeToggle[data-system="shadowdark"] .mode-ico[data-for="shadowdark"] { display: block; }
 #modeToggle[data-system="cards"] .mode-ico[data-for="cards"] { display: block; }
 /* A named system's mark carries its own accent so the header reads as that mode
    at a glance; the numeric default stays with the quiet chrome colour. */
@@ -809,29 +827,35 @@ body {
 
 /* ---- the scrub dial (prototype: Crows Modifier, Shadowdark Modifier/DC) ----
 
-   A spin-chip that scrubs: wheel or press-drag moves the value, and during a
-   drag a ghost rail of neighbouring values materialises around the pill,
-   fading with distance. touch-action: none is what lets the drag own the
-   gesture — without it the browser scrolls the page out from under a scrub. */
+   A spin-chip that scrubs: wheel or press-drag moves the value, and during
+   either gesture a ghost rail of neighbouring values materialises around the
+   pill, fading with distance. touch-action: none is what lets the drag own
+   the gesture — without it the browser scrolls the page out from under a
+   scrub. */
 .scrub-dial { touch-action: none; }
 
 /* The rail is a fixed-position overlay anchored to the chip from JS — never
-   in the picker's layout, so nothing shifts when it appears. The values are
-   dice data, so they speak mono; each row wears a faint paper pill so the
-   numbers stay legible over whatever the tray has behind them. */
+   in the picker's layout, so nothing shifts when it appears. The shell owns
+   only anchoring and the fade; the rows live in an inner column that JS
+   slides — on the drag's remainder or the wheel's row-per-notch roll — so
+   the two transforms never share a property. The values are dice data, so
+   they speak mono; each row wears a faint paper pill so the numbers stay
+   legible over whatever the tray has behind them. */
 .scrub-rail {
   position: fixed;
   z-index: 40;
   transform: translate(-50%, -50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
   pointer-events: none;
   opacity: 0;
   transition: opacity 150ms ease;
 }
 .scrub-rail[data-show="1"] { opacity: 1; }
+.scrub-rail-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
 .scrub-rail-val {
   display: flex;
   align-items: center;
@@ -863,7 +887,8 @@ body {
 .scrub-rail-gap { flex: none; }
 @media (prefers-reduced-motion: reduce) {
   /* The rail still appears — it is information — but nothing fades or
-     slides: JS also zeroes its translate under this query. */
+     slides: JS also zeroes the drag nudge and skips the wheel's roll under
+     this query, so the column steps in place. */
   .scrub-rail { transition: none; }
 }
 
