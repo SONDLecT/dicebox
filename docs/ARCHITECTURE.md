@@ -24,6 +24,16 @@ Everything is plain ES modules, no build step for the site itself.
 | `oracle-dice.js`, `*-oracles.js` | Oracle tables and lookup. |
 | `*-art.js` | The card decks' vector art, lazy-loaded. |
 
+**The known debt: the five deck clones.** The card decks are ~2,100
+hand-cloned lines of `app.js` (a quarter of the file) repeating one shape
+five times, while the registry abstraction that would collapse them exists
+three separate times (`deckBundle`, `PANEL_DECKS`, and owlbear-session's
+`SIMPLE_DECKS`, which already runs three decks through one draw function).
+This is the codebase's one unpartitioned drawer: the extraction seam is a
+`createDeck(config)` factory absorbing all three registries. Until that
+lands, every deck change is made five times, and the clones are where drift
+bugs breed — the `nap:`/`ita:` notation split came from exactly here.
+
 **The drift doctrine.** Anything two surfaces both need — a colour, a
 sentence, a palette, a deck — lives in exactly one shared module. History has
 been consistent: every time a surface carried its own copy (the toast's
@@ -67,8 +77,11 @@ in anger.
 6. `system-themes.js` — dark + light palette; contrast-checked.
 7. `app.js` — picker controls + `sync*`/`reset*`/notation round-trip
    (`sync*FromField`), `systemStageDescriptors` case,
-   `removeSystemStageKind` case, `emptyTrayRoll`, badge, hint, help/picker
-   visibility in `setSystem`, `SYSTEM_TO_SLUG` + aliases, `applySystemTheme`.
+   `removeSystemStageKind` case — and where a die is genuinely fixed and
+   deliberately not removable, its kind is NAMED in the default branch's
+   exemption comment, so absence always reads as a decision rather than an
+   oversight — `emptyTrayRoll`, badge, hint, help/picker visibility in
+   `setSystem`, `SYSTEM_TO_SLUG` + aliases, `applySystemTheme`.
 8. `index.html` — mode row (alphabetical), mode icon, picker section, help
    section.
 9. `style.css` — picker layout, `--sys` colour, any variants.
@@ -78,7 +91,9 @@ in anger.
 11. `worker.js` — slug rewrites.
 12. `tools/bundle.mjs` — `SYSTEM_EXPORTS` for every new export `app.js` or a
     shared module imports. Missing names break only the single-file build,
-    and only at roll time.
+    and only at roll time — which is why `test-bundle.mjs` statically diffs
+    every cross-module name `app.js` imports against the built artifact's
+    pull and fails the suite on any gap.
 13. Tests — reducer tests in `test-systems.mjs`, the room round-trip guard,
     the markup order string.
 
@@ -150,4 +165,6 @@ game, what user call, what bug the shape prevents. The voice is narrative
 thing here that resembles taking access away") and it is load-bearing
 documentation — an auditor should be able to reconstruct the design doc from
 the comments. Code that needs a *what* comment usually needs a rename
-instead.
+instead. And comments do not survive copy-paste: audit found the cloned deck
+sections dropped every comment their originals carried — a section with zero
+comments is usually a clone, and a clone is usually a bug nursery.

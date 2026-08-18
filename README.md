@@ -524,6 +524,12 @@ require a secure context for that, with `localhost` exempt.
 
 ## Working on it
 
+Two documents keep twenty-plus systems coherent:
+[`docs/DESIGN.md`](docs/DESIGN.md) is the ratified design language — the UX
+rules, the visual identity, and what of a game's rules gets integrated —
+and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) is the map under the
+hood, including the add-a-system checklist.
+
 ```sh
 npm test          # every suite, including the single-file bundle and the panel
 npm run bundle    # rebuild dist/dicebox.html on its own
