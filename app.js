@@ -1236,10 +1236,12 @@ function syncV5Hunger() {
 // stays idle rather than showing a "v5:0".
 function v5Notation() {
   if (v5.rouse) return v5.rouse === 2 ? 'v5:rouse2' : 'v5:rouse';
-  const total = v5.pool + v5.hunger;
-  if (total < 1) return '';
-  let s = `v5:${total}`;
-  if (v5.hunger > 0) s += `h${v5.hunger}`;
+  if (v5.pool < 1) return '';
+  // The pool IS the total; the h-count is how many of it Hunger turns red —
+  // never more than the pool holds, however high the tracker sits.
+  const red = Math.min(v5.hunger, v5.pool);
+  let s = `v5:${v5.pool}`;
+  if (red > 0) s += `h${red}`;
   if (v5.difficulty !== null) s += `@${v5.difficulty}`;
   return s;
 }
@@ -1260,8 +1262,10 @@ function syncV5({ writeField = true } = {}) {
   if (uiSystem === 'v5') stageSystemPool();
 }
 
-// The Pool die adds white dice without bound. Building the pool leaves the Rouse
-// staging — you are assembling an action roll now, not throwing a lone die.
+// The Pool die counts the book's pool — the TOTAL dice you throw, the number
+// on the sheet. Hunger never adds to it: the tracker recolours the last N of
+// these dice red, the way the rules swap Hunger dice into a pool. Building a
+// roll is tapping your sheet number, and the standing tracker does the rest.
 function v5StepPool(by) { v5.rouse = false; v5.pool = Math.max(0, Math.min(v5.pool + by, 100)); syncV5(); }
 
 // Tap the Pool die to add one, hold (or right-click) to remove; a die tapped in
@@ -1502,8 +1506,8 @@ function drawWillpowerMarks(ctx, t) {
 function syncV5FromField() {
   try {
     const { pool, hunger, difficulty } = parseV5($('notation').value);
-    // The notation total is pool + Hunger dice, so the white pool is the rest.
-    v5.pool = Math.max(0, pool - hunger);
+    // The notation total is the pool, exactly as the button counts it.
+    v5.pool = pool;
     v5.difficulty = difficulty;
     setHunger(hunger, { restage: false });
     syncV5({ writeField: false });
@@ -5265,8 +5269,11 @@ function systemStageDescriptors() {
     case 'v5':
       // A staged Rouse is one Hunger die in hand — or two, keeping the better.
       if (v5.rouse) { add(v5.rouse, { sides: 10, hunger: true, kind: 'v5-rouse' }); break; }
-      add(v5.pool, { sides: 10, kind: 'v5-normal' });
-      add(v5.hunger, { sides: 10, hunger: true, kind: 'v5-hunger' });
+      // The pool is the total; the tracker recolours its tail red. It can never
+      // turn more dice red than the pool holds.
+      { const red = Math.min(v5.hunger, v5.pool);
+        add(v5.pool - red, { sides: 10, kind: 'v5-normal' });
+        add(red, { sides: 10, hunger: true, kind: 'v5-hunger' }); }
       break;
     case 'fate':
       add(fate.count, { sides: 6, kind: 'fate' });
@@ -5408,12 +5415,10 @@ function stageSystemPool() {
 // tap on them is a gentle no-op rather than an error.
 function removeSystemStageKind(kind) {
   switch (kind) {
-    // A white die taken off the tray drops a pool die; a red one lowers Hunger,
-    // exactly as holding the Hunger button does. (Red dice were once a no-op —
-    // "Hunger only moves at its own control" — but every staged die answering a
-    // tap is the stronger rule, and the tracker is one tap to restore.)
-    case 'v5-normal': v5.pool = Math.max(0, v5.pool - 1); syncV5(); return true;
-    case 'v5-hunger': setHunger(v5.hunger - 1); return true;
+    // Every V5 staged die is a pool die — the red ones are just the tail the
+    // Hunger tracker recoloured — so tapping any of them puts one die back.
+    // The tracker itself moves only at its own button and by a Rouse.
+    case 'v5-normal': case 'v5-hunger': v5.pool = Math.max(0, v5.pool - 1); syncV5(); return true;
     case 'v5-rouse': v5.rouse = Math.max(0, Number(v5.rouse) - 1); syncV5(); return true;
     // Optional extras come back off the tray the way they went on: the Blade
     // Runner advantage die clears the Odds, a Twilight ammo die drops the pool
