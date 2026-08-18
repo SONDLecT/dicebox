@@ -1448,7 +1448,7 @@
     <div class="ms-fields-row" id="msFieldsRow" hidden>
       <div class="ms-direct-field ms-dial-field">
         <span>Target</span>
-        <button type="button" class="ms-value-dial" id="msTargetDial" aria-haspopup="dialog" aria-controls="dial" aria-label="Set Target">30</button>
+        <button type="button" class="ms-value-dial scrub-dial" id="msTargetDial" aria-label="Target — tap to type it, drag or scroll to scrub">30</button>
       </div>
       <div class="ms-direct-field ms-dial-field">
         <span>Stress</span>
@@ -1547,6 +1547,14 @@
       <button type="button" class="spin-chip scrub-dial" id="v5DiffChip" aria-label="Difficulty — drag or scroll through 1 to 10, down past 1 the table judges. From unset a tap or step up enters at 3">
         <span class="spin-chip-label">Difficulty</span>
         <span class="spin-chip-val" id="v5Difficulty" data-unset="1">—</span>
+      </button>
+      <!-- The standing Surge stat, visible instead of hidden behind the
+           post-roll button: Blood Potency's surge dice, wearing the same
+           drop the Blood Surge action wears, in the small-mark family. -->
+      <button type="button" class="spin-chip scrub-dial" id="v5SurgeChip" aria-label="Surge dice — from Blood Potency, remembered across sessions. Tap to raise, drag or scroll to scrub. Unset until first set, entering at 2">
+        <svg class="spin-mark" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1.8C5.2 4.4 3.7 6.4 3.7 8.4a3.3 3.3 0 0 0 6.6 0C10.3 6.4 8.8 4.4 7 1.8Z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+        <span class="spin-chip-label">Surge</span>
+        <span class="spin-chip-val" id="v5SurgeVal" data-unset="1">—</span>
       </button>
     </div>
   </section>
@@ -1944,7 +1952,7 @@
   <section class="picker coc-picker" id="cocPicker" aria-label="Call of Cthulhu roll" hidden>
     <div class="ms-direct-field ms-dial-field">
       <span>Skill</span>
-      <button type="button" class="ms-value-dial" id="cocSkillDial" data-unset="1" aria-haspopup="dialog" aria-controls="dial" aria-label="Set Skill">—</button>
+      <button type="button" class="ms-value-dial scrub-dial" id="cocSkillDial" data-unset="1" aria-label="Skill — tap to type it, drag or scroll to scrub. Unset, the table judges">—</button>
     </div>
     <!-- Bonus and penalty each ADD a percentile tens die, so they are shaped
          like one — a d10 silhouette that fills and badges its count. A tap
@@ -1964,7 +1972,7 @@
   <section class="picker ms-picker" id="dgPicker" aria-label="Delta Green roll" hidden>
     <div class="ms-direct-field ms-dial-field">
       <span>Target</span>
-      <button type="button" class="ms-value-dial" id="dgTargetDial" data-unset="1" aria-haspopup="dialog" aria-controls="dial" aria-label="Set Target">—</button>
+      <button type="button" class="ms-value-dial scrub-dial" id="dgTargetDial" data-unset="1" aria-label="Target — tap to type it, drag or scroll to scrub. Unset, the table judges">—</button>
     </div>
   </section>
 

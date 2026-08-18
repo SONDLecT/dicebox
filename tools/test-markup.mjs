@@ -57,13 +57,13 @@ ok('Mothership failed rolls surface Stress overflow consequences',
    /resolveMothershipStress\(ms\.stress, result\.summary\.stressDelta\)/.test(js) &&
    /result\.summary\.stressOverflow\s*=/.test(js));
 
-// Target keeps the wheel + direct-jump sheet (a 1-99 line wants "Target 73"
-// typed more than it wants a scrub); Stress is nineteen steps of tracked
-// status and rides the barrel like every other scrubbable number.
-ok('Mothership Target opens the bounded tactile number dial, Stress scrubs',
-   /id="msTargetDial"[^>]*aria-haspopup="dialog"[^>]*aria-controls="dial"/.test(html) &&
+// Both Mothership numbers ride the barrel now: Stress as a plain scrub
+// (nineteen steps), Target with the huge-range typing door — "Target 73"
+// is typed inline on a tap, not through a popup.
+ok('Mothership Target and Stress ride the barrel',
+   /class="ms-value-dial scrub-dial" id="msTargetDial"/.test(html) &&
    /class="ms-value-dial scrub-dial" id="msStressDial"/.test(html) &&
-   /msTargetDial\.addEventListener\('click'[^]*openNumberDial\(\{[^]*title: 'Target'[^]*min: 1[^]*max: 99[^]*actionLabel: 'Set Target'/.test(js) &&
+   /bindScrubDial\(msTargetDial, \{[^]{0,300}min: 1, max: 99/.test(js) &&
    /bindScrubDial\(msStressDial, \{[^]{0,200}min: 2, max: 20/.test(js) &&
    /function openNumberDial\(config\)/.test(js) &&
    /\.ms-value-dial::after\s*\{[^}]*content:\s*["']↕["']/.test(css));
@@ -184,15 +184,28 @@ ok('a tray tap reaches the torch before the dice',
 }
 ok('the scrub wheel listener is non-passive',
    /addEventListener\('wheel', [\s\S]{0,600}?\{ passive: false \}\)/.test(js));
-// The popup number dial survives only on the genuinely huge ranges, where a
-// typed direct jump beats any scrub — everything else scrubs.
-ok('the popup dial is limited to the huge-range launchers',
-   /msTargetDial\.addEventListener\('click'[\s\S]{0,200}openNumberDial/.test(js) &&
-   /cocSkillDial\.addEventListener\('click'[\s\S]{0,200}openNumberDial/.test(js) &&
-   /dgTargetDial\.addEventListener\('click'[\s\S]{0,200}openNumberDial/.test(js) &&
-   !/msStressDial\.addEventListener\('click'[\s\S]{0,200}openNumberDial/.test(js) &&
-   !/torTnChip\.addEventListener\('click'[\s\S]{0,200}openNumberDial/.test(js) &&
-   !/dhDiffChip\.addEventListener\('click'[\s\S]{0,200}openNumberDial/.test(js));
+// The huge ranges ride the barrel too, wearing the typing door — no number
+// chip opens the popup dial any more. The popup survives only for dice
+// business: the custom d? die, the hold-opened count dial, and the V5
+// surge first-use ask.
+ok('the huge-range chips scrub and type, never popup',
+   /bindScrubDial\(msTargetDial, \{[\s\S]{0,300}tapEntry: true/.test(js) &&
+   /bindScrubDial\(cocSkillDial, \{[\s\S]{0,300}tapEntry: true/.test(js) &&
+   /bindScrubDial\(dgTargetDial, \{[\s\S]{0,300}tapEntry: true/.test(js) &&
+   !/TargetDial\.addEventListener\('click'[\s\S]{0,200}openNumberDial/.test(js) &&
+   !/cocSkillDial\.addEventListener\('click'[\s\S]{0,200}openNumberDial/.test(js));
+ok('the popup dial survives only for dice business',
+   (js.match(/openNumberDial\(\{/g) || []).length === 3 &&
+   /function openCountDial[\s\S]{0,200}openNumberDial\(\{/.test(js) &&
+   /function openSurgeDial[\s\S]{0,300}openNumberDial\(\{/.test(js) &&
+   /function openDial\(\)[\s\S]{0,200}openNumberDial\(\{/.test(js));
+// The typing door itself: numeric keyboard, commit/cancel keys, and the
+// floating field styled so the guard sees the class.
+ok('inline entry raises the numeric keyboard and answers the keys',
+   /input\.inputMode = 'numeric'/.test(js) &&
+   /e\.key === 'Enter'[\s\S]{0,80}closeEntry\(true\)/.test(js) &&
+   /e\.key === 'Escape'[\s\S]{0,80}closeEntry\(false\)/.test(js) &&
+   /\.scrub-entry\s*\{/.test(css));
 
 // Torch events belong to the play record: both torch controls funnel through
 // lightTorch/snuffTorch and the tick's death notice, each of which writes a

@@ -783,16 +783,35 @@ body[data-torchlit] .breakdown {
 .ds-ico-down { transform: none; }   /* the bane's chevrons point down in their own paths */
 .ds-count .ds-chev-two { opacity: 0.18; }
 .ds-count[data-count="2"] .ds-chev-two { opacity: 1; }
-/* Floors the value slot so "—" → "+2" → "Tier ↑" doesn't wobble the chip;
-   24px is the narrowest that still holds "+2" steady, and the flank budget
-   needs the other ten since the ± mark joined Characteristic. */
-.ds-effect { min-width: 24px; text-align: right; }
+/* Centred under the chevrons; the column tile sizes itself to its widest
+   line, so no width floor is needed any more. */
+.ds-effect { text-align: center; }
 .ds-picker { display: flex; gap: 10px; align-items: center; }
 /* Slightly tighter than the stock spin-chip: the ± mark joined
    Characteristic, and the flank budget that centres the Power Roll pays
    for it here rather than by clipping the row's left edge. */
 .ds-picker .spin-chip { padding: 10px 12px; gap: 6px; }
-.ds-count { position: relative; }
+/* Edge and Bane in the Daggerheart adv/dis language (the owner's call):
+   a column tile — generous stacked chevrons as the mark, one short line
+   of text under them — instead of the crowded inline chip. The line is
+   self-labelling like the torch button: the word at rest, the EFFECT
+   (+2 / Tier ↑) once a count is set, when the tint and corner badge have
+   taken over saying which chip this is. Chevrons wear their side's
+   colour full-time, exactly as the DH buttons do. */
+.ds-count {
+  position: relative;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 7px 13px 5px;
+  border-radius: 12px;
+}
+.ds-count .ds-count-ico { width: 24px; height: 24px; color: var(--dc); }
+.ds-count .spin-chip-label,
+.ds-count .spin-chip-val { font-size: 10.5px; line-height: 1.2; }
+.ds-count[data-count] .spin-chip-label { display: none; }
+.ds-count:not([data-count]) .ds-effect { display: none; }
+.ds-count[data-count] .ds-effect { color: var(--line); }
 
 /* Row-overflow guard for the one-row system pickers — the Mothership rail
    precedent (DESIGN.md: wide content scrolls in its own container, never
@@ -813,6 +832,16 @@ body[data-torchlit] .breakdown {
   -webkit-overflow-scrolling: touch;
 }
 .ds-picker::-webkit-scrollbar, .crows-picker::-webkit-scrollbar, .sd-picker::-webkit-scrollbar { display: none; }
+/* A scrollport clips at its padding box, and the corner count badges hang
+   6px above their buttons — inside a scrolling row they were getting their
+   tops cut. Block padding buys the overhang room INSIDE the scrollport,
+   and the matching negative margin hands the same room straight back to
+   the layout, so the rows sit exactly where they did. Applied to every
+   row that scrolls, Mothership's original and the deck row included. */
+.ds-picker, .crows-picker, .sd-picker, .picker.mothership-rail, .cards-picker {
+  padding-block: 8px;
+  margin-block: -8px;
+}
 
 /* Flanks around the Power Roll tile — the Duality precedent: the primary
    action in the middle, its modifiers either side. At width the flanks go
@@ -840,16 +869,14 @@ body[data-torchlit] .breakdown {
   .lbl-wide { display: none; }
   .lbl-narrow { display: inline; }
   /* Cheap compressions before the scroll has to earn its keep: tighter
-     gaps and chip padding, narrower value slots. The Edge/Bane chevrons
-     stay at every width (the owner's call — the icon IS the identity);
-     it is their words that yield when pinched, with the tint, badge and
-     aria-labels still carrying the state in full. */
+     gaps and chip padding. The Edge/Bane tiles keep their full anatomy at
+     every width — chevrons, one text line, badge — because the column
+     layout already made them narrow. */
   .ds-picker { gap: 6px; padding-inline: 6px; }
   .pick-side { gap: 6px; }
   .ds-picker .spin-chip { padding: 8px 8px; gap: 5px; }
+  .ds-picker .ds-count { padding: 6px 9px 4px; gap: 3px; }
   .ds-picker .power-roll { padding: 8px 10px 6px; }
-  .ds-count .spin-chip-label { display: none; }
-  .ds-effect { min-width: 14px; }
   .crows-picker { gap: 8px; }
   /* The ± mark widened the Modifier chip; the padding pays it back. */
   .crows-picker .spin-chip { padding: 8px 8px; gap: 5px; }
@@ -921,6 +948,26 @@ body[data-torchlit] .breakdown {
    scrub. */
 .scrub-dial { touch-action: none; }
 
+/* The huge-range chips' typing door: tapping the value floats a numeric
+   field exactly over the chip (never inside it — an input inside a button
+   is a focus fight). Mono and tabular because a number being typed is dice
+   data; accent border because an open editor is a loaded state. */
+.scrub-entry {
+  position: fixed;
+  z-index: 41;
+  box-sizing: border-box;
+  padding: 0 6px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--face);
+  color: var(--line);
+  font-family: "Iosevka Etoile", ui-monospace, "SF Mono", monospace;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  outline: none;
+}
+
 /* The rail is a fixed-position overlay anchored to the chip from JS — never
    in the picker's layout, so nothing shifts when it appears. The shell owns
    only anchoring and the fade; inside it the rows hang on a wireframe DRUM:
@@ -940,21 +987,12 @@ body[data-torchlit] .breakdown {
 .scrub-rail[data-show="1"] { opacity: 1; }
 /* The drum's viewport: sized to the cylinder (2 × DRUM_R plus a row's
    height of breathing room) so the fixed shell centres it on the chip.
-   Rows and tangent rules position absolutely inside. */
+   Rows position absolutely inside. No tangent rules — the owner cut the
+   hairline edges; the curving rows carry the cylinder alone. */
 .scrub-rail-col {
   position: relative;
   width: 150px;
   height: 212px;
-}
-/* The drum's near-tangent edges: two hairline rules just above and below
-   the selection window (the chip itself), full rail width — the minimal
-   stroke-only cue that the rows ride a cylinder. JS sets each one's `top`
-   to hug the chip at show time. */
-.scrub-rail-edge {
-  position: absolute;
-  left: 0;
-  right: 0;
-  border-top: 1px solid var(--hair);
 }
 .scrub-rail-val {
   position: absolute;
@@ -988,8 +1026,8 @@ body[data-torchlit] .breakdown {
 .scrub-d2 { opacity: 0.35; }
 .scrub-d3 { opacity: 0.15; }
 @media (prefers-reduced-motion: reduce) {
-  /* The drum still appears — its geometry is information: foreshortened
-     rows and tangent rules say what the gesture does — but nothing fades
+  /* The drum still appears — its geometry is information: the
+     foreshortened rows say what the gesture does — but nothing fades
      or turns: JS pins the rotation at zero, so steps snap in place. */
   .scrub-rail { transition: none; }
 }

@@ -124,16 +124,21 @@ A system may add controls; it may never change what these four do.
   to turn a wireframe rotary drum whose neighbouring values curve over the
   tangents as they roll through the window. Dragging the drum's face down
   increments: the higher values hang above the window and the gesture
-  turns the object. Two exceptions, by kind: a wrapping cycle of named
-  states (a four-tier skill, even/advantage/disadvantage) keeps tap/hold —
-  a barrel does not wrap, and the wrap is the point; and the popup number
-  dial survives only where the range is genuinely huge (a d100 skill or
-  target), where a typed direct jump beats any scrub. Dice buttons are not
-  numbers and keep their own grammar (tap adds, hold removes or opens the
-  count dial). Where the number is a resolution target the table may
-  judge, the control defaults to unset — it reads "—", the roll reports
-  raw facts, scrubbing below minimum falls off into "—", and the first
-  step back in lands on the system's default value, never the minimum.
+  turns the object. Huge ranges (a d100 skill or target) ride the barrel
+  too, with one added door: tapping the value opens inline typed entry —
+  the numeric keyboard raised, Enter or blur committing clamped, Escape
+  cancelling, an emptied field returning an unset-capable chip to "—" —
+  because +1 across a hundred-step line is a gesture nobody meant. One
+  exception by kind: a wrapping cycle of named states (a four-tier skill,
+  even/advantage/disadvantage) keeps tap/hold — a barrel does not wrap,
+  and the wrap is the point. The popup number dial survives only for dice
+  business: the custom d? die and the count dial a die button opens on
+  hold. Dice buttons are not numbers and keep their own grammar (tap
+  adds, hold removes or opens the count dial). Where the number is a
+  resolution target the table may judge, the control defaults to unset —
+  it reads "—", the roll reports raw facts, scrubbing below minimum falls
+  off into "—", and the first step back in lands on the system's default
+  value, never the minimum.
 - **Buttons stage; the player rolls.** A control that assembles or selects a
   roll puts it on the tray — a pool button adds dice, a named-roll tile
   (Duality, Action, an oracle ask, Check/Save) selects and stages its roll —

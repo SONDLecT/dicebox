@@ -1294,10 +1294,10 @@ for (const row of modeRows) {
 // pass/fail.
 const V5_HUNGER_KEY = 'dicebox:v5:hunger';
 // Surge dice come from Blood Potency — a character property like Hunger, so
-// the size (1-4) persists across reloads. 0 means never set: the first Blood
-// Surge asks for it, later ones spend it in a single tap (hold the button to
-// change it). Unlike Hunger it survives the X: Blood Potency does not move in
-// play, so sweeping the table has no reason to forget it.
+// the size (1-6) persists across reloads. 0 means never set: the Surge pill
+// in the picker reads "—", and the first Blood Surge asks. Unlike Hunger it
+// survives the X: Blood Potency does not move in play, so sweeping the
+// table has no reason to forget it.
 const V5_SURGE_KEY = 'dicebox:v5:surge';
 // `rouse` is a transient staging mode: a single Hunger die pulled into hand,
 // thrown on its own as a Rouse check rather than added to the action pool.
@@ -1308,8 +1308,11 @@ const v5 = { pool: 0, hunger: 0, difficulty: null, rouse: false, flipped: 0, sur
 {
   const saved = Number(store.get(V5_HUNGER_KEY));
   if (Number.isFinite(saved) && saved >= 0 && saved <= 5) v5.hunger = Math.round(saved);
+  // Clamped to the dial's own 1-6, not Blood Potency's usual table — the
+  // book's line runs to 6 at Potency 10 and the old 1-4 clamp silently ate
+  // a legally-saved 5.
   const surge = Number(store.get(V5_SURGE_KEY));
-  if (Number.isFinite(surge) && surge >= 1 && surge <= 4) v5.surgeDice = Math.round(surge);
+  if (Number.isFinite(surge) && surge >= 1 && surge <= 6) v5.surgeDice = Math.round(surge);
 }
 const v5PoolFace = $('v5NormalFace');
 const v5HungerChip = $('v5HungerChip');
@@ -1654,6 +1657,14 @@ function updateV5BloodSurge() {
   // stat shows itself.
   if (v5.surgeDice > 0) btn.dataset.count = String(v5.surgeDice); else delete btn.dataset.count;
   btn.hidden = !v5SurgeEligible();
+  // The picker's Surge pill mirrors the same number — one stat, two views,
+  // and this funnel already runs on every path that can move it.
+  const pill = $('v5SurgeVal');
+  if (pill) {
+    pill.textContent = v5.surgeDice > 0 ? String(v5.surgeDice) : '—';
+    if (v5.surgeDice > 0) delete pill.dataset.unset; else pill.dataset.unset = '1';
+    $('v5SurgeChip').classList.toggle('is-set', v5.surgeDice > 0);
+  }
 }
 
 // The surge-size dial: Blood Potency's surge dice, asked once and remembered.
@@ -1666,10 +1677,31 @@ function openSurgeDial(perform) {
     commit: value => {
       v5.surgeDice = value;
       store.set(V5_SURGE_KEY, String(value));
+      // Light the pill (and the button badge) even on a hold's plain
+      // resize, where no surge follows to redraw them.
+      updateV5BloodSurge();
       if (perform) performBloodSurge();
     },
   });
 }
+
+// The Surge pill: the same standing stat, adjustable before anything is
+// rolled — barrel like every stat, "—" until first set, entering at 2 (the
+// dial's long-standing default). A first-use Blood Surge with the pill
+// still unset keeps the dial ask as the fallback, on purpose: mid-surge is
+// an action, and bouncing the player's focus into the picker to hunt a
+// pill would trade one tap for a treasure hunt — the dial asks, commits,
+// and surges in one motion, and the pill lights up from the same funnel.
+bindScrubDial($('v5SurgeChip'), {
+  get: () => v5.surgeDice || null,
+  set: v => {
+    v5.surgeDice = v ?? 0;
+    if (v) store.set(V5_SURGE_KEY, String(v)); else store.remove(V5_SURGE_KEY);
+    updateV5BloodSurge();
+  },
+  min: 1, max: 6,
+  unset: { enter: 2 },
+});
 
 // Beat one, mirroring preparePush: every rolled die locks in place holding its
 // face — a surge rethrows nothing — while the added dice gather blank on the
@@ -2371,13 +2403,16 @@ function bindTapHold(el, step, { onHold = null } = {}) {
 // The scrub dial — the barrel — is THE number gesture, owner-approved and
 // rolled out app-wide: every non-dice number control (modifiers,
 // difficulties, targets, tracked statuses, cards-per-draw) binds here.
-// What stays off it, by kind: dice buttons keep tap-adds/hold (their own
+// Huge ranges ride it too, wearing `tapEntry`: scrub is the gesture, and
+// the tap opens inline typed entry instead of stepping +1 (Mothership
+// Target 1-99, CoC Skill 1-100, Delta Green Target 1-99). What stays off
+// the barrel, by kind: dice buttons keep tap-adds/hold (their own
 // grammar); wrapping cycles keep tap/hold (Mothership Skill's four named
 // tiers, Blade Runner's even/adv/dis, the CoC bonus/penalty axis — a wrap
-// is the point, and a barrel does not wrap); the popup number dial survives
-// only where the range is genuinely huge and a typed direct jump beats any
-// scrub (Mothership Target 1-99, CoC Skill 1-100, Delta Green Target 1-99,
-// the numeric d? sides and dice-per-tap inputs).
+// is the point, and a barrel does not wrap); and the popup number dial
+// survives only for the custom d? die, the dice-count dial a die button
+// opens on hold, and the V5 surge first-use ask — all dice business, not
+// number chips.
 //
 // Three ways in, ordered by how much they ask a player to learn: a plain tap
 // still bumps +1 (the zero-learning fallback); hovering plus a wheel notch
@@ -2399,18 +2434,66 @@ function bindTapHold(el, step, { onHold = null } = {}) {
 // up from it enters at `enter` (Shadowdark's Normal 12), never at min — a
 // table that says "roll it" means the book's default difficulty, not DC 1.
 // `railLabel` may name specific values on the rail (the DC ladder's words).
-function bindScrubDial(el, { get, set, min, max, format = v => String(v), unset = null, railLabel = null }) {
+function bindScrubDial(el, { get, set, min, max, format = v => String(v), unset = null, railLabel = null, tapEntry = false } = {}) {
   if (!el) return;
   const clamp = v => Math.max(min, Math.min(max, v));
+
+  // Huge ranges get a second door: `tapEntry` swaps the tap's +1 for
+  // inline manual entry — a numeric field floated over the chip (never
+  // inside it: an input inside a button is a focus fight), phone keyboards
+  // raised by inputmode, Enter or blur committing clamped, Escape
+  // cancelling, and an emptied field returning an unset-capable chip to
+  // the table-judged "—". The scrub is still the primary gesture; the tap
+  // is how you say "73" without turning a drum seventy-three notches.
+  let entry = null;
+  const closeEntry = commit => {
+    if (!entry) return;
+    const { input } = entry;
+    entry = null;
+    if (commit) {
+      const text = input.value.trim();
+      if (text === '' && unset) set(null);
+      else if (/^-?\d+$/.test(text)) set(clamp(parseInt(text, 10)));
+      // Anything else — empty without unset, stray characters — changes
+      // nothing: a failed entry must never invent a value.
+    }
+    input.remove();
+    el.focus();
+  };
+  const openEntry = () => {
+    if (entry) return;
+    const r = el.getBoundingClientRect();
+    const input = document.createElement('input');
+    input.className = 'scrub-entry';
+    input.type = 'text';
+    input.inputMode = 'numeric';
+    input.autocomplete = 'off';
+    input.setAttribute('aria-label', el.getAttribute('aria-label') || 'Value');
+    const cur = get();
+    input.value = cur === null ? '' : String(cur);
+    input.style.left = `${Math.round(r.left)}px`;
+    input.style.top = `${Math.round(r.top)}px`;
+    input.style.width = `${Math.round(r.width)}px`;
+    input.style.height = `${Math.round(r.height)}px`;
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); closeEntry(true); }
+      else if (e.key === 'Escape') { e.preventDefault(); closeEntry(false); }
+    });
+    input.addEventListener('blur', () => closeEntry(true));
+    document.body.append(input);
+    entry = { input };
+    input.focus();
+    input.select();
+  };
 
   // The rail is built once, lazily, and re-anchored to the chip on every
   // show — position: fixed keeps it out of the picker's layout entirely.
   // It renders as a WIREFRAME DRUM (the owner's metaphor made explicit): the
   // rows hang on a rotary cylinder seen edge-on — drumRow gives each one its
-  // R·sin(θ) drop and cos(θ) squash — and two hairline rules mark the near
-  // tangents around the selection window, which is the chip itself, at full
-  // size and full opacity between them. The drum's rotation is one number in
-  // steps: the drag's live remainder, or the wheel's eased notch.
+  // R·sin(θ) drop and cos(θ) squash — around the selection window, which is
+  // the chip itself, at full size and full opacity. The drum's rotation is
+  // one number in steps: the drag's live remainder, or the wheel's eased
+  // notch.
   let rail = null, railCol = null, railRows = null, railHideTimer = null;
   let wheelIdleTimer = null, drumAnim = null;
   const buildRail = () => {
@@ -2426,23 +2509,22 @@ function bindScrubDial(el, { get, set, min, max, format = v => String(v), unset 
       railCol.append(row);
       railRows.push({ row, off });
     }
-    // The drum's near-tangent edges, sized to the window at show time.
-    for (const side of ['top', 'bottom']) {
-      const edge = document.createElement('div');
-      edge.className = 'scrub-rail-edge';
-      edge.dataset.side = side;
-      railCol.append(edge);
-    }
+    // No tangent rules: the drum had hairline edges marking its near
+    // tangents, and the owner cut them — the curving rows carry the
+    // cylinder on their own.
   };
   // Pose every row on the drum at the given rotation (in steps, positive =
   // surface moving down toward the viewer). Reduced motion pins the rotation
-  // at zero: the drum's geometry still reads — foreshortened rows, tangent
-  // rules — but steps snap instead of turning.
+  // at zero: the drum's geometry still reads — the foreshortened rows — but
+  // steps snap instead of turning.
   const poseDrum = rot => {
     const r = reduceMotion.matches ? 0 : rot;
     for (const { row, off } of railRows) {
       const g = drumRow(off, r);
-      row.style.visibility = g.visible ? '' : 'hidden';
+      // A row past the tangent is on the drum's far side; a row with no
+      // value (beyond the bounds) must not show as a blank paper pill —
+      // that was the ghost line hovering near a pinned chip.
+      row.style.visibility = g.visible && row.textContent !== '' ? '' : 'hidden';
       row.style.transform = `translate(-50%, -50%) translateY(${g.y}px) scaleY(${g.scale})`;
     }
   };
@@ -2489,11 +2571,6 @@ function bindScrubDial(el, { get, set, min, max, format = v => String(v), unset 
     if (wheelIdleTimer) { clearTimeout(wheelIdleTimer); wheelIdleTimer = null; }
     if (!rail) buildRail();
     const r = el.getBoundingClientRect();
-    // The tangent rules hug the selection window — the chip plus a breath.
-    const half = Math.round(r.height / 2) + 3;
-    for (const edge of railCol.querySelectorAll('.scrub-rail-edge')) {
-      edge.style.top = edge.dataset.side === 'top' ? `calc(50% - ${half}px)` : `calc(50% + ${half}px)`;
-    }
     rail.style.left = `${Math.round(r.left + r.width / 2)}px`;
     rail.style.top = `${Math.round(r.top + r.height / 2)}px`;
     document.body.append(rail);
@@ -2514,6 +2591,10 @@ function bindScrubDial(el, { get, set, min, max, format = v => String(v), unset 
   // line the drag does, "—" included — wheelValue owns those semantics so
   // the two gestures cannot drift apart.
   const onWheelNotch = e => {
+    // A horizontal trackpad pan (or a hover's zero-delta wheel event) is
+    // not a notch: no rail, no preventDefault — the row underneath may
+    // legitimately want that scroll.
+    if (!e.deltaY) return;
     e.preventDefault();
     const cur = get();
     const next = wheelValue(cur, e.deltaY, min, max, unset);
@@ -2593,6 +2674,9 @@ function bindScrubDial(el, { get, set, min, max, format = v => String(v), unset 
   el.addEventListener('pointercancel', endScrub);
   el.addEventListener('click', () => {
     if (scrubbed) { scrubbed = false; return; }
+    // On a huge-range chip the tap types instead of stepping — +1 across
+    // a d100 line is a gesture nobody meant.
+    if (tapEntry) { openEntry(); return; }
     const cur = get();
     if (unset && cur === null) { set(unset.enter); return; }
     const next = clamp(cur + 1);
@@ -3239,10 +3323,9 @@ function torchZonePath(gx, gy, R, p1, p2, p3) {
 // The torchlight, drawn UNDER the dice so they sit on the lit ground.
 // Pen-and-ink and TWO-TONED (the owner's ruling): an inner bright pool and
 // an outer dim ring, two flat shades of the felt, each ending sharply at
-// its own hand-inked wobbling edge — no falloff ever. Per scheme: dark
-// keeps the approved treatment, the colour change alone drawing each
-// boundary; light adds a stroked ink rim over deeper washes (the
-// engraving read — see the scheme fork below). The two edges ride
+// its own hand-inked wobbling edge — no falloff, no rim strokes, the
+// colour change alone drawing each boundary in both schemes; light simply
+// mixes deeper (the scheme fork below). The two edges ride
 // different phases so they never move in lockstep. (Presentation, not a
 // rules claim: the book gives the torch one "near" radius — the help says
 // so.)
@@ -3285,22 +3368,14 @@ function drawTorchGlow(ctx, t, r) {
   } else {
     // On parchment a lighter wash disappears — lamplight there reads as
     // WARMTH, not lightness. So the light scheme deepens instead: two
-    // amber washes strong enough to sit visibly warm on the paper, and —
-    // because a wash alone still whispers — each rim is also stroked in
-    // the scheme's ink, pen linework over the tone, the way an engraving
-    // draws a lamp's reach. Two-tone stays meaningful: deeper wash and
-    // firmer line for bright, fainter both for dim.
+    // amber washes strong enough to sit visibly warm on the paper, the
+    // colour change alone drawing each wobbling boundary, same as dark.
+    // (An ink rim was tried on these edges and the owner cut it — the
+    // washes carry the two tones on their own.)
     ctx.fillStyle = torchPoolColor(t.paper, 0.14);
     ctx.fill(dimPath);
     ctx.fillStyle = torchPoolColor(t.paper, 0.28);
     ctx.fill(brightPath);
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = t.line;
-    ctx.globalAlpha = 0.4;
-    ctx.stroke(dimPath);
-    ctx.globalAlpha = 0.55;
-    ctx.stroke(brightPath);
-    ctx.globalAlpha = 1;
   }
   ctx.restore();
 }
@@ -3489,7 +3564,7 @@ function setStress(n, { restage = true, fromOwlbear = false } = {}) {
 
 function syncMs({ writeField = true } = {}) {
   msTargetDial.textContent = ms.target === null ? '—' : String(ms.target);
-  msTargetDial.setAttribute('aria-label', `Set Target, current ${ms.target === null ? 'unset' : ms.target}`);
+  msTargetDial.setAttribute('aria-label', `Target ${ms.target === null ? 'unset — the table judges' : ms.target} — tap to type it, drag or scroll to scrub`);
   msSkillDial.textContent = msSkillLabel();
   msSkillDial.setAttribute('aria-label',
     `Skill tier, current ${msSkillLabel()}${ms.skill ? ' ' + MS_SKILL_BONUS_TEXT[ms.skill] : ''} — tap to raise, hold to lower`);
@@ -3506,16 +3581,16 @@ function syncMs({ writeField = true } = {}) {
 
 // Advantage/Disadvantage are mutually exclusive; tapping the active choice clears it.
 for (const b of msAdvButtons) b.addEventListener('click', () => { ms.advantage = ms.advantage === b.dataset.adv ? null : b.dataset.adv; syncMs(); });
-// Target and Stress launch the same tactile wheel + direct jump control as d?.
-// The resting rail stays two rows; the larger interaction exists only while used.
-msTargetDial.addEventListener('click', () => {
-  openNumberDial({
-    title: 'Target', value: ms.target ?? 30, min: 1, max: 99,
-    actionLabel: 'Set Target', inputLabel: 'Target number',
-    clearLabel: 'Table sets it',
-    commit: value => { ms.target = value; syncMs(); },
-    onClear: () => { ms.target = null; syncMs(); },
-  });
+// Target rides the barrel like everything else, with the huge-range door:
+// tap the value to type it (a d100 line is no place for +1 taps), scrub or
+// wheel to walk it, clear the field or scrub below 1 for the table-judged
+// "—", enter from unset at 30 — the old popup's default.
+bindScrubDial(msTargetDial, {
+  get: () => ms.target,
+  set: v => { ms.target = v; syncMs(); },
+  min: 1, max: 99,
+  unset: { enter: 30 },
+  tapEntry: true,
 });
 // Only four tiers, so Skill cycles: a tap advances (None → Trained → Expert →
 // Master → None), a hold (or left/down arrow) steps back the other way. Wrapping
@@ -3526,9 +3601,7 @@ bindTapHold(msSkillDial, dir => {
   ms.skill = MS_SKILL_ORDER[(i + dir + n) % n];
   syncMs();
 });
-// Stress is nineteen steps of tracked status — barrel territory. Target
-// keeps the popup dial above on purpose: a 1-99 line wants a typed direct
-// jump ("Target 73") more than it wants a scrub.
+// Stress is nineteen steps of tracked status — a plain barrel, tap +1.
 bindScrubDial(msStressDial, {
   get: () => ms.stress,
   set: setStress,
@@ -3572,14 +3645,15 @@ function syncCoc({ writeField = true } = {}) {
   if (uiSystem === 'callofcthulhu' && !$('total').dataset.rolling) stageSystemPool();
 }
 
-cocSkillDial.addEventListener('click', () => {
-  openNumberDial({
-    title: 'Skill', value: coc.target ?? 50, min: 1, max: 100,
-    actionLabel: 'Set Skill', inputLabel: 'Skill',
-    clearLabel: 'Table sets it',
-    commit: v => { coc.target = v; syncCoc(); },
-    onClear: () => { coc.target = null; syncCoc(); },
-  });
+// The skill rides the barrel with the huge-range door: tap the value to
+// type it, scrub to walk it, empty or scrub below 1 for the table-judged
+// "—", enter from unset at 50 — the old popup's default.
+bindScrubDial(cocSkillDial, {
+  get: () => coc.target,
+  set: v => { coc.target = v; syncCoc(); },
+  min: 1, max: 100,
+  unset: { enter: 50 },
+  tapEntry: true,
 });
 // Bonus and penalty are one signed axis, capped at 3 a side. A tap cycles that
 // side up and wraps back through zero (0 → 1 → 2 → 3 → 0); tapping the other
@@ -3618,14 +3692,14 @@ function syncDg({ writeField = true } = {}) {
   if (uiSystem === 'deltagreen' && !$('total').dataset.rolling) stageSystemPool();
 }
 
-dgTargetDial.addEventListener('click', () => {
-  openNumberDial({
-    title: 'Target', value: dg.target ?? 50, min: 1, max: 99,
-    actionLabel: 'Set Target', inputLabel: 'Target',
-    clearLabel: 'Table sets it',
-    commit: v => { dg.target = v; syncDg(); },
-    onClear: () => { dg.target = null; syncDg(); },
-  });
+// Same huge-range barrel as the CoC skill: scrub the line, tap to type,
+// empty for the table-judged "—", unset enters at 50.
+bindScrubDial(dgTargetDial, {
+  get: () => dg.target,
+  set: v => { dg.target = v; syncDg(); },
+  min: 1, max: 99,
+  unset: { enter: 50 },
+  tapEntry: true,
 });
 
 function syncDgFromField() {
