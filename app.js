@@ -1382,11 +1382,11 @@ function updateV5Willpower() {
   if (!btn) return;
   if (state.willpowerArmed) {
     btn.hidden = false;
-    btn.textContent = 'Cancel reroll';
+    $('v5WillpowerLabel').textContent = 'Cancel reroll';   // the label only — textContent on the button would wipe its icon
     btn.classList.add('is-arming');
   } else {
     btn.classList.remove('is-arming');
-    btn.textContent = 'Willpower reroll';
+    $('v5WillpowerLabel').textContent = 'Willpower reroll';
     btn.hidden = !v5WillpowerEligible();
   }
 }
@@ -1547,7 +1547,11 @@ function v5SurgeEligible() {
 
 function updateV5BloodSurge() {
   const btn = $('v5BloodSurge');
-  if (btn) btn.hidden = !v5SurgeEligible();
+  if (!btn) return;
+  // The remembered Surge size rides the button, the way every persistent
+  // stat shows itself.
+  if (v5.surgeDice > 0) btn.dataset.count = String(v5.surgeDice); else delete btn.dataset.count;
+  btn.hidden = !v5SurgeEligible();
 }
 
 // The surge-size dial: Blood Potency's surge dice, asked once and remembered.

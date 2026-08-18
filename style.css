@@ -614,6 +614,17 @@ body {
    or the pair would show before any roll. */
 .v5-actions .yz-push[hidden] { display: none; }
 .v5-act-ico { width: 17px; height: 17px; display: block; flex: none; }
+/* The remembered Surge size rides the button, the way every persistent stat
+   shows itself. */
+.v5-actions .yz-push { position: relative; }
+.v5-actions .yz-push[data-count]::after {
+  content: attr(data-count);
+  position: absolute; top: -6px; right: -4px;
+  min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px;
+  background: var(--accent); color: var(--paper);
+  font: 700 10px system-ui; line-height: 1; font-variant-numeric: tabular-nums;
+  display: flex; align-items: center; justify-content: center;
+}
 
 /* While a Willpower reroll is arming, the button is the way out: read it as a
    cancel, filled and quiet rather than inviting. */
