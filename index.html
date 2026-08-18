@@ -1342,16 +1342,32 @@
   <section class="picker v5-picker" id="v5Picker" aria-label="Vampire dice" hidden>
     <button type="button" class="yz-push v5-willpower" id="v5Willpower" hidden>Willpower reroll</button>
     <div class="v5-row">
+      <!-- The pool die: an ankh set in a d10, the same mark the tray draws on a
+           V5 success — ink for the ordinary dice, blood for Hunger. -->
       <button type="button" class="die-btn v5-pool" id="v5NormalFace" aria-label="Add a pool die; hold to remove one">
-        <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true"><path d="M15 3 24 9 V17 L15 27 6 17 V9Z"/></svg>
+        <svg class="v5-die-ico" viewBox="0 0 30 30" aria-hidden="true">
+          <path d="M15 3 24 11 15 27 6 11Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+          <circle cx="15" cy="11.2" r="2.6" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M15 13.8V22M10.8 16H19.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
         <span class="die-btn-label">Pool</span>
       </button>
       <button type="button" class="die-btn v5-hunger" id="v5HungerChip" aria-label="Hunger — tap to raise, hold to lower">
-        <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true"><path d="M15 3 24 9 V17 L15 27 6 17 V9Z"/></svg>
+        <svg class="v5-die-ico" viewBox="0 0 30 30" aria-hidden="true">
+          <path d="M15 3 24 11 15 27 6 11Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+          <circle cx="15" cy="11.2" r="2.6" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M15 13.8V22M10.8 16H19.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
         <span class="die-btn-label">Hunger</span>
       </button>
+      <!-- Rouse spends the Blood, so it wears a fanged mouth rather than a die. -->
       <button type="button" class="die-btn v5-rouse" id="v5Rouse" aria-label="Rouse — pull a Hunger die to roll">
-        <svg class="die-ico" viewBox="0 0 30 30" aria-hidden="true"><path d="M15 3 24 9 V17 L15 27 6 17 V9Z"/></svg>
+        <svg class="v5-die-ico" viewBox="0 0 30 30" aria-hidden="true">
+          <path d="M5 11Q15 7.5 25 11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <path d="M9 11 11 20 13 11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+          <path d="M17 11 19 20 21 11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+          <path d="M14 11V15.4M16 11V15.4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+        </svg>
         <span class="die-btn-label">Rouse</span>
       </button>
       <button type="button" class="spin-chip" id="v5DiffChip" aria-haspopup="dialog" aria-controls="dial" aria-label="Set Difficulty">

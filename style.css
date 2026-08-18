@@ -485,11 +485,14 @@ body {
    later in the sheet — Pool in ink, Hunger and Rouse in the blood accent. */
 .v5-picker .v5-pool { --dc: var(--line); }
 .v5-picker .v5-hunger, .v5-picker .v5-rouse { --dc: var(--accent); }
+/* Line-art die marks — the ankh and the fangs — in the button's own colour, so
+   they carry no fill the way the shared .die-ico silhouettes do. */
+.v5-die-ico { width: 30px; height: 30px; display: block; }
+.v5-die-ico path, .v5-die-ico circle { fill: none; stroke: currentColor; }
 /* Rouse staged: the die is in hand waiting to be thrown, so the button reads as
    loaded even though it carries no count. */
 .v5-picker .v5-rouse.is-staged { border-color: var(--dc); background: color-mix(in srgb, var(--dc) 12%, transparent); }
 .v5-picker .v5-rouse.is-staged .die-btn-label { color: var(--line); }
-.v5-picker .v5-rouse.is-staged .die-ico path { fill-opacity: 0.34; }
 
 /* ---- Fate dice ---- */
 
