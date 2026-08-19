@@ -331,6 +331,16 @@ ok('Mothership tactile value buttons own the full 44px target',
    /\.ms-value-dial\s*\{[^}]*width:\s*100%[^}]*min-height:\s*44px/.test(css));
 // (The shared number dial's modality assertion lived here until the dial
 // itself retired — see 'the popup number dial is fully retired'.)
+// Emory's row-order ruling: wherever the numeric strip shows, it reads
+// count chip → d? → the dice, and that is the markup's source order in
+// every mode. The Mothership rail used to flex-`order` the count chip
+// past the dice — the one deviation, spotted at the table — so any
+// `order:` on the rail's strip parts is a regression, not a layout tool.
+ok('the strip reads count chip, then d?, then dice — in source order, every mode',
+   numMarkup.indexOf('id="countChip"') !== -1 &&
+   numMarkup.indexOf('id="countChip"') < numMarkup.indexOf('class="dice-scroll"') &&
+   /<div class="dice-buttons" id="diceButtons" role="group">\s*<button class="dbtn custom scrub-dial" id="customDie"/.test(html) &&
+   !/\.mothership-rail[^{]*\{[^}]*\border\s*:/.test(css));
 ok('Mothership rail and notation form remain within the page width',
    /\.picker\.mothership-rail\s*\{[^}]*width:\s*100%[^}]*max-width:\s*100%[^}]*min-width:\s*0[^}]*scrollbar-width:\s*thin/.test(css) &&
    /\.picker\.mothership-rail::-webkit-scrollbar\s*\{[^}]*height:\s*4px/.test(css) &&

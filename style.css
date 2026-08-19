@@ -1439,8 +1439,10 @@ body[data-torchlit] .breakdown {
 .picker.mothership-rail::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--accent) 65%, transparent); border-radius: 999px; }
 .mothership-rail .ms-fields-row, .mothership-rail .count-chip, .mothership-rail .dice-scroll { flex: 0 0 auto; }
 .mothership-rail .dice-scroll { min-width: max-content; }
-.mothership-rail .dice-scroll { order: 2; }
-.mothership-rail .count-chip { order: 3; }
+/* No flex `order` here any more — Emory's row ruling: the strip reads
+   count chip, then d?, then the dice, in EVERY mode, and that is exactly
+   the markup's source order. The old rules pushed the count chip past the
+   dice on this one rail, which is where the inconsistency was spotted. */
 .mothership-rail .dice-buttons { overflow: visible; }
 .mothership-rail .nudge { display: none; }
 .mothership-rail .count-chip, .mothership-rail .dbtn { min-height: 44px; }
