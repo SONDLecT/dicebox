@@ -6,7 +6,7 @@ import { rollV5, rollRouse, rerollV5, surgeV5, describeV5, v5Headline, detectSys
 import { formatHeadline, formatDetail } from './result-text.js';
 import { SYSTEM_THEMES } from './system-themes.js';
 import { createSharedDecks } from './shared-decks.js';
-import { flattenRollDice, stampTrayDie, BAND_COLORS, FORCE_COLORS, TOR_COLORS, CT_COLORS, DH_COLORS, MS_COLORS, GEN_COLORS, YZ_COLORS, BR_COLORS, T2K_COLORS, COC_COLORS, DG_COLORS, IRON_COLORS } from './tray-faces.js';
+import { flattenRollDice, stampTrayDie, BAND_COLORS, FITD_COLORS, FORCE_COLORS, TOR_COLORS, CT_COLORS, DH_COLORS, MS_COLORS, GEN_COLORS, YZ_COLORS, BR_COLORS, T2K_COLORS, COC_COLORS, DG_COLORS, IRON_COLORS } from './tray-faces.js';
 import { rollFate, describeFate, fateHeadline, fateFace, parseFate } from './system-dice.js';
 import { rollGenesys, describeGenesys, genesysHeadline, parseGenesys } from './system-dice.js';
 import { rollDaggerheart, describeDaggerheart, daggerheartHeadline, parseDaggerheart } from './system-dice.js';
@@ -24,6 +24,7 @@ import { rollStarWars, describeStarWars, starWarsHeadline, parseStarWars } from 
 import { rollOneRing, describeOneRing, oneRingHeadline, parseOneRing } from './system-dice.js';
 import { rollPbta, rollMist, twod6Headline, describe2d6, parsePbta, parseMist } from './system-dice.js';
 import { rollDrawSteel, describeDrawSteel, drawSteelHeadline, parseDrawSteel } from './system-dice.js';
+import { rollFitD, parseFitD } from './system-dice.js';
 import { rollCrows, describeCrows, crowsHeadline, parseCrows } from './system-dice.js';
 import { rollShadowdark, parseShadowdark, torchRemaining, torchLabel, mergeTorch, joinTorch } from './system-dice.js';
 import { scrubValue, wheelValue, drumRow, SCRUB_PX_PER_STEP } from './scrub-math.js';
@@ -484,6 +485,7 @@ function doRoll(notation, { viaOwlbear = true } = {}) {
       : sys === 'pbta' ? rollPbta(notation)
       : sys === 'mist' ? rollMist(notation)
       : sys === 'drawsteel' ? rollDrawSteel(notation)
+      : sys === 'fitd' ? rollFitD(notation)
       : sys === 'crows' ? rollCrows(notation)
       : sys === 'shadowdark' ? rollShadowdark(notation)
       : sys === 'mothership' ? rollMothership(notation)
@@ -830,6 +832,7 @@ $('notation').addEventListener('input', () => {
   if (typedSystem === 'pbta') { pbtaCtl.fromField(); return; }
   if (typedSystem === 'mist') { mistCtl.fromField(); return; }
   if (typedSystem === 'drawsteel') { syncDsFromField(); return; }
+  if (typedSystem === 'fitd') { syncFitDFromField(); return; }
   if (typedSystem === 'crows') { syncCrowsFromField(); return; }
   if (typedSystem === 'shadowdark') { syncSdFromField(); return; }
   if (typedSystem === 'mothership') { syncMsFromField(); return; }
@@ -921,6 +924,7 @@ const SYSTEMS = {
   pbta: { badge: 'PbtA' },
   mist: { badge: 'Mist' },
   drawsteel: { badge: 'Draw Steel' },
+  fitd: { badge: 'FitD' },
   crows: { badge: 'Crows (Alpha)' },
   shadowdark: { badge: 'Shadowdark' },
   mothership: { badge: 'MoSh 1e' },
@@ -940,6 +944,7 @@ const SYSTEM_HINTS = {
   pbta: { idle: 'Set a modifier, then roll 2d6', placeholder: 'Set a modifier, or type pbta:+2' },
   mist: { idle: 'Set your Power, then roll 2d6', placeholder: 'Set your Power, or type mist:+1' },
   drawsteel: { idle: 'Set a characteristic and any edges, then roll 2d10', placeholder: 'Set the chips, or type ds:+2e1' },
+  fitd: { idle: 'Set your pool of d6 and roll — read the highest. Zero dice is desperate: roll 2, keep the lowest', placeholder: 'Set the pool, or type fitd:3 (or fitd:0 for desperate)' },
   crows: { idle: 'Set a modifier and roll 2d10 — or build a usage pool', placeholder: 'Set the chips, or type crows:+2 or crows:u4' },
   shadowdark: { idle: 'Roll d20 — set a DC to resolve it, or let the table judge', placeholder: 'Roll, or type sd:+3a@12' },
   mothership: { idle: 'Roll d100 — set a target to resolve it, or let the table judge', placeholder: 'Roll, or type ms:c@35' },
@@ -970,6 +975,7 @@ const SLUG_TO_SYSTEM = {
   cards: 'cards', tarot: 'tarot', italiane: 'napoletane', napoletane: 'napoletane', scopa: 'napoletane', hanafuda: 'hanafuda', koikoi: 'hanafuda', hana: 'hanafuda', utagaruta: 'utagaruta', karuta: 'utagaruta', hyakunin: 'utagaruta', vtmv5: 'v5', fate: 'fate', genesys: 'genesys', dh: 'daggerheart', ctech2e: 'cthulhutech',
   swrpg: 'starwars', tor2e: 'onering', pbta: 'pbta', mist: 'mist', mosh1e: 'mothership',
   drawsteel: 'drawsteel', ds: 'drawsteel', crows: 'crows', shadowdark: 'shadowdark', sd: 'shadowdark',
+  fitd: 'fitd', blades: 'fitd', bitd: 'fitd', forged: 'fitd', bladesinthedark: 'fitd',
   v5: 'v5', vtm: 'v5', daggerheart: 'daggerheart', cthulhutech: 'cthulhutech', ctech: 'cthulhutech',
   yz: 'yearzero', yearzero: 'yearzero', forbiddenlands: 'yearzero', vaesen: 'yearzero', coriolis: 'yearzero', mutant: 'yearzero', tales: 'yearzero',
   alien: 'alien',
@@ -978,7 +984,7 @@ const SLUG_TO_SYSTEM = {
   force: 'starwars', feat: 'onering', tor: 'onering', mothership: 'mothership', mosh: 'mothership', coc: 'callofcthulhu', callofcthulhu: 'callofcthulhu', cthulhu: 'callofcthulhu', dg: 'deltagreen', deltagreen: 'deltagreen',
   ironsworn: 'ironsworn', iron: 'ironsworn', starforged: 'starforged', sf: 'starforged', dcc: 'dcc',
 };
-const SYSTEM_TO_SLUG = { cards: 'cards', tarot: 'tarot', napoletane: 'napoletane', hanafuda: 'hanafuda', utagaruta: 'utagaruta', v5: 'vtmv5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', yearzero: 'yz', alien: 'alien', bladerunner: 'brrpg', twilight: 't2k', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', drawsteel: 'drawsteel', crows: 'crows', shadowdark: 'shadowdark', mothership: 'mosh1e', callofcthulhu: 'coc', deltagreen: 'dg', ironsworn: 'ironsworn', starforged: 'starforged', dcc: 'dcc' };
+const SYSTEM_TO_SLUG = { cards: 'cards', tarot: 'tarot', napoletane: 'napoletane', hanafuda: 'hanafuda', utagaruta: 'utagaruta', v5: 'vtmv5', fate: 'fate', genesys: 'genesys', daggerheart: 'dh', cthulhutech: 'ctech2e', yearzero: 'yz', alien: 'alien', bladerunner: 'brrpg', twilight: 't2k', starwars: 'swrpg', onering: 'tor2e', pbta: 'pbta', mist: 'mist', drawsteel: 'drawsteel', fitd: 'fitd', crows: 'crows', shadowdark: 'shadowdark', mothership: 'mosh1e', callofcthulhu: 'coc', deltagreen: 'dg', ironsworn: 'ironsworn', starforged: 'starforged', dcc: 'dcc' };
 
 function systemFromPath() {
   const seg = (location.pathname || '/').replace(/^\/+|\/+$/g, '').toLowerCase();
@@ -1002,6 +1008,7 @@ const torPicker = $('torPicker');
 // stepper, identical between the two modes.
 const twod6Picker = $('twod6Picker');
 const dsPicker = $('dsPicker');
+const fitdPicker = $('fitdPicker');
 const crowsPicker = $('crowsPicker');
 const sdPicker = $('sdPicker');
 const msPicker = $('msPicker');
@@ -1077,6 +1084,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
   torPicker.hidden = system !== 'onering';
   twod6Picker.hidden = system !== 'pbta' && system !== 'mist';
   dsPicker.hidden = system !== 'drawsteel';
+  fitdPicker.hidden = system !== 'fitd';
   crowsPicker.hidden = system !== 'crows';
   sdPicker.hidden = system !== 'shadowdark';
   msPicker.hidden = system !== 'mothership';
@@ -1130,6 +1138,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
   $('helpPbta').hidden = system !== 'pbta';
   $('helpMist').hidden = system !== 'mist';
   $('helpDrawsteel').hidden = system !== 'drawsteel';
+  $('helpFitd').hidden = system !== 'fitd';
   $('helpCrows').hidden = system !== 'crows';
   $('helpShadowdark').hidden = system !== 'shadowdark';
   $('helpMothership').hidden = system !== 'mothership';
@@ -1164,6 +1173,7 @@ function setSystem(system, { roll = false, url = true } = {}) {
     pbtaCtl.reset();
     mistCtl.reset();
     resetDs();
+    resetFitD();
     resetCrows();
     // Shadowdark resets the roll config (modifier, advantage, DC) but NOT the
     // torch — a lit torch is the crawl's ongoing state, and the hour keeps
@@ -2803,6 +2813,57 @@ function syncCtFromField() {
     ct.dice = dice;
     ct.difficulty = difficulty;
     syncCt({ writeField: false });
+  } catch { /* mid-type, not yet valid */ }
+}
+
+// ---- Forged in the Dark pool ----
+//
+// One control: the d6 pool. There are no numeric modifiers in Blades — help
+// adds dice, harm removes them — so the pool count is the whole roll. The pool
+// is an ACTION barrel (the CthulhuTech / Crows precedent): tap adds one d6,
+// scrub or wheel sets the whole pool. A pool of 0 is the DESPERATE roll: the
+// tray opens empty (as every assembled-pool system does) and that empty state
+// IS the desperate 2d6-keep-lowest throw, so the button reads "Desperate" at
+// zero and the notation `fitd:0` is a legal, meaningful roll.
+const FITD_CAP = 10;
+const fitd = { pool: 0 };
+const fitdPoolBtn = $('fitdPool');
+
+// Opening empty is opening desperate — the assembled-pool default (DESIGN.md
+// "Staging-on-open"), and here the zero state carries its own meaning.
+function resetFitD() { fitd.pool = 0; syncFitD({ writeField: false }); }
+
+// fitd:0 always writes: unlike an empty CthulhuTech pool it is a real roll, so
+// the field never goes blank while this mode is up.
+function fitdNotation() { return `fitd:${fitd.pool}`; }
+
+function syncFitD({ writeField = true } = {}) {
+  if (fitdPoolBtn) {
+    if (fitd.pool > 0) fitdPoolBtn.dataset.count = String(fitd.pool);
+    else delete fitdPoolBtn.dataset.count;
+    // The zero pool is the desperate roll; the button says so, and a flag lets
+    // the picker paint the warning.
+    fitdPoolBtn.dataset.desperate = fitd.pool === 0 ? '1' : '';
+    const label = fitdPoolBtn.querySelector('.die-btn-label');
+    if (label) label.textContent = fitd.pool === 0 ? 'Desperate' : 'Dice';
+  }
+  if (writeField && uiSystem === 'fitd') $('notation').value = fitdNotation();
+  if (uiSystem === 'fitd') stageSystemPool();
+}
+
+// Tap adds a die, scrub sets the pool — the action-barrel grammar.
+bindScrubDial(fitdPoolBtn, {
+  get: () => fitd.pool,
+  set: v => { fitd.pool = v; syncFitD(); },
+  min: 0, max: FITD_CAP,
+  tap: () => { fitd.pool = Math.min(FITD_CAP, fitd.pool + 1); syncFitD(); },
+});
+
+function syncFitDFromField() {
+  try {
+    const { pool } = parseFitD($('notation').value);
+    fitd.pool = pool;
+    syncFitD({ writeField: false });
   } catch { /* mid-type, not yet valid */ }
 }
 
@@ -6743,6 +6804,12 @@ function systemStageDescriptors() {
       // physical dice carry no per-die colour, so neither do ours.
       add(2, { sides: 10, kind: 'ds' });
       break;
+    case 'fitd':
+      // The pool of d6 stages in the neutral smoke colour until it is read; a
+      // pool of 0 (the desperate roll) stages nothing — the empty tray IS the
+      // desperate throw, and the picker button carries the warning.
+      add(fitd.pool, { sides: 6, genColor: FITD_COLORS.failure, kind: 'fitd' });
+      break;
     case 'crows':
       // A built usage pool displaces the power roll, exactly like a staged
       // Rouse displaces the V5 pool; otherwise the fixed 2d10 sit ready.
@@ -6872,6 +6939,7 @@ function removeSystemStageKind(kind) {
       return false;
     case 'fate': fate.count = Math.max(1, fate.count - 1); syncFate(); return true;
     case 'ct': ct.dice = Math.max(0, ct.dice - 1); syncCt(); return true;
+    case 'fitd': fitd.pool = Math.max(0, fitd.pool - 1); syncFitD(); return true;
     case 'tor-success': tor.success = Math.max(0, tor.success - 1); syncTor(); return true;
     case 'dh-adv':
       dhState.advantage -= Math.sign(dhState.advantage);
@@ -6950,6 +7018,7 @@ function clearPool({ trackers = true } = {}) {
       case 'onering': resetOneRing(); syncTor(); break;
       case 'pbta': case 'mist': resetTwod6(); syncTwod6(); break;
       case 'drawsteel': resetDs(); syncDs(); break;
+      case 'fitd': resetFitD(); syncFitD(); break;
       case 'crows': resetCrows(); syncCrows(); break;
       // The X snuffs the torch as part of the full table sweep — the same
       // tracker rule as Hunger and Stress: it survives mode switches and
@@ -8182,6 +8251,7 @@ function emptyTrayRoll() {
   if (uiSystem === 'pbta') return pbtaCtl.notation();
   if (uiSystem === 'mist') return mistCtl.notation();
   if (uiSystem === 'drawsteel') return dsNotation();
+  if (uiSystem === 'fitd') return fitdNotation();
   if (uiSystem === 'crows') return crowsNotation();
   if (uiSystem === 'shadowdark') return sdNotation();
   if (uiSystem === 'mothership') return msNotation();
@@ -8213,6 +8283,7 @@ function restageActiveSystem() {
     case 'onering': syncTor(); break;
     case 'pbta': case 'mist': syncTwod6(); break;
     case 'drawsteel': syncDs(); break;
+    case 'fitd': syncFitD(); break;
     case 'crows': syncCrows(); break;
     case 'shadowdark': syncSd(); break;
     case 'mothership': syncMs(); break;

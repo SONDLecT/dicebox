@@ -16,6 +16,7 @@ import { parseStarWars, rollStarWars, summarizeStarWars, describeStarWars, starW
 import { parseOneRing, rollOneRing, summarizeOneRing, describeOneRing, oneRingHeadline } from '../system-dice.js';
 import { parsePbta, parseMist, rollPbta, rollMist, summarize2d6, describe2d6, twod6Headline } from '../system-dice.js';
 import { parseDrawSteel, rollDrawSteel, summarizeDrawSteel, describeDrawSteel, drawSteelHeadline } from '../system-dice.js';
+import { parseFitD, rollFitD, summarizeForged, forgedHeadline, describeForged } from '../system-dice.js';
 import { parseCrows, rollCrows, rollCrowsUsage, summarizeCrows, summarizeCrowsUsage, describeCrows, crowsHeadline } from '../system-dice.js';
 import { parseShadowdark, rollShadowdark, summarizeShadowdark, describeShadowdark, shadowdarkHeadline, torchRemaining, torchLabel, mergeTorch, joinTorch } from '../system-dice.js';
 import { parseMothership, rollMothership, summarizeMothershipCheck, summarizeMothershipPanic, describeMothership, mothershipHeadline } from '../system-dice.js';
@@ -1085,6 +1086,63 @@ ok('nat 1 fails regardless', (() => { const s = summarizeShadowdark([1], null, 1
   ok('a doomed fumble says it fails regardless',
      /natural 1 — fumble, it fails regardless/.test(describeShadowdark({ summary: summarizeShadowdark([1], null, 15, 9) })));
 }
+// ---- Forged in the Dark: the read-highest d6 pool ----
+{
+  // Notation
+  ok('detect fitd', detectSystem('fitd:3') === 'fitd');
+  ok('parse fitd:3', eq(parseFitD('fitd:3'), { pool: 3 }));
+  ok('parse the desperate fitd:0', eq(parseFitD('fitd:0'), { pool: 0 }));
+  ok('parse the cap', eq(parseFitD('fitd:10'), { pool: 10 }));
+  for (const bad of ['fitd:', 'fitd:-1', 'fitd:11', 'fitd:x', 'fitd:2.5', 'ds:3', 'fitd']) {
+    ok(`reject bad ${bad}`, (() => { try { parseFitD(bad); return false; } catch { return true; } })());
+  }
+  ok('rollAny routes fitd', rollAny('fitd:3').system === 'fitd');
+
+  // The bands, driven off summarizeForged so the read is exercised directly.
+  const S = (rolls, opts) => summarizeForged(rolls, opts).result;
+  ok('two 6s is a critical', S([6, 6, 2]) === 'crit');
+  ok('three 6s is still a critical', S([6, 6, 6]) === 'crit');
+  ok('one 6 is a success', S([6, 4, 1]) === 'success');
+  ok('highest 4 or 5 is a partial', S([5, 3, 2]) === 'partial' && S([4, 1]) === 'partial');
+  ok('highest 1-3 is a failure', S([3, 2, 1]) === 'failure');
+  ok('a single-die pool reads that die', S([6]) === 'success' && S([2]) === 'failure');
+
+  // The signature edge case: desperate reads the LOWEST of 2d6.
+  ok('desperate reads the lowest die', summarizeForged([5, 2], { desperate: true }).read === 2);
+  ok('a desperate low read of 2 is a failure', S([5, 2], { desperate: true }) === 'failure');
+  ok('a desperate double-6 is NOT a crit — only the lowest is read',
+     S([6, 6], { desperate: true }) === 'success');
+  ok('a desperate 6-and-low is a failure, not a success',
+     S([6, 1], { desperate: true }) === 'failure');
+  ok('a desperate 4/5 low read is a partial', S([6, 5], { desperate: true }) === 'partial');
+
+  // The read-die marking the tray uses.
+  {
+    const r = rollFitD('fitd:3');
+    ok('fitd stages the pool count', r.groups[0].dice.length === 3);
+    ok('exactly one die is read on a non-crit', r.summary.result === 'crit'
+       || r.groups[0].dice.filter(d => d.kept).length === 1);
+    const crit = { summary: summarizeForged([6, 6, 3], {}) };
+    ok('every 6 stands on a crit', crit.summary.readIdx.length === 2);
+    const desp = rollFitD('fitd:0');
+    ok('the desperate roll throws exactly 2d6', desp.groups[0].dice.length === 2);
+    ok('the desperate summary is flagged', desp.summary.desperate === true);
+  }
+
+  // Headline labels
+  const H = (rolls, opts) => forgedHeadline({ summary: summarizeForged(rolls, opts) });
+  ok('critical headline', eq(H([6, 6]), { kind: 'text', text: 'Critical', variant: 'fitd-crit' }));
+  ok('success headline', eq(H([6, 2]), { kind: 'text', text: 'Success', variant: 'fitd-success' }));
+  ok('partial headline', eq(H([5]), { kind: 'text', text: 'Partial', variant: 'fitd-partial' }));
+  ok('failure headline', eq(H([3]), { kind: 'text', text: 'Failure', variant: 'fitd-failure' }));
+
+  // Detail line names the read die and flags the desperate case.
+  ok('the detail names the highest', /highest 5/.test(describeForged({ summary: summarizeForged([5, 3], {}) })));
+  ok('the detail flags desperate — kept lowest',
+     /desperate — kept lowest 2/.test(describeForged({ summary: summarizeForged([5, 2], { desperate: true }) })));
+  ok('a crit detail counts the sixes', /2 sixes/.test(describeForged({ summary: summarizeForged([6, 6, 1], {}) })));
+}
+
 // the torch clock: pure timestamp math, so a reload can never drift it
 {
   const now = 1_000_000_000;

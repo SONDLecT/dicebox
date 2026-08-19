@@ -474,6 +474,7 @@ body[data-torchlit] .breakdown {
 #modeToggle[data-system="mothership"] .mode-ico[data-for="mothership"] { display: block; }
 #modeToggle[data-system="crows"] .mode-ico[data-for="crows"] { display: block; }
 #modeToggle[data-system="drawsteel"] .mode-ico[data-for="drawsteel"] { display: block; }
+#modeToggle[data-system="fitd"] .mode-ico[data-for="fitd"] { display: block; }
 #modeToggle[data-system="shadowdark"] .mode-ico[data-for="shadowdark"] { display: block; }
 #modeToggle[data-system="cards"] .mode-ico[data-for="cards"] { display: block; }
 /* A named system's mark carries its own accent so the header reads as that mode
@@ -767,6 +768,19 @@ body[data-torchlit] .breakdown {
 /* CthulhuTech: one d10 to build the pool, Difficulty as a subordinate chip. */
 .ct-picker { display: flex; gap: 14px; justify-content: center; align-items: center; }
 .ct-picker .die-btn { --dc: #57B591; }
+
+/* Forged in the Dark: one control, the d6 pool button. It wears the ghost-fire
+   teal, and at a pool of zero — the desperate roll — it goes to the danger
+   tone with a tinted well and its "Desperate" label, so the grim state reads
+   before you throw. */
+.fitd-picker { display: flex; gap: 14px; justify-content: center; align-items: center; }
+.fitd-picker .die-btn { --dc: #3FC7BD; }
+.fitd-pool[data-desperate="1"] {
+  --dc: var(--danger);
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+.fitd-pool[data-desperate="1"] .die-btn-label { color: var(--danger); letter-spacing: 0.02em; }
 
 /* PbtA / Mist: nothing to build (the 2d6 sit in the tray), so just the one chip. */
 .twod6-picker { display: flex; justify-content: center; }
@@ -1361,6 +1375,13 @@ body[data-torchlit] .breakdown {
 .total[data-variant="sd-failure"] { color: #C4705C; }
 .total[data-variant="sd-crit"] { color: #E7C24C; }
 .total[data-variant="sd-fumble"] { color: var(--danger); }
+/* Forged in the Dark: the ghost-fire ladder — a critical in bright ghostlight
+   cyan, a full success in the electric Duskwall teal, a partial in the shared
+   cautionary amber, a failure in the muted tone. One outcome vocabulary. */
+.total[data-variant="fitd-crit"] { color: #6FE0D5; }
+.total[data-variant="fitd-success"] { color: #3FB8AE; }
+.total[data-variant="fitd-partial"] { color: #C99A3C; }
+.total[data-variant="fitd-failure"] { color: var(--muted); }
 /* Oracle readings are prose, not a headline word — smaller, serif, wrapping. */
 .total[data-variant="oracle"] {
   color: var(--line);
@@ -2092,6 +2113,7 @@ body[data-torchlit] .breakdown {
 .mode-pbta { --sys: #D97A3C; }
 .mode-mist { --sys: #3F9FA0; }
 .mode-drawsteel { --sys: #E27B3F; }
+.mode-fitd { --sys: #3FC7BD; }
 .mode-crows { --sys: #98A08A; }
 .mode-shadowdark { --sys: #E39A2E; }
 .mode-mothership { --sys: #AEC93C; }

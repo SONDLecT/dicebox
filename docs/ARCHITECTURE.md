@@ -12,7 +12,7 @@ Everything is plain ES modules, no build step for the site itself.
 | --- | --- |
 | `app.js` | The application: UI wiring, pickers, tray orchestration, mode switching, sharing fan-out. Big by design — it is the integration layer — but it must contain no logic another surface needs. |
 | `dice.js` | The numeric engine: notation parse, fair rolls, describe. |
-| `system-dice.js` | Every game system's parse/roll/summarize/format, pure functions on data. No DOM, no state. |
+| `system-dice.js` | Every game system's parse/roll/summarize/format, pure functions on data. No DOM, no state. Some engines are shared across systems as generic cores with per-skin tables: the 2d6 core skins PbtA and the Mist Engine; the read-highest-d6 core (`summarizeForged`) skins Forged in the Dark, with a `crit6` seam and a labels table left open for Candela Obscura's gilded-die path. |
 | `render.js` | The canvas: `Die`, `Surface`, glyph drawing, physics-as-presentation. System-agnostic — it paints what fields on a die tell it to paint. |
 | `tray-faces.js` | How a rolled die looks: per-system colours and face stamps. The single source for the tray, the toast, and any future surface. |
 | `result-text.js` | What a roll says: headline/detail dispatch. Single source for the readout, history, rooms, toast. |

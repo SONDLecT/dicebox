@@ -16,6 +16,7 @@ import {
   bladeRunnerHeadline, describeBladeRunner, twilightHeadline, describeTwilight,
   starWarsHeadline, describeStarWars, oneRingHeadline, describeOneRing,
   twod6Headline, describe2d6, drawSteelHeadline, describeDrawSteel,
+  forgedHeadline, describeForged,
   crowsHeadline, describeCrows,
   shadowdarkHeadline, describeShadowdark,
   mothershipHeadline, describeMothership,
@@ -37,6 +38,7 @@ export function formatHeadline(result) {
   if (result.system === 'onering') return oneRingHeadline(result);
   if (result.system === 'pbta' || result.system === 'mist') return twod6Headline(result);
   if (result.system === 'drawsteel') return drawSteelHeadline(result);
+  if (result.system === 'fitd') return forgedHeadline(result);
   if (result.system === 'crows') return crowsHeadline(result);
   if (result.system === 'shadowdark') return shadowdarkHeadline(result);
   if (result.system === 'mothership') return mothershipHeadline(result);
@@ -65,6 +67,7 @@ export function formatDetail(result) {
   if (result.system === 'onering') return describeOneRing(result);
   if (result.system === 'pbta' || result.system === 'mist') return describe2d6(result);
   if (result.system === 'drawsteel') return describeDrawSteel(result);
+  if (result.system === 'fitd') return describeForged(result);
   if (result.system === 'crows') return describeCrows(result);
   if (result.system === 'shadowdark') return describeShadowdark(result);
   if (result.system === 'mothership') return describeMothership(result);

@@ -52,6 +52,7 @@ const SYSTEM_EXPORTS = [
   'rollOneRing', 'describeOneRing', 'oneRingHeadline', 'parseOneRing',
   'rollPbta', 'rollMist', 'twod6Headline', 'describe2d6', 'parsePbta', 'parseMist',
   'rollDrawSteel', 'describeDrawSteel', 'drawSteelHeadline', 'parseDrawSteel',
+  'rollFitD', 'parseFitD', 'summarizeForged', 'forgedHeadline', 'describeForged',
   'rollCrows', 'rollCrowsUsage', 'describeCrows', 'crowsHeadline', 'parseCrows',
   'rollShadowdark', 'describeShadowdark', 'shadowdarkHeadline', 'parseShadowdark', 'torchRemaining', 'torchLabel',
   'mergeTorch', 'joinTorch',
@@ -85,7 +86,7 @@ const SYSTEM_THEME_EXPORTS = ['SYSTEM_THEMES'];
 const SHARED_DECK_EXPORTS = ['createSharedDecks'];
 const TRAY_FACES_EXPORTS = [
   'flattenRollDice', 'stampTrayDie',
-  'BAND_COLORS', 'FORCE_COLORS', 'TOR_COLORS', 'CT_COLORS', 'DH_COLORS',
+  'BAND_COLORS', 'FITD_COLORS', 'FORCE_COLORS', 'TOR_COLORS', 'CT_COLORS', 'DH_COLORS',
   'MS_COLORS', 'GEN_COLORS', 'YZ_COLORS', 'BR_COLORS', 'T2K_COLORS',
   'COC_COLORS', 'DG_COLORS', 'IRON_COLORS',
 ];

@@ -9,6 +9,13 @@ import { v5Face, fateFace } from './system-dice.js';
 // glows, a partial is cautionary amber, a miss goes muted. Legible on both trays.
 export const BAND_COLORS = { hit: '#57B591', partial: '#C99A3C', miss: '#9A7070' };
 
+// Forged in the Dark: only the READ die is coloured — a crit in bright
+// ghost-fire cyan, a full success in the electric Duskwall teal, a partial in
+// cautionary amber, a failure in cold smoke; the unread dice fade on their own
+// (kept:false). On a crit every 6 wears the crit colour so the pair stands
+// together. Legible on both trays.
+export const FITD_COLORS = { crit: '#7FE9DE', success: '#39C2B7', partial: '#C99A3C', failure: '#8A8088' };
+
 // The Force die's pips: Light side pale, Dark side a mystic violet (the pips are
 // black/white on the real die, but black is invisible on the dark tray).
 export const FORCE_COLORS = { lightside: '#DEE4EC', darkside: '#8267AE' };
@@ -115,6 +122,8 @@ export function flattenRollDice(result) {
         yzType: d.type,
         // Ironsworn: whether the action score beat this challenge die.
         beaten: d.beaten,
+        // Forged in the Dark: a 6 that forms part of a critical pair.
+        crit: d.crit,
       });
     }
   }
@@ -165,6 +174,12 @@ export function stampTrayDie(die, f, result) {
   }
   // PbtA / Mist: both d6s take the outcome-band colour of the whole roll.
   else if (result.system === 'pbta' || result.system === 'mist') die.genColor = BAND_COLORS[result.summary?.band];
+  // Forged in the Dark: colour only the read die (a crit's sixes each), so the
+  // die that decided it reads at a glance; the rest fade via kept:false.
+  else if (result.system === 'fitd') {
+    if (f.crit) die.genColor = FITD_COLORS.crit;
+    else if (f.kept) die.genColor = FITD_COLORS[result.summary?.result] || FITD_COLORS.failure;
+  }
   // Mothership: the kept dice tint by the resolved outcome (green pass / red
   // fail); a dropped adv/dis pair fades on its own via kept=false. With no
   // outcome yet (unresolved check), keep the percentile tens/ones tints.

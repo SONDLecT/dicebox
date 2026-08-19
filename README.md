@@ -25,7 +25,7 @@ With Dicebox you can:
   the picker (typed notation accepts sides up to d10000);
 - build rolls by tapping or typing standard notation, with advantage,
   disadvantage, keep/drop, exploding dice, and rerolls;
-- switch among **22 built-in game modes**, each with its own controls, dice,
+- switch among **23 built-in game modes**, each with its own controls, dice,
   result reading, colours, and short URL;
 - draw from **five card decks**, including the Woodcut playing cards and tarot,
   carte napoletane, Hanafuda, and Uta-garuta;
@@ -130,6 +130,7 @@ picker and the notation all change to match.
 | **Draw Steel** | `ds:+2e1` | the 2d10 power roll in three tiers, with edges and banes |
 | **Daggerheart** | `dh:+2@15` | the Hope and Fear duality dice |
 | **Fate / Fudge** | `4dF+2` | four +/blank/− dice and the ladder |
+| **Forged in the Dark** | `fitd:3` | a d6 pool read on the highest die — Blades in the Dark, with the desperate 2d6 keep-lowest |
 | **Genesys** | `gen:2A+1P+2D` | narrative dice with symbol cancellation |
 | **Ironsworn** | `iron:+2` | action and progress rolls, plus the Ironsworn/Delve oracle library |
 | **Mist Engine** | `mist:+1` | 2d6 + Power for City of Mist and Legend in the Mist |

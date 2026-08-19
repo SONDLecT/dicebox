@@ -23,7 +23,7 @@ import {
 } from '../room-crypto.js';
 import {
   rollV5, rollFate, rollGenesys, rollDaggerheart, rollCthulhuTech, rollStarWars,
-  rollOneRing, rollPbta, rollMist, rollDrawSteel, rollCrows, rollCrowsUsage,
+  rollOneRing, rollPbta, rollMist, rollDrawSteel, rollFitD, rollCrows, rollCrowsUsage,
   rollShadowdark, rollMothership, rollCallOfCthulhu, rollDeltaGreen,
   rollIronsworn, rollYearZero, rollBladeRunner, rollTwilight,
   pushYearZero, pushBladeRunner, pushTwilight,
@@ -673,6 +673,8 @@ const sampleSystemRoll = {
     'PbtA': rollPbta('pbta:+1'),
     'Mist': rollMist('mist:+0'),
     'Draw Steel': rollDrawSteel('ds:+2e1'),
+    'Forged in the Dark': rollFitD('fitd:3'),
+    'Forged in the Dark (desperate)': rollFitD('fitd:0'),
     'Crows': rollCrows('crows:+2'),
     'Crows usage': rollCrowsUsage('crows:u3'),
     'Shadowdark': rollShadowdark('sd:+3a@12'),

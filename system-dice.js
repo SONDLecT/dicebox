@@ -44,6 +44,7 @@ export function detectSystem(src) {
   if (/^pbta:/.test(s)) return 'pbta';
   if (/^mist:/.test(s)) return 'mist';
   if (/^ds:/.test(s)) return 'drawsteel';
+  if (/^fitd:/.test(s)) return 'fitd';
   if (/^crows:/.test(s)) return 'crows';
   if (/^sd:/.test(s)) return 'shadowdark';
   if (/^ms:/.test(s)) return 'mothership';
@@ -358,6 +359,7 @@ export function rollAny(src, uiSystem = 'numeric') {
   if (sys === 'pbta') return rollPbta(src);
   if (sys === 'mist') return rollMist(src);
   if (sys === 'drawsteel') return rollDrawSteel(src);
+  if (sys === 'fitd') return rollFitD(src);
   if (sys === 'crows') return rollCrows(src);
   if (sys === 'shadowdark') return rollShadowdark(src);
   if (sys === 'mothership') return rollMothership(src);
@@ -429,6 +431,103 @@ export function describe2d6(result) {
   let math = `${s.a} + ${s.b}`;
   if (s.modifier) math += ` ${s.modifier > 0 ? '+' : '−'} ${Math.abs(s.modifier)}`;
   parts.push(math, `total ${s.total}`);
+  return parts.join(' · ');
+}
+
+// ---- Forged in the Dark engine (read-highest d6 pool) ----
+//
+// The Blades in the Dark engine, and the whole game's one roll — action rolls,
+// fortune rolls, resistance, all of it. Build a pool of d6 and read the SINGLE
+// highest die: a 6 is a full Success, two or more 6s a Critical, a 4 or 5 a
+// Partial (success with a consequence), a 1-3 a Failure. There are NO numeric
+// modifiers — everything that helps in Blades (push, assist, a devil's
+// bargain, better position) adds DICE and everything that hurts removes them,
+// so the pool count is the entire input.
+//
+// The signature edge case: a pool of ZERO is the DESPERATE roll — throw 2d6
+// and read the LOWEST die on the same ladder. So a desperate double-6 is NOT a
+// critical and not even a full success unless BOTH dice are 6, because only
+// the one lowest die is read.
+//
+// Built as a skin over a generic core so Candela Obscura — a second Forged
+// skin with a gilded-die crit path and its own ladder labels — drops in beside
+// this by adding a row to each table, never touching the core. `crit6`, false
+// here, is the seam that skin flips.
+const FITD_REGEX = { fitd: /^fitd:(\d+)$/ };
+const FITD_LABELS = {
+  fitd: { crit: 'Critical', success: 'Success', partial: 'Partial', failure: 'Failure' },
+};
+// No hard cap in the book; a generous engine bound past any real table.
+const FITD_CAP = 10;
+
+function parseForged(src, system) {
+  const m = FITD_REGEX[system].exec(String(src || '').trim().toLowerCase());
+  if (!m) throw new Error(`Expected a ${system} roll like "${system}:3" (0 is the desperate roll)`);
+  const pool = Number(m[1]);
+  if (pool > FITD_CAP) throw new Error(`Pool must be 0 to ${FITD_CAP}`);
+  return { pool };
+}
+export function parseFitD(src) { return parseForged(src, 'fitd'); }
+
+// The read from a set of d6 rolls. `desperate` reads the lowest of the thrown
+// pair; everything else reads the highest. The result ladder is shared across
+// skins; `crit6` lets a skin add its own crit path (Candela's gilded die)
+// without the core assuming Blades' "two 6s" is the only way to crit.
+export function summarizeForged(rolls, { desperate, system = 'fitd', crit6 = false } = {}) {
+  const sixes = rolls.filter(v => v === 6).length;
+  const read = desperate ? Math.min(...rolls) : Math.max(...rolls);
+  // A critical needs two 6s AND a real pool — the desperate low read never
+  // crits, however many 6s the unlucky pair shows, because only the lowest
+  // die is read.
+  const critical = !desperate && (sixes >= 2 || crit6);
+  const result = critical ? 'crit'
+    : read === 6 ? 'success'
+    : read >= 4 ? 'partial'
+    : 'failure';
+  // Which dice "stand" on the tray (kept:true, unfaded): on a crit every 6
+  // stands; otherwise the single die that decided it — the first max, or for
+  // the desperate low read the first minimum.
+  const readIdx = result === 'crit'
+    ? rolls.map((v, i) => (v === 6 ? i : -1)).filter(i => i >= 0)
+    : [rolls.indexOf(read)];
+  return { kind: system, rolls: [...rolls], desperate, sixes, read, result, readIdx };
+}
+
+function rollForged(src, system, parse) {
+  const { pool } = parse(src);
+  const desperate = pool === 0;
+  const n = desperate ? 2 : pool;
+  const rolls = Array.from({ length: n }, () => randInt(6));
+  const summary = summarizeForged(rolls, { desperate, system });
+  const keep = new Set(summary.readIdx);
+  const dice = rolls.map((v, i) => ({
+    value: v, sides: 6, kept: keep.has(i), rerolled: false, exploded: false,
+    // The crit sixes carry a flag so the tray can mark the pair distinctly.
+    crit: summary.result === 'crit' && v === 6,
+  }));
+  return {
+    schema: 2,
+    system,
+    notation: String(src),
+    groups: [{ kind: 'dice', dieType: system, sides: 6, count: n, dice, subtotal: summary.read }],
+    summary,
+  };
+}
+export function rollFitD(src) { return rollForged(src, 'fitd', parseFitD); }
+
+// The read die's band is the answer — one word, tinted by its variant.
+export function forgedHeadline(result) {
+  const s = result.summary;
+  return { kind: 'text', text: FITD_LABELS[s.kind][s.result], variant: `fitd-${s.result}` };
+}
+
+export function describeForged(result) {
+  const s = result.summary;
+  const parts = [FITD_LABELS[s.kind][s.result]];
+  parts.push(`${s.rolls.length}d6 ${s.rolls.join(', ')}`);
+  // Name the read die, and flag the desperate low read as the signature it is.
+  parts.push(s.desperate ? `desperate — kept lowest ${s.read}` : `highest ${s.read}`);
+  if (s.result === 'crit') parts.push(`${s.sixes} sixes`);
   return parts.join(' · ');
 }
 

@@ -64,6 +64,20 @@ export const SYSTEM_THEMES = {
       '--hair': '#D0DAD3', '--accent': '#2E7358', '--danger': '#8C3A2E',
     },
   },
+  // Forged in the Dark — Duskwall: coal-smoke industrial gothic lit by the
+  // spectral electric-teal of the ghost field. A cold near-black ground under
+  // ghost-fire cyan; light is soot-washed slate and aged paper under a deep
+  // ghostlight teal.
+  fitd: {
+    dark: {
+      '--paper': '#080C0D', '--face': '#111819', '--line': '#DEE9E9', '--muted': '#728F8C',
+      '--hair': '#1A2626', '--accent': '#3FC7BD', '--danger': '#D2685F',
+    },
+    light: {
+      '--paper': '#DCE5E4', '--face': '#E8EFEE', '--line': '#101C1B', '--muted': '#4F625F',
+      '--hair': '#C2D0CE', '--accent': '#095349', '--danger': '#9E3529',
+    },
+  },
   // Year Zero Engine — a muted survival olive on gunmetal, broad enough for the
   // family (Mutant, Forbidden Lands, Vaesen, Coriolis). The dice carry their
   // Base/Skill/Gear colours (below); the chrome stays neutral with an olive readout.

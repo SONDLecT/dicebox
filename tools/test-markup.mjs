@@ -138,6 +138,18 @@ if (sdTheme) for (const block of sdTheme.slice(1)) {
 }
 ok('Shadowdark small text meets WCAG AA contrast in both themes', sdContrastPass);
 
+// Forged in the Dark's Duskwall teal is a cold accent that reads bright on
+// soot and must not sink on the pale slate scheme — same AA bar as the rest.
+const fitdTheme = /fitd:\s*\{\s*dark:\s*\{([^}]*)\},\s*light:\s*\{([^}]*)\}/.exec(themesJs);
+let fitdContrastPass = !!fitdTheme;
+if (fitdTheme) for (const block of fitdTheme.slice(1)) {
+  const paper = themeColor(block, 'paper'), face = themeColor(block, 'face');
+  const muted = themeColor(block, 'muted'), accent = themeColor(block, 'accent');
+  fitdContrastPass &&= [paper, face].every(bg => contrast(muted, bg) >= 4.5);
+  fitdContrastPass &&= [paper, face].every(bg => contrast(accent, mix(accent, bg)) >= 4.5);
+}
+ok('Forged in the Dark small text meets WCAG AA contrast in both themes', fitdContrastPass);
+
 // The torch on the tray is wiring that crosses the draw loop, the hit test
 // and the idle cache, and a miss in any one of the three has no error — the
 // torch just quietly stops burning, stops answering taps, or freezes. So
@@ -383,7 +395,7 @@ ok('Mothership numeric rail is limited to rules dice plus d-question',
   const order = [...pop.matchAll(/data-system="([a-z0-9]+)"/g)].map(m => m[1]);
   ok('picker is a popover: Dicebox pinned first, then systems alphabetical by label',
      /class="mode-pop"/.test(pop) &&
-     order.join(',') === 'numeric,alien,bladerunner,callofcthulhu,crows,cthulhutech,dcc,drawsteel,deltagreen,daggerheart,fate,genesys,ironsworn,mist,mothership,pbta,shadowdark,starforged,starwars,twilight,onering,v5,yearzero,cards,tarot,napoletane,hanafuda,utagaruta' &&
+     order.join(',') === 'numeric,alien,bladerunner,callofcthulhu,crows,cthulhutech,dcc,drawsteel,deltagreen,daggerheart,fate,fitd,genesys,ironsworn,mist,mothership,pbta,shadowdark,starforged,starwars,twilight,onering,v5,yearzero,cards,tarot,napoletane,hanafuda,utagaruta' &&
      /class="mode-row mode-row-pinned" data-system="numeric"[^]*?>Dicebox</.test(pop));
   // The header toggle is the only always-visible statement of which system
   // is active, and a missing rule fails silently — the button just goes

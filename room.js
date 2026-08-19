@@ -197,7 +197,7 @@ export function validateRoll(msg) {
 // 'yearzero', Starforged as 'ironsworn'. Miss one and every roll from that mode
 // is silently dropped at the receiver.
 const SYSTEM_ROLL_KINDS = new Set([
-  'v5', 'fate', 'genesys', 'daggerheart', 'cthulhutech', 'starwars', 'onering', 'pbta', 'mist', 'drawsteel', 'crows', 'shadowdark', 'mothership', 'coc', 'deltagreen', 'ironsworn', 'oracle', 'yearzero', 'bladerunner', 'twilight', 'cards', 'tarot', 'napoletane', 'hanafuda', 'utagaruta',
+  'v5', 'fate', 'genesys', 'daggerheart', 'cthulhutech', 'starwars', 'onering', 'pbta', 'mist', 'drawsteel', 'fitd', 'crows', 'shadowdark', 'mothership', 'coc', 'deltagreen', 'ironsworn', 'oracle', 'yearzero', 'bladerunner', 'twilight', 'cards', 'tarot', 'napoletane', 'hanafuda', 'utagaruta',
 ]);
 
 export function validateSystemRoll(msg) {
