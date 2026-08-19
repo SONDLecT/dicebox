@@ -236,6 +236,15 @@ ok('tap-vs-scrub is a slop plus a time window, not a latch',
 ok('the CT pool and the Twilight magazine scrub their counts in place',
    /bindScrubDial\(ctAddDie, \{[\s\S]{0,300}tap: \(\) => \{ ct\.dice = Math\.min\(100, ct\.dice \+ 1\); syncCt\(\); \}/.test(js) &&
    /bindScrubDial\(\$\('t2k-ammo'\), \{[\s\S]{0,300}tap: \(\) => stepT2kAmmo\(1\)/.test(js));
+// The ratified-pattern rollout: Crows' usage die joins the cap-20 action
+// barrels (tap adds one, scrub sets the pool), and V5 Hunger rides the
+// plain value barrel like Stress — tap raises, scrub sets, hold retired.
+ok('the Crows usage die is an action barrel',
+   /bindScrubDial\(crowsUsageBtn, \{[\s\S]{0,300}tap: \(\) => \{ crows\.usage = Math\.min\(20, crows\.usage \+ 1\); syncCrows\(\); \}/.test(js) &&
+   !/bindTapHold\(crowsUsageBtn/.test(js));
+ok('V5 Hunger is a value barrel',
+   /bindScrubDial\(v5HungerChip, \{[\s\S]{0,200}set: v => \{ v5\.rouse = false; setHunger\(v\); \}[\s\S]{0,60}min: 0, max: 5/.test(js) &&
+   !/bindTapHold\(v5HungerChip/.test(js));
 // The Blood Surge button is its own barrel: scrubbing sets the size, only
 // a clean tap surges (the shared 6px tap budget is the gate), and a tap
 // with no size set arms the default instead of spending blood on a guess.

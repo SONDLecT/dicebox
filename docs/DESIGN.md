@@ -119,33 +119,29 @@ A system may add controls; it may never change what these four do.
   cap (Hunger 0-5, Stress's floor of 2). A pool the rules leave uncapped gets
   only an engine sanity bound, far past table reality — and counts always
   clamp at their bounds, never roll over.
-- **Numbers ride the barrel, and unset is the default.** A non-dice number
-  (Difficulty, Target, a modifier, a tracked status, cards per draw) is
-  never a bare input: its chip is a scrub dial — tap for +1, drag or wheel
-  to turn a wireframe rotary drum whose neighbouring values curve over the
-  tangents as they roll through the window. Dragging the drum's face down
-  increments: the higher values hang above the window and the gesture
-  turns the object. Huge ranges (a d100 skill or target) ride the barrel
-  too, with one added door: tapping the value opens inline typed entry —
-  the numeric keyboard raised, Enter or blur committing clamped, Escape
-  cancelling, an emptied field returning an unset-capable chip to "—" —
-  because +1 across a hundred-step line is a gesture nobody meant. One
-  exception by kind: a wrapping cycle of named states (a four-tier skill,
-  even/advantage/disadvantage) keeps tap/hold — a barrel does not wrap,
-  and the wrap is the point. A button whose tap is an ACTION may still be
-  a barrel for its own number (Blood Surge: scrub sets the size, tap
-  spends it — and a first tap with no size set arms the default without
-  acting, never spending on a guess — and the custom d? die: scrubbing it
-  previews the size on its own label, and only a tap mints the previewed
-  die or opens typed entry, so a stray notch can never create a die). The
-  popup number dial is gone entirely; the barrel with its typing door is
-  every number surface the app has. Dice buttons are not numbers and keep
-  their own grammar (tap adds, hold removes; large counts scrub on the
-  button, per the picker rule above). Where the number is a resolution
-  target the table may judge, the control defaults to unset — it reads
-  "—", the roll reports raw facts, scrubbing below minimum falls off into
-  "—", and the first step back in lands on the system's default value,
-  never the minimum.
+- **Numbers ride the barrel, and unset is the default.** Every number is a
+  scrub dial — drag or wheel turns a wireframe rotary drum whose
+  neighbouring values curve over the tangents as they roll through the
+  window; dragging the drum's face down increments, because the higher
+  values hang above the window and the gesture turns the object. The
+  pattern, canonical and two sentences long: **a VALUE chip's tap edits
+  the number — +1 on a small range, inline typed entry on a huge one (a
+  d100 skill, dice per tap), where Enter or blur commits clamped, Escape
+  cancels, and an emptied field returns an unset-capable chip to "—". An
+  ACTION chip always displays a concrete value, its tap performs the
+  action at that value (the custom die spawns one, a pool button adds
+  one, Blood Surge spends), and its typed entry lives behind a long-press
+  whose commit sets the value and acts.** One exception by kind: a
+  wrapping cycle of named states (a four-tier skill,
+  even/advantage/disadvantage, a die-size chain) keeps tap/hold — a
+  barrel does not wrap, and the wrap is the point. Small dice adders
+  whose realistic counts stay within tapping distance (a rating of 1-5, a
+  V5 pool in the low teens) keep tap-adds/hold-removes. The popup number
+  dial is gone entirely. Where the number is a resolution target the
+  table may judge, the control defaults to unset — it reads "—", the roll
+  reports raw facts, scrubbing below minimum falls off into "—", and the
+  first step back in lands on the system's default value, never the
+  minimum.
 - **Buttons stage; the player rolls.** A control that assembles or selects a
   roll puts it on the tray — a pool button adds dice, a named-roll tile
   (Duality, Action, an oracle ask, Check/Save) selects and stages its roll —

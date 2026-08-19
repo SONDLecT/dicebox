@@ -1396,7 +1396,15 @@ bindTapHold(v5PoolFace, dir => v5StepPool(dir));
 // joins the pool), hold to lower. It is standing state, so nothing about building
 // the pool moves it — only this and a Rouse check do. Touching it also leaves any
 // staged Rouse, since you are back to building the action pool.
-bindTapHold(v5HungerChip, dir => { v5.rouse = false; setHunger(v5.hunger + dir); });
+// Hunger rides the barrel like every tracked stat (Stress's precedent):
+// tap raises one, scrub or wheel sets it outright, hold retires. Touching
+// it is pool business, so the transient Rouse staging stands down first,
+// exactly as the tap always did.
+bindScrubDial(v5HungerChip, {
+  get: () => v5.hunger,
+  set: v => { v5.rouse = false; setHunger(v); },
+  min: 0, max: 5,
+});
 
 // Difficulty opens the tactile roller, the one number-picker every system
 // shares, with a "Table sets it" release back to unset — the same control as
@@ -3038,7 +3046,16 @@ bindScrubDial($('crowsModChip'), {
 });
 // Tap adds a usage die, hold removes one — an item's pool stays within tapping
 // distance, so the small-pool gesture applies, not the rotary dial.
-bindTapHold(crowsUsageBtn, dir => { crows.usage = Math.max(0, Math.min(20, crows.usage + dir)); syncCrows(); });
+// The usage die is an action barrel in the CT-pool/Twilight-magazine
+// class (a cap-20 pool button): tap adds one d6 to the item's pool as
+// ever, scrub or wheel sets the whole pool in one gesture. No typing —
+// a magazine this small never needs a keyboard.
+bindScrubDial(crowsUsageBtn, {
+  get: () => crows.usage,
+  set: v => { crows.usage = v; syncCrows(); },
+  min: 0, max: 20,
+  tap: () => { crows.usage = Math.min(20, crows.usage + 1); syncCrows(); },
+});
 // The way BACK to the power roll: tapping the usage d6 flips the tray to an
 // item's pool, and this button flips it home — select-and-stage, the Rouse
 // flip-back made explicit. It never rolls; Roll and the tray do the throwing.
