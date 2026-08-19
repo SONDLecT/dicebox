@@ -306,6 +306,53 @@ machine no more than a friend's copy of Dicebox does: it rolls and announces
 under your name, whether or not your own client is open. That is the whole
 mechanism — there is no remote-control channel and no authority to elect.
 
+### Worked example
+
+The whole publisher, using the shipped modules and nothing else:
+
+```js
+import { createRoom } from './room.js';
+import { rollAny } from './system-dice.js';
+import { roll as rollNumeric } from './dice.js';
+
+// rollAny handles every system mode; numeric notation comes back `deferred`,
+// finished by the plain-dice engine. Either path yields { system, notation,
+// groups, summary } — exactly what share() puts on the wire.
+const rollForRoom = n => {
+  const r = rollAny(n);
+  return r.deferred ? rollNumeric(n) : r;
+};
+
+const room = createRoom({ url: 'wss://relay.dicebox.cc', name: 'Kira' });
+await room.join('acid-baker-lunar-otter-viper');   // the room passphrase
+
+const result = rollForRoom('v5:6h2');
+result.rollId = 'sheet-42';                         // stable id → two-transport dedupe
+room.share(result);                                 // announced to the table as Kira
+```
+
+A runnable version is in [`examples/room-publisher.mjs`](../examples/room-publisher.mjs).
+
+### The stable surface
+
+These exports are what this contract promises to hold still. Vendor the four
+files as a set — they are dependency-free ES modules with no DOM or app coupling.
+(An npm distribution may follow if there's demand; until then, these files are the
+package.)
+
+- [`room.js`](../room.js) — `createRoom(options)` → a room with `join(passphrase)`,
+  `share(result)`, `leave()`, `setName(name)`, `shareTorch(torch)`, and presence
+  getters. `createRoom` takes `WebSocketImpl` / `now` / timer injectables so it
+  runs under test and outside a browser.
+- [`system-dice.js`](../system-dice.js) — `rollAny(notation)` → a room-ready
+  result, or `{ deferred: true }` for numeric notation.
+- [`dice.js`](../dice.js) — `roll(notation)` → a numeric result; `parseNotation`
+  for validating input before rolling.
+- [`room-crypto.js`](../room-crypto.js) — `deriveRoom`, `generatePassphrase`,
+  `normalizePassphrase`, `PROTOCOL_VERSION`, for lower-level use. `createRoom`
+  already calls `deriveRoom` inside `join`, so a publisher rarely touches this
+  directly.
+
 ## What you could build on this
 
 Two families, split by which capability they need — and the split is the whole
