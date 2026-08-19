@@ -101,8 +101,10 @@ transport here proves a roll came from an unmodified client. Broadcast
 payloads are readable by any extension that deliberately listens on the known
 channel — that is the deal the VTT mode makes, and it is disclosed in the
 app's share menu. Dicebox's end-to-end encrypted passphrase rooms are a
-separate transport with a separate trust boundary; see the
-[main README](../README.md#rooms).
+separate transport with a separate trust boundary — a peer-to-peer broadcast
+rather than this request/response bridge, and one an app can also build on. It
+has its own contract in [the room API](../docs/room-api.md); the
+[main README](../README.md#rooms) covers the user-facing side.
 
 ## Delivery semantics
 

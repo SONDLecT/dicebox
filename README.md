@@ -314,6 +314,13 @@ deliberate, and covered under [Running your own relay](#running-your-own-relay).
 Nothing above applies until someone opens the Share panel. With no relay
 configured the app is a local dice roller and the room code never runs.
 
+The same encrypted feed a room shares between screens is a surface other apps can
+build on — a character sheet that rolls as you, a stream overlay, a chat bridge.
+The read-and-publish contract is documented in
+[the room API](docs/room-api.md). It sits alongside the
+[Owlbear bridge](owlbear/API.md), which is a separate, request/response transport
+for extensions running inside Owlbear Rodeo.
+
 ### Running your own relay
 
 The relay is a small WebSocket server that forwards encrypted messages between
